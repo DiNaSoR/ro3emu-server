@@ -1,0 +1,92 @@
+syntax = "proto2";
+package phonest.proto;
+
+message MsMetadata {
+  optional string service = 1;
+  optional string hint = 2;
+  optional string callback = 3;
+}
+
+message RequestInfo {
+  optional bytes header = 1;
+  optional string remote_ip = 2;
+}
+
+message MsRequest {
+  optional uint64 rid = 1;
+  required string service = 2;
+  required string method = 3;
+  optional bytes params = 4;
+  optional string callerId = 5;
+  optional bytes context = 7;
+  optional bytes options = 8;
+  optional phonest.proto.MsMetadata metadata = 9;
+  optional int32 gate_retried = 10;
+  optional phonest.proto.RequestInfo request_info = 11;
+}
+
+message MsResponse {
+  optional uint64 rid = 1;
+  required bytes params = 2;
+  optional bytes context = 3;
+  optional string service_id = 4;
+  optional phonest.proto.MsMetadata metadata = 5;
+}
+
+message MsPush {
+  optional string org_type = 1 [default = "ENTITY"];
+  repeated string ep_ids = 2;
+  optional string msg_uuid = 3;
+  required string service = 4;
+  required string method = 5;
+  optional bytes params = 6;
+  optional string server_id = 7;
+  optional bool to_client = 8;
+}
+
+message MsRegistration {
+  required string process_id = 1;
+  required string process_type = 2;
+  required string process_name = 3;
+  required string route_strategy = 4;
+  optional bytes metadata = 5;
+}
+
+message MsRegistrationAck {
+  optional string address = 1;
+  optional bytes metadata = 2;
+}
+
+message MsDeregistration {
+  optional string reason = 1;
+  optional bytes metadata = 2;
+  optional string process_name = 3;
+}
+
+message MsDeregistrationAck {
+  optional string address = 1;
+  optional bytes metadata = 2;
+}
+
+message StatefulMsg {
+  optional string from = 1;
+  optional string to = 2;
+  optional string service = 3;
+  optional bytes params = 4;
+  optional bytes context = 5;
+}
+
+message EnumMicroProtocol {
+  enum Type {
+    MicroRequest = 33;
+    MicroResponse = 34;
+    MicroPush = 35;
+    MicroRegister = 36;
+    MicroDeregister = 37;
+    MicroStatefulMsg = 39;
+    MicroRegisterAck = 40;
+    MicroDeregisterAck = 41;
+  }
+
+}
+

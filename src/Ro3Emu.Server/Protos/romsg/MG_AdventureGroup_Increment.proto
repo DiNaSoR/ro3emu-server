@@ -1,0 +1,309 @@
+syntax = "proto3";
+package romsg;
+import "APIError.proto";
+import "client2service.proto";
+import "FieldOption.proto";
+import "GM_Chat.proto";
+import "MG_Achievement.proto";
+import "MG_Activity.proto";
+import "MG_Adventure.proto";
+import "MG_AdventureGroup.proto";
+import "MG_AFK.proto";
+import "MG_AreaConcur.proto";
+import "MG_Auction.proto";
+import "MG_Barroom.proto";
+import "MG_Base.proto";
+import "MG_BaseMgr.proto";
+import "MG_BlueDbg.proto";
+import "MG_BroadCast.proto";
+import "MG_Card.proto";
+import "MG_CareerSpecial.proto";
+import "MG_Cell.proto";
+import "MG_CellMgr.proto";
+import "MG_Chat.proto";
+import "MG_Chicken.proto";
+import "MG_Common.proto";
+import "MG_DB.proto";
+import "MG_Define.proto";
+import "MG_DragonIsland.proto";
+import "MG_Dungeon.proto";
+import "MG_Emblem.proto";
+import "MG_EmojiPlay.proto";
+import "MG_Entity.proto";
+import "MG_Equipment.proto";
+import "MG_FirstHeart.proto";
+import "MG_FlyingDragon.proto";
+import "MG_Friend.proto";
+import "MG_Function.proto";
+import "MG_Gateway.proto";
+import "MG_Genre.proto";
+import "MG_GlobalCache.proto";
+import "MG_Guide.proto";
+import "MG_Guild.proto";
+import "MG_GuildBlackMarket.proto";
+import "MG_GuildCampFire.proto";
+import "MG_GuildDraculaWedding_Init.proto";
+import "MG_GuildDraculaWedding.proto";
+import "MG_GuildLeague.proto";
+import "MG_GuildVoiceChannel.proto";
+import "MG_HeroicSpirit.proto";
+import "MG_HiddenTreasure.proto";
+import "MG_IDIP.proto";
+import "MG_IDIPSerialNumber.proto";
+import "MG_Interact.proto";
+import "MG_LeaderBoardClient.proto";
+import "MG_Library.proto";
+import "MG_Lifejob.proto";
+import "MG_Login.proto";
+import "MG_Lottery.proto";
+import "MG_Mail.proto";
+import "MG_MapData.proto";
+import "MG_Match.proto";
+import "MG_Mount.proto";
+import "MG_Mover.proto";
+import "MG_MultiDungeon.proto";
+import "MG_MVP.proto";
+import "MG_NewActivity.proto";
+import "MG_Pack.proto";
+import "MG_Paragon.proto";
+import "MG_Pay.proto";
+import "MG_Personal.proto";
+import "MG_Pet.proto";
+import "MG_Player.proto";
+import "MG_PlayerOfflineMessage.proto";
+import "MG_PlayMethod.proto";
+import "MG_PlotActing.proto";
+import "MG_PublicChat.proto";
+import "MG_PublicServer.proto";
+import "MG_RainbowKoi_Init.proto";
+import "MG_Relationship.proto";
+import "MG_Scene.proto";
+import "MG_SceneStream.proto";
+import "MG_Season_Increment.proto";
+import "MG_Season.proto";
+import "MG_SeasonPage.proto";
+import "MG_SeasonRefine.proto";
+import "MG_SeasonTalent.proto";
+import "MG_ServerClientMsg.proto";
+import "MG_Setting.proto";
+import "MG_Shop.proto";
+import "MG_Siege.proto";
+import "MG_Skill.proto";
+import "MG_SkillGrowth.proto";
+import "MG_SocialOutfit.proto";
+import "MG_SpecialEffect.proto";
+import "MG_StageRewards.proto";
+import "MG_Stalls.proto";
+import "MG_State.proto";
+import "MG_Statistics.proto";
+import "MG_StorageHole.proto";
+import "MG_Task.proto";
+import "MG_Team.proto";
+import "MG_TerritoryAuction.proto";
+import "MG_TerritoryWars.proto";
+import "MG_ThreeDay.proto";
+import "MG_Title.proto";
+import "MG_Totem.proto";
+import "MG_TradeCenter.proto";
+import "MG_TradeMarket.proto";
+import "MG_Training.proto";
+import "MG_TransAction.proto";
+import "MG_TypeWriter.proto";
+import "MG_WardRobe.proto";
+import "MG_WorldExploration.proto";
+import "MG_Zone.proto";
+
+message AdventureGroupBaseInfoIncrement {
+  message labelRepeatedOrigin {
+    repeated int32 value = 1;
+  }
+
+  message labelRepeatedIncrement {
+    repeated int32 value = 1;
+  }
+
+  message labelFieldIncrement {
+    oneof value {
+      romsg.AdventureGroupBaseInfoIncrement.labelRepeatedOrigin all = 1;
+      romsg.AdventureGroupBaseInfoIncrement.labelRepeatedIncrement inc = 2;
+    }
+  }
+
+  message saplingDataFieldIncrement {
+    oneof value {
+      romsg.SaplingData all = 1;
+      romsg.SaplingDataIncrement inc = 2;
+    }
+  }
+
+  message resourceDataFieldIncrement {
+    oneof value {
+      romsg.Resource all = 1;
+      romsg.ResourceIncrement inc = 2;
+    }
+  }
+
+  message conveneDataFieldIncrement {
+    oneof value {
+      romsg.ConveneData all = 1;
+      romsg.ConveneDataIncrement inc = 2;
+    }
+  }
+
+  message availablebackgroundRepeatedOrigin {
+    repeated int32 value = 1;
+  }
+
+  message availablebackgroundRepeatedIncrement {
+    repeated int32 value = 1;
+  }
+
+  message availablebackgroundFieldIncrement {
+    oneof value {
+      romsg.AdventureGroupBaseInfoIncrement.availablebackgroundRepeatedOrigin all = 1;
+      romsg.AdventureGroupBaseInfoIncrement.availablebackgroundRepeatedIncrement inc = 2;
+    }
+  }
+
+  message seasonStateFieldIncrement {
+    oneof value {
+      romsg.SeasonState all = 1;
+      romsg.SeasonStateIncrement inc = 2;
+    }
+  }
+
+  optional string name = 10;
+  optional int32 level = 20;
+  optional string announce = 30;
+  optional int32 createTime = 40;
+  optional int32 status = 50;
+  romsg.AdventureGroupBaseInfoIncrement.labelFieldIncrement label = 60;
+  optional bool autoAgreeHelperApply = 70;
+  optional int32 background = 80;
+  optional int64 owner = 90;
+  optional bool autoAgreeApply = 100;
+  optional int32 recruitTime = 110;
+  optional int32 changeOwnerTime = 120;
+  optional string chatGroupid = 130;
+  optional bool canSeeMemberAnnounce = 140;
+  optional romsg.AdventureGroupCreateType createType = 150;
+  romsg.AdventureGroupBaseInfoIncrement.saplingDataFieldIncrement saplingData = 160;
+  romsg.AdventureGroupBaseInfoIncrement.resourceDataFieldIncrement resourceData = 170;
+  optional int32 weekResetTime = 180;
+  optional int32 dayResetTime = 190;
+  romsg.AdventureGroupBaseInfoIncrement.conveneDataFieldIncrement conveneData = 200;
+  romsg.AdventureGroupBaseInfoIncrement.availablebackgroundFieldIncrement availablebackground = 210;
+  romsg.AdventureGroupBaseInfoIncrement.seasonStateFieldIncrement seasonState = 220;
+  optional int32 lastUpdateTime = 230;
+}
+
+message ConveneDataIncrement {
+  optional int32 useTime = 10;
+  optional int32 lastConveneTime = 20;
+}
+
+message DBAdventureGroupDataIncrement {
+  message baseDataFieldIncrement {
+    oneof value {
+      romsg.AdventureGroupBaseInfo all = 1;
+      romsg.AdventureGroupBaseInfoIncrement inc = 2;
+    }
+  }
+
+  message memberDataRepeatedOrigin {
+    repeated romsg.PlayerBaseInfo value = 1;
+  }
+
+  message memberDataRepeatedIncrement {
+    repeated romsg.PlayerBaseInfoIncrement value = 1;
+  }
+
+  message memberDataFieldIncrement {
+    oneof value {
+      romsg.DBAdventureGroupDataIncrement.memberDataRepeatedOrigin all = 1;
+      romsg.DBAdventureGroupDataIncrement.memberDataRepeatedIncrement inc = 2;
+    }
+  }
+
+  message applyDataRepeatedOrigin {
+    repeated romsg.PlayerBaseInfo value = 1;
+  }
+
+  message applyDataRepeatedIncrement {
+    repeated romsg.PlayerBaseInfoIncrement value = 1;
+  }
+
+  message applyDataFieldIncrement {
+    oneof value {
+      romsg.DBAdventureGroupDataIncrement.applyDataRepeatedOrigin all = 1;
+      romsg.DBAdventureGroupDataIncrement.applyDataRepeatedIncrement inc = 2;
+    }
+  }
+
+  message eventDataRepeatedOrigin {
+    repeated romsg.EventData value = 1;
+  }
+
+  message eventDataRepeatedIncrement {
+    repeated romsg.EventDataIncrement value = 1;
+  }
+
+  message eventDataFieldIncrement {
+    oneof value {
+      romsg.DBAdventureGroupDataIncrement.eventDataRepeatedOrigin all = 1;
+      romsg.DBAdventureGroupDataIncrement.eventDataRepeatedIncrement inc = 2;
+    }
+  }
+
+  optional int64 uuid = 10;
+  optional int32 bornAreaId = 20;
+  romsg.DBAdventureGroupDataIncrement.baseDataFieldIncrement baseData = 30;
+  romsg.DBAdventureGroupDataIncrement.memberDataFieldIncrement memberData = 40;
+  romsg.DBAdventureGroupDataIncrement.applyDataFieldIncrement applyData = 50;
+  romsg.DBAdventureGroupDataIncrement.eventDataFieldIncrement eventData = 70;
+}
+
+message DeclarationInfoIncrement {
+  optional string content = 10;
+  optional romsg.DeclarationType declarationType = 20;
+  optional bytes voice = 30;
+  optional int32 voiceDuration = 40;
+}
+
+message EventDataIncrement {
+  optional romsg.AdventureGroupEventType eventType = 10;
+  optional int32 eventTime = 20;
+  optional int64 eventFirstParam = 30;
+  optional int64 eventSecondParam = 40;
+  optional string eventThirdParam = 50;
+}
+
+message PlayerBaseInfoIncrement {
+  message declarationDataFieldIncrement {
+    oneof value {
+      romsg.DeclarationInfo all = 1;
+      romsg.DeclarationInfoIncrement inc = 2;
+    }
+  }
+
+  optional int64 playerID = 10;
+  optional int32 enterTime = 20;
+  optional int32 bornAreaId = 30;
+  optional int32 offTime = 40;
+  optional string nickname = 50;
+  romsg.PlayerBaseInfoIncrement.declarationDataFieldIncrement declarationData = 60;
+  optional int32 wateringCount = 70;
+  optional string userName = 80;
+}
+
+message ResourceIncrement {
+  optional int64 adventGroupMoney = 10;
+  optional int32 weekMoney = 20;
+}
+
+message SaplingDataIncrement {
+  optional int32 saplingId = 10;
+  optional int32 wateringCount = 20;
+  optional int32 upvoteCount = 30;
+}
+

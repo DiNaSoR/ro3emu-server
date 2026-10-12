@@ -1,0 +1,892 @@
+syntax = "proto3";
+package romsg;
+import "APIError.proto";
+import "client2service.proto";
+import "FieldOption.proto";
+import "GM_Chat.proto";
+import "MG_Achievement.proto";
+import "MG_Activity_Increment.proto";
+import "MG_Activity.proto";
+import "MG_Adventure.proto";
+import "MG_AdventureGroup.proto";
+import "MG_AFK.proto";
+import "MG_AreaConcur.proto";
+import "MG_Auction.proto";
+import "MG_Barroom.proto";
+import "MG_Base.proto";
+import "MG_BaseMgr.proto";
+import "MG_BlueDbg.proto";
+import "MG_BroadCast.proto";
+import "MG_Card.proto";
+import "MG_CareerSpecial.proto";
+import "MG_Cell.proto";
+import "MG_CellMgr.proto";
+import "MG_Chat.proto";
+import "MG_Chicken.proto";
+import "MG_Common_Increment.proto";
+import "MG_Common.proto";
+import "MG_DB.proto";
+import "MG_Define.proto";
+import "MG_DragonIsland.proto";
+import "MG_Dungeon.proto";
+import "MG_Emblem.proto";
+import "MG_EmojiPlay.proto";
+import "MG_Entity.proto";
+import "MG_Equipment.proto";
+import "MG_FirstHeart.proto";
+import "MG_FlyingDragon.proto";
+import "MG_Friend.proto";
+import "MG_Function.proto";
+import "MG_Gateway.proto";
+import "MG_Genre.proto";
+import "MG_GlobalCache.proto";
+import "MG_Guide.proto";
+import "MG_Guild.proto";
+import "MG_GuildBlackMarket.proto";
+import "MG_GuildCampFire.proto";
+import "MG_GuildDraculaWedding_Init.proto";
+import "MG_GuildDraculaWedding.proto";
+import "MG_GuildLeague.proto";
+import "MG_GuildVoiceChannel.proto";
+import "MG_HeroicSpirit.proto";
+import "MG_HiddenTreasure.proto";
+import "MG_IDIP.proto";
+import "MG_IDIPSerialNumber.proto";
+import "MG_Interact.proto";
+import "MG_LeaderBoardClient.proto";
+import "MG_Library.proto";
+import "MG_Lifejob.proto";
+import "MG_Login.proto";
+import "MG_Lottery.proto";
+import "MG_Mail.proto";
+import "MG_MapData.proto";
+import "MG_Match.proto";
+import "MG_Mount.proto";
+import "MG_Mover.proto";
+import "MG_MultiDungeon.proto";
+import "MG_MVP.proto";
+import "MG_NewActivity.proto";
+import "MG_Pack.proto";
+import "MG_Paragon.proto";
+import "MG_Pay.proto";
+import "MG_Personal.proto";
+import "MG_Pet.proto";
+import "MG_Player.proto";
+import "MG_PlayerOfflineMessage.proto";
+import "MG_PlayMethod.proto";
+import "MG_PlotActing.proto";
+import "MG_PublicChat.proto";
+import "MG_PublicServer.proto";
+import "MG_RainbowKoi_Init.proto";
+import "MG_Relationship.proto";
+import "MG_Scene.proto";
+import "MG_SceneStream.proto";
+import "MG_Season.proto";
+import "MG_SeasonPage.proto";
+import "MG_SeasonRefine.proto";
+import "MG_SeasonTalent.proto";
+import "MG_ServerClientMsg.proto";
+import "MG_Setting.proto";
+import "MG_Shop.proto";
+import "MG_Siege.proto";
+import "MG_Skill.proto";
+import "MG_SkillGrowth.proto";
+import "MG_SocialOutfit.proto";
+import "MG_SpecialEffect.proto";
+import "MG_StageRewards.proto";
+import "MG_Stalls.proto";
+import "MG_State.proto";
+import "MG_Statistics.proto";
+import "MG_StorageHole.proto";
+import "MG_Task.proto";
+import "MG_Team.proto";
+import "MG_TerritoryAuction.proto";
+import "MG_TerritoryWars_Increment.proto";
+import "MG_TerritoryWars.proto";
+import "MG_ThreeDay.proto";
+import "MG_Title.proto";
+import "MG_Totem.proto";
+import "MG_TradeCenter.proto";
+import "MG_TradeMarket.proto";
+import "MG_Training.proto";
+import "MG_TransAction.proto";
+import "MG_TypeWriter.proto";
+import "MG_WardRobe.proto";
+import "MG_WorldExploration.proto";
+import "MG_Zone.proto";
+
+message DBJourneyInfoIncrement {
+  message curActIdsFieldIncrement {
+    oneof value {
+      bool all = 1;
+      bool inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message curEventsFieldIncrement {
+    oneof value {
+      bool all = 1;
+      bool inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message attributesFieldIncrement {
+    oneof value {
+      int64 all = 1;
+      int64 inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message completeNodeFieldIncrement {
+    oneof value {
+      romsg.JourneyCompleteInfo all = 1;
+      romsg.JourneyCompleteInfoIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message completeActFieldIncrement {
+    oneof value {
+      romsg.JourneyCompleteInfo all = 1;
+      romsg.JourneyCompleteInfoIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message completeEventFieldIncrement {
+    oneof value {
+      romsg.JourneyCompleteInfo all = 1;
+      romsg.JourneyCompleteInfoIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message travelInfoFieldIncrement {
+    oneof value {
+      romsg.JourneyTravelInfo all = 1;
+      romsg.JourneyTravelInfoIncrement inc = 2;
+    }
+  }
+
+  message completeAwardNodeFieldIncrement {
+    oneof value {
+      bool all = 1;
+      bool inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message eventInfoFieldIncrement {
+    oneof value {
+      romsg.JourneyEventInfo all = 1;
+      romsg.JourneyEventInfoIncrement inc = 2;
+    }
+  }
+
+  message completeTravelFieldIncrement {
+    oneof value {
+      romsg.JourneyCompleteInfo all = 1;
+      romsg.JourneyCompleteInfoIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  optional int64 curNodeId = 20;
+  map<int64, romsg.DBJourneyInfoIncrement.curActIdsFieldIncrement> curActIds = 30;
+  map<int64, romsg.DBJourneyInfoIncrement.curEventsFieldIncrement> curEvents = 40;
+  map<int64, romsg.DBJourneyInfoIncrement.attributesFieldIncrement> attributes = 50;
+  map<int64, romsg.DBJourneyInfoIncrement.completeNodeFieldIncrement> completeNode = 60;
+  map<int64, romsg.DBJourneyInfoIncrement.completeActFieldIncrement> completeAct = 70;
+  map<int64, romsg.DBJourneyInfoIncrement.completeEventFieldIncrement> completeEvent = 80;
+  romsg.DBJourneyInfoIncrement.travelInfoFieldIncrement travelInfo = 90;
+  map<int64, romsg.DBJourneyInfoIncrement.completeAwardNodeFieldIncrement> completeAwardNode = 100;
+  optional int64 reportEnterTime = 110;
+  romsg.DBJourneyInfoIncrement.eventInfoFieldIncrement eventInfo = 120;
+  optional bool isSendJourneyNoticeMail = 130;
+  map<int64, romsg.DBJourneyInfoIncrement.completeTravelFieldIncrement> completeTravel = 140;
+  optional int64 gainCoinCount = 150;
+  optional int64 titleId = 160;
+  optional bool isOpenCompletePanel = 170;
+}
+
+message DBMonthCardInfoIncrement {
+  message infosFieldIncrement {
+    oneof value {
+      romsg.MonthCardInfo all = 1;
+      romsg.MonthCardInfoIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  int64 version = 1;
+  bool syncAllMark = 2;
+  map<int64, romsg.DBMonthCardInfoIncrement.infosFieldIncrement> infos = 10;
+}
+
+message DBNewActivityPublicDataPreIncrement {
+  message guildDatasFieldIncrement {
+    oneof value {
+      romsg.DBNewActivityPublicDataPreGuild all = 1;
+      romsg.DBNewActivityPublicDataPreGuildIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  optional int64 progress = 10;
+  map<int64, romsg.DBNewActivityPublicDataPreIncrement.guildDatasFieldIncrement> guildDatas = 20;
+}
+
+message DBNewActivityPublicDataPreGuildIncrement {
+  message memberContributionsFieldIncrement {
+    oneof value {
+      int64 all = 1;
+      int64 inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message dailyLimitFieldIncrement {
+    oneof value {
+      int64 all = 1;
+      int64 inc = 2;
+      bool del = 3;
+    }
+  }
+
+  map<int64, romsg.DBNewActivityPublicDataPreGuildIncrement.memberContributionsFieldIncrement> memberContributions = 10;
+  map<int64, romsg.DBNewActivityPublicDataPreGuildIncrement.dailyLimitFieldIncrement> dailyLimit = 20;
+  optional int64 lastResetMs = 30;
+  optional int64 score = 40;
+}
+
+message DBThreeDayDataIncrement {
+  message awardDataFieldIncrement {
+    oneof value {
+      int64 all = 1;
+      int64 inc = 2;
+      bool del = 3;
+    }
+  }
+
+  map<int64, romsg.DBThreeDayDataIncrement.awardDataFieldIncrement> awardData = 10;
+}
+
+message DBWorldExplorationIncrement {
+  message phaseInfosFieldIncrement {
+    oneof value {
+      romsg.DBWorldExplorationPhase all = 1;
+      romsg.DBWorldExplorationPhaseIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message dropDataFieldIncrement {
+    oneof value {
+      romsg.DBWorldExplorationDropData all = 1;
+      romsg.DBWorldExplorationDropDataIncrement inc = 2;
+    }
+  }
+
+  message mapCollectFieldIncrement {
+    oneof value {
+      romsg.DBWorldExplorationNpcCollectCount all = 1;
+      romsg.DBWorldExplorationNpcCollectCountIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  int64 version = 1;
+  bool syncAllMark = 2;
+  map<int64, romsg.DBWorldExplorationIncrement.phaseInfosFieldIncrement> phaseInfos = 10;
+  romsg.DBWorldExplorationIncrement.dropDataFieldIncrement dropData = 20;
+  map<int64, romsg.DBWorldExplorationIncrement.mapCollectFieldIncrement> mapCollect = 30;
+}
+
+message DBWorldExplorationDropDataIncrement {
+  message dropNotesFieldIncrement {
+    oneof value {
+      romsg.DBWorldExplorationDropNote all = 1;
+      romsg.DBWorldExplorationDropNoteIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  optional int32 index = 10;
+  optional int32 count = 20;
+  map<int32, romsg.DBWorldExplorationDropDataIncrement.dropNotesFieldIncrement> dropNotes = 30;
+}
+
+message DBWorldExplorationDropNoteIncrement {
+  message ItemIdsRepeatedOrigin {
+    repeated int64 value = 1;
+  }
+
+  message ItemIdsRepeatedIncrement {
+    repeated int64 value = 1;
+  }
+
+  message ItemIdsFieldIncrement {
+    oneof value {
+      romsg.DBWorldExplorationDropNoteIncrement.ItemIdsRepeatedOrigin all = 1;
+      romsg.DBWorldExplorationDropNoteIncrement.ItemIdsRepeatedIncrement inc = 2;
+    }
+  }
+
+  romsg.DBWorldExplorationDropNoteIncrement.ItemIdsFieldIncrement ItemIds = 10;
+}
+
+message DBWorldExplorationNpcCollectCountIncrement {
+  message collectCountFieldIncrement {
+    oneof value {
+      int64 all = 1;
+      int64 inc = 2;
+      bool del = 3;
+    }
+  }
+
+  map<int64, romsg.DBWorldExplorationNpcCollectCountIncrement.collectCountFieldIncrement> collectCount = 10;
+  optional int64 sum = 20;
+}
+
+message DBWorldExplorationPhaseIncrement {
+  message nodeInfosFieldIncrement {
+    oneof value {
+      romsg.DBWorldExplorationPhaseNode all = 1;
+      romsg.DBWorldExplorationPhaseNodeIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  optional int64 PhaseCfgId = 10;
+  map<int64, romsg.DBWorldExplorationPhaseIncrement.nodeInfosFieldIncrement> nodeInfos = 20;
+  optional int32 totalRate = 30;
+}
+
+message DBWorldExplorationPhaseNodeIncrement {
+  message itemsFieldIncrement {
+    oneof value {
+      int64 all = 1;
+      int64 inc = 2;
+      bool del = 3;
+    }
+  }
+
+  optional int64 nodeCfgId = 10;
+  map<int64, romsg.DBWorldExplorationPhaseNodeIncrement.itemsFieldIncrement> items = 20;
+  optional bool isFinished = 30;
+}
+
+message FragmentGatherDailyIncrement {
+  optional int64 expireTs = 10;
+  optional int32 askTimes = 20;
+  optional int32 receiveTimes = 30;
+}
+
+message JourneyEventInfoIncrement {
+  message attrChangeFieldIncrement {
+    oneof value {
+      int64 all = 1;
+      int64 inc = 2;
+      bool del = 3;
+    }
+  }
+
+  optional int64 eventId = 10;
+  map<int64, romsg.JourneyEventInfoIncrement.attrChangeFieldIncrement> attrChange = 20;
+}
+
+message JourneyTravelInfoIncrement {
+  optional int64 curDay = 10;
+  optional int64 remainHour = 20;
+}
+
+message MonthCardInfoIncrement {
+  optional int64 monthCardId = 10;
+  optional int64 lastDays = 20;
+  optional bool dayAward = 30;
+  optional int64 expireTs = 40;
+}
+
+message PlayerActivityBattlePassIncrement {
+  message claimed_free_levelsRepeatedOrigin {
+    repeated int32 value = 1;
+  }
+
+  message claimed_free_levelsRepeatedIncrement {
+    repeated int32 value = 1;
+  }
+
+  message claimed_free_levelsFieldIncrement {
+    oneof value {
+      romsg.PlayerActivityBattlePassIncrement.claimed_free_levelsRepeatedOrigin all = 1;
+      romsg.PlayerActivityBattlePassIncrement.claimed_free_levelsRepeatedIncrement inc = 2;
+    }
+  }
+
+  message claimed_premium_levelsRepeatedOrigin {
+    repeated int32 value = 1;
+  }
+
+  message claimed_premium_levelsRepeatedIncrement {
+    repeated int32 value = 1;
+  }
+
+  message claimed_premium_levelsFieldIncrement {
+    oneof value {
+      romsg.PlayerActivityBattlePassIncrement.claimed_premium_levelsRepeatedOrigin all = 1;
+      romsg.PlayerActivityBattlePassIncrement.claimed_premium_levelsRepeatedIncrement inc = 2;
+    }
+  }
+
+  message activated_privilege_idsRepeatedOrigin {
+    repeated int32 value = 1;
+  }
+
+  message activated_privilege_idsRepeatedIncrement {
+    repeated int32 value = 1;
+  }
+
+  message activated_privilege_idsFieldIncrement {
+    oneof value {
+      romsg.PlayerActivityBattlePassIncrement.activated_privilege_idsRepeatedOrigin all = 1;
+      romsg.PlayerActivityBattlePassIncrement.activated_privilege_idsRepeatedIncrement inc = 2;
+    }
+  }
+
+  optional int32 level = 10;
+  optional int32 exp = 20;
+  optional bool premium = 30;
+  optional int64 premium_time = 40;
+  romsg.PlayerActivityBattlePassIncrement.claimed_free_levelsFieldIncrement claimed_free_levels = 50;
+  romsg.PlayerActivityBattlePassIncrement.claimed_premium_levelsFieldIncrement claimed_premium_levels = 60;
+  optional bool unlock_page_viewed = 70;
+  optional int32 bought_level_count = 80;
+  romsg.PlayerActivityBattlePassIncrement.activated_privilege_idsFieldIncrement activated_privilege_ids = 90;
+}
+
+message PlayerActivityFragmentGatherIncrement {
+  message dailyDataFieldIncrement {
+    oneof value {
+      romsg.FragmentGatherDaily all = 1;
+      romsg.FragmentGatherDailyIncrement inc = 2;
+    }
+  }
+
+  optional int32 seed = 10;
+  optional int32 reqID = 20;
+  optional int32 progressFinish = 30;
+  optional int32 progressAward = 40;
+  romsg.PlayerActivityFragmentGatherIncrement.dailyDataFieldIncrement dailyData = 50;
+  optional int64 playbook = 60;
+}
+
+message PlayerActivityInfoIncrement {
+  message activityParamFieldIncrement {
+    oneof value {
+      romsg.PlayerActivityParam all = 1;
+      romsg.PlayerActivityParamIncrement inc = 2;
+    }
+  }
+
+  message StateTimeStampsFieldIncrement {
+    oneof value {
+      int64 all = 1;
+      int64 inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message StateTimeStampListRepeatedOrigin {
+    repeated romsg.TimeSegment value = 1;
+  }
+
+  message StateTimeStampListRepeatedIncrement {
+    repeated romsg.TimeSegmentIncrement value = 1;
+  }
+
+  message StateTimeStampListFieldIncrement {
+    oneof value {
+      romsg.PlayerActivityInfoIncrement.StateTimeStampListRepeatedOrigin all = 1;
+      romsg.PlayerActivityInfoIncrement.StateTimeStampListRepeatedIncrement inc = 2;
+    }
+  }
+
+  romsg.PlayerActivityInfoIncrement.activityParamFieldIncrement activityParam = 10;
+  optional string activityKey = 20;
+  optional int64 activityInstance = 30;
+  optional string state = 40;
+  optional bool isOldRound = 50;
+  optional bool IsEnterComplete = 60;
+  optional bool IsExitComplete = 70;
+  optional int64 playbook = 80;
+  map<string, romsg.PlayerActivityInfoIncrement.StateTimeStampsFieldIncrement> StateTimeStamps = 90;
+  optional int64 stateInstance = 100;
+  optional bool IsShielded = 110;
+  romsg.PlayerActivityInfoIncrement.StateTimeStampListFieldIncrement StateTimeStampList = 120;
+  optional int64 CurStartTime = 130;
+  optional int64 CurEndTime = 140;
+  optional int64 CycleStartTime = 150;
+  optional int64 CycleEndTime = 160;
+}
+
+message PlayerActivityParamIncrement {
+  message taskRenewSegmentTimesFieldIncrement {
+    oneof value {
+      int64 all = 1;
+      int64 inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message sevenDayFieldIncrement {
+    oneof value {
+      romsg.PlayerActivitySevenDay all = 1;
+      romsg.PlayerActivitySevenDayIncrement inc = 2;
+    }
+  }
+
+  message seasonEveFieldIncrement {
+    oneof value {
+      romsg.PlayerActivitySeasonEve all = 1;
+      romsg.PlayerActivitySeasonEveIncrement inc = 2;
+    }
+  }
+
+  message pronteraDefenseFieldIncrement {
+    oneof value {
+      romsg.PlayerActivityPronteraDefense all = 1;
+      romsg.PlayerActivityPronteraDefenseIncrement inc = 2;
+    }
+  }
+
+  message fragmentGatherFieldIncrement {
+    oneof value {
+      romsg.PlayerActivityFragmentGather all = 1;
+      romsg.PlayerActivityFragmentGatherIncrement inc = 2;
+    }
+  }
+
+  message racingFieldIncrement {
+    oneof value {
+      romsg.PlayerActivityRacing all = 1;
+      romsg.PlayerActivityRacingIncrement inc = 2;
+    }
+  }
+
+  message levelAwardFieldIncrement {
+    oneof value {
+      romsg.DBThreeDayData all = 1;
+      romsg.DBThreeDayDataIncrement inc = 2;
+    }
+  }
+
+  message functionPreviewFieldIncrement {
+    oneof value {
+      romsg.DBThreeDayData all = 1;
+      romsg.DBThreeDayDataIncrement inc = 2;
+    }
+  }
+
+  message worldExplorationFieldIncrement {
+    oneof value {
+      romsg.DBWorldExploration all = 1;
+      romsg.DBWorldExplorationIncrement inc = 2;
+    }
+  }
+
+  message journeyFieldIncrement {
+    oneof value {
+      romsg.DBJourneyInfo all = 1;
+      romsg.DBJourneyInfoIncrement inc = 2;
+    }
+  }
+
+  message monthCardFieldIncrement {
+    oneof value {
+      romsg.DBMonthCardInfo all = 1;
+      romsg.DBMonthCardInfoIncrement inc = 2;
+    }
+  }
+
+  message territoryWarFieldIncrement {
+    oneof value {
+      romsg.PlayerActivityTerritoryWar all = 1;
+      romsg.PlayerActivityTerritoryWarIncrement inc = 2;
+    }
+  }
+
+  message rainbowKoiFieldIncrement {
+    oneof value {
+      romsg.PlayerActivityRainbowKoi all = 1;
+      romsg.PlayerActivityRainbowKoiIncrement inc = 2;
+    }
+  }
+
+  message runRingTaskFieldIncrement {
+    oneof value {
+      romsg.PlayerActivityRunRingTask all = 1;
+      romsg.PlayerActivityRunRingTaskIncrement inc = 2;
+    }
+  }
+
+  message battlePassFieldIncrement {
+    oneof value {
+      romsg.PlayerActivityBattlePass all = 1;
+      romsg.PlayerActivityBattlePassIncrement inc = 2;
+    }
+  }
+
+  map<int64, romsg.PlayerActivityParamIncrement.taskRenewSegmentTimesFieldIncrement> taskRenewSegmentTimes = 100;
+  oneof val {
+    romsg.PlayerActivityParamIncrement.sevenDayFieldIncrement sevenDay = 10;
+    romsg.PlayerActivityParamIncrement.seasonEveFieldIncrement seasonEve = 20;
+    romsg.PlayerActivityParamIncrement.pronteraDefenseFieldIncrement pronteraDefense = 30;
+    romsg.PlayerActivityParamIncrement.fragmentGatherFieldIncrement fragmentGather = 40;
+    romsg.PlayerActivityParamIncrement.racingFieldIncrement racing = 50;
+    romsg.PlayerActivityParamIncrement.levelAwardFieldIncrement levelAward = 60;
+    romsg.PlayerActivityParamIncrement.functionPreviewFieldIncrement functionPreview = 70;
+    romsg.PlayerActivityParamIncrement.worldExplorationFieldIncrement worldExploration = 80;
+    romsg.PlayerActivityParamIncrement.journeyFieldIncrement journey = 90;
+    romsg.PlayerActivityParamIncrement.monthCardFieldIncrement monthCard = 110;
+    romsg.PlayerActivityParamIncrement.territoryWarFieldIncrement territoryWar = 120;
+    romsg.PlayerActivityParamIncrement.rainbowKoiFieldIncrement rainbowKoi = 130;
+    romsg.PlayerActivityParamIncrement.runRingTaskFieldIncrement runRingTask = 140;
+    romsg.PlayerActivityParamIncrement.battlePassFieldIncrement battlePass = 150;
+  }
+}
+
+message PlayerActivityPronteraDefenseIncrement {
+  message globalInfoFieldIncrement {
+    oneof value {
+      romsg.DBPronteraDefenseInfo all = 1;
+      romsg.DBPronteraDefenseInfoIncrement inc = 2;
+    }
+  }
+
+  romsg.PlayerActivityPronteraDefenseIncrement.globalInfoFieldIncrement globalInfo = 10;
+  optional int64 contributionPoint = 20;
+}
+
+message PlayerActivityRacingIncrement {
+  message joinStateFieldIncrement {
+    oneof value {
+      int64 all = 1;
+      int64 inc = 2;
+      bool del = 3;
+    }
+  }
+
+  map<int64, romsg.PlayerActivityRacingIncrement.joinStateFieldIncrement> joinState = 10;
+}
+
+message PlayerActivityRainbowKoiIncrement {
+  message progressFieldIncrement {
+    oneof value {
+      romsg.RainbowKoiProgress all = 1;
+      romsg.RainbowKoiProgressIncrement inc = 2;
+    }
+  }
+
+  optional int64 betTargetId = 10;
+  romsg.PlayerActivityRainbowKoiIncrement.progressFieldIncrement progress = 20;
+}
+
+message PlayerActivityRunRingTaskIncrement {
+  optional int32 remainRingCount = 10;
+}
+
+message PlayerActivitySeasonEveIncrement {
+  message chapterInfoFieldIncrement {
+    oneof value {
+      romsg.PlayerSeasonEveChapterInfo all = 1;
+      romsg.PlayerSeasonEveChapterInfoIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message claimedRewardFieldIncrement {
+    oneof value {
+      bool all = 1;
+      bool inc = 2;
+      bool del = 3;
+    }
+  }
+
+  map<int64, romsg.PlayerActivitySeasonEveIncrement.chapterInfoFieldIncrement> chapterInfo = 10;
+  optional int64 selectWish = 20;
+  map<int64, romsg.PlayerActivitySeasonEveIncrement.claimedRewardFieldIncrement> claimedReward = 30;
+}
+
+message PlayerActivitySeasonPreIncrement {
+  message receivedRewardIDsFieldIncrement {
+    oneof value {
+      int64 all = 1;
+      int64 inc = 2;
+      bool del = 3;
+    }
+  }
+
+  map<int64, romsg.PlayerActivitySeasonPreIncrement.receivedRewardIDsFieldIncrement> receivedRewardIDs = 10;
+  optional int64 score = 20;
+}
+
+message PlayerActivitySelfDataIncrement {
+  message seasonPreFieldIncrement {
+    oneof value {
+      romsg.PlayerActivitySeasonPre all = 1;
+      romsg.PlayerActivitySeasonPreIncrement inc = 2;
+    }
+  }
+
+  message gatherFieldIncrement {
+    oneof value {
+      romsg.PlayerActivityFragmentGather all = 1;
+      romsg.PlayerActivityFragmentGatherIncrement inc = 2;
+    }
+  }
+
+  message racingFieldIncrement {
+    oneof value {
+      romsg.PlayerActivityRacing all = 1;
+      romsg.PlayerActivityRacingIncrement inc = 2;
+    }
+  }
+
+  message sevenDayFieldIncrement {
+    oneof value {
+      romsg.PlayerActivitySevenDay all = 1;
+      romsg.PlayerActivitySevenDayIncrement inc = 2;
+    }
+  }
+
+  romsg.PlayerActivitySelfDataIncrement.seasonPreFieldIncrement seasonPre = 10;
+  romsg.PlayerActivitySelfDataIncrement.gatherFieldIncrement gather = 50;
+  romsg.PlayerActivitySelfDataIncrement.racingFieldIncrement racing = 60;
+  romsg.PlayerActivitySelfDataIncrement.sevenDayFieldIncrement sevenDay = 70;
+}
+
+message PlayerActivitySevenDayIncrement {
+  message rewardStatusFieldIncrement {
+    oneof value {
+      bool all = 1;
+      bool inc = 2;
+      bool del = 3;
+    }
+  }
+
+  map<int32, romsg.PlayerActivitySevenDayIncrement.rewardStatusFieldIncrement> rewardStatus = 10;
+  optional int32 loginDays = 20;
+  optional int64 lastLoginTime = 30;
+}
+
+message PlayerActivityStateIncrement {
+  message selfDataFieldIncrement {
+    oneof value {
+      romsg.PlayerActivitySelfData all = 1;
+      romsg.PlayerActivitySelfDataIncrement inc = 2;
+    }
+  }
+
+  message taskRenewSegmentTimesFieldIncrement {
+    oneof value {
+      int64 all = 1;
+      int64 inc = 2;
+      bool del = 3;
+    }
+  }
+
+  optional int64 enterTime = 10;
+  romsg.PlayerActivityStateIncrement.selfDataFieldIncrement selfData = 20;
+  optional int64 beginTime = 30;
+  optional int64 endTime = 40;
+  map<int64, romsg.PlayerActivityStateIncrement.taskRenewSegmentTimesFieldIncrement> taskRenewSegmentTimes = 50;
+}
+
+message PlayerActivityTerritoryWarIncrement {
+  message territoryWarDataFieldIncrement {
+    oneof value {
+      romsg.DBTerritoryWarData all = 1;
+      romsg.DBTerritoryWarDataIncrement inc = 2;
+    }
+  }
+
+  message territoryWarStageFieldIncrement {
+    oneof value {
+      romsg.TerritoryWarStage all = 1;
+      romsg.TerritoryWarStageIncrement inc = 2;
+    }
+  }
+
+  romsg.PlayerActivityTerritoryWarIncrement.territoryWarDataFieldIncrement territoryWarData = 10;
+  romsg.PlayerActivityTerritoryWarIncrement.territoryWarStageFieldIncrement territoryWarStage = 20;
+}
+
+message PlayerActivityTypeInfoIncrement {
+  message activityInfoFieldIncrement {
+    oneof value {
+      romsg.PlayerActivityInfo all = 1;
+      romsg.PlayerActivityInfoIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  map<int64, romsg.PlayerActivityTypeInfoIncrement.activityInfoFieldIncrement> activityInfo = 10;
+}
+
+message PlayerActivityTypeStateIncrement {
+  message activityStateFieldIncrement {
+    oneof value {
+      romsg.PlayerActivityState all = 1;
+      romsg.PlayerActivityStateIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  map<int64, romsg.PlayerActivityTypeStateIncrement.activityStateFieldIncrement> activityState = 10;
+}
+
+message PlayerSeasonEveChapterInfoIncrement {
+  message notesFieldIncrement {
+    oneof value {
+      int64 all = 1;
+      int64 inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message cluesFieldIncrement {
+    oneof value {
+      bool all = 1;
+      bool inc = 2;
+      bool del = 3;
+    }
+  }
+
+  optional bool isFinish = 10;
+  map<int64, romsg.PlayerSeasonEveChapterInfoIncrement.notesFieldIncrement> notes = 20;
+  map<int64, romsg.PlayerSeasonEveChapterInfoIncrement.cluesFieldIncrement> clues = 30;
+}
+
+message SeasonEveGlobalChapterInfoIncrement {
+  message cluesFieldIncrement {
+    oneof value {
+      int64 all = 1;
+      int64 inc = 2;
+      bool del = 3;
+    }
+  }
+
+  optional int64 chapterId = 10;
+  optional int64 openTime = 20;
+  map<int64, romsg.SeasonEveGlobalChapterInfoIncrement.cluesFieldIncrement> clues = 30;
+}
+
+message TerritoryWarStageIncrement {
+  optional romsg.TerritoryWarStageType stageType = 10;
+  optional int64 startTime = 20;
+  optional int64 endTime = 30;
+}
+

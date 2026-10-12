@@ -1,0 +1,297 @@
+syntax = "proto2";
+package phonest.proto;
+
+enum GameServerType {
+  Scene = 0;
+  Service = 1;
+}
+
+enum ChannelMessageType {
+  Data = 0;
+  KeepAlive = 1;
+  Close = 2;
+  MigrateNotify = 3;
+  RecoverNotify = 4;
+}
+
+message Void {
+}
+
+message EntityMailbox {
+  required bytes entity_id = 1;
+  required string server_name = 2;
+  optional int32 cluster_id = 3;
+  optional bytes extra = 4;
+}
+
+message ServerInfo {
+  optional string server_name = 1;
+  optional int32 clusterId = 2;
+}
+
+message GateInfo {
+  required bytes gateId = 1;
+  required bytes ip = 2;
+  required bytes publicIp = 3;
+  required int32 port = 4;
+  required int32 publicPort = 5;
+  required int32 clusterId = 6;
+}
+
+message ClientInfo {
+  optional bytes ip = 1;
+  optional int32 port = 2;
+  required bytes sessionId = 3;
+  optional bytes gateId = 4;
+}
+
+message ChannelEntityInfo {
+  optional bytes type = 1;
+  optional bytes info = 2;
+  optional bytes entityId = 3;
+  optional bool lazyload = 4;
+  optional int64 channelId = 5 [default = -1];
+  optional int64 channelMode = 6 [default = -1];
+  optional bytes sessionId = 7;
+  optional bytes reconnectInfo = 8;
+}
+
+message ClientEntityInfo {
+  optional bytes type = 1;
+  optional bytes info = 2;
+  optional bytes entityId = 3;
+  optional bool lazyload = 4;
+  optional bytes sessionId = 5;
+}
+
+message RecoverChannelEntityInfo {
+  required bytes entityId = 1;
+  required int64 channelId = 2;
+  optional bytes sessionId = 3;
+}
+
+message BindSoulInfo {
+  required bytes soulMailbox = 1;
+  required bytes auth = 2;
+  required bytes gates = 3;
+  optional bytes sessionId = 4;
+}
+
+message UnbindSoulInfo {
+  optional bytes sessionId = 1;
+}
+
+message BindAvatarInfo {
+  required bytes avtMailbox = 1;
+  required bytes auth = 2;
+  required int32 clusterId = 3;
+  optional bytes onlineInfo = 4;
+  optional bytes sessionId = 5;
+  optional bool reconnectGate = 6;
+  optional bool isActive = 7;
+}
+
+message BindAccountInfo {
+  required bytes actMailbox = 1;
+  required bytes auth = 2;
+  required int32 clusterId = 3;
+  optional bytes onlineInfo = 4;
+  optional bytes sessionId = 5;
+}
+
+message ConnectServerReq {
+  enum ReqType {
+    NewConnection = 0;
+    ReConnection = 1;
+    BindSoul = 2;
+    BindAvatar = 3;
+    BindAccount = 4;
+    ReBindSoul = 5;
+    SwitchToAccount = 6;
+  }
+
+  required phonest.proto.ConnectServerReq.ReqType type = 1;
+  optional bytes deviceId = 2;
+  optional bytes clientInfo = 3;
+  optional bytes auth = 4;
+  optional bytes entityInfo = 5;
+  optional bytes version = 6;
+  optional bytes token = 7;
+  optional bool isCross = 8;
+  optional bool isActive = 9;
+}
+
+message ConnectServerResp {
+  enum RespType {
+    Busy = 0;
+    Connected = 1;
+    ConnectRefused = 2;
+    Reconnected = 3;
+    ReconnectRefused = 4;
+    Forbidden = 5;
+    MaxConnections = 6;
+    SwitchToAccount = 7;
+    ClusterShutdown = 8;
+  }
+
+  required phonest.proto.ConnectServerResp.RespType type = 1;
+  optional bytes sessionId = 2;
+}
+
+message EntityMessage {
+  optional bytes entityId = 1;
+  optional bytes methodName = 2;
+  optional int32 index = 3;
+  required bytes parameters = 4;
+  optional bytes sessionId = 5;
+  optional bytes context = 6;
+}
+
+message EntityMessage2C {
+  optional bytes entityId = 1;
+  required int32 protocol = 2;
+  required bytes parameters = 3;
+  optional bytes sessionId = 4;
+}
+
+message ForwardEntityMessage {
+  required bytes entityMailbox = 1;
+  optional bytes methodName = 2;
+  required bytes parameters = 3;
+  optional bytes context = 4;
+}
+
+message ChannelHeartBeatMessage {
+  repeated bytes entityMailboxes = 1;
+  required bytes parameters = 2;
+}
+
+message ReliableQueue {
+  message Segment {
+    optional uint32 ts = 1;
+    optional uint32 sn = 2;
+    optional uint32 una = 3;
+    optional uint32 resendts = 4;
+    optional uint32 rto = 5;
+    optional uint32 fastack = 6;
+    optional uint32 xmit = 7;
+    optional bytes context = 8;
+    optional bytes message = 9;
+  }
+
+  repeated phonest.proto.ReliableQueue.Segment snd_queue = 1;
+  repeated phonest.proto.ReliableQueue.Segment rcv_queue = 2;
+  repeated phonest.proto.ReliableQueue.Segment snd_buf = 3;
+  repeated phonest.proto.ReliableQueue.Segment rcv_buf = 4;
+  optional uint32 nsnd_que = 5;
+  optional uint32 nsnd_buf = 6;
+  optional uint32 nrcv_buf = 7;
+  optional uint32 dead_link = 8;
+  optional uint32 rx_rto = 9;
+  optional uint32 resent = 10;
+  optional uint32 snd_una = 11;
+  optional uint32 snd_nxt = 12;
+  optional uint32 rcv_nxt = 13;
+  optional uint32 snd_wnd = 14;
+  optional uint32 rcv_wnd = 15;
+}
+
+message ChannelMessage {
+  required phonest.proto.ChannelMessageType type = 1;
+  required int64 channelId = 2;
+  optional bytes message = 3;
+  optional bytes sessionId = 4;
+  optional bytes context = 5;
+  optional string version = 6;
+}
+
+message ForwardChannelMessage {
+  required bytes entityMailbox = 1;
+  required phonest.proto.ChannelMessageType type = 2;
+  required bytes channelId = 3;
+  optional bytes message = 4;
+  optional bytes context = 5;
+}
+
+message ChannelMessageData {
+  enum DataType {
+    Request = 0;
+    Response = 1;
+  }
+
+  optional bytes methodName = 1;
+  required bytes parameters = 2;
+  required int64 rid = 3;
+  required phonest.proto.ChannelMessageData.DataType type = 4;
+}
+
+message ReliableMessageData {
+  enum ReliableType {
+    Data = 0;
+    Ack = 1;
+  }
+
+  optional bytes data = 1;
+  required int32 una = 2;
+  required int32 sn = 3;
+  required phonest.proto.ReliableMessageData.ReliableType type = 4;
+}
+
+message AttachChannelInfo {
+  required bytes srcmb = 1;
+  required bytes dstmb = 2;
+  required bytes name = 3;
+  required bytes channelId = 4;
+}
+
+message AttachChannelResp {
+  enum AttachChannelRespType {
+    DstAttached = 0;
+    DstNotFound = 1;
+    DstTimeout = 2;
+  }
+
+  required phonest.proto.AttachChannelResp.AttachChannelRespType type = 1;
+  required bytes srcmb = 2;
+  required bytes dstid = 3;
+  required bytes channelId = 4;
+}
+
+message MigrateInfo {
+  required bytes dstmb = 1;
+  required bytes entityId = 2;
+  required bytes minfo = 3;
+  optional bool lazyload = 4;
+}
+
+message Heartbeat {
+  optional int64 time = 1;
+  optional int64 connectionQuota = 2;
+  optional int64 connectionAllocated = 3;
+}
+
+message PropertySyncClientMessage {
+  optional bytes ownerid = 1;
+  required int64 propertyid = 2;
+  required int32 optype = 3;
+  required bytes name = 4;
+  optional bytes value = 5;
+  optional bytes sessionId = 6;
+  optional bool isBroadcast = 7;
+}
+
+message PropertyStrategySyncClientMessage {
+  required int32 syncMode = 1;
+  optional bytes ownerid = 2;
+  required bytes syncdata = 3;
+  optional bytes sessionId = 4;
+}
+
+message PropertyIdSyncClientMessage {
+  optional bytes ownerid = 1;
+  required int64 propertyid = 2;
+  required bytes name = 3;
+  required bytes value = 4;
+  optional bytes sessionId = 5;
+}
+

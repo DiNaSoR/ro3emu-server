@@ -1,0 +1,51 @@
+syntax = "proto3";
+package romsg;
+import "MG_Common.proto";
+
+message StorageHoleInfoNtf {
+  map<int32, romsg.EquipCardInfo> cardInfo = 1;
+}
+
+message EquipmentCardInsertReq {
+  romsg.EquipGridType equipPos = 1;
+  int64 cardGuid = 2;
+  int32 slotIndex = 3;
+}
+
+message EquipmentCardInsertResp {
+  int32 result = 1;
+  romsg.EquipGridType equipPos = 2;
+  int64 cardGuid = 3;
+  int32 slotIndex = 4;
+  romsg.ItemBaseInfo cardInfo = 5;
+}
+
+message EquipmentCardRemoveReq {
+  romsg.EquipGridType equipPos = 1;
+  int32 slotIndex = 2;
+}
+
+message EquipmentCardRemoveResp {
+  int32 result = 1;
+  romsg.EquipGridType equipPos = 2;
+  int32 slotIndex = 3;
+  int64 cardGuid = 4;
+}
+
+message EquipmentCardTransferReq {
+  romsg.EquipGridType srcEquipPos = 1;
+  int32 srcEquipSlot = 2;
+  romsg.EquipGridType destEquipPos = 3;
+  int32 destEquipSlot = 4;
+}
+
+message EquipmentCardTransferResp {
+  int32 result = 1;
+  romsg.EquipGridType srcEquipPos = 2;
+  int32 srcEquipSlot = 3;
+  romsg.EquipGridType destEquipPos = 4;
+  int32 destEquipSlot = 5;
+  romsg.ItemBaseInfo srcCardInfo = 6;
+  romsg.ItemBaseInfo destCardInfo = 7;
+}
+

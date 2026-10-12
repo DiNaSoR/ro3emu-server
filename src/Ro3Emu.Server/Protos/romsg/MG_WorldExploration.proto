@@ -1,0 +1,14 @@
+syntax = "proto3";
+package romsg;
+
+message WorldExplorationFillPhaseNodeReq {
+  int64 PhaseCfgId = 1;
+  int64 NodeCfgId = 2;
+  int64 ItemId = 3;
+  int32 position = 4;
+}
+
+message WorldExplorationFillPhaseNodeRes {
+  int32 Err = 1;
+}
+

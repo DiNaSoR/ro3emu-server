@@ -1,0 +1,303 @@
+syntax = "proto3";
+package romsg;
+import "FieldOption.proto";
+
+enum SettingType {
+  SettingType_AutoBattle = 0;
+  SettingType_BaseBattle = 1;
+  SettingType_GuildSetting = 2;
+  SettingType_ShowDetailInfo = 3;
+  SettingType_PublicChatInfo = 4;
+  SettingType_WildAFK = 5;
+  SettingType_GuideData = 6;
+  SettingType_EquipMakeFilterData = 7;
+  SettingType_Profession = 8;
+  SettingType_NewOperation = 9;
+  SettingType_GameMode = 10;
+  SettingType_Library = 11;
+  SettingType_PCWindow = 12;
+  SettingType_AutoAttack = 13;
+  SettingType_SkillLockState = 14;
+  SettingType_KeyBoard = 15;
+  SettingType_MapTarget = 16;
+  SettingType_ShowSetting = 17;
+  SettingType_CutScene = 18;
+  SettingType_Layout = 19;
+  SettingType_CanvasScale = 20;
+  SettingType_WindowChatTab = 21;
+}
+
+enum FastSkillCast {
+  FastSkillCast_Normal = 0;
+  FastSkillCast_Fast = 1;
+  FastSkillCast_Intelligent = 2;
+}
+
+enum ClickNormalAttack {
+  ClickNormalAttack_Open = 0;
+  ClickNormalAttack_Close = 1;
+}
+
+enum ChaseType {
+  ChaseType_SkillLockRange = 0;
+  ChaseType_UserSetLockRange = 1;
+  ChaseType_SkillAndUserSetLockRange = 2;
+}
+
+enum SelectTargetTragedy {
+  SelectTargetTragedy_All = 0;
+  SelectTargetTragedy_HighDouble = 1;
+}
+
+enum SelectTargetWeight {
+  SelectTargetWeight_HP = 0;
+  SelectTargetWeight_Distance = 1;
+  SelectTargetWeight_AutoDPS = 2;
+  SelectTargetWeight_AutoHeal = 3;
+}
+
+enum LockSkillSelectType {
+  LockSkillSelectType_LockTarget = 0;
+  LockSkillSelectType_Free = 1;
+}
+
+enum ShowDetailInfoType {
+  ShowDetailInfoType_NoShow = 0;
+  ShowDetailInfoType_ShowAll = 1;
+}
+
+enum CommonSettingSize {
+  CommonSettingSize_None = 0;
+  CommonSettingSize_StringLen = 16000;
+}
+
+enum EClientSettingNum {
+  EClientSettingNum_None = 0;
+}
+
+enum ECommonSettingNum {
+  ECommonSettingNum_None = 0;
+  ECommonSettingNum_DisableShowMyNews = 100;
+  ECommonSettingNum_DisAbleConsumeAFKTime = 120;
+  ECommonSettingNum_AutoBack = 121;
+  ECommonSettingNum_TimeBack = 122;
+  ECommonSettingNum_AutoCancel = 123;
+  ECommonSettingNum_FirstEquipCraftDone = 140;
+  ECommonSettingNum_FirstEquipIdentifyDone = 141;
+}
+
+message CommonIntSetting {
+  int32 value = 1;
+}
+
+message CommonStringSetting {
+  string value = 1;
+}
+
+message GameModeSetting {
+  int32 gameMode = 1;
+  bool pcPlatformRecord = 2;
+}
+
+message SettingAutoBattle {
+  bool isFullView = 1;
+  int32 autoAttackRange = 2;
+  bool isInsitu = 3;
+  bool isAllEnemy = 4;
+  bool isAutoBattle = 5;
+}
+
+message SettingBaseBattle {
+  int32 eFixSkillChaseType_PC = 1;
+  int32 eDragSkillChaseType_PC = 2;
+  int32 eDragSkillDefaultReleaseType_PC = 3;
+  int32 eChaseDistanceType_PC = 4;
+  int32 fUserSetDistance_PC = 5;
+  int32 eTabSelectTargetConditionType_PC = 6;
+  int32 eTabSelectTargetType_PC = 7;
+  int32 eLockSkillSelectType = 8;
+  bool bHideSkillRangeIndicator_PC = 9;
+  int32 eSkillWordRange_PC = 10;
+  int32 eSkillWordDensity_PC = 11;
+  int32 iShowModelNum = 12;
+  int32 chaseDistance = 13;
+  romsg.ChaseType chaseType = 14;
+  bool isHideSkillRangeIndicator = 15;
+  romsg.SelectTargetTragedy selectTargetMethod = 16;
+  romsg.SelectTargetWeight selectTargetWeight = 17;
+  romsg.LockSkillSelectType lockType = 18;
+  int32 fastSkillCast = 19;
+  int32 clickNormalAttack = 20;
+  int32 eFixSkillChaseType_Mobile = 21;
+  int32 eDragSkillChaseType_Mobile = 22;
+  int32 eDragSkillDefaultReleaseType_Mobile = 23;
+  int32 eChaseDistanceType_Mobile = 24;
+  int32 fUserSetDistance_Mobile = 25;
+  int32 eTabSelectTargetConditionType_Mobile = 26;
+  int32 eTabSelectTargetType_Mobile = 27;
+  bool bHideSkillRangeIndicator_Mobile = 28;
+  int32 eSkillWordRange_Mobile = 29;
+  int32 eSkillWordDensity_Mobile = 30;
+  int32 eFastSkill_PC = 31;
+  int32 eSelectTargetNormalAttack_PC = 32;
+}
+
+message SettingProfessionInfo {
+  map<int32, int32> planToProfessionId = 1;
+}
+
+message SettingLibraryInfo {
+  map<int32, bool> isNewToThemeId = 1;
+}
+
+message SaveSettingReq {
+  repeated romsg.SettingType type = 1;
+  romsg.DBSettingInfo dbSettingInfo = 2;
+}
+
+message SaveSettingResp {
+  int32 result = 1;
+}
+
+message SettingGuild {
+  bool disableShowMyNews = 1;
+}
+
+message SettingShowDetailInfo {
+  romsg.ShowDetailInfoType showDetailInfo = 1;
+  bool init = 2;
+}
+
+message SettingPublicChatInfo {
+  repeated string forbiddenHeapPop = 1;
+  repeated string showBarrage = 2;
+  repeated string autoPlayVoiceButton = 3;
+  repeated string onlyWifiAutoPlayVoice = 4;
+  repeated string mainUiShowChannelType = 5;
+  bool isShowTimeText = 6;
+}
+
+message SettingWindowChatTabManageInfo {
+  repeated romsg.ChatTabInfo chatTabInfos = 1;
+}
+
+message ChatTabInfo {
+  string tabName = 1;
+  repeated int32 channelIndex = 2;
+  int32 posX = 3;
+  int32 posY = 4;
+  bool canDelete = 5;
+  bool isOut = 6;
+  int64 lastClearContentTime = 7;
+}
+
+message SettingWildAFKInfo {
+  bool disAbleConsumeAFKTime = 1;
+  bool autoBack = 2;
+  bool timeBack = 3;
+  bool autoCancel = 4;
+}
+
+message GuideData {
+  int32 finishedGuideID = 1;
+  int64 finishedTime = 2;
+}
+
+message GuideFinishedData {
+  repeated int32 finishedGuideID = 1;
+  repeated int32 triggerGuideID = 2;
+  repeated int64 finishedTime = 3;
+}
+
+message EquipMakeFilterData {
+  int32 iRank = 1;
+  int32 iEquipType = 2;
+}
+
+message SettingWindowsInfo {
+  map<string, romsg.WindowsInfo> windowsInfo = 1;
+}
+
+message AutoSkillInfo {
+  repeated int32 autoSkillList = 1;
+  repeated int32 autoSkillAssetList = 2;
+}
+
+message WindowsInfo {
+  bool isOpen = 1;
+  int32 layer = 2;
+  int32 posX = 3;
+  int32 posY = 4;
+  int32 sizeX = 5;
+  int32 sizeY = 6;
+  bool isMinSize = 7;
+}
+
+message SkillLockStateInfo {
+  int32 SkillLockState = 1;
+}
+
+message KeyBoardInfo {
+  int32 KeyBoardMode = 1;
+  string OverrideBindingJson = 2;
+  int32 MovementCtrl = 3;
+  bool EnableKeyboardMove = 4;
+  bool EnableMouseMove = 5;
+  int32 SelectBtn = 6;
+  int32 MoveBtn = 7;
+  int32 CameraMode = 8;
+}
+
+message LayoutInfo {
+  string overrideJson = 1;
+  bool isOpend = 2;
+}
+
+message CanvasScaleInfo {
+  bool auto = 1;
+  int32 canvasScale = 2;
+}
+
+message NewOperation {
+  map<int32, int32> records = 1;
+}
+
+message MapTargetSetting {
+  map<uint32, uint32> settings = 7;
+}
+
+message DBSettingInfo {
+  int64 ro3Define_SyncVersion = 9998;
+  romsg.SettingGuild guildSettingInfo = 3;
+  romsg.SettingShowDetailInfo showDetailInfo = 4;
+  romsg.SettingWildAFKInfo wildAFKInfo = 5;
+  map<int32, bytes> clientSetting = 6;
+  map<int32, int64> commonSetting = 7;
+  reserved 1 to 1;
+  reserved 2 to 2;
+}
+
+message ShowSettingInfo {
+  int32 iNameBoardPos = 1;
+  int32 iNameShowType_PC = 2;
+  int32 iHpShowType_PC = 3;
+  int32 iJumpWordShowType_PC = 4;
+  int32 iSelfNameColor = 5;
+  int32 iTeamNameColor = 6;
+  int32 iCampNameColor = 7;
+  int32 iEnemyNameColor = 8;
+  int32 iSelfHpColor = 9;
+  int32 iTeamHpColor = 10;
+  int32 iCampHpColor = 11;
+  int32 iEnemyHpColor = 12;
+  int32 iNameShowType_Mobile = 13;
+  int32 iHpShowType_Mobile = 14;
+  int32 iJumpWordShowType_Mobile = 15;
+  int32 iCursorScale = 16;
+  int32 iCursorStyle = 17;
+}
+
+message CutSceneInfo {
+  map<int32, bool> cutSceneMap = 1;
+}
+

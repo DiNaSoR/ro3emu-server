@@ -1,0 +1,693 @@
+{
+  "version": 1,
+  "about": "Reconstructed story dungeon encounters (re/dungeon-reconstruction-plan.md, accepted 2026-10-11). The original server's encounter scripts and its 2000xxxx monster templates are not in the client. Each spawn below places a monster the client knows (NPCConfig) at an authored scene-editor point; the reason and the confidence of every decision are recorded. Waves follow the dungeon's quest stages; \"quest\" is the DungeonQuestConfig _iQuestID a wave plays (the client tracker shows it). Switch: Ro3Emu:ReconstructedDungeons. Never mixed into client data.",
+  "monsterAttacks": {
+    "5300001": {
+      "from": 5020009,
+      "why": "story Eddga has no normal attack in the client (its server script chose skills); the field MVP Eddga's"
+    },
+    "5300002": {
+      "from": 5020002,
+      "why": "story Golden Thief Bug; the field MVP Golden Thief Bug's"
+    },
+    "5300003": {
+      "from": 5020013,
+      "why": "story Baphomet; the field MVP Baphomet's"
+    },
+    "5300006": {
+      "from": 5020005,
+      "why": "story Maya; the field MVP Maya's"
+    },
+    "5300010": {
+      "from": 5020016,
+      "why": "story Pharaoh; the field MVP Pharaoh's"
+    },
+    "5300018": {
+      "from": 5020004,
+      "why": "story Evil Boss (a human boss); Orc Hero's melee boss attack, low confidence"
+    },
+    "5300042": {
+      "from": 5000098,
+      "why": "story Evil Warrior (charging melee); Orc Warrior's melee attack, low confidence"
+    },
+    "5300043": {
+      "from": 5000098,
+      "why": "story Evil Warrior (charging melee); Orc Warrior's melee attack, low confidence"
+    },
+    "5300044": {
+      "from": 5000098,
+      "why": "story Evil Warrior (charging melee); Orc Warrior's melee attack, low confidence"
+    },
+    "5300045": {
+      "from": 5000098,
+      "why": "story Evil Warrior (charging melee); Orc Warrior's melee attack, low confidence"
+    },
+    "5300046": {
+      "from": 5000111,
+      "why": "story Evil Archer; Goblin Archer's ranged attack (15 m), low confidence"
+    },
+    "5300047": {
+      "from": 5000111,
+      "why": "story Evil Archer; Goblin Archer's ranged attack (15 m), low confidence"
+    },
+    "5300048": {
+      "from": 5000111,
+      "why": "story Evil Archer; Goblin Archer's ranged attack (15 m), low confidence"
+    },
+    "5300049": {
+      "from": 5000111,
+      "why": "story Evil Archer; Goblin Archer's ranged attack (15 m), low confidence"
+    },
+    "5300050": {
+      "from": 5000111,
+      "why": "story Evil Archer; Goblin Archer's ranged attack (15 m), low confidence"
+    },
+    "5300082": {
+      "from": 5000083,
+      "why": "story Elusive Pecopeco; the field Peco Peco's"
+    },
+    "about": "Story templates (530xxxx) have no normal attack in the client; each borrows the normal attack of the named monster."
+  },
+  "soloTuning": {
+    "5300001": {
+      "hp": 870,
+      "attack": 2060,
+      "why": "Eddga: solo tuning, see about"
+    },
+    "5300002": {
+      "hp": 580,
+      "attack": 250,
+      "why": "Golden Thief Bug: solo tuning, see about"
+    },
+    "5300003": {
+      "hp": 540,
+      "attack": 300,
+      "why": "Baphomet: solo tuning, see about"
+    },
+    "5300006": {
+      "hp": 2420,
+      "attack": 810,
+      "why": "Maya: solo tuning, see about"
+    },
+    "5300010": {
+      "hp": 390,
+      "attack": 220,
+      "why": "Pharaoh: solo tuning, see about"
+    },
+    "5300018": {
+      "hp": 2870,
+      "attack": 980,
+      "why": "Evil Boss: solo tuning, see about"
+    },
+    "5300042": {
+      "hp": 10000,
+      "attack": 2000,
+      "why": "airship boarder: attack scaled so a group of three is a solo fight at L20, see about"
+    },
+    "5300043": {
+      "hp": 10000,
+      "attack": 2000,
+      "why": "airship boarder: attack scaled so a group of three is a solo fight at L20, see about"
+    },
+    "5300044": {
+      "hp": 10000,
+      "attack": 2000,
+      "why": "airship boarder: attack scaled so a group of three is a solo fight at L20, see about"
+    },
+    "5300045": {
+      "hp": 10000,
+      "attack": 2000,
+      "why": "airship boarder: attack scaled so a group of three is a solo fight at L20, see about"
+    },
+    "5300046": {
+      "hp": 10000,
+      "attack": 2000,
+      "why": "airship boarder: attack scaled so a group of three is a solo fight at L20, see about"
+    },
+    "5300047": {
+      "hp": 10000,
+      "attack": 2000,
+      "why": "airship boarder: attack scaled so a group of three is a solo fight at L20, see about"
+    },
+    "5300048": {
+      "hp": 10000,
+      "attack": 2000,
+      "why": "airship boarder: attack scaled so a group of three is a solo fight at L20, see about"
+    },
+    "5300049": {
+      "hp": 10000,
+      "attack": 2000,
+      "why": "airship boarder: attack scaled so a group of three is a solo fight at L20, see about"
+    },
+    "5300050": {
+      "hp": 10000,
+      "attack": 2000,
+      "why": "airship boarder: attack scaled so a group of three is a solo fight at L20, see about"
+    },
+    "5300082": {
+      "hp": 5210,
+      "attack": 2880,
+      "why": "Elusive Pecopeco: solo tuning, see about"
+    },
+    "about": "Story bosses were fought with allied NPC companions in the original; those are not reproduced. Each is scaled (basis points of HP and of attack) so a Swordman at the boss level, every stat point spent STR:VIT 2:1, no equipment, normal attacks only, kills it in about 90 s and would fall to it in about 1.4 times that (DungeonTests.EveryStoryBossIsASoloFightAtItsLevel). Inferred, not original data."
+  },
+  "dungeons": {
+    "1000401": {
+      "name": "Maya's nest",
+      "confidence": "medium",
+      "skipped": "Stages 2-5 (find and free the Professor from the ant egg, help him walk, open the chest) are scripted interactions; only Maya is placed, so the instance completes after stage 1.",
+      "waves": [
+        {
+          "stage": "Encounter Maya: defeat Maya",
+          "quest": 1,
+          "spawns": [
+            {
+              "point": 21,
+              "npc": 5300006,
+              "why": "label 蚁后刷怪点 'ant queen spawn point' and stage 1 'Defeat Maya'; story Maya template 5300006 (L30)"
+            }
+          ]
+        }
+      ]
+    },
+    "1000501": {
+      "name": "Airship",
+      "confidence": "medium",
+      "skipped": "Stage 1 (chat), stage 2 (cannons against the enemy airships), stages 5-6 (talking) and the allied NPCs are not reproduced; only the boarding fight and the boss. The nine boarders come in three groups of three (a solo player cannot hold nine at once; inferred).",
+      "waves": [
+        {
+          "stage": "The enemy has boarded the ship: eliminate all enemies (1/3)",
+          "quest": 3,
+          "spawns": [
+            {
+              "point": 44,
+              "npc": 5300042,
+              "why": "label 冲锋怪-1 'charging monster'; the client has exactly four story 'Evil Warrior' templates 5300042-45 for the four charge points"
+            },
+            {
+              "point": 45,
+              "npc": 5300043,
+              "why": "冲锋怪-2"
+            },
+            {
+              "point": 48,
+              "npc": 5300046,
+              "why": "label 弓箭-1 'archer'; exactly five story 'Evil Archer' templates 5300046-50 for the five archer points"
+            }
+          ]
+        },
+        {
+          "stage": "The enemy has boarded the ship: eliminate all enemies (2/3)",
+          "quest": 3,
+          "spawns": [
+            {
+              "point": 46,
+              "npc": 5300044,
+              "why": "冲锋怪-3"
+            },
+            {
+              "point": 49,
+              "npc": 5300047,
+              "why": "弓箭-2"
+            },
+            {
+              "point": 50,
+              "npc": 5300048,
+              "why": "弓箭-3"
+            }
+          ]
+        },
+        {
+          "stage": "The enemy has boarded the ship: eliminate all enemies (3/3)",
+          "quest": 3,
+          "spawns": [
+            {
+              "point": 47,
+              "npc": 5300045,
+              "why": "冲锋怪-4"
+            },
+            {
+              "point": 51,
+              "npc": 5300049,
+              "why": "弓箭-4"
+            },
+            {
+              "point": 52,
+              "npc": 5300050,
+              "why": "弓箭-5"
+            }
+          ]
+        },
+        {
+          "stage": "Defeat the Evil Boss",
+          "quest": 4,
+          "spawns": [
+            {
+              "point": 22,
+              "npc": 5300018,
+              "why": "stage 4 'Defeat the Evil Boss'; story template 5300018 'Evil Boss' (L25) at the first generic spawn point"
+            }
+          ]
+        }
+      ]
+    },
+    "1011301": {
+      "name": "Prontera North Gate",
+      "confidence": "high",
+      "skipped": "Stage 1 is walking to the fork (no enemy). Points 21-23 are copies of the spawn point; one Baphomet.",
+      "waves": [
+        {
+          "stage": "Defeat Baphomet",
+          "quest": 2,
+          "spawns": [
+            {
+              "point": 20,
+              "npc": 5300003,
+              "why": "stage 2 'Encountered Baphomet at Prontera's North Gate / Defeat Baphomet'; 5300003 is the client's story Baphomet (L40)"
+            }
+          ]
+        }
+      ]
+    },
+    "1015051": {
+      "name": "Culvert (story)",
+      "confidence": "high",
+      "skipped": "Points 27-32 are friendly adventurers (友方战士/牧师/弓箭手/魔法师, ids 20001004-6, 20001009-11): companions, not enemies; no companion AI.",
+      "waves": [
+        {
+          "stage": "Clear out the nearby Chonchons",
+          "quest": 1,
+          "spawns": [
+            {
+              "point": 22,
+              "npc": 5000005,
+              "why": "label 苍蝇1-1 'fly' = Chonchon; stage 1 text names Chonchons; Chonchon lives in the base map's region (L21)"
+            },
+            {
+              "point": 23,
+              "npc": 5000005,
+              "why": "label 苍蝇1-2, as point 22"
+            }
+          ]
+        },
+        {
+          "stage": "Continue investigating deeper",
+          "quest": 2,
+          "spawns": [
+            {
+              "point": 24,
+              "npc": 5000015,
+              "why": "label 盗虫2-1 'thief bug'; Thief Bug is the base map prt_sewb1's main monster (L21)"
+            },
+            {
+              "point": 25,
+              "npc": 5000015,
+              "why": "label 盗虫2-2"
+            },
+            {
+              "point": 26,
+              "npc": 5000015,
+              "why": "label 盗虫2-3"
+            }
+          ]
+        },
+        {
+          "stage": "Defeat Golden Thief Bug",
+          "quest": 3,
+          "spawns": [
+            {
+              "point": 33,
+              "npc": 5300002,
+              "why": "label MVP黄金虫 'MVP golden bug' and stage 3 text; 5300002 is the client's story-dungeon Golden Thief Bug template (530xxxx story series, like Eddga 5300001 in Payon Forest)"
+            }
+          ]
+        }
+      ]
+    },
+    "1020051": {
+      "name": "Payon (elite)",
+      "confidence": "medium",
+      "waves": [
+        {
+          "stage": "Eliminate the elite Squirrel",
+          "quest": 1,
+          "spawns": [
+            {
+              "point": 17,
+              "npc": 5000027,
+              "why": "stage text 'elite Squirrel'; the client has no monster named Squirrel; Smokie (L29), the Payon-region small mammal, is the closest; no elite stat scaling is invented"
+            }
+          ]
+        }
+      ]
+    },
+    "1021301": {
+      "name": "Southern Payon (portal waves)",
+      "confidence": "low",
+      "skipped": "The arrow points (箭头) are guides. Which monsters each original wave held is unknown; the waves use the base map pay_fild03's monsters, strongest last.",
+      "waves": [
+        {
+          "stage": "Wave 1",
+          "quest": 1,
+          "spawns": [
+            {
+              "point": 25,
+              "npc": 5000035,
+              "why": "stage 'Defeat three waves of attacking monsters' at 传送门1-3 'portal'; Pupa, the base map's most common monster"
+            },
+            {
+              "point": 26,
+              "npc": 5000035,
+              "why": "portal 2"
+            },
+            {
+              "point": 27,
+              "npc": 5000035,
+              "why": "portal 3"
+            }
+          ]
+        },
+        {
+          "stage": "Wave 2",
+          "quest": 1,
+          "spawns": [
+            {
+              "point": 25,
+              "npc": 5000028,
+              "why": "Boa, the base map's second monster"
+            },
+            {
+              "point": 26,
+              "npc": 5000028,
+              "why": "portal 2"
+            },
+            {
+              "point": 27,
+              "npc": 5000028,
+              "why": "portal 3"
+            }
+          ]
+        },
+        {
+          "stage": "Wave 3",
+          "quest": 1,
+          "spawns": [
+            {
+              "point": 25,
+              "npc": 5000007,
+              "why": "Willow, the base map's third monster"
+            },
+            {
+              "point": 26,
+              "npc": 5000007,
+              "why": "portal 2"
+            },
+            {
+              "point": 27,
+              "npc": 5000007,
+              "why": "portal 3"
+            }
+          ]
+        }
+      ]
+    },
+    "1021851": {
+      "name": "Eastern Payon (elite)",
+      "confidence": "high",
+      "waves": [
+        {
+          "stage": "Eliminate the elite Mandragora",
+          "quest": 1,
+          "spawns": [
+            {
+              "point": 17,
+              "npc": 5000025,
+              "why": "stage text 'elite Mandragora'; Mandragora (L35); no elite stat scaling is invented"
+            }
+          ]
+        }
+      ]
+    },
+    "1030051": {
+      "name": "Geffen (elite)",
+      "confidence": "medium",
+      "waves": [
+        {
+          "stage": "Eliminate the elite Savage",
+          "quest": 1,
+          "spawns": [
+            {
+              "point": 17,
+              "npc": 5000009,
+              "why": "stage text 'elite Savage', but the same server id 20001016 is labelled 小野猪 'little wild boar' in Geffen East Gate (1033052 point 32): Savage Babe (L14), which also fits the area's levels; Savage (L59) would not"
+            }
+          ]
+        }
+      ]
+    },
+    "1032101": {
+      "name": "Goblin Forest",
+      "confidence": "low",
+      "skipped": "Stage 1 is walking to the fork. The original pulls the player into a 'mysterious space' with a giant hand (likely the sphinx scene 3120702); that transfer is not reproduced, Pharaoh appears here instead so the step can be completed.",
+      "waves": [
+        {
+          "stage": "Defeat Pharaoh",
+          "quest": 2,
+          "spawns": [
+            {
+              "point": 20,
+              "npc": 5300010,
+              "why": "stage 2 text 'Defeat Pharaoh', same text as 3120702; story Pharaoh 5300010"
+            }
+          ]
+        }
+      ]
+    },
+    "1033051": {
+      "name": "Geffen East Gate",
+      "confidence": "high",
+      "skipped": "Point 19 is the portal (传送门, id 20001018), an actor the monsters come out of, not an enemy.",
+      "waves": [
+        {
+          "stage": "Eliminate the monsters emerging from the portal",
+          "quest": 1,
+          "spawns": [
+            {
+              "point": 18,
+              "npc": 5000009,
+              "why": "label 小野猪 'little wild boar' = Savage Babe"
+            },
+            {
+              "point": 20,
+              "npc": 5000003,
+              "why": "label 绿棉虫1 'green cotton worm' = Fabre (base map gef_fild00 monster)"
+            },
+            {
+              "point": 21,
+              "npc": 5000003,
+              "why": "label 绿棉虫2"
+            },
+            {
+              "point": 22,
+              "npc": 5000003,
+              "why": "label 绿棉虫3"
+            },
+            {
+              "point": 23,
+              "npc": 5000010,
+              "why": "label 蝗虫1 'locust' = Rocker"
+            },
+            {
+              "point": 24,
+              "npc": 5000010,
+              "why": "label 蝗虫2"
+            },
+            {
+              "point": 25,
+              "npc": 5000010,
+              "why": "label 蝗虫3"
+            },
+            {
+              "point": 26,
+              "npc": 5000011,
+              "why": "label 罗达蛙1 'Roda frog' = Roda Frog (base map monster)"
+            },
+            {
+              "point": 27,
+              "npc": 5000011,
+              "why": "label 罗达蛙2"
+            },
+            {
+              "point": 28,
+              "npc": 5000011,
+              "why": "label 罗达蛙3"
+            }
+          ]
+        }
+      ]
+    },
+    "1033052": {
+      "name": "Geffen East Gate (second)",
+      "confidence": "high",
+      "skipped": "Points 17-19 are portals (传送门, id 20001018).",
+      "waves": [
+        {
+          "stage": "Eliminate the monsters emerging from the portal",
+          "quest": 1,
+          "spawns": [
+            {
+              "point": 20,
+              "npc": 5000003,
+              "why": "label 绿棉虫1 = Fabre"
+            },
+            {
+              "point": 21,
+              "npc": 5000003,
+              "why": "label 绿棉虫2"
+            },
+            {
+              "point": 22,
+              "npc": 5000003,
+              "why": "label 绿棉虫3"
+            },
+            {
+              "point": 23,
+              "npc": 5000028,
+              "why": "label 毒蛇1 'venomous snake' = Boa (snake, L18)"
+            },
+            {
+              "point": 24,
+              "npc": 5000028,
+              "why": "label 毒蛇2"
+            },
+            {
+              "point": 25,
+              "npc": 5000028,
+              "why": "label 毒蛇3"
+            },
+            {
+              "point": 26,
+              "npc": 5000010,
+              "why": "label 蝗虫1 = Rocker"
+            },
+            {
+              "point": 27,
+              "npc": 5000010,
+              "why": "label 蝗虫2"
+            },
+            {
+              "point": 28,
+              "npc": 5000010,
+              "why": "label 蝗虫3"
+            },
+            {
+              "point": 29,
+              "npc": 5000011,
+              "why": "label 罗达蛙1 = Roda Frog"
+            },
+            {
+              "point": 30,
+              "npc": 5000011,
+              "why": "label 罗达蛙2"
+            },
+            {
+              "point": 31,
+              "npc": 5000011,
+              "why": "label 罗达蛙3"
+            },
+            {
+              "point": 32,
+              "npc": 5000009,
+              "why": "label 小野猪 = Savage Babe"
+            }
+          ]
+        }
+      ]
+    },
+    "1051001": {
+      "name": "Desert Crossroad (Peco Peco nest)",
+      "confidence": "medium",
+      "skipped": "Bragis (5300085) is the NPC to rescue, Ancient Nest (5300083) an object with an unknown mechanic; points 27-37 have no recoverable role.",
+      "waves": [
+        {
+          "stage": "Defeat the Peco Peco and rescue Bragis",
+          "quest": 1,
+          "spawns": [
+            {
+              "point": 26,
+              "npc": 5300082,
+              "why": "stage text 'Defeat the Peco Peco'; 5300082 'Elusive Pecopeco' is the client's story template for it (L25)"
+            }
+          ]
+        }
+      ]
+    },
+    "1051051": {
+      "name": "Desert Crossroad (elite)",
+      "confidence": "high",
+      "waves": [
+        {
+          "stage": "Eliminate the elite Scorpion",
+          "quest": 1,
+          "spawns": [
+            {
+              "point": 17,
+              "npc": 5000022,
+              "why": "stage text 'elite Scorpion'; Scorpion (L23), a Morroc desert monster"
+            }
+          ]
+        }
+      ]
+    },
+    "3120702": {
+      "name": "Pharaoh (main story)",
+      "confidence": "high",
+      "skipped": "Point 24 is not given a Pyramid/Coffin actor: their mechanic is unknown.",
+      "waves": [
+        {
+          "stage": "Defeat Pharaoh",
+          "quest": 1,
+          "spawns": [
+            {
+              "point": 20,
+              "npc": 5300010,
+              "why": "stage 'Mysterious Space / Defeat Pharaoh'; 5300010 is the client's story Pharaoh (L45)"
+            }
+          ]
+        }
+      ]
+    },
+    "3120902": {
+      "name": "Baphomet (main story maze)",
+      "confidence": "high",
+      "skipped": "Points 25 and 26 have no recoverable role; only the boss is placed.",
+      "waves": [
+        {
+          "stage": "Defeat Baphomet",
+          "quest": 1,
+          "spawns": [
+            {
+              "point": 20,
+              "npc": 5300003,
+              "why": "stage 'Encounter Baphomet / Defeat Baphomet'; story Baphomet template 5300003"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "notReconstructed": {
+    "1000101": "Job advance scene; no spawn points.",
+    "1000201": "Ant nest exploration: walking, jumping into the vortex, avoiding ant eggs; no fight. Rebuilt as a scripted scene: scripted-scenes.json.",
+    "1000301": "Riding and feeding the Deniro; no fight. Rebuilt as a scripted scene: scripted-scenes.json.",
+    "1010101": "Izlude scene; no spawn points.",
+    "1015052": "Culvert variant without spawn points.",
+    "1023001": "Payon instance without spawn points.",
+    "1054001": "Ant Hell scene without spawn points.",
+    "3120402": "Louie's game (find Kitty-Katie), retrieving an instrument; a minigame, not a fight. Rebuilt as a scripted scene: scripted-scenes.json.",
+    "3120703": "Louie's game, as 3120402.",
+    "3120802": "Moonlight Flower's hide-and-seek; being discovered is the failure, not a fight.",
+    "4400001": "Ring Test; a test map without stages.",
+    "5000101": "MVP role-playing party for up to 2000 players; an event, not a story dungeon."
+  }
+}

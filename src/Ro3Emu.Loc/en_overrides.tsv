@@ -1,0 +1,6 @@
+# English text the client already ships in English, replaced as drawn (Ro3Loc.MapFrom). "client text\tour text".
+# Loading-screen tips (LoadingInfoConfig 4 / 5 -> Localization 10460000000 with @{1}=3, 10460000001).
+Welcome to RO Ragnarok Online 3!	Welcome to Ragnarok Online 3!
+Goodbye, imitators! Only the real RO can fight!	Adventure awaits across Rune-Midgard!
+# Auction list cell (PUBLIC lot): the shipped sentence overflows the cell on both sides.
+Fixed price purchases will become available after the listing period ends.	Buyout opens when the listing ends.

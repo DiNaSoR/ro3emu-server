@@ -1,0 +1,329 @@
+#pragma warning disable CS1998 // arms that only send or return keep the uniform async shape
+using Google.Protobuf;
+using Romsg;
+
+namespace Ro3Emu.Server.Game;
+
+public sealed partial class GameMessageHandler
+{
+    private void MapSocialRoutes(Messaging.MessageRoutes routes)
+    {
+        // Not a guild-social owner: the default Realm reservation serializes the first entries of one guild, as 30400.
+        routes.Map(GuildHomeService.EnterHome, "guildHome", async (session, msgId, body) =>
+        {
+            await guildHome.EnterAsync(session);
+        });
+        routes.Map(83242, "campfire", async (session, msgId, body) =>
+        {
+            await campfire.InfoAsync(session);
+        });
+        routes.Map(GuildChallengeService.Info, "guildChallenge", async (session, msgId, body) =>
+        {
+            await guildChallenge.InfoAsync(session);
+        });
+        routes.Map(GuildChallengeService.Open, "guildChallenge", async (session, msgId, body) =>
+        {
+            await guildChallenge.OpenAsync(session, GuildDungeonChallengeOpenReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(83243, "campfire", async (session, msgId, body) =>
+        {
+            await campfire.AccelerantAsync(session, GuildCampFireAddAccelerantReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(83244, "campfire", async (session, msgId, body) =>
+        {
+            await campfire.PlayerInfoAsync(session);
+        });
+        routes.Map(82200, "friendExtra", async (session, msgId, body) =>
+        {
+            await friendExtra.CreateAsync(session, CreateFriendChatGroupReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(82201, "friendExtra", async (session, msgId, body) =>
+        {
+            await friendExtra.RenameAsync(session, RenameFriendChatGroupReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(82202, "friendExtra", async (session, msgId, body) =>
+        {
+            await friendExtra.InviteAsync(session, InviteFriendChatGroupReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(82203, "friendExtra", async (session, msgId, body) =>
+        {
+            await friendExtra.KickAsync(session, KickFriendChatGroupReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(82204, "friendExtra", async (session, msgId, body) =>
+        {
+            await friendExtra.DismissAsync(session, DismissFriendChatGroupReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(82205, "friendExtra", async (session, msgId, body) =>
+        {
+            await friendExtra.LeaveAsync(session, LeaveFriendChatGroupReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(82206, "friendExtra", async (session, msgId, body) =>
+        {
+            await friendExtra.DndAsync(session, SetFriendChatGroupDNDReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(82207, "friendExtra", async (session, msgId, body) =>
+        {
+            await friendExtra.FetchAsync(session);
+        });
+        routes.Map(82209, "friendExtra", async (session, msgId, body) =>
+        {
+            await friendExtra.GiftAsync(session, GiveFriendGiftReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(82210, "friendExtra", async (session, msgId, body) =>
+        {
+            await friendExtra.RecommendAsync(session);
+        });
+        routes.Map(42002, "teams", async (session, msgId, body) =>
+        {
+            await teams.ChangeTypeAsync(session, ChangeTeamTypeReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(42003, "teams", async (session, msgId, body) =>
+        {
+            await teams.ChangeInfoAsync(session, ChangeTeamInfoReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(42009, "teams", async (session, msgId, body) =>
+        {
+            await teams.RallyAsync(session, RallyTeamReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(42011, "teams", async (session, msgId, body) =>
+        {
+            await teams.RallyResponseAsync(session, RallyTeamMemberResponse.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(42012, "teams", async (session, msgId, body) =>
+        {
+            await teams.EditorAsync(session, EditorTeamReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(42013, "teams", async (session, msgId, body) =>
+        {
+            await teams.GetListAsync(session, GetTeamListReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(42014, "teams", async (session, msgId, body) =>
+        {
+            await teams.EnterAsync(session, EnterTeamReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(42015, "teams", async (session, msgId, body) =>
+        {
+            await teams.SetFlagAsync(session, TeamSetFlagReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(42018, "teams", async (session, msgId, body) =>
+        {
+            await teams.ApplyAsync(session, ApplyListOperateReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(42031, "teams", async (session, msgId, body) =>
+        {
+            await teams.FollowAsync(session, TeamFollowOperReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(42034, "teams", async (session, msgId, body) =>
+        {
+            await teams.RecruitAsync(session, TeamRecruitReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(GuildService.Create, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.CreateAsync(session, GuildCreateReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(GuildService.CheckSensitive, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.CheckSensitiveAsync(session, CheckSensitiveWordReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(GuildService.Recommend, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.RecommendAsync(session, GuildRecommendListReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(GuildService.HelperList, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.HelperListAsync(session, GuildCreateHelperListReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(32215, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.CancelCreateAsync(session);
+        });
+        routes.Map(32220, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.HelperOpeAsync(session, GuildCreateHelperOpeReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(32221, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.HelperLeaveAsync(session, GuildCreateHelperLeaveReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(32257, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.RecruitAsync(session, GuildRecruitReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(GuildService.Detail, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.DetailAsync(session, GuildDetailInfoReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(GuildService.MemberIds, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.MemberIdsAsync(session, GuildMemberIDListReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(GuildService.SyncOnce, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.SyncOnceAsync(session, SyncGuildDataOnceReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(GuildService.BuildUpgrade, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.BuildUpgradeAsync(session, GuildBuildLevelUpReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(GuildService.Apply, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.ApplyAsync(session, GuildEnterApplyReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(GuildService.ApplyOpe, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.ApplyOpeAsync(session, GuildEnterApplyOpeReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(GuildService.Invite, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.InviteAsync(session, GuildInviteReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(GuildService.InviteAck, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.InviteAckAsync(session, GuildInviteAckReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(GuildService.ChangeOfficial, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.ChangeOfficialAsync(session, GuildChangeOfficialReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(GuildService.Kick, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.KickAsync(session, GuildMemberKickReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(GuildService.Leave, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.LeaveAsync(session);
+        });
+        routes.Map(GuildService.Edit, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.EditAsync(session, GuildEditReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(GuildCaravanService.Show, "caravan", async (session, msgId, body) =>
+        {
+            await caravan.ShowAsync(session);
+        });
+        routes.Map(GuildCaravanService.Submit, "caravan", async (session, msgId, body) =>
+        {
+            await caravan.SubmitAsync(session, GuildCatShopItemSubmitReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(GuildCaravanService.WantHelp, "caravan", async (session, msgId, body) =>
+        {
+            await caravan.WantHelpAsync(session, GuildCatShopItemWantHelpReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(GuildCaravanService.HelpOther, "caravan", async (session, msgId, body) =>
+        {
+            await caravan.HelpOtherAsync(session, GuildCatShopItemHelpOtherReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(GuildCaravanService.HelpList, "caravan", async (session, msgId, body) =>
+        {
+            await caravan.HelpListAsync(session);
+        });
+        routes.Map(GuildCaravanService.Depart, "caravan", async (session, msgId, body) =>
+        {
+            await caravan.DepartAsync(session);
+        });
+        routes.Map(GuildCaravanService.Refresh, "caravan", async (session, msgId, body) =>
+        {
+            await caravan.RefreshAsync(session, GuildCatShopRefreshReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(GuildService.MarketBooth, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.MarketAsync(session, msgId, body);
+        });
+        routes.Map(GuildService.MarketItems, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.MarketAsync(session, msgId, body);
+        });
+        routes.Map(GuildService.MarketList, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.MarketAsync(session, msgId, body);
+        });
+        routes.Map(GuildService.MarketUnlist, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.MarketAsync(session, msgId, body);
+        });
+        routes.Map(GuildService.MarketBuy, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.MarketAsync(session, msgId, body);
+        });
+        routes.Map(GuildService.MarketSellRecords, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.MarketAsync(session, msgId, body);
+        });
+        routes.Map(GuildService.MarketBuyRecords, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.MarketAsync(session, msgId, body);
+        });
+        routes.Map(GuildService.MarketUpdate, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.MarketAsync(session, msgId, body);
+        });
+        routes.Map(TeamService.TeamCreate, "teams", async (session, msgId, body) =>
+        {
+            await teams.CreateAsync(session, TeamCreateReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(TeamService.TeamLeave, "teams", async (session, msgId, body) =>
+        {
+            await teams.LeaveAsync(session);
+        });
+        routes.Map(TeamService.TeamInvite, "teams", async (session, msgId, body) =>
+        {
+            await teams.InviteAsync(session, InviteIntoTeamReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(TeamService.TeamInviteeResp, "teams", async (session, msgId, body) =>
+        {
+            await teams.InviteeRespAsync(session, InviteeResp.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(TeamService.TeamOperate, "teams", async (session, msgId, body) =>
+        {
+            await teams.OperateAsync(session, TeamOperateReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(TeamService.TeamInviteList, "teams", async (session, msgId, body) =>
+        {
+            await teams.InviteListAsync(session, TeamInviteListReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(TeamService.TeamChangeMemberState, "teams", async (session, msgId, body) =>
+        {
+            await teams.ChangeMemberStateAsync(session, ChangeTeamMemberStateReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(GetGuildLeagueMgrData, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.LeagueMgrDataAsync(session, GetGuildLeagueMgrData);
+        });
+        routes.Map(SetFriendSystemMetadata, "friendExtra", async (session, msgId, body) =>
+        {
+            await friendExtra.SetAsync(session, SetFriendSystemMetadataReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(EmblemService.SetUp, "emblems", async (session, msgId, body) =>
+        {
+            await emblems.SetUpAsync(session, SetUpEmblemReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(EmblemService.SetDown, "emblems", async (session, msgId, body) =>
+        {
+            await emblems.SetDownAsync(session, SetDownEmblemReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(EmblemService.Upgrade, "emblems", async (session, msgId, body) =>
+        {
+            await emblems.UpgradeAsync(session, UpgradeEmblemReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(EmblemService.SwitchPlan, "emblems", async (session, msgId, body) =>
+        {
+            await emblems.SwitchPlanAsync(session, EmbleSwitchPlanReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(EmblemService.RenamePlan, "emblems", async (session, msgId, body) =>
+        {
+            await emblems.RenamePlanAsync(session, EmblemPlanChangeNameReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(ChatService.ImUserSig, "chat", async (session, msgId, body) =>
+        {
+            await chat.UserSigAsync(session);
+        });
+        routes.Map(ChatService.JoinChannel, "chat", async (session, msgId, body) =>
+        {
+            await chat.JoinAsync(session, JoinChatChannelReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(ChatService.TunnelUp, "chat", async (session, msgId, body) =>
+        {
+            await chat.TunnelAsync(session, body);
+        });
+    }
+}

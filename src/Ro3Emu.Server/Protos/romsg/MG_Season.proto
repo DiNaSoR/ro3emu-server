@@ -1,0 +1,65 @@
+syntax = "proto3";
+package romsg;
+import "FieldOption.proto";
+
+message UpdateSeasonStageInfo {
+  int64 stageId = 1;
+}
+
+message SeasonState {
+  int64 seasonId = 1;
+  int64 playBookId = 2;
+  int64 stageId = 3;
+}
+
+message DBSeasonStageInfo {
+  int64 ro3Define_SaveVersion = 9999;
+  int64 ro3Define_DbTerm = 10000;
+  int64 stageId = 1;
+  int64 seasonArea = 2;
+  int64 playbook = 3;
+  repeated int64 bornAreas = 4;
+  bool canMatch = 5;
+  bool finished = 6;
+}
+
+message SeasonStateChangeNotify {
+  romsg.SeasonState oldSeasonState = 1;
+  romsg.SeasonState newSeasonState = 2;
+}
+
+message SeasonTimeInfoNotify {
+  int64 seasonStartTime = 1;
+  int64 seasonBreakStartTime = 2;
+  int64 nextMatchStartTime = 3;
+  int64 matchResultPublicTime = 4;
+  int64 nextSeasonTime = 5;
+  int64 serverMatchUpCircle = 6;
+  int64 showCountDownTime = 7;
+  map<int64, romsg.SeasonStageTimeInfo> stageTimeInfo = 8;
+}
+
+message SeasonStageTimeInfo {
+  int64 stageId = 1;
+  int64 startTime = 2;
+  int64 endTime = 3;
+}
+
+message SeasonAreaMatchVersionResult {
+  int64 ro3Define_SaveVersion = 9999;
+  int64 ro3Define_DbTerm = 10000;
+  map<string, romsg.SeasonAreaMatchResult> versionResult = 1;
+  map<int32, int32> counter = 2;
+}
+
+message SeasonAreaMatchResult {
+  map<string, romsg.SeasonAreaMatchResultItem> matchResults = 1;
+}
+
+message SeasonAreaMatchResultItem {
+  int64 seasonAreaId = 1;
+  int64 season = 2;
+  int64 playbook = 3;
+  repeated int64 bornAreas = 4;
+}
+

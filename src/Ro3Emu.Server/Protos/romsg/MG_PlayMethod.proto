@@ -1,0 +1,157 @@
+syntax = "proto3";
+package romsg;
+import "MG_Common.proto";
+
+message ClimTowerInfoReq {
+}
+
+message ClimTowerInfoRsp {
+  int32 result = 1;
+  int32 layer = 2;
+  bool isCanSweep = 3;
+  repeated int32 petIds = 4;
+  int32 curDay = 5;
+  int32 durationTime = 6;
+  int64 passedMaxLayerConfID = 7;
+  int64 lastLayerConfID = 8;
+}
+
+message ClimTowerSweepReq {
+}
+
+message ClimTowerSweepRes {
+  int32 result = 1;
+  romsg.GetRewardNotify rewardNotify = 2;
+}
+
+message SetClimTowerPetsReq {
+  repeated int32 pets = 1;
+}
+
+message SetClimTowerPetsRes {
+  int32 result = 1;
+  repeated int32 pets = 2;
+}
+
+message ClimTowerStartReq {
+  int32 layer = 1;
+  bool isInClimTower = 2;
+}
+
+message ClimTowerStartRes {
+  int32 result = 1;
+}
+
+message ClimTowerEndNotify {
+  int32 result = 1;
+  int32 layer = 2;
+  int64 curTime = 3;
+  int32 duration = 4;
+  romsg.GetRewardNotify rewardNotify = 5;
+  bool climTowerResult = 6;
+  bool isNewRecord = 7;
+  int64 passedMaxLayerConfID = 8;
+}
+
+message ClimTowerQuickReq {
+}
+
+message ClimTowerQuickRes {
+  int32 result = 1;
+  int32 layer = 2;
+  int64 passedMaxLayerConfID = 3;
+  romsg.GetRewardNotify rewards = 4;
+}
+
+message ActivitySubTask {
+  int64 curProgress = 1;
+}
+
+message ActivityTask {
+  int32 id = 1;
+  bool isReceive = 2;
+  bool isComplete = 3;
+  repeated romsg.ActivitySubTask subTask = 4;
+  int32 curCompleteTimes = 5;
+  int64 startTime = 6;
+  int64 endTime = 7;
+}
+
+message DailyActivityTaskInfoReq {
+}
+
+message DailyActivityTaskInfoRes {
+  int32 result = 1;
+  repeated romsg.ActivityTask getActivityTask = 2;
+  repeated romsg.ActivityTask activityValueRewardTask = 3;
+  int32 activityValue = 4;
+}
+
+message ReceiveDailyActivityValueRewardReq {
+  int32 taskId = 1;
+}
+
+message ReceiveDailyActivityValueRewardRes {
+  int32 result = 1;
+  romsg.ActivityTask task = 2;
+}
+
+message DailyGetActivityTaskNotify {
+  romsg.ActivityTask task = 1;
+  int32 curActivity = 2;
+}
+
+message DailyActivityValueTaskNotify {
+  romsg.ActivityTask task = 1;
+}
+
+message LotteryRefreshData {
+  int32 dailyCount = 1;
+  int32 freeCount = 2;
+  bool isOpen = 3;
+  int32 totalCount = 4;
+}
+
+message LotteryRefreshResp {
+  map<int32, romsg.LotteryRefreshData> mapFreeCount = 1;
+}
+
+message AfterRefreshNotify {
+  romsg.DailyActivityTaskInfoRes dailyRes = 1;
+  romsg.ClimTowerInfoRsp climbTowerRes = 2;
+  romsg.LotteryRefreshResp lotteryRefreshResp = 3;
+}
+
+message QueryClimbTowerFirstPassRangeReq {
+  int64 minLayer = 1;
+  int64 maxLayer = 2;
+}
+
+message ClimbTowerFirstPassData {
+  int64 layer = 1;
+  bool hasFirstPass = 2;
+  int64 playerId = 3;
+  string playerName = 4;
+  int64 passTime = 5;
+  int32 headImage = 6;
+  int32 job = 7;
+  int32 gender = 8;
+}
+
+message QueryClimbTowerFirstPassRangeResp {
+  int32 result = 1;
+  repeated romsg.ClimbTowerFirstPassData results = 2;
+}
+
+message ClimbTowerClaimFirstPassRewardReq {
+}
+
+message ClimbTowerClaimFirstPassRewardRes {
+  int32 result = 1;
+  int64 claimedUpToLayer = 2;
+}
+
+message ClimbTowerSyncPetDeadStateRes {
+  map<int64, int64> petDeadState = 1;
+}
+

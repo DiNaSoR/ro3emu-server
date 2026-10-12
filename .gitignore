@@ -1,0 +1,20 @@
+# Build output
+bin/
+obj/
+dist/
+TestResults/
+*.user
+.vs/
+.idea/
+
+# Game data and client research: exported from your own client, never committed
+/data/
+/re/
+
+# Third-party decompiler (download it yourself)
+unluac.jar
+tools/unluac-batch/*.class
+
+# Load test runs
+/.loadtest/
+/.loadtest-temp/

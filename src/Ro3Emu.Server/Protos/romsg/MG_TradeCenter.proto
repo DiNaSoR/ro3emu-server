@@ -1,0 +1,827 @@
+syntax = "proto3";
+package romsg;
+import "MG_Common.proto";
+import "FieldOption.proto";
+
+enum ETradeItemSpecialType {
+  ETradeItemSpecialType_None = 0;
+  ETradeItemSpecialType_NotAppraisal = 1;
+  ETradeItemSpecialType_Appraisal = 2;
+  ETradeItemSpecialType_NotCollection = 3;
+  ETradeItemSpecialType_Collection = 4;
+}
+
+enum TradeSearchType {
+  TradeSearchType_None = 0;
+  TradeSearchType_Job = 1;
+  TradeSearchType_Grade = 2;
+  TradeSearchType_Quality = 3;
+  TradeSearchType_Part = 4;
+  TradeSearchType_SkillNum = 5;
+  TradeSearchType_SpSkills = 6;
+  TradeSearchType_BaseAttr = 7;
+  TradeSearchType_Entry = 8;
+  TradeSearchType_SubType = 9;
+  TradeSearchType_Apprise = 10;
+  TradeSearchType_Score = 11;
+  TradeSearchType_Price = 12;
+  TradeSearchType_Type = 13;
+}
+
+enum TradeAttionType {
+  tradeAttionType_None = 0;
+  tradeAttionType_ItemId = 1;
+  tradeAttionType_SkuId = 2;
+}
+
+enum PreTradeStatusEnums {
+  PreTradeStatusEnums_Init = 0;
+  PreTradeStatusEnums_Offline = 1;
+  PreTradeStatusEnums_Success = 2;
+  PreTradeStatusEnums_Refunded = 3;
+  PreTradeStatusEnums_ExceptionNotNotified = 4;
+  PreTradeStatusEnums_NotSelected = 5;
+}
+
+message FieldWhereFilter {
+  string field_name = 1;
+  string logical_operator = 2;
+  string logical_value = 3;
+}
+
+message QueryProductByParamWithPageRequest {
+  string war_zone_id = 1;
+  string game_season = 2;
+  repeated string rule_job = 3;
+  repeated string rule_grade = 4;
+  string category_id = 5;
+  string game_category_id = 6;
+  repeated string item_ids = 7;
+  int32 item_type = 8;
+  bool has_inventory = 9;
+  bool is_publicity = 10;
+  map<string, string> sort_filed = 11;
+  repeated romsg.FieldWhereFilter where_filed = 12;
+  int32 page_no = 13;
+  int32 page_size = 14;
+}
+
+message CountItemInTradeByParamResponse {
+  int32 count = 1;
+}
+
+message QueryItemInTradeByParamResponse {
+  repeated romsg.QueryItemInTradeByParamDTO item_trade_info = 1;
+}
+
+message QueryItemInTradeByParamDTO {
+  string app_id = 1;
+  string item_id = 2;
+  string war_zone_id = 3;
+  string game_category_id = 4;
+  double min_price = 5;
+  int32 inventory_quantity = 6;
+}
+
+message SCountQueryProductByParamRequest {
+  string war_zone_id = 1;
+  string category_id = 2;
+  string game_category_id = 3;
+  string spu_id = 4;
+  string item_id = 5;
+  int32 item_level = 6;
+  int32 item_type = 7;
+  string area_server_id = 8;
+  string last_document_id = 9;
+  bool is_publicity = 10;
+  bool has_inventory = 11;
+  repeated romsg.SFieldWhereFilter where_filed = 15;
+}
+
+message SQueryProductByParamRequest {
+  string war_zone_id = 1;
+  string category_id = 2;
+  string game_category_id = 3;
+  string spu_id = 4;
+  string item_id = 5;
+  int32 item_level = 6;
+  int32 item_type = 7;
+  string area_server_id = 8;
+  string last_document_id = 9;
+  bool is_publicity = 10;
+  bool has_inventory = 11;
+  int32 page_no = 12;
+  int32 page_size = 13;
+  int32 page_no_limit = 16;
+  map<string, string> sort_filed = 14;
+  repeated romsg.SFieldWhereFilter where_filed = 15;
+  string share_sku_id = 17;
+  romsg.ETradeItemSpecialType item_special_type = 18;
+  string user_role_id = 19;
+}
+
+message SQueryMultiProductByParamRequest {
+  repeated romsg.SQueryProductByParamRequest items = 1;
+}
+
+message SFieldWhereFilter {
+  string field_name = 1;
+  string logical_operator = 2;
+  string logical_value = 3;
+}
+
+message CCountItemInTradeByParamResponse {
+  int32 code = 1;
+  int32 errno = 2;
+  string errmsg = 3;
+  romsg.CCountItemInTradeByParam data = 4;
+}
+
+message CCountItemInTradeByParam {
+  int32 count = 1;
+}
+
+message CCommodityInfo {
+  string war_zone_id = 1;
+  string game_category_id = 2;
+  string item_id = 3;
+  int32 item_level = 4;
+  int32 item_type = 5;
+  string sku_id = 6;
+  string spu_id = 7;
+  string spu_name = 8;
+  int64 quantity = 9;
+  int64 sale_time = 10;
+  int64 suspension_time = 11;
+  int64 put_on_sale_time = 12;
+  int64 take_down_time = 13;
+  int64 publicity_time = 14;
+  string user_id = 15;
+  string user_role_id = 16;
+  string area_server_id = 17;
+  bool is_copy = 18;
+  int32 currency_type = 19;
+  double item_price = 20;
+  string ext_info = 21;
+  int32 status = 22;
+  bytes item_base_info = 23;
+  int32 equipment_appraisal = 24;
+  double recommended_price = 25;
+  string base_sku_id = 26;
+  romsg.ETradeItemSpecialType item_special_type = 27;
+}
+
+message CStrCommodityInfo {
+  string war_zone_id = 1;
+  string game_category_id = 2;
+  string item_id = 3;
+  int32 item_level = 4;
+  int32 item_type = 5;
+  string sku_id = 6;
+  string spu_id = 7;
+  string spu_name = 8;
+  int64 quantity = 9;
+  int64 sale_time = 10;
+  int64 suspension_time = 11;
+  int64 put_on_sale_time = 12;
+  int64 take_down_time = 13;
+  int64 publicity_time = 14;
+  string user_id = 15;
+  string user_role_id = 16;
+  string area_server_id = 17;
+  bool is_copy = 18;
+  int32 currency_type = 19;
+  double item_price = 20;
+  string ext_info = 21;
+  int32 status = 22;
+  bytes item_base_info = 23;
+}
+
+message CQueryProductByParamWithPageResp {
+  int32 code = 1;
+  int32 errno = 2;
+  string errmsg = 3;
+  romsg.CQueryProductByParamWithPage data = 4;
+}
+
+message CQueryProductByParamWithPage {
+  int32 item_id = 1;
+  bool is_publicity = 2;
+  int32 page_no = 3;
+  int32 page_size = 4;
+  map<string, string> sort_filed = 5;
+  int32 total_count = 6;
+  repeated romsg.CCommodityInfo data_list = 7;
+  double tax_rate = 8;
+  repeated romsg.SFieldWhereFilter where_filed = 9;
+  romsg.ETradeItemSpecialType item_special_type = 10;
+}
+
+message CQueryMultiProductByParamWithPageRespData {
+  repeated romsg.CQueryProductByParamWithPage items = 1;
+}
+
+message CQueryMultiProductByParamWithPageResp {
+  int32 code = 1;
+  int32 errno = 2;
+  string errmsg = 3;
+  romsg.CQueryMultiProductByParamWithPageRespData data = 4;
+}
+
+message QueryItemInventoryInfoByItemIdRequest {
+  string war_zone_id = 1;
+  string area_server_id = 2;
+  repeated string item_ids = 3;
+  bool is_from_db = 4;
+  bool is_publicity = 5;
+  string user_id = 6;
+  string user_role_id = 7;
+  string game_season = 8;
+  romsg.ETradeItemSpecialType item_special_type = 9;
+}
+
+message ItemInventoryInfo {
+  string app_id = 1;
+  string area_server_id = 2;
+  string item_id = 3;
+  int32 inventory_quantity = 4;
+  double min_price = 5;
+  double max_price = 6;
+  bool is_publicity = 7;
+  string war_zone_id = 8;
+  romsg.ETradeItemSpecialType item_special_type = 9;
+  string sku_id = 10;
+}
+
+message ItemInventoryInfoByItemIdResponse {
+  int32 code = 1;
+  int32 errno = 2;
+  string errmsg = 3;
+  romsg.ItemInventoryInfoByItemId data = 4;
+}
+
+message ItemInventoryInfoByItemId {
+  repeated romsg.ItemInventoryInfo item_inventory_infos = 1;
+}
+
+message FindItemPriceRequest {
+  string war_zone_id = 1;
+  string treasuer_pavilion_trace_app = 2;
+  string area_server_id = 3;
+  string item_id = 4;
+  int32 item_type = 5;
+  string spu_id = 6;
+  string item_ext_info = 7;
+  map<string, string> risk_param = 8;
+  romsg.ETradeItemSpecialType item_special_type = 9;
+}
+
+message FindItemPriceResponse {
+  int32 code = 1;
+  int32 errno = 2;
+  string errmsg = 3;
+  romsg.FindItemPrice data = 4;
+}
+
+message FindItemPrice {
+  string app_id = 1;
+  string war_zone_id = 2;
+  string area_server_id = 3;
+  string item_id = 4;
+  string spu_id = 5;
+  string risk_strage_id = 6;
+  double max_price = 7;
+  double min_price = 8;
+  double recommended_price = 9;
+  string item_ext_info = 10;
+  repeated double price_ladder = 11;
+}
+
+message QueryBuyTradeInfoRequest {
+  string area_server_id = 1;
+  string user_id = 2;
+  string user_role_id = 3;
+  string item_id = 4;
+  string spu_id = 5;
+  int64 start_time = 6;
+  int64 end_time = 7;
+  int32 status = 8;
+  int32 count = 9;
+  int32 page_no = 10;
+  int32 page_size = 11;
+  string war_zone_id = 12;
+}
+
+message BuyTradeInfo {
+  string app_id = 1;
+  string area_id = 2;
+  string order_id = 3;
+  string serial_number = 4;
+  string item_id = 5;
+  string spu_id = 6;
+  double total_price = 7;
+  int64 quantity = 8;
+  int64 sale_time = 9;
+  string user_id = 10;
+  string user_role_id = 11;
+  int32 status = 12;
+  string war_zone_id = 13;
+  bytes item_base_info = 14;
+}
+
+message BuyTradeInfoResponse {
+  int32 code = 1;
+  int32 errno = 2;
+  string errmsg = 3;
+  romsg.BuyTradeInfoEntity data = 4;
+}
+
+message BuyTradeInfoEntity {
+  repeated romsg.BuyTradeInfo buy_trade_infos = 1;
+}
+
+message CQuerySaleTradeInfoRequest {
+  string area_server_id = 1;
+  string user_id = 2;
+  string user_role_id = 3;
+  repeated string item_ids = 4;
+  repeated string spu_ids = 5;
+  repeated string sku_ids = 6;
+  int64 start_time = 7;
+  int64 end_time = 8;
+  int32 status = 9;
+  int32 count = 10;
+  int32 page_no = 11;
+  int32 page_size = 12;
+  string war_zone_id = 13;
+}
+
+message CSaleTradeInfoResponse {
+  int32 code = 1;
+  int32 errno = 2;
+  string errmsg = 3;
+  romsg.CSaleTradeInfoEntity data = 4;
+}
+
+message CSaleTradeInfoEntity {
+  repeated romsg.CSaleTradeInfo sale_trade_infos = 1;
+}
+
+message CSaleTradeInfo {
+  string app_id = 1;
+  string area_server_id = 2;
+  string detail_id = 3;
+  string serial_number = 4;
+  string order_id = 5;
+  string item_id = 6;
+  string spu_id = 7;
+  string sku_id = 8;
+  double sale_price = 9;
+  double total_price = 10;
+  int64 quantity = 11;
+  int64 sale_time = 12;
+  string user_id = 13;
+  string user_role_id = 14;
+  int32 status = 15;
+  bool is_copy_sku = 16;
+  string war_zone_id = 17;
+  bytes item_base_info = 18;
+}
+
+message CFindUserCreditScoreRequest {
+  string war_zone_id = 1;
+  string area_server_id = 2;
+  string user_id = 3;
+  string user_role_id = 4;
+  int32 query_reason = 5;
+}
+
+message CFindUserCreditScoreResponse {
+  int32 code = 1;
+  int32 errno = 2;
+  string errmsg = 3;
+  romsg.CFindUserCreditScore data = 4;
+  int32 query_reason = 5;
+}
+
+message CFindUserCreditScore {
+  string war_zone_id = 1;
+  string area_server_id = 2;
+  string user_id = 3;
+  string user_role_id = 4;
+  int32 user_credit_score = 5;
+  int32 user_credit_score_rate = 6;
+  int64 audit_duration = 7;
+  repeated int64 score_list = 8;
+  repeated int64 audit_duration_list = 9;
+  int32 low_credit_score_threshold = 10;
+  int32 poor_credit_score_threshold = 11;
+  int32 credit_score_ratio = 12;
+}
+
+message CFindSpuRecentTransationPriceRequest {
+  string war_zone_id = 1;
+  string item_id = 2;
+  string item_ext_info = 3;
+  romsg.ETradeItemSpecialType item_special_type = 4;
+}
+
+message CFindSpuRecentTransationPriceResponse {
+  int32 code = 1;
+  int32 errno = 2;
+  string errmsg = 3;
+  romsg.CFindSpuRecentTransationPrice data = 4;
+}
+
+message CFindSpuRecentTransationPrice {
+  string spu_id = 1;
+  double max_price = 2;
+  double min_price = 3;
+  double avg_price = 4;
+  repeated double point_price = 5;
+}
+
+message CSearchTopPropsRequest {
+  string war_zone_id = 1;
+  string area_server_id = 2;
+  string game_season = 3;
+  string item_id = 4;
+  repeated romsg.SFieldWhereFilter where_filed = 5;
+  bool is_publicity = 6;
+  int32 page_no = 7;
+  int32 page_size = 8;
+  int32 page_no_limit = 9;
+  map<string, string> sort_filed = 10;
+  string user_id = 11;
+  string user_role_id = 12;
+}
+
+message CQueryItemInTradeByParamDTO {
+  string app_id = 1;
+  string item_id = 2;
+  string war_zone_id = 3;
+  string game_category_id = 4;
+  double min_price = 5;
+  int32 inventory_quantity = 6;
+}
+
+message CQueryItemInTradeByParam {
+  repeated romsg.CQueryItemInTradeByParamDTO item_trade_info = 1;
+}
+
+message QueryPlayerBoothInfoRequest {
+  string war_zone_id = 1;
+  string area_server_id = 2;
+  string user_id = 3;
+  string user_role_id = 4;
+}
+
+message CQueryAllItemInventoryInfoByItemIdRequest {
+  string war_zone_id = 1;
+  string area_server_id = 2;
+  bool is_from_db = 3;
+  string user_id = 4;
+  string user_role_id = 5;
+  map<int32, romsg.TradeSpecialTypeInfo> item_info = 6;
+  map<int32, romsg.TradeSpecialTypeInfo> publicity_item_info = 7;
+}
+
+message TradeSpecialTypeInfo {
+  repeated string itemid = 1;
+}
+
+message CAllItemInventoryInfoByItemIdResponse {
+  int32 code = 1;
+  int32 errno = 2;
+  string errmsg = 3;
+  romsg.CAllItemInventoryInfoByItemId data = 4;
+}
+
+message CAllItemInventoryInfoByItemId {
+  map<int32, romsg.ItemInventoryInfoByItemId> item_info = 1;
+  map<int32, romsg.ItemInventoryInfoByItemId> publicity_item_info = 2;
+}
+
+message QueryProductBySkuIdReq {
+  repeated string sku_ids = 1;
+  string war_zone_id = 2;
+}
+
+message CQueryProductBySkuIdResp {
+  int32 code = 1;
+  int32 errno = 2;
+  string errmsg = 3;
+  romsg.CQueryProductBySkuId data = 4;
+}
+
+message CQueryProductBySkuId {
+  repeated romsg.CCommodityInfo commodity_infos = 1;
+}
+
+message ChangeSkuPriceReq {
+  string sku_id = 1;
+  double sku_price = 2;
+}
+
+message SChangeSkuPriceResp {
+  string sku_id = 1;
+  string spu_id = 2;
+  string item_id = 3;
+  double final_price = 4;
+  double price_diff = 5;
+  double recommended_price = 6;
+  double sku_price = 7;
+  repeated romsg.CCommodityInfo booth_infos = 8;
+  romsg.CCommodityInfo commodity_info = 9;
+}
+
+message ChangeSkuPriceResp {
+  int32 code = 1;
+  int32 errno = 2;
+  string errmsg = 3;
+  romsg.SChangeSkuPriceResp data = 4;
+}
+
+message CQueryPlayerBoothInfoResp {
+  int32 code = 1;
+  int32 errno = 2;
+  string errmsg = 3;
+  romsg.CQueryProductByParamWithPage data = 4;
+}
+
+message CSearchTopPropsResp {
+  int32 code = 1;
+  int32 errno = 2;
+  string errmsg = 3;
+  romsg.CQueryProductByParamWithPage data = 4;
+}
+
+message CQueryPenaltyOrdersResponse {
+  int32 code = 1;
+  int32 errno = 2;
+  string errmsg = 3;
+  romsg.CQueryPenaltyOrdersPage data = 4;
+}
+
+message CQueryPenaltyOrdersPage {
+  int32 pageNo = 1;
+  int32 totalCount = 2;
+  repeated romsg.CQueryPenaltyOrdersDTO penaltyOrders = 3;
+  double totalFreezeAmount = 4;
+}
+
+message CQueryPenaltyOrdersDTO {
+  string detail_id = 1;
+  string serial_number = 2;
+  string item_id = 3;
+  string spu_id = 4;
+  string sku_id = 5;
+  double sale_price = 6;
+  double freeze_amount = 7;
+  int64 freeze_time = 8;
+  int64 quantity = 9;
+  int64 sale_time = 10;
+  bytes item_base_info = 11;
+}
+
+message CQueryPenaltyOrdersRequest {
+  string war_zone_id = 1;
+  string user_id = 2;
+  string user_role_id = 3;
+  int32 page_no = 4;
+  int32 page_size = 5;
+}
+
+message CbbPutOnItemReq {
+  int32 war_zone_id = 1;
+  int32 area_server_id = 2;
+  int32 item_id = 3;
+  int32 item_price = 4;
+  int32 currency_type = 5;
+  int32 quantity = 6;
+  string item_ext_info = 7;
+  romsg.ItemBaseInfo info = 8;
+}
+
+message TradePutOnItemReq {
+  int64 item_Guid = 1;
+  int32 item_price = 2;
+  int32 currency_type = 3;
+  int32 quantity = 4;
+  string itemName = 5;
+}
+
+message TradePutOnItemResp {
+  int32 result = 1;
+  double tax = 2;
+  int32 itemId = 3;
+  repeated romsg.CCommodityInfo booth_infos = 4;
+}
+
+message TradeBuyItemsReq {
+  string spuId = 1;
+  int32 totalQuantity = 2;
+  int32 price = 3;
+  int32 totalPrice = 4;
+  int32 itemId = 5;
+  string skuId = 6;
+}
+
+message TradeBuyItemsResp {
+  int32 result = 1;
+}
+
+message TradeBuyNormalItemsReq {
+  string spuId = 1;
+  int32 totalQuantity = 2;
+  int32 price = 3;
+  int32 totalPrice = 4;
+  int32 itemId = 5;
+}
+
+message TradeBuyNormalItemsResp {
+  int32 result = 1;
+}
+
+message TradeUnLockCubeReq {
+}
+
+message TradeUnLockCubeResp {
+  int32 result = 1;
+}
+
+message TradePutOffItemReq {
+  int32 itemId = 1;
+  string spuId = 2;
+  string skuId = 3;
+  int32 quantity = 4;
+  int32 putoffType = 5;
+}
+
+message TradePutOffItemResp {
+  int32 result = 1;
+  repeated romsg.CCommodityInfo booth_infos = 2;
+}
+
+message TradeAttionReq {
+  int32 opType = 1;
+  int32 attionType = 2;
+  string id = 3;
+  int32 key = 4;
+}
+
+message TradeAttionResp {
+  int32 result = 1;
+  int32 opType = 2;
+  int32 attionType = 3;
+  string id = 4;
+}
+
+message RefreshTradeMarketReq {
+}
+
+message RefreshTradeMarketResp {
+  int32 result = 1;
+}
+
+message skuQueueNtf {
+  int32 itemId = 1;
+  int32 price = 2;
+  int32 quantity = 3;
+  int64 saleTime = 4;
+  string skuId = 5;
+}
+
+message tradeAppovalNtf {
+  bytes tradeNtf = 1;
+}
+
+message tradeMultiPutOffNtf {
+  bytes tradeNtf = 1;
+}
+
+message tradeSendRewardNtf {
+  int64 userId = 1;
+  string orderId = 2;
+  int32 punishment = 3;
+  double payamount = 4;
+  int32 itemId = 5;
+  int32 itemNum = 6;
+  double tax = 7;
+  double taxRate = 8;
+  int64 saleTime = 9;
+  int32 creditReturnRatio = 10;
+}
+
+message tradeStrategyOrder {
+  bytes strategyOrder = 1;
+}
+
+message CPreTradeTopRequest {
+  string spuId = 1;
+  int32 totalQuantity = 2;
+  int32 price = 3;
+  int32 totalPrice = 4;
+  int32 itemId = 5;
+  string skuId = 6;
+}
+
+message CPreTradeTopResponse {
+  int32 result = 1;
+}
+
+message CPreTradeTopQueryRequest {
+  string war_zone_id = 1;
+  string user_id = 2;
+  string user_role_id = 3;
+  int32 page_no = 4;
+  int32 page_size = 5;
+}
+
+message CPreTradeTopQueryResponse {
+  int32 code = 1;
+  int32 errno = 2;
+  string errmsg = 3;
+  romsg.CPreTradeTopQueryPage data = 4;
+}
+
+message CPreTradeTopQueryPage {
+  int32 pageNo = 1;
+  int32 totalCount = 2;
+  int32 pageSize = 3;
+  repeated romsg.CPreTradeTopOrderDTO pre_trade_order = 4;
+}
+
+message CPreTradeTopOrderDTO {
+  string pre_trade_id = 1;
+  string user_id = 2;
+  string user_role_id = 3;
+  string item_id = 4;
+  string sku_id = 5;
+  int32 quantity = 6;
+  romsg.PreTradeStatusEnums status = 7;
+  int64 create_time = 8;
+  int64 sale_begin_time = 9;
+  int64 price = 10;
+  bytes item_base_info = 11;
+  int64 credit_point_cost = 12;
+}
+
+message CRefundPreTradeTopRequest {
+  string war_zone_id = 1;
+  string user_id = 2;
+  string user_role_id = 3;
+  repeated string pre_trade_order_ids = 4;
+  bool is_reward = 5;
+}
+
+message CRefundPreTradeTopResponse {
+  int32 code = 1;
+  int32 errno = 2;
+  string errmsg = 3;
+  romsg.CRefundPreTradeTopDTO data = 4;
+}
+
+message CRefundPreTradeTopDTO {
+  repeated romsg.CPreTradeTopOrderDTO orders = 1;
+  bool is_reward = 2;
+}
+
+message preTradeResultRequest {
+  bytes request = 1;
+}
+
+message ExpiredItemsNtf {
+  int32 expired_count = 1;
+}
+
+message PreTradeFailNtf {
+}
+
+message PreTradeSuccessNtf {
+}
+
+message TradeCommonNtf {
+  romsg.ExpiredItemsNtf expire_ntf = 1;
+  romsg.PreTradeFailNtf pre_trade_ntf = 2;
+  romsg.PreTradeSuccessNtf pre_trade_success_ntf = 3;
+}
+
+service ProductService {
+  rpc CountProductByParamWithPage (romsg.SCountQueryProductByParamRequest) returns (romsg.CCountItemInTradeByParamResponse);
+  rpc QueryProductByParamWithPage (romsg.SQueryProductByParamRequest) returns (romsg.CQueryProductByParamWithPageResp);
+  rpc QueryItemInventoryInfoByItemId (romsg.QueryItemInventoryInfoByItemIdRequest) returns (romsg.ItemInventoryInfoByItemIdResponse);
+  rpc FindItemPrice (romsg.FindItemPriceRequest) returns (romsg.FindItemPriceResponse);
+  rpc BuyTradeInfoWithUser (romsg.QueryBuyTradeInfoRequest) returns (romsg.BuyTradeInfoResponse);
+  rpc SaleTradeInfoWithUser (romsg.CQuerySaleTradeInfoRequest) returns (romsg.CSaleTradeInfoResponse);
+  rpc QueryPlayerBoothInfo (romsg.QueryPlayerBoothInfoRequest) returns (romsg.CQueryPlayerBoothInfoResp);
+  rpc FindUserCreditScore (romsg.CFindUserCreditScoreRequest) returns (romsg.CFindUserCreditScoreResponse);
+  rpc FindSpuRecentTransationPrice (romsg.CFindSpuRecentTransationPriceRequest) returns (romsg.CFindSpuRecentTransationPriceResponse);
+  rpc SearchTopProps (romsg.CSearchTopPropsRequest) returns (romsg.CSearchTopPropsResp);
+  rpc QueryAllItemInventoryInfoByItemId (romsg.CQueryAllItemInventoryInfoByItemIdRequest) returns (romsg.CAllItemInventoryInfoByItemIdResponse);
+  rpc QueryProductBySkuId (romsg.QueryProductBySkuIdReq) returns (romsg.CQueryProductBySkuIdResp);
+  rpc ChangeSkuPrice (romsg.ChangeSkuPriceReq) returns (romsg.ChangeSkuPriceResp);
+  rpc QueryPenaltyOrders (romsg.CQueryPenaltyOrdersRequest) returns (romsg.CQueryPenaltyOrdersResponse);
+  rpc TtTradeGetAllPreTradeTop (romsg.CPreTradeTopQueryRequest) returns (romsg.CPreTradeTopQueryResponse);
+}
+

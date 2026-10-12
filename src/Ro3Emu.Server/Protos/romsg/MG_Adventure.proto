@@ -1,0 +1,22 @@
+syntax = "proto3";
+package romsg;
+
+message AdventureEventSelectReq {
+  int64 operateId = 1;
+  repeated int64 cardId = 2;
+}
+
+message AdventureEventSelectResp {
+  int32 result = 1;
+  romsg.AdventureEventSelectReq req = 2;
+}
+
+message AdventureRefreshReq {
+  int64 operateId = 1;
+}
+
+message AdventureRefreshResp {
+  int32 result = 1;
+  romsg.AdventureRefreshReq req = 2;
+}
+

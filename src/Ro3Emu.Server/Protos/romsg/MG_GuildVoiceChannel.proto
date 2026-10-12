@@ -1,0 +1,266 @@
+syntax = "proto3";
+package romsg;
+import "FieldOption.proto";
+
+enum GuildSpeakAuthorityType {
+  GuildSpeakAuthorityType_Free = 0;
+  GuildSpeakAuthorityType_Order = 1;
+}
+
+message GuildVoiceChannelMemberData {
+  int64 playerId = 1;
+  int64 joinTime = 2;
+}
+
+message GuildVoiceInviteState {
+  int64 playerId = 1;
+  int64 lastInviteTime = 3;
+  int64 rejectInviteUntil = 4;
+}
+
+message GuildVoiceApplyInfo {
+  int64 playerId = 1;
+  string reason = 2;
+  int64 applyTime = 3;
+}
+
+message GuildVoiceAllData {
+  map<int32, romsg.GuildVoiceChannelData> voiceChannels = 1;
+  map<int64, romsg.GuildVoiceInviteState> memberVoiceStates = 2;
+}
+
+message GuildVoiceChannelData {
+  int32 channelIndex = 1;
+  map<int64, int64> blackList = 2;
+  map<int64, romsg.GuildVoiceChannelMemberData> currentMembers = 3;
+  romsg.GuildSpeakAuthorityType speakMode = 4;
+  repeated int64 speakerList = 5;
+  map<int64, romsg.GuildVoiceApplyInfo> applyList = 6;
+  int64 createTime = 7;
+}
+
+message GuildVoiceChannelJoinReq {
+  int32 channelIndex = 1;
+}
+
+message GuildVoiceChannelJoinRsp {
+  int32 errorCode = 1;
+  romsg.GuildVoiceChannelInfo channelInfo = 2;
+}
+
+message GuildVoiceChannelLeaveReq {
+  int32 channelIndex = 1;
+}
+
+message GuildVoiceChannelLeaveRsp {
+  int32 errorCode = 1;
+}
+
+message GuildVoiceChannelSetSpeakModeReq {
+  int32 channelIndex = 1;
+  romsg.GuildSpeakAuthorityType speakMode = 2;
+}
+
+message GuildVoiceChannelSetSpeakModeRsp {
+  int32 errorCode = 1;
+}
+
+message GuildVoiceChannelApplyMicReq {
+  int32 channelIndex = 1;
+  string reason = 2;
+}
+
+message GuildVoiceChannelApplyMicRsp {
+  int32 errorCode = 1;
+}
+
+message GuildVoiceChannelHandleApplyReq {
+  int32 channelIndex = 1;
+  int64 targetPlayerId = 2;
+  bool isAgree = 3;
+}
+
+message GuildVoiceChannelHandleApplyRsp {
+  int32 errorCode = 1;
+}
+
+message GuildVoiceChannelKickPlayerReq {
+  int32 channelIndex = 1;
+  int64 targetPlayerId = 2;
+}
+
+message GuildVoiceChannelKickPlayerRsp {
+  int32 errorCode = 1;
+}
+
+message GuildVoiceChannelUnbanPlayerReq {
+  int32 channelIndex = 1;
+  int64 targetPlayerId = 2;
+}
+
+message GuildVoiceChannelUnbanPlayerRsp {
+  int32 errorCode = 1;
+  int64 targetPlayerId = 2;
+}
+
+message GuildVoiceChannelInviteReq {
+  int32 channelIndex = 1;
+  repeated int64 targetPlayerIds = 2;
+}
+
+message GuildVoiceChannelInviteFailedPlayer {
+  int64 playerId = 1;
+  int32 errorCode = 2;
+}
+
+message GuildVoiceChannelInviteRsp {
+  int32 errorCode = 1;
+  repeated romsg.GuildVoiceChannelInviteFailedPlayer PlayersResult = 2;
+}
+
+message GuildVoiceChannelInviteResponseReq {
+  int32 channelIndex = 1;
+  bool isAccept = 2;
+  bool rejectAll = 3;
+  int64 inviteUserId = 4;
+}
+
+message GuildVoiceChannelInviteResponseRsp {
+  int32 errorCode = 1;
+  romsg.GuildVoiceChannelInfo channelInfo = 2;
+}
+
+message GuildVoiceChannelGetInviteStatesReq {
+  int32 channelIndex = 1;
+}
+
+message GuildVoiceChannelGetInviteStatesRsp {
+  int32 errorCode = 1;
+  int32 channelIndex = 2;
+  map<int64, romsg.GuildVoiceInviteState> memberVoiceStates = 3;
+}
+
+message GuildVoiceTypeDownMessageReq {
+  int32 type = 1;
+  int32 channelId = 2;
+}
+
+message GuildVoiceTypeDownMessageResp {
+  int32 errorCode = 1;
+}
+
+message GuildVoiceGetNotInCdPlayerReq {
+}
+
+message GuildVoiceGetNotInCdPlayerResp {
+  int32 errorCode = 1;
+  repeated int64 userIds = 2;
+}
+
+message GuildVoiceChannelGetBlackListReq {
+  int32 channelIndex = 1;
+}
+
+message GuildVoiceChannelGetBlackListRsp {
+  int32 errorCode = 1;
+  map<int64, int64> blackList = 2;
+}
+
+message GuildVoiceChannelSpeakPermissionItem {
+  int64 targetPlayerId = 1;
+  bool grantPermission = 2;
+}
+
+message GuildVoiceChannelSetSpeakPermissionReq {
+  int32 channelIndex = 1;
+  repeated romsg.GuildVoiceChannelSpeakPermissionItem permissionItems = 2;
+  romsg.GuildSpeakAuthorityType speakMode = 3;
+}
+
+message GuildVoiceChannelSetSpeakPermissionRsp {
+  int32 errorCode = 1;
+}
+
+message GuildVoiceChannelGetAllMemberCountReq {
+}
+
+message GuildVoiceChannelGetAllMemberCountRsp {
+  int32 errorCode = 1;
+  repeated romsg.ChannelMemberCount channelCounts = 2;
+}
+
+message GuildVoiceChannelUpdateNotify {
+  int32 channelIndex = 1;
+  romsg.GuildVoiceChannelInfo channelInfo = 2;
+}
+
+message GuildVoiceChannelMemberChangeNotify {
+  int32 channelIndex = 1;
+  int64 playerId = 2;
+  bool isJoin = 4;
+}
+
+message GuildVoiceChannelKickedNotify {
+  int32 channelIndex = 1;
+}
+
+message GuildVoiceChannelSpeakModeChangeNotify {
+  int32 channelIndex = 1;
+  romsg.GuildSpeakAuthorityType speakMode = 2;
+}
+
+message GuildVoiceChannelApplyNotify {
+  int32 channelIndex = 1;
+  int64 playerId = 2;
+  string reason = 3;
+  int64 applyTime = 4;
+}
+
+message GuildVoiceChannelApplyResultNotify {
+  int32 channelIndex = 1;
+  bool isAgree = 2;
+}
+
+message GuildVoiceChannelSpeakPermissionNotify {
+  int32 channelIndex = 1;
+  int64 playerId = 2;
+  bool hasPermission = 3;
+}
+
+message GuildVoiceChannelInviteNotify {
+  int32 channelIndex = 1;
+  int64 inviterPlayerId = 2;
+  int32 timeoutSeconds = 3;
+}
+
+message GuildVoiceChannelInviteResponseNotify {
+  int32 channelIndex = 1;
+  int64 targetPlayerId = 2;
+  bool isAccept = 3;
+}
+
+message GuildVoiceChannelInfo {
+  int32 channelIndex = 1;
+  romsg.GuildSpeakAuthorityType speakMode = 2;
+  repeated romsg.GuildVoiceChannelMember members = 3;
+  repeated romsg.ApplyInfo applyList = 4;
+  int32 totalMemberCount = 5;
+}
+
+message GuildVoiceChannelMember {
+  int64 playerId = 1;
+  int64 joinTime = 2;
+  bool hasSpeakPermission = 3;
+}
+
+message ApplyInfo {
+  int64 playerId = 1;
+  string reason = 2;
+  int64 applyTime = 3;
+}
+
+message ChannelMemberCount {
+  int32 channelIndex = 1;
+  int32 memberCount = 2;
+}
+

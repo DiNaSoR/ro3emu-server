@@ -1,0 +1,57 @@
+syntax = "proto3";
+package romsg;
+import "MG_DB.proto";
+
+message LibraryInfoNotify {
+  int32 overviewTheme = 1;
+  map<int32, romsg.LibraryCardInfo> cards = 2;
+  map<int32, romsg.LibraryMonsterInfo> monsters = 3;
+  map<int32, romsg.LibraryPageInfo> pages = 4;
+}
+
+message LibraryBorrowPageReq {
+  int32 pageId = 1;
+  int64 roleId = 2;
+}
+
+message LibraryBorrowPageResp {
+  int32 result = 1;
+  int32 pageId = 2;
+}
+
+message LibraryCardUnlockReq {
+  int32 cardId = 1;
+  bool isTreasure = 2;
+}
+
+message LibraryCardUnlockResp {
+  int32 result = 1;
+  int32 cardId = 2;
+}
+
+message LibraryMonsterUnlockReq {
+  int64 monsterId = 1;
+}
+
+message LibraryMonsterUnlockResp {
+  int32 result = 1;
+}
+
+message LibrarySwitchThemeReq {
+  int32 themeId = 1;
+}
+
+message LibrarySwitchThemeResp {
+  int32 result = 1;
+  int32 themeId = 2;
+}
+
+message LibraryClaimBookRewardReq {
+  int32 bookId = 1;
+}
+
+message LibraryClaimBookRewardResp {
+  int32 result = 1;
+  int32 bookId = 2;
+}
+

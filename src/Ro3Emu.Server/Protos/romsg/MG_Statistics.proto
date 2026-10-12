@@ -1,0 +1,53 @@
+syntax = "proto3";
+package romsg;
+import "MG_Common.proto";
+import "MG_DB.proto";
+
+message DungeonStatisticsInfoWithDungeonReq {
+  repeated int64 staisticsIds = 1;
+}
+
+message DungeonStatisticsInfoWithDungeonResp {
+  int32 result = 1;
+  repeated romsg.DungeonStatisticsInfoWithDungeon dungeonStatistics = 2;
+}
+
+message GetDungeonStatisticsInDungeonReq {
+}
+
+message GetDungeonStatisticsInDungeonResp {
+  int32 result = 1;
+  romsg.DungeonStatisticsInfoWithDungeon dungeonStatistics = 2;
+}
+
+message DungeonPlayerStatisticsNtf {
+  int64 playerId = 1;
+  romsg.RoleStatisticsInfo statisticsInfo = 2;
+}
+
+message DungeonTaskScoreRoleInfo {
+  int64 playerId = 1;
+  int64 taskValue = 2;
+}
+
+message DungeonTaskScoreNtf {
+  repeated romsg.DungeonTaskScoreRoleInfo playerRankList = 1;
+}
+
+message DungeonSnapshotNotify {
+  romsg.DungeonSnapshotData snapshot = 1;
+}
+
+message QueryDungeonResultReq {
+  repeated string resultIds = 1;
+}
+
+message QueryDungeonResultResp {
+  repeated romsg.DBDungeonResultData results = 1;
+}
+
+message DungeonResultNotify {
+  romsg.DungeonResultInfo resultInfo = 1;
+  string resultId = 2;
+}
+

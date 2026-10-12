@@ -1,0 +1,19 @@
+syntax = "proto3";
+package romsg;
+
+message GetThreeDayLevelAwardReq {
+  int64 levelAwardCfgId = 1;
+}
+
+message GetThreeDayLevelAwardRsp {
+  int32 placeholder = 1;
+}
+
+message GetThreeDayFunctionPreviewAwardReq {
+  int64 functionPreviewCfgId = 1;
+}
+
+message GetThreeDayFunctionPreviewAwardRsp {
+  int32 placeholder = 1;
+}
+

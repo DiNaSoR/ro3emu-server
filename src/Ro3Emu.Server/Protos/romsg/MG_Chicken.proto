@@ -1,0 +1,321 @@
+syntax = "proto3";
+package romsg;
+import "MG_Common.proto";
+import "FieldOption.proto";
+
+enum ChickenItemType {
+  ChickenItemType_None = 0;
+  ChickenItemType_Item = 1;
+  ChickenItemType_Skill = 2;
+  ChickenItemType_Equip = 3;
+  ChickenItemType_Occupation = 4;
+  ChickenItemType_IdentityCard = 5;
+  ChickenItemType_Currency = 6;
+}
+
+enum EChickenFollowNotifyType {
+  EChickenFollowNotifyType_Cancle = 0;
+  EChickenFollowNotifyType_Invite = 1;
+  EChickenFollowNotifyType_Followed = 2;
+}
+
+enum EChickenOpenPanel {
+  EChickenOpenPanel_None = 0;
+  EChickenOpenPanel_Shop = 5000008;
+  EChickenOpenPanel_Adventure = 5000009;
+  EChickenOpenPanel_Ambulance = 5000010;
+}
+
+message ChickenInitData {
+  int32 teamCount = 1;
+  int32 teamMemberCount = 2;
+  map<int64, int64> playerToTeamId = 3;
+  int32 matchEntry = 4;
+}
+
+message ChickenDungeonInfo {
+  int64 chickenOpenTime = 1;
+  map<int32, int64> skills = 2;
+  map<int32, int32> items = 3;
+  map<int32, int64> equips = 4;
+  map<int64, int64> identityCards = 5;
+}
+
+message NpcBuyItemReq {
+  int64 npcId = 1;
+  int32 itemId = 2;
+  int32 count = 3;
+}
+
+message NpcBuyItemResp {
+  int32 result = 1;
+  int64 npcId = 2;
+  int32 itemId = 3;
+  int32 count = 4;
+}
+
+message InsertChickenItemReq {
+  romsg.ChickenItemType type = 1;
+  int32 index = 2;
+  int64 itemGuid = 3;
+}
+
+message InsertChickenItemResp {
+  int32 result = 1;
+  romsg.ChickenItemType type = 2;
+  int32 index = 3;
+  int64 itemGuid = 4;
+}
+
+message UseChickenItemReq {
+  int64 itemGuid = 1;
+  int32 count = 2;
+}
+
+message UseChickenItemResp {
+  int32 result = 1;
+  int64 itemGuid = 2;
+  int32 count = 3;
+}
+
+message DiscardChickenItemReq {
+  map<int64, int32> items = 1;
+  int64 npcId = 2;
+  romsg.Vec3 pos = 3;
+}
+
+message DiscardChickenItemResp {
+  int32 result = 1;
+  int64 npcId = 3;
+  romsg.Vec3 pos = 4;
+}
+
+message PickUpChickenItemReq {
+  int64 npcId = 1;
+  int64 itemGuid = 2;
+  int32 count = 3;
+}
+
+message PickUpChickenItemResp {
+  int32 result = 1;
+  int64 npcId = 2;
+  int64 itemGuid = 3;
+  int32 count = 4;
+  romsg.ItemBaseInfo itemInfo = 5;
+}
+
+message PickUpAllChickenItemReq {
+  repeated int64 npcIds = 1;
+}
+
+message PickUpAllChickenItemResp {
+  int32 result = 1;
+  repeated int64 npcIds = 2;
+}
+
+message PickChickenItemNotify {
+  repeated romsg.ItemBaseInfo pickItems = 1;
+}
+
+message SelectRoleCareerReq {
+  int32 career = 1;
+}
+
+message SelectRoleCareerResp {
+  int32 result = 1;
+  int32 career = 2;
+}
+
+message SelectRolePositionReq {
+  int32 positionX = 1;
+  int32 positionY = 2;
+}
+
+message SelectRolePositionResp {
+  int32 result = 1;
+  int32 positionX = 2;
+  int32 positionY = 3;
+}
+
+message SelectRolePositionNotify {
+  message SelectRolePositionInfo {
+    int64 roleId = 1;
+    int32 positionX = 2;
+    int32 positionY = 3;
+    int32 playerNum = 4;
+    int32 opId = 5;
+  }
+
+  map<int64, romsg.SelectRolePositionNotify.SelectRolePositionInfo> infos = 1;
+}
+
+message ChickenSelectFollowReq {
+  romsg.EChickenFollowNotifyType type = 1;
+  int64 roleId = 2;
+  int64 followedRoleId = 3;
+}
+
+message ChickenSelectFollowResp {
+  map<int64, int64> followedMap = 1;
+  map<int64, int64> inviteCd = 2;
+}
+
+message ChickenInviteFollowNotify {
+  int64 followedRoleId = 1;
+}
+
+message SelectFollowReq {
+  romsg.EChickenFollowNotifyType type = 1;
+  int64 roleId = 2;
+  int64 followedRoleId = 3;
+}
+
+message SelectFollowResp {
+  int32 result = 1;
+}
+
+message SelectFollowNotify {
+  romsg.EChickenFollowNotifyType type = 1;
+  int64 roleId = 2;
+  int64 followedRoleId = 3;
+}
+
+message ChickenChangeWatchPlayerReq {
+  int64 player_id = 1;
+}
+
+message ChickenPlayerForceDeadReq {
+}
+
+message ChickenPlayerForceDeadResp {
+  int32 result = 1;
+}
+
+message ChickenResultNotify {
+  romsg.TeamStatisticsInfo teamStatistics = 1;
+  map<int64, romsg.RoleStatisticsInfo> roleStatistics = 2;
+  map<int32, romsg.ExtraValueData> sceneStatistics = 3;
+  bool hasAborted = 4;
+  int64 battleStartTime = 5;
+}
+
+message ReadChickenLibraryReq {
+  enum EChickenLibraryType {
+    EChickenLibraryType_Skill = 0;
+    EChickenLibraryType_Career = 1;
+  }
+
+  romsg.ReadChickenLibraryReq.EChickenLibraryType type = 1;
+  int32 id = 2;
+}
+
+message ReadChickenLibraryResp {
+  int32 result = 1;
+  romsg.ReadChickenLibraryReq req = 2;
+}
+
+message ChickenServerPoisonNotify {
+  int64 startTime = 1;
+  int64 endTime = 2;
+  double startPosX = 3;
+  double startPosY = 4;
+  double endPosX = 5;
+  double endPosY = 6;
+  double startRadius = 7;
+  double endRadius = 8;
+  int64 totalTime = 9;
+  double velocityX = 10;
+  double velocityY = 11;
+  double velocityRadius = 12;
+  double centerPosX = 13;
+  double centerPosY = 14;
+  double centerRadius = 15;
+  int64 currentTime = 16;
+  double rolePosX = 17;
+  double rolePosY = 18;
+  double distance = 19;
+}
+
+message ChickenRelifeReq {
+  int32 positionX = 1;
+  int32 positionY = 2;
+}
+
+message ChickenRelifeResp {
+  int32 result = 1;
+}
+
+message ChickenRelifeNotify {
+  int64 relifeEndTime = 1;
+  int32 positionX = 2;
+  int32 positionY = 3;
+}
+
+message ChickenWatchNotify {
+  int64 autoWatchTime = 1;
+}
+
+message ChickenRelifeOtherReq {
+  int64 teamMateId = 1;
+  int64 npcId = 2;
+}
+
+message ChickenRelifeOtherResp {
+  int32 result = 1;
+}
+
+message ChickenSelectTaskReq {
+  int64 taskId = 1;
+}
+
+message ChickenSelectTaskResp {
+  romsg.ChickenSelectTaskReq req = 1;
+}
+
+message ChickenOpenPanelReq {
+  romsg.EChickenOpenPanel panelNum = 1;
+  bool isOpen = 2;
+}
+
+message ChickenOpenPanelResp {
+  romsg.ChickenOpenPanelReq req = 1;
+}
+
+message ChickenMatchPlayerNumNotify {
+  int64 playerNum = 1;
+  int64 maxNum = 2;
+}
+
+message ChickenItemUpgradeReq {
+  int32 itemConfigId = 1;
+}
+
+message ChickenItemUpgradeResp {
+  int32 result = 1;
+  int32 itemConfigId = 2;
+  uint64 newItemGuid = 3;
+}
+
+message ChickenItemUpgradeAllReq {
+}
+
+message ChickenItemUpgradeAllResp {
+  int32 result = 1;
+  repeated uint64 newItemGuids = 2;
+}
+
+message ChickenOtherRevivingNotify {
+  int64 reviver = 1;
+  int64 reviveStartTime = 2;
+  bool interrupted = 3;
+  repeated int64 beReviveIds = 4;
+  int64 reviveDuration = 5;
+}
+
+message ChickenStartReviveReq {
+}
+
+message ChickenStartReviveResp {
+  int32 result = 1;
+}
+

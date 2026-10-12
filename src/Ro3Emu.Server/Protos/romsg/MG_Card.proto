@@ -1,0 +1,148 @@
+syntax = "proto3";
+package romsg;
+import "MG_Common.proto";
+import "FieldOption.proto";
+
+enum CardLevelSourceType {
+  CardLevelSourceTypeNone = 0;
+  CardLevelSourceTypePack = 1;
+  CardLevelSourceTypeBonds = 2;
+  CardLevelSourceTypeEquipInBag = 3;
+  CardLevelSourceTypeEquip = 4;
+}
+
+message BondsInfo {
+  int32 entryId = 1;
+  map<int32, romsg.ItemBaseInfo> cardList = 2;
+}
+
+message CardInfoNtf {
+  map<int32, romsg.BondsInfo> bondsList = 1;
+  map<int32, int32> setUpBondsList = 2;
+}
+
+message CardBondsInsertReq {
+  int32 bondsEntry = 1;
+  int32 slotIndex = 2;
+  int64 insertGuid = 3;
+}
+
+message CardBondsInsertResp {
+  int32 result = 1;
+  romsg.BondsInfo bondsDeatail = 2;
+}
+
+message CardBondsRemoveReq {
+  int32 bondsEntry = 1;
+  int32 slotIndex = 2;
+}
+
+message CardBondsRemoveResp {
+  int32 result = 1;
+  romsg.BondsInfo bondsDeatail = 2;
+}
+
+message CardRevertReq {
+  int64 cardGuid = 1;
+}
+
+message CardRevertResp {
+  int32 result = 1;
+  int64 cardGuid = 2;
+  int32 entryId = 3;
+  bool isBind = 4;
+  romsg.ItemBindInfo bindInfo = 5;
+  repeated romsg.ItemBaseInfo revertCards = 6;
+  int32 type = 7;
+}
+
+message CardBondsSetUpReq {
+  int32 setUpSlot = 1;
+  int32 bondsEntry = 2;
+}
+
+message CardBondsSetUpResp {
+  int32 result = 1;
+  map<int32, int32> setUpBondsList = 2;
+}
+
+message CardBondsSetDownReq {
+  int32 setDownSlot = 1;
+}
+
+message CardBondsSetDownResp {
+  int32 result = 1;
+  map<int32, int32> setUpBondsList = 2;
+}
+
+message CardBondsTransferReq {
+  int32 srcSlot = 1;
+  int32 destSlot = 2;
+}
+
+message CardBondsTransferResp {
+  int32 result = 1;
+  map<int32, int32> setUpBondsList = 2;
+}
+
+message CardLevelUpReq {
+  romsg.CardLevelSourceType sourceType = 1;
+  int64 guid = 2;
+  int32 slotIndex = 3;
+  romsg.EquipGridType gridType = 4;
+}
+
+message CardLevelUpResp {
+  int32 result = 1;
+  romsg.CardLevelSourceType sourceType = 2;
+  int64 guid = 3;
+  int32 slotIndex = 4;
+  romsg.EquipGridType gridType = 5;
+  int32 newLevel = 6;
+}
+
+message CardStarUpReq {
+  romsg.CardLevelSourceType sourceType = 1;
+  int64 guid = 2;
+  int32 slotIndex = 3;
+  romsg.EquipGridType gridType = 4;
+}
+
+message CardStarUpResp {
+  int32 result = 1;
+  romsg.CardLevelSourceType sourceType = 2;
+  int64 guid = 3;
+  int32 slotIndex = 4;
+  romsg.EquipGridType gridType = 5;
+  int32 newStarNum = 6;
+}
+
+message CardTreasuredReq {
+  romsg.CardLevelSourceType sourceType = 1;
+  repeated int64 guids = 2;
+}
+
+message CardTreasuredResp {
+  int32 result = 1;
+  int64 guid = 2;
+  int64 itemid = 3;
+}
+
+message CardSwitchPlanReq {
+  int32 targetIndex = 1;
+}
+
+message CardSwitchPlanResp {
+  int32 result = 1;
+  int32 currentPlan = 2;
+}
+
+message StorageholeChangeNameReq {
+  int32 targetIndex = 1;
+  string name = 2;
+}
+
+message StorageholeChangeNameResp {
+  int32 result = 1;
+}
+

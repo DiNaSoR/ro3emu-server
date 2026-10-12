@@ -1,0 +1,173 @@
+syntax = "proto3";
+package romsg;
+import "MG_Skill.proto";
+import "MG_Common.proto";
+import "FieldOption.proto";
+
+enum ETerritoryBossStage {
+  EClose = 0;
+  ENotActive = 1;
+  EActivating = 2;
+  EActivated = 3;
+  ECd = 4;
+}
+
+message BuildCannonState {
+  enum EBuildProcess {
+    None = 0;
+    Building = 1;
+    BuildComplete = 2;
+  }
+
+  romsg.BuildCannonState.EBuildProcess progress = 1;
+  int64 gvgCannonConfigId = 2;
+  int64 completeTime = 3;
+}
+
+message EnterCannonState {
+  int64 gvgCannonConfigId = 1;
+  int64 cannonUId = 2;
+}
+
+message ChickenReviveState {
+  int64 startTs = 1;
+  int32 duration = 2;
+}
+
+message CollectionState {
+  romsg.InteractPlayInfo playInfo = 1;
+  romsg.CollectMinigameInfo minigameInfo = 2;
+}
+
+message CollectMinigameInfo {
+  int32 miniGameId = 1;
+  int32 round = 2;
+  int64 npcId = 3;
+  int32 jobId = 4;
+}
+
+message UpperCannonState {
+  int64 cannonGuId = 1;
+}
+
+message InteractPlayInfo {
+  int32 playConfigId = 1;
+  int64 playEndTimeStamp = 2;
+}
+
+message CampFireInteractState {
+  romsg.InteractPlayInfo playInfo = 1;
+}
+
+message TrapBossInfo {
+  romsg.ETerritoryBossStage stage = 1;
+  int64 activeEndTime = 2;
+  int64 cdEndTime = 3;
+  int64 bossUid = 4;
+}
+
+message BlackHoleBossInfo {
+  romsg.ETerritoryBossStage stage = 1;
+  int64 cdEndTime = 2;
+  int64 bossUid = 3;
+}
+
+message InteractInfo {
+  enum EState {
+    Idle = 0;
+    BuildingCannon = 1;
+    GVGCannon = 2;
+    Vehicle = 3;
+    Sit = 4;
+    Collection = 5;
+    CampFireCollectSeed = 6;
+    CampFire = 7;
+    Treasure = 9;
+    UpperCannon = 10;
+    TakeEscortCart = 11;
+    GeneralCollection = 13;
+    ExploreCollection = 14;
+    ExploreCollectionMiniGame = 15;
+    BlackHoleBoss = 16;
+    TrapBoss = 17;
+    MultiPersonProgress = 18;
+    ChickenRevive = 20;
+    Skill = 24;
+    CutScene = 25;
+  }
+
+  romsg.InteractInfo.EState eType = 1;
+  int64 stateId = 2;
+  romsg.BuildCannonState buildCannonInfo = 3;
+  romsg.EnterCannonState enterCannonInfo = 4;
+  romsg.CollectionState collectionInfo = 5;
+  romsg.CampFireInteractState campFireInfo = 6;
+  romsg.UpperCannonState upperCannonInfo = 7;
+  int32 interactConfigId = 8;
+  romsg.TrapBossInfo trapBossInfo = 9;
+  romsg.BlackHoleBossInfo blackHoleBossInfo = 10;
+  romsg.ChickenReviveState chickenReviveInfo = 11;
+  int64 activeObjId = 12;
+}
+
+message InteractSubStateEnterReq {
+  int32 state = 1;
+  int32 subState = 2;
+}
+
+message InteractSubStateEnterRes {
+  int32 result = 1;
+}
+
+message InteractChangeNtf {
+  int64 Uid = 1;
+  romsg.InteractInfo dataInfo = 2;
+  bool Interrupt = 3;
+}
+
+message UseInteractActionReq {
+  int64 buttonId = 1;
+  map<int64, romsg.ActionParam> actionParams = 2;
+  romsg.CannonUseSkill cannonUseSkill = 3;
+}
+
+message BulletExtraParam {
+  float gravity = 1;
+  int32 speed = 2;
+  romsg.Vec3 faceVector3D = 3;
+}
+
+message CannonUseSkill {
+  romsg.CastSkillReq useSkillParam = 1;
+  repeated romsg.BulletExtraParam bulletExtraParam = 2;
+}
+
+message ActionParam {
+  romsg.CastSkillReq useSkillParam = 1;
+}
+
+message UseInteractActionRes {
+  int32 result = 1;
+}
+
+message Change3CNtf {
+  int32 cfgId = 1;
+}
+
+message NpcSkillsCdNotify {
+  int64 npcUid = 1;
+  map<int64, romsg.SkillCdInfo> skillCds = 2;
+}
+
+message ChangeVehicleSeatReq {
+  int32 seatIdx = 1;
+}
+
+message ChangeVehicleSeatRes {
+  int32 seatIdx = 1;
+  int32 result = 2;
+}
+
+message ExitCutSceneStateReq {
+}
+

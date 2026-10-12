@@ -1,0 +1,410 @@
+syntax = "proto3";
+package romsg;
+import "MG_Common.proto";
+import "FieldOption.proto";
+import "MG_Chat.proto";
+
+enum ItemQualityType {
+  ItemQualityType_None = 0;
+  ItemQualityType_White = 1;
+  ItemQualityType_Green = 2;
+  ItemQualityType_Blue = 3;
+  ItemQualityType_Purple = 4;
+  ItemQualityType_Orange = 5;
+  ItemQualityType_Red = 6;
+}
+
+enum ItemTypeEnum {
+  ItemTypeNone = 0;
+  ItemTypeCurrency = 1;
+  ItemTypeConsume = 2;
+  ItemTypeGift = 3;
+  ItemTypeCard = 4;
+  ItemTypeEquip = 5;
+  ItemTypeTotem = 7;
+  ItemTypeEmblem = 8;
+  ItemTypeMaterial = 9;
+  ItemTypeSiege = 14;
+}
+
+enum ItemSubTypeEnum {
+  ItemSubTypeMin = 0;
+  ItemSubTypeMiao = 101;
+  ItemSubTypeZeny = 102;
+  ItemSubTypeDiamond = 103;
+  ItemSubTypeCreditPoint = 104;
+  ItemSubTypeBaseExp = 110;
+  ItemSubTypeJobExp = 111;
+  ItemSubTypeGuildUserContribute = 112;
+  ItemSubTypeGuildUserSkillPoint = 113;
+  ItemSubTypeGuildMoney = 114;
+  ItemSubTypeNoviceLiveness = 116;
+  ItemSubTypeChicken = 119;
+  ItemSubTypeChickenLevel = 120;
+  ItemSubTypeChickenProtect = 121;
+  ItemSubTypeGuildCoin = 122;
+  ItemSubTypePersonalDecal = 123;
+  ItemSubTypeHonorBadge = 124;
+  ItemSubTypeVitality = 125;
+  ItemSubTypeCook = 201;
+  ItemSubTypeMedicine = 202;
+  ItemSubTypeWings = 203;
+  ItemSubTypeLeaves = 204;
+  ItemSubTypeEmoji = 205;
+  ItemSubTypeTrumpet = 206;
+  ItemSubTypeArrow = 207;
+  ItemSubTypeFriend = 208;
+  ItemSubTypeLimitedTimeAppearance = 209;
+  ItemSubTypeAppearance = 210;
+  ItemSubTypeGuildMarket = 216;
+  ItemSubTypeSmallGift = 301;
+  ItemSubTypeRandomGift = 302;
+  ItemSubTypeChooseGift = 303;
+  ItemSubTypeOnePieceCommonBox = 304;
+  ItemSubTypeOnePieceSuperBox = 305;
+  ItemSubTypeOnePieceGift = 306;
+  ItemSubTypeCardDefault = 400;
+  ItemSubTypeEmblem = 800;
+  ItemSubTypeWeaponStrengthen = 901;
+  ItemSubTypeArmorStrengthen = 902;
+  ItemSubTypeWeaponRefine = 903;
+  ItemSubTypeArmorRefine = 904;
+  ItemSubTypeEquipAppraise = 905;
+  ItemSubTypePetPiece = 906;
+  ItemSubTypePetExpBook = 908;
+  ItemSubTypeEmblemUpgradeMaterial = 914;
+  ItemSubTypeBirdHorse = 1001;
+  ItemSubTypeCart = 1002;
+  ItemSubTypeFalcon = 1003;
+  ItemSubTypeWorf = 1004;
+  ItemSubTypeVehicle = 1401;
+  ItemSubTypeFirearm = 1402;
+}
+
+enum ItemAttrTypeEnum {
+  ItemAttrTypeMin = 0;
+  ItemAttrTypeHoleNum = 1;
+  ItemAttrTypeScore = 2;
+  ItemAttrTypeAppraise = 3;
+  ItemAttrTypeCraftName = 4;
+  ItemAttrTypeCraftRoleID = 5;
+  ItemAttrTypeCraftArea = 6;
+  ItemAttrTypeAttrKey_Start = 30;
+  ItemAttrTypeAttrKey_End = 49;
+  ItemAttrTypeAttrValue_Start = 60;
+  ItemAttrTypeAttrValue_End = 79;
+  ItemAttrTypeSpecial_Start = 80;
+  ItemAttrTypeSpecial_End = 89;
+  ItemAttrTypeEntryKey_Start = 100;
+  ItemAttrTypeEntryKey_End = 119;
+  ItemAttrTypeEntryValue_Start = 140;
+  ItemAttrTypeEntryValue_End = 159;
+  ItemAttrTypeTotemAttrKey_Start = 220;
+  ItemAttrTypeTotemAttrKey_End = 229;
+  ItemAttrTypeTotemAttrValue_Start = 230;
+  ItemAttrTypeTotemAttrValue_End = 239;
+  ItemAttrTypeTotemSkill_Start = 240;
+  ItemAttrTypeTotemSkill_End = 249;
+  ItemAttrTypeTotemAttrValueLower_Start = 250;
+  ItemAttrTypeTotemAttrValueLower_End = 259;
+  ItemAttrTypeTotemAttrValueUpper_Start = 260;
+  ItemAttrTypeTotemAttrValueUpper_End = 269;
+  ItemAttrTypeTotemAttrRemainingTimes = 270;
+  ItemAttrTypeCardLevel = 501;
+  ItemAttrTypeCardStar = 502;
+  ItemAttrTypeCardLevelCost1 = 510;
+  ItemAttrTypeCardLevelCost2 = 511;
+  ItemAttrTypeCardLevelCost3 = 512;
+  ItemAttrTypeCardLevelCost4 = 513;
+  ItemAttrTypeCardStarCost1 = 520;
+  ItemAttrTypeCardStarCost2 = 521;
+  ItemAttrTypeCardStarCost3 = 522;
+  ItemAttrTypeCardStarCost4 = 523;
+  ItemAttrTypeCardStarCost5 = 524;
+  ItemAttrTypeCardStarCost6 = 525;
+  ItemAttrTypeCardStarCost7 = 526;
+  ItemAttrTypeCardStarCost8 = 527;
+  ItemAttrTypeCardStarCost9 = 528;
+  ItemAttrTypeCardStarCost10 = 529;
+  ItemAttrTypeCardIsTreasured = 530;
+  ItemAttrTypeEmblemLevel = 1001;
+  ItemAttrTypeEmblemExp = 1002;
+  ItemAttrTypeEmblemTotalExp = 1003;
+  ItemAttrTypeEmblemMark_Start = 1021;
+  ItemAttrTypeEmblemMark_End = 1030;
+  ItemAttrTypeEmblemPrimaryAttrKey_Start = 1031;
+  ItemAttrTypeEmblemPrimaryAttrKey_End = 1040;
+  ItemAttrTypeEmblemPrimaryAttrValue_Start = 1041;
+  ItemAttrTypeEmblemPrimaryAttrValue_End = 1050;
+  ItemAttrTypeEmblemSubAttrKey_Start = 1051;
+  ItemAttrTypeEmblemSubAttrKey_End = 1070;
+  ItemAttrTypeEmblemSubAttrValue_Start = 1071;
+  ItemAttrTypeEmblemSubAttrValue_End = 1090;
+  ItemAttrTypeEmblemSpecialEffect_Start = 1091;
+  ItemAttrTypeEmblemSpecialEffect_End = 1100;
+  ItemAttrTypeChickenPlayerId = 1200;
+  ItemAttrTypeChickenPlayerName = 1201;
+  ItemAttrTypeSetUpSource = 10001;
+  ItemAttrTypeSetUpPos = 10002;
+  ItemAttrTypeSetUpTime = 10003;
+}
+
+enum EItemInUseSourceType {
+  EItemInUseSourceTypeNone = 0;
+  EItemInUseSourceTypeTotemSetup = 1;
+  EItemInUseSourceTypeEmblemSetup = 2;
+}
+
+enum ItemAttrConst {
+  ItemAttrConstMin = 0;
+  ItemAttrConstEntryMaxNum = 10;
+  ItemAttrConstHoleMaxNum = 4;
+}
+
+enum PackType {
+  PackType_None = 0;
+  PackType_Item = 1;
+  PackType_Equip = 2;
+  PackType_Card = 3;
+  PackType_Totem = 4;
+  PackType_Emblem = 5;
+  PackType_Currency = 20;
+  PackType_CareerSpecial = 100;
+}
+
+enum ConsumeItemBindType {
+  ConsumeItemBindFirst = 0;
+  ConsumeItemBind = 1;
+  ConsumeItemNotBind = 2;
+}
+
+enum CareerSpecialTransferItemsType {
+  ToNone = 0;
+  ToNormal = 1;
+  ToCart = 2;
+}
+
+enum MedicineAutoUseType {
+  MEDICINE_AUTOUSE_TYPE_MIN = 0;
+  MEDICINE_AUTOUSE_TYPE_HP = 1;
+  MEDICINE_AUTOUSE_TYPE_SP = 2;
+}
+
+enum MedicineAutoUseOpType {
+  MEDICINE_AUTOUSE_OP_TYPE_MIN = 0;
+  MEDICINE_AUTOUSE_OP_TYPE_SWITCH = 1;
+  MEDICINE_AUTOUSE_OP_TYPE_THRESHOLDS = 2;
+  MEDICINE_AUTOUSE_OP_TYPE_MEDICINE = 3;
+}
+
+message QuickUseSaveInfo {
+  int32 lieQuickUse = 1;
+  int32 itemEntry = 2;
+}
+
+message ArrangeItemReq {
+  romsg.PackType packType = 1;
+}
+
+message ArrangeItemRes {
+  int32 result = 1;
+  romsg.ArrangeItemReq req = 2;
+}
+
+message QuickUseSaveReq {
+  int32 lieQuickUse = 1;
+  int32 entryItem = 2;
+}
+
+message QuickUseSaveRes {
+  int32 result = 1;
+  repeated romsg.QuickUseSaveInfo quick_save_infos = 2;
+}
+
+message ShortcutBarInfo {
+  int32 slotIndex = 1;
+  int64 itemGuid = 2;
+}
+
+message ShortcutBarSaveReq {
+  int32 slotIndex = 1;
+  int64 itemGuid = 2;
+}
+
+message ShortcutBarSaveRes {
+  int32 result = 1;
+}
+
+message ShortcutBarUseReq {
+  int32 slotIndex = 1;
+}
+
+message ShortcutBarUseRes {
+  int32 result = 1;
+  int32 slotIndex = 2;
+}
+
+message CareerSpecialTransferItemsReq {
+  romsg.CareerSpecialTransferItemsType transType = 1;
+  map<int64, int64> itemGuidCountMap = 2;
+}
+
+message CareerSpecialTransferItemsRsp {
+  int32 result = 1;
+}
+
+message NotifyCareerSpecialPackSizeChange {
+  int32 size = 1;
+}
+
+message SendItemCds {
+  map<int64, int64> itemCds = 1;
+  map<int64, int64> shareCds = 2;
+}
+
+message MedicinesAutoUse {
+  bool isOpen = 1;
+  int32 condition = 2;
+  repeated int32 itemEntrys = 3;
+}
+
+message MedicinesAutoUseSet {
+  romsg.MedicinesAutoUse hpConfig = 1;
+  romsg.MedicinesAutoUse spConfig = 2;
+}
+
+message MedicinesAutoUseSetReq {
+  romsg.MedicineAutoUseType type = 1;
+  romsg.MedicineAutoUseOpType opType = 2;
+  romsg.MedicinesAutoUse setData = 3;
+}
+
+message MedicinesAutoUseSetResp {
+  int32 result = 1;
+  romsg.MedicineAutoUseType type = 2;
+  romsg.MedicinesAutoUse setData = 3;
+}
+
+message ItemUseParamInfo {
+  message SelfChoosePet {
+    map<int32, int32> choosePet = 1;
+  }
+
+  message SelfChooseGift {
+    map<int32, int32> chooseGift = 1;
+  }
+
+  message ButterflyWings {
+    int32 mapId = 1;
+  }
+
+  message UnlockMount {
+    int32 mountId = 1;
+    int32 mountTime = 2;
+    bool firstUnlockMount = 3;
+  }
+
+  oneof var {
+    romsg.ItemUseParamInfo.SelfChooseGift selfChooseGift = 1;
+    romsg.ItemUseParamInfo.ButterflyWings butterflyWings = 2;
+    romsg.ItemUseParamInfo.UnlockMount unlockMount = 3;
+    romsg.ItemUseParamInfo.SelfChoosePet selfChoosePet = 4;
+    romsg.ChatCustomizeDada chatCustomizeData = 5;
+    bool isFirstHeartBox = 6;
+  }
+}
+
+message ItemUseReq {
+  int64 itemGuid = 1;
+  int32 itemCount = 2;
+  repeated romsg.ItemUseParamInfo itemParam = 3;
+}
+
+message ItemUseResp {
+  int32 result = 1;
+  int64 itemGuid = 2;
+  int32 itemCount = 3;
+  int32 itemId = 4;
+  int64 itemCd = 5;
+  int64 shareCd = 6;
+  int32 itemTimes = 7;
+  repeated romsg.ItemUseParamInfo itemParam = 8;
+}
+
+message ItemCDInfo {
+  int32 itemId = 1;
+  int64 itemCd = 2;
+  int64 shareCd = 3;
+}
+
+message ItemsCDNotify {
+  repeated romsg.ItemCDInfo items = 1;
+}
+
+message ItemArrowSwitchReq {
+  int32 itemId = 1;
+}
+
+message ItemArrowSwitchResp {
+  int32 result = 1;
+  int32 itemId = 2;
+  int32 itemCount = 3;
+}
+
+message ItemCombineReq {
+  map<int32, int32> costItem = 1;
+  int32 itemId = 2;
+  int32 itemCount = 3;
+}
+
+message ItemCombineResp {
+  int32 result = 1;
+}
+
+message ItemDecomposeReq {
+  map<int64, int32> decomposeItem = 1;
+  bool isLapseDecompose = 3;
+}
+
+message ItemDecomposeResp {
+  int32 result = 1;
+}
+
+message AutoDecomposeSetting {
+  map<int32, romsg.ItemAutoDecomposeSettingReq> tabOptionSetting = 1;
+}
+
+message OptionGroup {
+  repeated int32 options = 1;
+}
+
+message ItemAutoDecomposeSettingReq {
+  int32 tabId = 1;
+  map<int32, romsg.OptionGroup> optionSetting = 2;
+  bool isOpen = 3;
+}
+
+message ItemAutoDecomposeSettingResp {
+  int32 result = 1;
+}
+
+message ItemLockDecomposeReq {
+  int64 itemGuid = 1;
+  bool isLocked = 2;
+}
+
+message ItemLockDecomposeResp {
+  int32 result = 1;
+  int64 itemGuid = 2;
+  bool isLocked = 3;
+}
+
+message ItemAutoDecomposeGainItems {
+  map<int32, int32> itemInfo = 1;
+}
+
+message ItemAutoDecomposeTipsNtf {
+  map<int32, int32> decomposeItemInfo = 1;
+  map<int32, romsg.ItemAutoDecomposeGainItems> decomposeGainItemInfo = 2;
+}
+

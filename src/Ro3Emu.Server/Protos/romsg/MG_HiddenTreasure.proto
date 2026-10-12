@@ -1,0 +1,65 @@
+syntax = "proto3";
+package romsg;
+import "FieldOption.proto";
+
+enum EHiddenTreasureNpcState {
+  EHiddenTreasureNpcState_None = 0;
+  EHiddenTreasureNpcState_Idle = 1;
+  EHiddenTreasureNpcState_CantEnter = 2;
+  EHiddenTreasureNpcState_Destroy = 3;
+}
+
+enum EHiddenTreasureRoundState {
+  EHiddenTreasureRoundState_NotOpen = 0;
+  EHiddenTreasureRoundState_Open = 1;
+}
+
+message HiddenTreasureInitData {
+  int64 npcSceneId = 1;
+  int64 npcId = 2;
+  repeated int64 playerIds = 3;
+  int64 npcEntryId = 4;
+  int64 monsterEntryId = 5;
+  int64 waveEndTime = 6;
+}
+
+message HiddenTreasureMapInfoNotify {
+  romsg.EHiddenTreasureRoundState roundState = 1;
+  int32 npcCount = 2;
+  int64 endTime = 3;
+  int32 maxNpcCount = 4;
+}
+
+message HiddenTreasureRoundInfoReq {
+}
+
+message HiddenTreasureRoundInfoResp {
+  int32 result = 1;
+  bool isOpen = 2;
+  int32 curIndex = 3;
+  map<int32, romsg.HiddenTreasureRoundInfo> timeMap = 4;
+  repeated romsg.HiddenTreasureGainItemInfo itemInfo = 5;
+  int64 nextOpenTime = 6;
+  map<int64, romsg.HiddenTreasureSceneLineInfo> sceneInfo = 7;
+}
+
+message HiddenTreasureSceneLineInfo {
+  int64 sceneUid = 1;
+  int64 sceneEntry = 2;
+  int64 lineNum = 3;
+  int64 npcRemainCount = 4;
+  int64 npcRoundCount = 5;
+}
+
+message HiddenTreasureGainItemInfo {
+  int32 itemId = 1;
+  int64 curGainCount = 2;
+  int64 maxGainCount = 3;
+}
+
+message HiddenTreasureRoundInfo {
+  int32 index = 1;
+  int64 startTime = 2;
+  int64 endTime = 3;
+}
+

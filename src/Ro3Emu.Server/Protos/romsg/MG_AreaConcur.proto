@@ -1,0 +1,30 @@
+syntax = "proto3";
+package romsg;
+import "FieldOption.proto";
+
+message AreaConcurGainMapAwardReq {
+  int64 mapId = 1;
+}
+
+message AreaConcurGainMapAwardResp {
+  romsg.AreaConcurGainMapAwardReq req = 1;
+}
+
+message AreaConcurGainAreaAwardReq {
+  int64 areaId = 1;
+  map<int64, bool> stageIds = 2;
+}
+
+message AreaConcurGainAreaAwardResp {
+  romsg.AreaConcurGainAreaAwardReq req = 1;
+}
+
+message AreaConcurGainMonsterAwardReq {
+  int64 monsterId = 1;
+  map<int64, bool> stageIds = 2;
+}
+
+message AreaConcurGainMonsterAwardResp {
+  romsg.AreaConcurGainMonsterAwardReq req = 1;
+}
+

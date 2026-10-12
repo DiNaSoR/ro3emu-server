@@ -1,0 +1,308 @@
+syntax = "proto3";
+package romsg;
+import "APIError.proto";
+import "client2service.proto";
+import "FieldOption.proto";
+import "GM_Chat.proto";
+import "MG_Achievement.proto";
+import "MG_Activity.proto";
+import "MG_Adventure.proto";
+import "MG_AdventureGroup.proto";
+import "MG_AFK.proto";
+import "MG_AreaConcur.proto";
+import "MG_Auction.proto";
+import "MG_Barroom.proto";
+import "MG_Base.proto";
+import "MG_BaseMgr.proto";
+import "MG_BlueDbg.proto";
+import "MG_BroadCast.proto";
+import "MG_Card.proto";
+import "MG_CareerSpecial.proto";
+import "MG_Cell.proto";
+import "MG_CellMgr.proto";
+import "MG_Chat.proto";
+import "MG_Chicken.proto";
+import "MG_Common_Increment.proto";
+import "MG_Common.proto";
+import "MG_DB.proto";
+import "MG_Define.proto";
+import "MG_DragonIsland.proto";
+import "MG_Dungeon.proto";
+import "MG_Emblem.proto";
+import "MG_EmojiPlay.proto";
+import "MG_Entity.proto";
+import "MG_Equipment.proto";
+import "MG_FirstHeart.proto";
+import "MG_FlyingDragon.proto";
+import "MG_Friend.proto";
+import "MG_Function.proto";
+import "MG_Gateway.proto";
+import "MG_Genre.proto";
+import "MG_GlobalCache.proto";
+import "MG_Guide.proto";
+import "MG_Guild_Increment.proto";
+import "MG_Guild.proto";
+import "MG_GuildBlackMarket.proto";
+import "MG_GuildCampFire.proto";
+import "MG_GuildDraculaWedding_Init.proto";
+import "MG_GuildDraculaWedding.proto";
+import "MG_GuildLeague.proto";
+import "MG_GuildVoiceChannel.proto";
+import "MG_HeroicSpirit.proto";
+import "MG_HiddenTreasure.proto";
+import "MG_IDIP.proto";
+import "MG_IDIPSerialNumber.proto";
+import "MG_Interact.proto";
+import "MG_LeaderBoardClient.proto";
+import "MG_Library.proto";
+import "MG_Lifejob.proto";
+import "MG_Login.proto";
+import "MG_Lottery.proto";
+import "MG_Mail.proto";
+import "MG_MapData.proto";
+import "MG_Match.proto";
+import "MG_Mount.proto";
+import "MG_Mover.proto";
+import "MG_MultiDungeon.proto";
+import "MG_MVP.proto";
+import "MG_NewActivity.proto";
+import "MG_Pack.proto";
+import "MG_Paragon.proto";
+import "MG_Pay.proto";
+import "MG_Personal.proto";
+import "MG_Pet.proto";
+import "MG_Player.proto";
+import "MG_PlayerOfflineMessage.proto";
+import "MG_PlayMethod.proto";
+import "MG_PlotActing.proto";
+import "MG_PublicChat.proto";
+import "MG_PublicServer.proto";
+import "MG_RainbowKoi_Init.proto";
+import "MG_Relationship.proto";
+import "MG_Scene.proto";
+import "MG_SceneStream.proto";
+import "MG_Season.proto";
+import "MG_SeasonPage.proto";
+import "MG_SeasonRefine.proto";
+import "MG_SeasonTalent.proto";
+import "MG_ServerClientMsg.proto";
+import "MG_Setting.proto";
+import "MG_Shop.proto";
+import "MG_Siege.proto";
+import "MG_Skill.proto";
+import "MG_SkillGrowth.proto";
+import "MG_SocialOutfit.proto";
+import "MG_SpecialEffect.proto";
+import "MG_StageRewards.proto";
+import "MG_Stalls.proto";
+import "MG_State.proto";
+import "MG_Statistics.proto";
+import "MG_StorageHole.proto";
+import "MG_Task.proto";
+import "MG_Team.proto";
+import "MG_TerritoryAuction.proto";
+import "MG_TerritoryWars.proto";
+import "MG_ThreeDay.proto";
+import "MG_Title.proto";
+import "MG_Totem.proto";
+import "MG_TradeCenter.proto";
+import "MG_TradeMarket.proto";
+import "MG_Training.proto";
+import "MG_TransAction.proto";
+import "MG_TypeWriter.proto";
+import "MG_WardRobe.proto";
+import "MG_WorldExploration.proto";
+import "MG_Zone.proto";
+
+message GuildLeagueGuildInfoIncrement {
+  message iconFieldIncrement {
+    oneof value {
+      romsg.GuildHeadIcon all = 1;
+      romsg.GuildHeadIconIncrement inc = 2;
+    }
+  }
+
+  message honorFieldIncrement {
+    oneof value {
+      romsg.GuildHistoryHonor all = 1;
+      romsg.GuildHistoryHonorIncrement inc = 2;
+    }
+  }
+
+  optional int64 guildID = 10;
+  optional int64 power = 20;
+  optional string name = 30;
+  romsg.GuildLeagueGuildInfoIncrement.iconFieldIncrement icon = 40;
+  optional int32 memberCount = 50;
+  optional int32 guildWeekActivity = 60;
+  optional int32 WarnNum = 70;
+  optional bool del = 80;
+  optional int32 areaId = 90;
+  romsg.GuildLeagueGuildInfoIncrement.honorFieldIncrement honor = 100;
+}
+
+message GuildLeagueGuildMatchInfoIncrement {
+  optional int64 guildID = 10;
+  optional int64 power = 20;
+  optional int32 rank = 30;
+  optional int32 rankOrder = 40;
+  optional int32 matcharea = 50;
+  optional int32 score = 60;
+  optional romsg.GuildLeagueRankLift rankLift = 70;
+}
+
+message GuildLeagueMatchGroupInfoIncrement {
+  message guildDataRepeatedOrigin {
+    repeated romsg.GuildLeagueGuildMatchInfo value = 1;
+  }
+
+  message guildDataRepeatedIncrement {
+    repeated romsg.GuildLeagueGuildMatchInfoIncrement value = 1;
+  }
+
+  message guildDataFieldIncrement {
+    oneof value {
+      romsg.GuildLeagueMatchGroupInfoIncrement.guildDataRepeatedOrigin all = 1;
+      romsg.GuildLeagueMatchGroupInfoIncrement.guildDataRepeatedIncrement inc = 2;
+    }
+  }
+
+  message matchpairRepeatedOrigin {
+    repeated romsg.GuildLeagueMatchPair value = 1;
+  }
+
+  message matchpairRepeatedIncrement {
+    repeated romsg.GuildLeagueMatchPairIncrement value = 1;
+  }
+
+  message matchpairFieldIncrement {
+    oneof value {
+      romsg.GuildLeagueMatchGroupInfoIncrement.matchpairRepeatedOrigin all = 1;
+      romsg.GuildLeagueMatchGroupInfoIncrement.matchpairRepeatedIncrement inc = 2;
+    }
+  }
+
+  message resultInfoRepeatedOrigin {
+    repeated romsg.LeagueResultInfo value = 1;
+  }
+
+  message resultInfoRepeatedIncrement {
+    repeated romsg.LeagueResultInfoIncrement value = 1;
+  }
+
+  message resultInfoFieldIncrement {
+    oneof value {
+      romsg.GuildLeagueMatchGroupInfoIncrement.resultInfoRepeatedOrigin all = 1;
+      romsg.GuildLeagueMatchGroupInfoIncrement.resultInfoRepeatedIncrement inc = 2;
+    }
+  }
+
+  message preliMatchpairRepeatedOrigin {
+    repeated romsg.GuildLeagueMatchPair value = 1;
+  }
+
+  message preliMatchpairRepeatedIncrement {
+    repeated romsg.GuildLeagueMatchPairIncrement value = 1;
+  }
+
+  message preliMatchpairFieldIncrement {
+    oneof value {
+      romsg.GuildLeagueMatchGroupInfoIncrement.preliMatchpairRepeatedOrigin all = 1;
+      romsg.GuildLeagueMatchGroupInfoIncrement.preliMatchpairRepeatedIncrement inc = 2;
+    }
+  }
+
+  optional int64 rank = 10;
+  optional int64 rankorder = 20;
+  romsg.GuildLeagueMatchGroupInfoIncrement.guildDataFieldIncrement guildData = 30;
+  romsg.GuildLeagueMatchGroupInfoIncrement.matchpairFieldIncrement matchpair = 40;
+  romsg.GuildLeagueMatchGroupInfoIncrement.resultInfoFieldIncrement resultInfo = 50;
+  romsg.GuildLeagueMatchGroupInfoIncrement.preliMatchpairFieldIncrement preliMatchpair = 60;
+}
+
+message GuildLeagueMatchPairIncrement {
+  optional int64 blueGuildId = 10;
+  optional int64 redGuildId = 20;
+}
+
+message GuildLeagueTotalInfoIncrement {
+  message activityInfoFieldIncrement {
+    oneof value {
+      romsg.LeagueActivityInfo all = 1;
+      romsg.LeagueActivityInfoIncrement inc = 2;
+    }
+  }
+
+  message matchInfoRepeatedOrigin {
+    repeated romsg.GuildLeagueMatchGroupInfo value = 1;
+  }
+
+  message matchInfoRepeatedIncrement {
+    repeated romsg.GuildLeagueMatchGroupInfoIncrement value = 1;
+  }
+
+  message matchInfoFieldIncrement {
+    oneof value {
+      romsg.GuildLeagueTotalInfoIncrement.matchInfoRepeatedOrigin all = 1;
+      romsg.GuildLeagueTotalInfoIncrement.matchInfoRepeatedIncrement inc = 2;
+    }
+  }
+
+  message guildInfoRepeatedOrigin {
+    repeated romsg.GuildLeagueGuildInfo value = 1;
+  }
+
+  message guildInfoRepeatedIncrement {
+    repeated romsg.GuildLeagueGuildInfoIncrement value = 1;
+  }
+
+  message guildInfoFieldIncrement {
+    oneof value {
+      romsg.GuildLeagueTotalInfoIncrement.guildInfoRepeatedOrigin all = 1;
+      romsg.GuildLeagueTotalInfoIncrement.guildInfoRepeatedIncrement inc = 2;
+    }
+  }
+
+  message guildSceneMapFieldIncrement {
+    oneof value {
+      romsg.GuildSceneDungeonMap all = 1;
+      romsg.GuildSceneDungeonMapIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  romsg.GuildLeagueTotalInfoIncrement.activityInfoFieldIncrement activityInfo = 10;
+  romsg.GuildLeagueTotalInfoIncrement.matchInfoFieldIncrement matchInfo = 20;
+  romsg.GuildLeagueTotalInfoIncrement.guildInfoFieldIncrement guildInfo = 30;
+  map<int64, romsg.GuildLeagueTotalInfoIncrement.guildSceneMapFieldIncrement> guildSceneMap = 40;
+}
+
+message GuildSceneDungeonMapIncrement {
+  message dungeonSceneMapFieldIncrement {
+    oneof value {
+      int64 all = 1;
+      int64 inc = 2;
+      bool del = 3;
+    }
+  }
+
+  map<int64, romsg.GuildSceneDungeonMapIncrement.dungeonSceneMapFieldIncrement> dungeonSceneMap = 10;
+}
+
+message LeagueActivityInfoIncrement {
+  optional bool open = 10;
+  optional int64 startTime = 20;
+  optional int64 endTime = 30;
+  optional romsg.GuildLeagueStatus eStatus = 40;
+  optional int64 initTime = 50;
+  optional int64 preliminaryTime = 70;
+  optional int64 semiFinalTime = 80;
+  optional int64 finalTime = 90;
+  optional string errMsg = 100;
+  optional int32 index = 110;
+  optional int64 nextPreliminaryTime = 120;
+  optional int64 preliminaryEndTime = 130;
+  optional int64 semiFinalEndTime = 140;
+  optional int64 finalEndTime = 150;
+}
+

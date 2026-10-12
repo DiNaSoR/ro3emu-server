@@ -1,0 +1,150 @@
+syntax = "proto3";
+package romsg;
+import "MG_Common.proto";
+import "MG_DB.proto";
+import "FieldOption.proto";
+
+enum EQueueType {
+  EQueueTypeMin = 0;
+  EQueueTypeLogin = 1001;
+}
+
+message AccountLoginCreateRoleReq {
+  string token = 1;
+  int32 regionID = 2;
+  int32 areaId = 3;
+  int32 career = 4;
+  string roleName = 5;
+  string account = 6;
+  int32 sex = 7;
+  string accountNick = 8;
+  string deviceId = 9;
+  string eventLifeId = 10;
+  string clientIp = 11;
+  map<int32, int32> appearances = 12;
+  string country = 13;
+}
+
+message AccountLoginCreateRoleResp {
+  int32 result = 1;
+  romsg.RoleBaseInfo roleBaseInfo = 2;
+  map<int32, int32> appearances = 3;
+}
+
+message AccountLoginSelectRoleReq {
+  string token = 1;
+  int32 areaId = 2;
+  int64 id = 3;
+  string account = 4;
+  string accountNick = 5;
+  string deviceId = 6;
+  string eventLifeId = 7;
+  string clientIp = 8;
+  bytes clientSDKInfo = 9;
+}
+
+message AccountLoginSelectRoleResp {
+  int32 result = 1;
+  romsg.RoleAssets roleAssets = 2;
+  string reconnect_token = 3;
+  int32 protoVersion = 4;
+  string proto_version_str = 5;
+}
+
+message PreSwitchRoleReq {
+}
+
+message PreSwitchRoleResp {
+  int32 result = 1;
+}
+
+message AccountDeleteRoleReq {
+  string token = 1;
+  int32 areaId = 2;
+  int64 id = 3;
+  string account = 4;
+  bool isCancel = 5;
+  string accountNick = 6;
+  string deviceId = 7;
+  string eventLifeId = 8;
+  string clientIp = 9;
+}
+
+message AccountDeleteRoleResp {
+  int32 result = 1;
+}
+
+message Ping {
+  string strDebugTag = 1;
+  string account = 2;
+}
+
+message Pong {
+  uint64 serverTimeMs = 1;
+  string strDebugTag = 2;
+  uint64 sceneServerTimeMs = 3;
+}
+
+message UserLoginReconnectReq {
+  int64 roleID = 1;
+  string token = 2;
+  int32 areaID = 3;
+  string account = 4;
+  string clientSession = 5;
+}
+
+message UserLoginReconnectRsp {
+  int32 result = 1;
+  int64 roleID = 2;
+  string account = 3;
+  string newToken = 4;
+  int32 areaID = 5;
+  int64 sceneId = 6;
+}
+
+message OnlineAccountInfo {
+  string account = 1;
+  string reconToken = 2;
+  optional uint64 curRoleID = 3;
+  optional string sceneNode = 4;
+  optional string clientSession = 5;
+  romsg.RoleSceneState roleSceneState = 6;
+  int64 stateModTs = 7;
+  romsg.SwitchSceneInfo switchSceneInfo = 8;
+}
+
+message SwitchSceneInfo {
+  romsg.PlayerSceneLocation sourceLocation = 1;
+  romsg.PlayerSceneLocation targetLocation = 2;
+}
+
+message OnlineClientHeartResp {
+  romsg.OnlineStatuChangeNtf allInfo = 1;
+}
+
+message onlineBaseInfo {
+  int64 playerId = 1;
+  int32 areaId = 2;
+  int32 level = 3;
+  int32 career = 4;
+}
+
+message OnlineStatuChangeNtf {
+  enum eChangeType {
+    eChangeType_None = 0;
+    eChangeType_Change = 1;
+    eChangeType_All = 2;
+  }
+
+  repeated int64 offlineId = 1;
+  repeated int64 onlineId = 2;
+  repeated int64 allOnlineId = 3;
+  romsg.OnlineStatuChangeNtf.eChangeType changeType = 4;
+  int64 tarEntityId = 5;
+  repeated romsg.onlineBaseInfo onlineBaseData = 6;
+}
+
+message ClientEnterRes {
+  int64 newLv = 1;
+}
+

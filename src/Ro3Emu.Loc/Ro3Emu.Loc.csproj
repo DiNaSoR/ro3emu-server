@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The client's text sink: Ro3Loc.Map(string) is called from Cecil-inserted prefixes in
+    Unity.TextMeshPro.dll and HUD.dll, so it references nothing but the player's mscorlib/System.
+    The English map (loc_en.tsv, built by tools/Loc/build_locmap.js) is embedded.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <!-- The client's managed DLLs: -p:ClientManaged=..., or the RO3_CLIENT_DIR environment variable (the ROO_PC folder). -->
+    <ClientManaged Condition="'$(ClientManaged)' == '' and '$(RO3_CLIENT_DIR)' != ''">$(RO3_CLIENT_DIR)\ro3_Data\Managed</ClientManaged>
+    <ClientManaged Condition="'$(ClientManaged)' == ''">C:\RO3\ROO_PC\ro3_Data\Managed</ClientManaged>
+    <NoWarn>$(NoWarn);MSB3277;CS1701;CS1702</NoWarn>
+    <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
+    <NoStdLib>true</NoStdLib>
+    <NoCompilerStandardLib>true</NoCompilerStandardLib>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="mscorlib"><HintPath>$(ClientManaged)\mscorlib.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="netstandard"><HintPath>$(ClientManaged)\netstandard.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="System"><HintPath>$(ClientManaged)\System.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="System.Core"><HintPath>$(ClientManaged)\System.Core.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\data\loc\loc_en.tsv" LogicalName="loc_en.tsv" Condition="Exists('..\..\data\loc\loc_en.tsv')" />
+    <EmbeddedResource Include="en_overrides.tsv" LogicalName="en_overrides.tsv" />
+    <EmbeddedResource Include="..\..\data\loc\loc_sids.tsv" LogicalName="loc_sids.tsv" Condition="Exists('..\..\data\loc\loc_sids.tsv')" />
+  </ItemGroup>
+
+</Project>

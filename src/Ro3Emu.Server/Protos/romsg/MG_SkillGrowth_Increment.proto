@@ -1,0 +1,298 @@
+syntax = "proto3";
+package romsg;
+import "APIError.proto";
+import "client2service.proto";
+import "FieldOption.proto";
+import "GM_Chat.proto";
+import "MG_Achievement.proto";
+import "MG_Activity.proto";
+import "MG_Adventure.proto";
+import "MG_AdventureGroup.proto";
+import "MG_AFK.proto";
+import "MG_AreaConcur.proto";
+import "MG_Auction.proto";
+import "MG_Barroom.proto";
+import "MG_Base.proto";
+import "MG_BaseMgr.proto";
+import "MG_BlueDbg.proto";
+import "MG_BroadCast.proto";
+import "MG_Card.proto";
+import "MG_CareerSpecial.proto";
+import "MG_Cell.proto";
+import "MG_CellMgr.proto";
+import "MG_Chat.proto";
+import "MG_Chicken.proto";
+import "MG_Common_Increment.proto";
+import "MG_Common.proto";
+import "MG_DB.proto";
+import "MG_Define.proto";
+import "MG_DragonIsland.proto";
+import "MG_Dungeon.proto";
+import "MG_Emblem.proto";
+import "MG_EmojiPlay.proto";
+import "MG_Entity.proto";
+import "MG_Equipment.proto";
+import "MG_FirstHeart.proto";
+import "MG_FlyingDragon.proto";
+import "MG_Friend.proto";
+import "MG_Function.proto";
+import "MG_Gateway.proto";
+import "MG_Genre.proto";
+import "MG_GlobalCache.proto";
+import "MG_Guide.proto";
+import "MG_Guild.proto";
+import "MG_GuildBlackMarket.proto";
+import "MG_GuildCampFire.proto";
+import "MG_GuildDraculaWedding_Init.proto";
+import "MG_GuildDraculaWedding.proto";
+import "MG_GuildLeague.proto";
+import "MG_GuildVoiceChannel.proto";
+import "MG_HeroicSpirit.proto";
+import "MG_HiddenTreasure.proto";
+import "MG_IDIP.proto";
+import "MG_IDIPSerialNumber.proto";
+import "MG_Interact.proto";
+import "MG_LeaderBoardClient.proto";
+import "MG_Library.proto";
+import "MG_Lifejob.proto";
+import "MG_Login.proto";
+import "MG_Lottery.proto";
+import "MG_Mail.proto";
+import "MG_MapData.proto";
+import "MG_Match.proto";
+import "MG_Mount.proto";
+import "MG_Mover.proto";
+import "MG_MultiDungeon.proto";
+import "MG_MVP.proto";
+import "MG_NewActivity.proto";
+import "MG_Pack.proto";
+import "MG_Paragon.proto";
+import "MG_Pay.proto";
+import "MG_Personal.proto";
+import "MG_Pet.proto";
+import "MG_Player.proto";
+import "MG_PlayerOfflineMessage.proto";
+import "MG_PlayMethod.proto";
+import "MG_PlotActing.proto";
+import "MG_PublicChat.proto";
+import "MG_PublicServer.proto";
+import "MG_RainbowKoi_Init.proto";
+import "MG_Relationship.proto";
+import "MG_Scene.proto";
+import "MG_SceneStream.proto";
+import "MG_Season.proto";
+import "MG_SeasonPage.proto";
+import "MG_SeasonRefine.proto";
+import "MG_SeasonTalent.proto";
+import "MG_ServerClientMsg.proto";
+import "MG_Setting.proto";
+import "MG_Shop.proto";
+import "MG_Siege.proto";
+import "MG_Skill.proto";
+import "MG_SkillGrowth.proto";
+import "MG_SocialOutfit.proto";
+import "MG_SpecialEffect.proto";
+import "MG_StageRewards.proto";
+import "MG_Stalls.proto";
+import "MG_State.proto";
+import "MG_Statistics.proto";
+import "MG_StorageHole.proto";
+import "MG_Task.proto";
+import "MG_Team.proto";
+import "MG_TerritoryAuction.proto";
+import "MG_TerritoryWars.proto";
+import "MG_ThreeDay.proto";
+import "MG_Title.proto";
+import "MG_Totem.proto";
+import "MG_TradeCenter.proto";
+import "MG_TradeMarket.proto";
+import "MG_Training.proto";
+import "MG_TransAction.proto";
+import "MG_TypeWriter.proto";
+import "MG_WardRobe.proto";
+import "MG_WorldExploration.proto";
+import "MG_Zone.proto";
+
+message DBSkillDataIncrement {
+  message skillListRepeatedOrigin {
+    repeated int32 value = 1;
+  }
+
+  message skillListRepeatedIncrement {
+    repeated int32 value = 1;
+  }
+
+  message skillListFieldIncrement {
+    oneof value {
+      romsg.DBSkillDataIncrement.skillListRepeatedOrigin all = 1;
+      romsg.DBSkillDataIncrement.skillListRepeatedIncrement inc = 2;
+    }
+  }
+
+  message skillAssignPlansRepeatedOrigin {
+    repeated romsg.SkillPlan value = 1;
+  }
+
+  message skillAssignPlansRepeatedIncrement {
+    repeated romsg.SkillPlanIncrement value = 1;
+  }
+
+  message skillAssignPlansFieldIncrement {
+    oneof value {
+      romsg.DBSkillDataIncrement.skillAssignPlansRepeatedOrigin all = 1;
+      romsg.DBSkillDataIncrement.skillAssignPlansRepeatedIncrement inc = 2;
+    }
+  }
+
+  message skillWheelFieldIncrement {
+    oneof value {
+      romsg.SkillWheel all = 1;
+      romsg.SkillWheelIncrement inc = 2;
+    }
+  }
+
+  message originSkillWheelFieldIncrement {
+    oneof value {
+      romsg.SkillWheel all = 1;
+      romsg.SkillWheelIncrement inc = 2;
+    }
+  }
+
+  int64 version = 1;
+  bool syncAllMark = 2;
+  optional int32 maxPlanCount = 10;
+  optional int32 currentPlanIndex = 20;
+  romsg.DBSkillDataIncrement.skillListFieldIncrement skillList = 30;
+  romsg.DBSkillDataIncrement.skillAssignPlansFieldIncrement skillAssignPlans = 40;
+  optional int32 currentAtkSkillId = 50;
+  romsg.DBSkillDataIncrement.skillWheelFieldIncrement skillWheel = 60;
+  optional bytes skillCdData = 70;
+  romsg.DBSkillDataIncrement.originSkillWheelFieldIncrement originSkillWheel = 80;
+}
+
+message SkillDataIncrement {
+  optional int32 skillId = 10;
+  optional int32 skillLevel = 20;
+}
+
+message SkillPlanIncrement {
+  message skillAssignsFieldIncrement {
+    oneof value {
+      romsg.SkillData all = 1;
+      romsg.SkillDataIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message manualLoadSkillRepeatedOrigin {
+    repeated romsg.SkillData value = 1;
+  }
+
+  message manualLoadSkillRepeatedIncrement {
+    repeated romsg.SkillDataIncrement value = 1;
+  }
+
+  message manualLoadSkillFieldIncrement {
+    oneof value {
+      romsg.SkillPlanIncrement.manualLoadSkillRepeatedOrigin all = 1;
+      romsg.SkillPlanIncrement.manualLoadSkillRepeatedIncrement inc = 2;
+    }
+  }
+
+  message autoLoadSkillRepeatedOrigin {
+    repeated romsg.SkillData value = 1;
+  }
+
+  message autoLoadSkillRepeatedIncrement {
+    repeated romsg.SkillDataIncrement value = 1;
+  }
+
+  message autoLoadSkillFieldIncrement {
+    oneof value {
+      romsg.SkillPlanIncrement.autoLoadSkillRepeatedOrigin all = 1;
+      romsg.SkillPlanIncrement.autoLoadSkillRepeatedIncrement inc = 2;
+    }
+  }
+
+  message skillQueueFieldIncrement {
+    oneof value {
+      romsg.SkillData all = 1;
+      romsg.SkillDataIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message powerFieldIncrement {
+    oneof value {
+      romsg.PowerUnit all = 1;
+      romsg.PowerUnitIncrement inc = 2;
+    }
+  }
+
+  message skillPointsFieldIncrement {
+    oneof value {
+      int32 all = 1;
+      int32 inc = 2;
+      bool del = 3;
+    }
+  }
+
+  optional bool isUnlock = 10;
+  map<int32, romsg.SkillPlanIncrement.skillAssignsFieldIncrement> skillAssigns = 20;
+  romsg.SkillPlanIncrement.manualLoadSkillFieldIncrement manualLoadSkill = 30;
+  romsg.SkillPlanIncrement.autoLoadSkillFieldIncrement autoLoadSkill = 40;
+  map<int32, romsg.SkillPlanIncrement.skillQueueFieldIncrement> skillQueue = 50;
+  optional string name = 60;
+  romsg.SkillPlanIncrement.powerFieldIncrement power = 70;
+  optional int32 skillGenre = 80;
+  map<int32, romsg.SkillPlanIncrement.skillPointsFieldIncrement> skillPoints = 90;
+}
+
+message SkillWheelIncrement {
+  message whellSkillsFieldIncrement {
+    oneof value {
+      romsg.SkillWheelSlot all = 1;
+      romsg.SkillWheelSlotIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message skillQueueFieldIncrement {
+    oneof value {
+      romsg.SkillWheelSlot all = 1;
+      romsg.SkillWheelSlotIncrement inc = 2;
+    }
+  }
+
+  message petSkillFieldIncrement {
+    oneof value {
+      romsg.SkillWheelSlot all = 1;
+      romsg.SkillWheelSlotIncrement inc = 2;
+    }
+  }
+
+  message dungeonSkillsFieldIncrement {
+    oneof value {
+      romsg.SkillWheelSlot all = 1;
+      romsg.SkillWheelSlotIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  map<int32, romsg.SkillWheelIncrement.whellSkillsFieldIncrement> whellSkills = 10;
+  optional int32 atkSkillId = 20;
+  romsg.SkillWheelIncrement.skillQueueFieldIncrement skillQueue = 30;
+  romsg.SkillWheelIncrement.petSkillFieldIncrement petSkill = 40;
+  map<int32, romsg.SkillWheelIncrement.dungeonSkillsFieldIncrement> dungeonSkills = 50;
+}
+
+message SkillWheelSlotIncrement {
+  optional int32 skillConfigId = 10;
+  optional bool enable = 20;
+  optional bool isHighlight = 30;
+  optional bool isInteraction = 40;
+  optional romsg.ESkillDisableReason disableReason = 50;
+  optional int64 highlightEndTimeMs = 60;
+  optional int32 mode = 70;
+}
+

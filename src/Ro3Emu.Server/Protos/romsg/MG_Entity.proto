@@ -1,0 +1,391 @@
+syntax = "proto3";
+package romsg;
+import "MG_Common.proto";
+import "MG_Skill.proto";
+import "MG_Scene.proto";
+import "MG_Dungeon.proto";
+import "MG_Interact.proto";
+import "FieldOption.proto";
+import "MG_TerritoryWars.proto";
+
+enum EntityState {
+  EntityState_Alive = 0;
+  EntityState_Dead = 1;
+  EntityState_UnWatch = 2;
+  EntityState_SPAWN = 3;
+  EntityState_Dying = 4;
+  EntityState_Ghost = 5;
+  EntityState_DeadHideBody = 6;
+  EntityState_DeadWatch = 7;
+  EntityState_Invalid = 100;
+}
+
+enum WatchState {
+  WatchState_None = 0;
+  WatchState_Watching = 1;
+}
+
+enum ReviveParamType {
+  ReviveParamType_Default = 0;
+  ReviveParamType_TerritoryPoint = 2;
+}
+
+enum ReviveReqType {
+  ReviveReqType_Revive = 0;
+  ReviveReqType_SendDungeonMsg = 1;
+}
+
+message EntityNewGuildInfo {
+  romsg.GuildHeadIcon icon = 1;
+  int64 guildID = 2;
+  int64 official = 3;
+  int64 honorOfficial = 4;
+  string guildName = 5;
+}
+
+message EffigyData {
+  int64 carrer = 1;
+}
+
+message NpcStallsData {
+  int64 carrer = 1;
+  int64 StallsID = 2;
+  int64 SystemStallID = 3;
+  int32 sex = 4;
+  int32 level = 5;
+  int32 stallNameID = 6;
+  int32 nameID = 7;
+  map<int32, int32> curUseAppearances = 8;
+}
+
+message AoIViewChangeData {
+  repeated uint64 leave_aoi = 1;
+  repeated romsg.EntityBase bases = 2;
+  romsg.GateBroadCast gateInfo = 3;
+  bool bReset = 4;
+  bool bIngoreClient = 5;
+}
+
+message AOIAttrChange {
+  uint64 entity_uuid = 1;
+  repeated romsg.AoIProperty property = 2;
+  romsg.AoIBuffInfo buff_info = 3;
+  romsg.AoiObjStateInfo state_info = 10;
+  romsg.AoiObjForbidInfo forbid_info = 11;
+  romsg.AoiBehaviorStateMachineInfo behavior_state_machine = 12;
+  romsg.AoiIdleInfo idle_info = 13;
+  romsg.AoiObjStaggerInfo stagger_info = 14;
+}
+
+message AoIViewToGate {
+  repeated uint64 add_uid = 1;
+  repeated uint64 leave_uid = 2;
+}
+
+message TeamInfo {
+  int64 teamId = 1;
+  int32 internalTeamSlot = 2;
+  int32 teamFiveIndex = 3;
+}
+
+message ChickenInfo {
+  int64 chickenCareerId = 1;
+}
+
+message SaplingInfo {
+  int32 unitId = 1;
+}
+
+message EntityBase {
+  enum NotifyType {
+    All = 0;
+    TeamInfo = 4;
+    Base = 5;
+    Equip = 6;
+    Rider = 7;
+    WardRobe = 8;
+    Stalls = 9;
+    CollectionInfo = 10;
+    ChickenChestInfo = 11;
+    Element = 12;
+    SaplingTree = 13;
+  }
+
+  uint64 uuid = 1;
+  uint64 entityTemplateID = 2;
+  float face = 3;
+  romsg.EntityState state = 6;
+  string name = 7;
+  uint64 aiMasterEntityId = 8;
+  int64 owner = 9;
+  int32 entityType = 10;
+  int64 entityCamp = 12;
+  map<int32, romsg.PendantData> pendantInfo = 14;
+  repeated int64 equipInfo = 15;
+  map<int32, int32> animationInfo = 16;
+  int64 hatredTargetId = 17;
+  int64 curRider = 20;
+  int64 bornTimeMs = 21;
+  romsg.EffigyData effigyData = 22;
+  int32 gender = 23;
+  romsg.NpcStallsData stallsInfo = 24;
+  repeated int32 hitDecorateRules = 25;
+  repeated romsg.AoIProperty property = 26;
+  repeated romsg.SkillBlackWhiteInfo skillBlackWhiteInfo = 30;
+  romsg.AoIBuffInfo buff_data = 31;
+  map<int32, int32> curUseAppearances = 32;
+  repeated romsg.CustomData customDatas = 33;
+  uint64 TickNowMs = 35;
+  bool is3D = 37;
+  romsg.AoiObjStateInfo objState = 39;
+  romsg.AoiObjForbidInfo objForbid = 40;
+  repeated romsg.WidgetInfo widgetDatas = 41;
+  romsg.ChickenInfo chickenInfo = 45;
+  romsg.InteractInfo interactInfo = 46;
+  romsg.EPlayerLifeStatus playerLifeStatus = 47;
+  romsg.AoICarryInfo carryInfo = 48;
+  romsg.AoIVehicleDetail vehicle_detail = 49;
+  romsg.EntityEnforceInfo enforce_info = 50;
+  repeated int64 be_enforced_uids = 51;
+  romsg.DynamicCollisionInfo dynamic_collision = 52;
+  romsg.ShapeExpanderInfo shapeExpanderInfo = 53;
+  romsg.AoiBehaviorStateMachineInfo behaviorStateMachineInfo = 54;
+  romsg.AoiIdleInfo idleInfo = 55;
+  romsg.EscortCartInfo escort_cart_info = 56;
+  romsg.MovementInfo movementInfo = 57;
+  romsg.CollectionInfo collection_info = 58;
+  int64 guildId = 59;
+  int64 teamId = 60;
+  romsg.ContinueTurningInfo continueTurningInfo = 61;
+  romsg.ChickenChestInfo chicken_chest_info = 62;
+  romsg.AoiObjStaggerInfo objStagger = 63;
+  int32 element_type = 64;
+  romsg.SaplingInfo saplingData = 65;
+  romsg.WatchState watch_state = 66;
+  romsg.EntityBase.NotifyType notifyType = 200;
+}
+
+message ChickenChestInfo {
+  map<int64, romsg.ItemBaseInfo> items = 1;
+  bool isOpened = 2;
+  int32 quality = 3;
+}
+
+message CollectionInfo {
+  map<int64, int64> collect_cd = 1;
+  map<int64, int32> collect_count_by_player = 2;
+  int32 total_collect_count = 3;
+  int32 point_config_id = 4;
+}
+
+message BaseTurningInfo {
+  float endFace = 1;
+  float turnSpeed = 2;
+}
+
+message EntitySelf {
+  romsg.EntityBase base = 1;
+}
+
+message EntityWatchStateNotify {
+  uint64 uuid = 1;
+  romsg.WatchState watch_state = 2;
+}
+
+message SyncAoIUnviewReq {
+  repeated int64 uuids = 1;
+}
+
+message EntityNameBoard {
+  uint64 uid = 1;
+  uint64 campId = 2;
+  uint64 lv = 3;
+  uint64 guildId = 4;
+  uint64 hpMax = 5;
+  uint64 curHp = 6;
+  uint64 posX = 7;
+  uint64 posY = 8;
+  uint64 posZ = 9;
+}
+
+message NameBoardListNotify {
+  repeated romsg.EntityNameBoard datas = 1;
+}
+
+message GetPlayerInSceneDetailReq {
+  repeated uint64 ids = 1;
+  bool bGetGuildOfficals = 2;
+  bool bGetName = 3;
+  bool bGetGuildFull = 4;
+}
+
+message PlayerDetailInScene {
+  int64 uid = 1;
+  string name = 2;
+  int64 guildId = 3;
+  int64 official = 4;
+  int64 honorOfficial = 5;
+  romsg.GuildHeadIcon icon = 6;
+  string guildName = 7;
+}
+
+message GetPlayerInSceneDetailResp {
+  repeated romsg.PlayerDetailInScene data = 1;
+  bool bGetGuildOfficals = 2;
+  bool bGetName = 3;
+  bool bGetGuildFull = 4;
+}
+
+message EntityTMStall {
+  int64 uuid = 1;
+  int64 owner = 2;
+  romsg.Vec3 position = 3;
+  string name = 4;
+  float face = 5;
+}
+
+message EntityAppearData {
+  repeated romsg.EntityBase bases = 1;
+  repeated romsg.EntityTMStall stalls = 2;
+}
+
+message EntityDisappearData {
+  uint64 entity_uuid = 1;
+}
+
+message EntityChange {
+  repeated romsg.EntityBase bases = 1;
+}
+
+message EntityDeadInfo {
+  uint64 deadEntityID = 1;
+  uint64 killerID = 2;
+}
+
+message EntityReliveReq {
+  int64 reviveParam = 1;
+  romsg.ReviveParamType type = 2;
+  romsg.ReviveReqType reqType = 3;
+}
+
+message EntityReliveAck {
+  int32 result = 1;
+  uint64 entityID = 2;
+  int64 reviveParam = 3;
+  romsg.ReviveParamType type = 4;
+  romsg.ReviveReqType reqType = 5;
+}
+
+message EntityReliveCostItemReq {
+}
+
+message EntityReliveCostItemResp {
+  int32 result = 1;
+}
+
+message EntityReliveInviteAcceptReq {
+  int64 sourceEntityID = 1;
+  bool isAccept = 2;
+}
+
+message EntityReliveReceiveInviteNotify {
+  int64 sourceEntityID = 1;
+  int64 targetEntityID = 2;
+  romsg.Vec3 position = 3;
+  int64 endTimestampMs = 4;
+}
+
+message EntityReliveInviteAcceptResp {
+  int32 result = 1;
+  int64 sourceEntityID = 2;
+  int64 targetEntityID = 3;
+}
+
+message EntityReliveInviteInfoNotify {
+  int64 sourceEntityID = 1;
+  int64 targetEntityID = 2;
+  bool isAccept = 3;
+}
+
+message EntityReliveHelpReq {
+  int64 targetEntityID = 1;
+}
+
+message EntityReliveHelpResp {
+  int32 result = 1;
+}
+
+message EntityFaceToAll {
+  uint64 entityID = 1;
+  float face = 2;
+  bool force = 3;
+}
+
+message EntityFloatText {
+  uint64 entityID = 1;
+  string text = 2;
+  uint32 type = 3;
+}
+
+message PendantData {
+  int32 pendantId = 1;
+  int32 piles = 2;
+  bool isHide = 3;
+}
+
+message PendantUpdate {
+  int64 entityID = 1;
+  map<int32, romsg.PendantData> pendantInfo = 2;
+}
+
+message UpdateEntityAnimation {
+  int64 entityID = 1;
+  map<int32, int32> animationInfo = 2;
+}
+
+message HitDecorateRulesNotify {
+  int64 entityId = 1;
+  repeated int32 hitDecorateRules = 2;
+}
+
+message PlayerLifeStatusNotify {
+  int64 entityId = 1;
+  romsg.EPlayerLifeStatus playerLifeStatus = 2;
+}
+
+message CustomDataChange {
+  int64 entityId = 1;
+  repeated romsg.CustomData customDatas = 2;
+}
+
+message EntityChangeCampNotify {
+  int64 entityId = 1;
+  int64 camp = 2;
+}
+
+message MonitorCustomDataReq {
+  repeated int64 entityIds = 1;
+}
+
+message MonitorCustomDataResp {
+  int32 result = 1;
+}
+
+message RingFixedPaddingWidthExpanderInfo {
+  romsg.Vec3 center = 1;
+  float initInnerRadius = 2;
+  float paddingWidth = 3;
+  float expandSpeed = 4;
+}
+
+message ShapeExpanderInfo {
+  enum EShapeExpanderType {
+    EShapeExpanderType_None = 0;
+    EShapeExpanderType_RingFixedPaddingWidth = 1;
+  }
+
+  romsg.ShapeExpanderInfo.EShapeExpanderType shapeType = 1;
+  int64 updateTimestampMs = 2;
+  romsg.RingFixedPaddingWidthExpanderInfo ringFixedPaddingWidthExpanderInfo = 3;
+}
+

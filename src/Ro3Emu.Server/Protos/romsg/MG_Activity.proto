@@ -1,0 +1,449 @@
+syntax = "proto3";
+package romsg;
+import "MG_Common.proto";
+import "FieldOption.proto";
+import "MG_TerritoryWars.proto";
+import "MG_Siege.proto";
+import "MG_GuildLeague.proto";
+import "MG_FlyingDragon.proto";
+
+enum ActivityStatus {
+  ActivityStatus_None = 0;
+  ActivityStatus_NotOpen = 1;
+  ActivityStatus_Open = 2;
+  ActivityStatus_Start = 3;
+  ActivityStatus_End = 4;
+  ActivityStatus_Close = 5;
+}
+
+enum EDailyActivityState {
+  EAS_Invalid = 0;
+  EAS_NotStart = 1;
+  EAS_Running = 2;
+}
+
+enum ENewActivityState {
+  ENewActivityState_WaitStart = 0;
+  ENewActivityState_Start = 1;
+  ENewActivityState_End = 2;
+}
+
+message NoviceActivity {
+  map<int32, int32> taskIds = 1;
+}
+
+message NoviceActivityReq {
+  int32 taskId = 1;
+}
+
+message NoviceActivityResp {
+  int32 result = 1;
+  int32 taskId = 2;
+}
+
+message ActivityParam {
+  oneof val {
+    romsg.NoviceActivity noviceActivity = 1;
+  }
+}
+
+message ActivityBaseInfo {
+  int32 activityId = 1;
+  romsg.ActivityParam activityParam = 2;
+}
+
+message ActivityReqParam {
+  oneof val {
+    romsg.NoviceActivityReq noviceReq = 1;
+  }
+}
+
+message ActivityReq {
+  int32 activityId = 1;
+  romsg.ActivityReqParam reqParam = 2;
+}
+
+message ActivityRespParam {
+  oneof val {
+    romsg.NoviceActivityResp noviceResp = 1;
+  }
+}
+
+message ActivityResp {
+  int32 result = 1;
+  int32 activityId = 2;
+  romsg.ActivityRespParam respParam = 3;
+}
+
+message DBActivityParam {
+  oneof val {
+    romsg.NoviceActivity noviceActivity = 1;
+    romsg.SiegeEntityTotalInfo siegeData = 2;
+    romsg.DBTerritoryWarsData territoryWarsData = 3;
+    romsg.GuildLeagueTotalInfo guildLeagueTotalInfo = 4;
+    romsg.DBFlyingDragonProduceInfo flyingDragonProduceInfo = 5;
+    romsg.DBSeasonEveInfo seasonEveInfo = 6;
+    romsg.DBJourneyActivity journey = 7;
+    romsg.DBPronteraDefenseInfo pronteraDefense = 8;
+    romsg.DBTerritoryWarData territoryWarData = 9;
+    romsg.DBRainbowKoiActivityData rainbowKoiData = 10;
+    romsg.DBGveHuntingActivityData gveHuntingData = 11;
+    romsg.DBCasualBattleActivityData casualBattleData = 12;
+    romsg.DBOnePieceActivity OnePieceInfo = 13;
+  }
+}
+
+message RainbowKoiCandidateInfo {
+  bool isEliminated = 1;
+  bool isGiveUp = 2;
+  int32 rank = 3;
+  bool isSettle = 4;
+}
+
+message RainbowKoiProgress {
+  map<int64, romsg.RainbowKoiCandidateInfo> candidateMap = 1;
+  bool isGameOver = 2;
+}
+
+message DBRainbowKoiActivityData {
+  romsg.RainbowKoiProgress progress = 1;
+  int64 dungeonId = 2;
+  map<int64, int64> actorBetMap = 3;
+  bool isSettled = 4;
+}
+
+message GveHuntingGuildResult {
+  int64 guildId = 1;
+  int64 score = 2;
+  int64 reachTs = 3;
+  int32 rank = 4;
+  int64 commandSkillKill = 5;
+}
+
+message GveHuntingGroupMatchResult {
+  repeated romsg.GveHuntingGuildResult guildResults = 1;
+}
+
+message DBGveHuntingActivityData {
+  map<int64, romsg.GveHuntingMatchGroup> groupMap = 1;
+  repeated romsg.GveHuntingGuildResult topResults = 2;
+  bool isSettled = 3;
+  int64 candidateEndMs = 4;
+  int64 startPhaseEndMs = 5;
+  int64 settlementPhaseEndMs = 6;
+  map<int64, romsg.GveHuntingGroupMatchResult> guildMatchResults = 7;
+}
+
+message DBActivityData {
+  int64 ro3Define_SaveVersion = 9999;
+  int64 ro3Define_DbTerm = 10000;
+  romsg.DBActivityParam activityParam = 1;
+  string activityKey = 2;
+  int64 activityInstance = 3;
+  string businessState = 4;
+  bool isOldRound = 5;
+  bool IsEnterComplete = 6;
+  bool IsExitComplete = 7;
+  map<string, int64> StateTimeStamps = 8;
+  int64 stateInstance = 9;
+  bool IsShielded = 10;
+  repeated romsg.TimeSegment StateTimeStampList = 11;
+  int64 CurStartTime = 12;
+  int64 CurEndTime = 13;
+  int64 CycleStartTime = 14;
+  int64 CycleEndTime = 15;
+}
+
+message DBActivityInfo {
+  map<int32, romsg.ActivityBaseInfo> activityInfo = 1;
+}
+
+message ActivityDataUploadParam {
+  oneof val {
+    romsg.NoviceActivity noviceActivity = 1;
+  }
+}
+
+message ActivityDataUploadReq {
+  int64 playerId = 1;
+  int32 activityId = 2;
+  romsg.ActivityDataUploadParam uploadParam = 3;
+}
+
+message ActivityDataUploadResp {
+  int32 result = 1;
+  int64 playerId = 2;
+  int32 activityId = 3;
+  romsg.DBActivityParam downloadParam = 4;
+}
+
+message ActivityDataNtf {
+  int32 activityId = 1;
+  romsg.ActivityStatus activityStatus = 2;
+  int64 openTime = 3;
+  int64 closeTime = 4;
+  romsg.ActivityParam activityParam = 5;
+}
+
+message DailyActivityState {
+  romsg.EDailyActivityState state = 1;
+  int64 startTime = 2;
+  int64 endTime = 3;
+}
+
+message DailyActivityObject {
+  int32 activityId = 1;
+  romsg.DailyActivityState kState = 2;
+}
+
+message AreaDailyActivityInfo {
+  int64 area = 1;
+  repeated romsg.DailyActivityObject listObj = 2;
+}
+
+message SyncDailyActivityChangeNtf {
+  romsg.AreaDailyActivityInfo info = 1;
+}
+
+message SyncDailyActivityBroadCastNtf {
+  int64 area = 1;
+  int64 activityid = 2;
+  bytes ntf = 3;
+}
+
+message SeasonEveBulletInfo {
+  int64 playerId = 1;
+  int64 chapterId = 2;
+  int64 timeMs = 3;
+}
+
+message DBSeasonEveInfo {
+  int64 progress = 1;
+  map<int64, romsg.DBSeasonEveChapterInfo> chapterInfo = 2;
+  repeated romsg.SeasonEveBulletInfo playerBullet = 3;
+  int64 lastCalcTime = 4;
+}
+
+message DBSeasonEveChapterInfo {
+  map<int64, int64> notes = 1;
+  map<int64, int64> clues = 2;
+  int64 openTime = 3;
+  int64 chapterId = 4;
+}
+
+message DBJourneyActivity {
+  map<int64, romsg.JourneyPlayerCompleteInfo> playerCompleteInfo = 1;
+}
+
+message JourneyPlayerCompleteInfo {
+  int64 playerId = 1;
+  map<int64, romsg.JourneyCompleteInfo> completeNode = 2;
+  map<int64, romsg.JourneyCompleteInfo> completeAct = 3;
+  map<int64, romsg.JourneyCompleteInfo> completeEvent = 4;
+  map<int64, romsg.JourneyCompleteInfo> completeTravel = 5;
+  int64 gainCoinCount = 6;
+  map<int64, int64> attributes = 7;
+  int64 titleId = 8;
+}
+
+message JourneyCompleteInfo {
+  int64 chapterId = 1;
+  int64 count = 2;
+}
+
+message DBPronteraDefenseInfo {
+  map<int64, romsg.DBPronteraDefenseMapInfo> mapInfo = 1;
+  map<int64, romsg.DBPronteraDefenseRoundInfo> roundInfo = 2;
+  map<int64, romsg.DBPronteraDefenseGuildInfo> guildInfo = 3;
+  int64 curRound = 4;
+  int64 curIntensity = 5;
+}
+
+message DBPronteraDefenseMapInfo {
+  int64 mapId = 1;
+  int64 curResistLevel = 2;
+  int64 defensePoint = 3;
+  int64 maxDefensePoint = 4;
+  int64 defendRoundCount = 5;
+  bool isFall = 6;
+  int64 fallRound = 7;
+  map<int64, bool> defenseGuilds = 8;
+  map<int64, romsg.DBPronteraDefenseGuildBoardInfo> guildContributionBoard = 9;
+}
+
+message DBPronteraDefenseGuildBoardInfo {
+  int64 guildId = 1;
+  int64 contribution = 2;
+}
+
+message DBPronteraDefenseRoundInfo {
+  int64 roundId = 1;
+  int64 startTime = 2;
+  int64 endTime = 3;
+  map<int64, bool> mapIds = 4;
+}
+
+message DBPronteraDefenseGuildInfo {
+  int64 guildId = 1;
+  int64 guildPrepLv = 2;
+  int64 guildPrepExp = 3;
+  int64 guildContribution = 4;
+}
+
+message DailyActivityPlaceholderReq {
+}
+
+message DailyActivityPlaceholderRes {
+}
+
+message DailyActivityPlaceholderNotify {
+}
+
+message CommonDailyActivityReq {
+  int32 activityId = 1;
+  int64 requestId = 2;
+  oneof activity {
+    romsg.DailyActivityPlaceholderReq placeholder = 3;
+    romsg.RainbowKoiBetReq rainbowKoiBet = 100;
+    romsg.RunRingTaskAcceptReq runRingTaskAccept = 110;
+    romsg.CasualBattleSignUpReq casualBattleSignUp = 120;
+    romsg.GveHuntingQueryResultReq gveHuntingQueryResult = 200;
+  }
+}
+
+message CommonDailyActivityRes {
+  int32 result = 1;
+  int32 activityId = 2;
+  int64 requestId = 3;
+  oneof activity {
+    romsg.DailyActivityPlaceholderRes placeholder = 4;
+    romsg.RainbowKoiBetRes rainbowKoiBet = 100;
+    romsg.RunRingTaskAcceptRes runRingTaskAccept = 110;
+    romsg.CasualBattleRes casualBattleSignUp = 120;
+    romsg.GveHuntingMatchResultNotify gveHuntingQueryResult = 200;
+  }
+}
+
+message CommonDailyActivityNotify {
+  int32 activityId = 1;
+  oneof activity {
+    romsg.DailyActivityPlaceholderNotify placeholder = 2;
+  }
+}
+
+message RainbowKoiBetReq {
+  int64 targetPlayerId = 1;
+}
+
+message RainbowKoiBetRes {
+  int64 targetPlayerId = 1;
+}
+
+message RunRingTaskAcceptReq {
+  int32 placeholder = 1;
+}
+
+message RunRingTaskAcceptRes {
+  int32 placeholder = 1;
+}
+
+message CasualBattleSignUpReq {
+}
+
+message CasualBattleRes {
+}
+
+message GveHuntingQueryResultReq {
+}
+
+message GveHuntingHistoryQueryReq {
+}
+
+message UseGveHuntingSkillReq {
+  int64 toGuildId = 1;
+  int64 skillConfigId = 2;
+}
+
+message GveHuntingSkillsNotify {
+  repeated int64 guildIds = 1;
+  repeated romsg.HuntingSkillInfo huntingSkills = 2;
+  int64 nextSkillMs = 3;
+}
+
+message HuntingSkillInfo {
+  int64 skillConfigId = 1;
+  int64 slotID = 2;
+}
+
+message GveHuntingMatchedNotify {
+  repeated int64 guildIds = 1;
+  int64 candidateEndMs = 2;
+  int64 startPhaseEndMs = 3;
+  int64 settlementPhaseEndMs = 4;
+}
+
+message GveHuntingLiveRankNotify {
+  repeated romsg.GveHuntingGuildResult guilds = 1;
+}
+
+message GveHuntingMatchResultNotify {
+  repeated romsg.GveHuntingGuildResult matchResults = 1;
+  repeated romsg.GveHuntingGuildResult topResults = 2;
+}
+
+message UseHuntingSkillNtf {
+  int64 sourceGuildId = 1;
+  int64 targetGuildId = 2;
+  int64 skillConfigId = 3;
+}
+
+message CasualBattlePlayerList {
+  repeated int64 values = 1;
+}
+
+message CasualBattlePlayerInfo {
+  int64 playerId = 1;
+  int32 mmr = 2;
+  int64 joinTimeMs = 3;
+}
+
+message CasualBattleMatchUnit {
+  int64 teamId = 1;
+  repeated int64 playerIds = 2;
+  int32 totalMmr = 3;
+  int32 squadIndex = 4;
+}
+
+message CasualBattleSide {
+  repeated romsg.CasualBattleMatchUnit units = 1;
+  int32 playerCount = 2;
+  int32 totalMmr = 3;
+}
+
+message CasualBattleGroup {
+  romsg.CasualBattleSide sideA = 1;
+  romsg.CasualBattleSide sideB = 2;
+}
+
+message DBCasualBattleActivityData {
+  map<int64, romsg.CasualBattlePlayerInfo> playerMap = 1;
+  map<int64, romsg.CasualBattlePlayerList> teamPlayerMap = 2;
+  map<int32, romsg.CasualBattleGroup> battleGroupMap = 3;
+  repeated int64 battleSceneIds = 4;
+  int64 current_match_scene_id = 5;
+  int32 current_match_player_count = 6;
+}
+
+message DBOnePieceActivity {
+  map<int64, romsg.OnePieceSceneNpcInfo> npcInfo = 1;
+  int64 endTime = 2;
+}
+
+message OnePieceSceneNpcInfo {
+  map<int64, int64> npcPointInfo = 1;
+  int64 sceneGuid = 2;
+  int64 sceneEntry = 3;
+  int64 sceneLineId = 4;
+  int64 sceneNpcRoundCount = 5;
+}
+

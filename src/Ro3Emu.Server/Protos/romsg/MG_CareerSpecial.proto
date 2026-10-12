@@ -1,0 +1,19 @@
+syntax = "proto3";
+package romsg;
+
+message LeaseCareerSpecialItemReq {
+  int32 cartRemouldCfgId = 1;
+}
+
+message CancelLeaseCareerSpecialItemReq {
+  int32 cartRemouldCfgId = 1;
+}
+
+message LeaseCareerSpecialItemRsp {
+  int32 errCode = 1;
+}
+
+message CancelLeaseCareerSpecialItemRsp {
+  int32 errCode = 1;
+}
+

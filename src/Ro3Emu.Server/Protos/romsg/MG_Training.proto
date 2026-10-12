@@ -1,0 +1,50 @@
+syntax = "proto3";
+package romsg;
+
+message TrainingChallengeModeResp {
+  int64 result = 1;
+}
+
+message TrainingGroundResData {
+  int64 maxDps = 1;
+  int64 sumDamage = 2;
+}
+
+message TrainingExitChallengeModeResp {
+  int64 result = 1;
+}
+
+message TrainingUpdateWoodNpcAttrReq {
+  int32 race = 1;
+  int32 element = 2;
+  int32 bodyType = 3;
+}
+
+message TrainingUpdateWoodNpcAttrResp {
+  int64 result = 1;
+}
+
+message TrainingAimAwardReq {
+  repeated int64 aimAwardIds = 1;
+}
+
+message TrainingAimAwardResp {
+  int64 result = 1;
+}
+
+message TrainingReconnectRes {
+  int64 race = 1;
+  int64 ele = 2;
+  int64 body = 3;
+  int64 isChallenge = 4;
+}
+
+message TrainingChallengeReconnectRes {
+  int64 endTime = 1;
+  int64 totalDamage = 2;
+}
+
+message TrainingChallengeResetRes {
+  int64 result = 1;
+}
+

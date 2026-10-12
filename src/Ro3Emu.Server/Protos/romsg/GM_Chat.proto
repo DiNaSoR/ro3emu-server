@@ -1,0 +1,207 @@
+syntax = "proto3";
+package Tencent.IM;
+
+message TextChatMessage {
+  string message_id = 1;
+  string sender_id = 2;
+  string receive_id = 3;
+  uint64 send_time = 4;
+  string content = 5;
+  string extra_param = 6;
+}
+
+message AudioChatMessage {
+  string message_id = 1;
+  string sender_id = 2;
+  string receive_id = 3;
+  uint64 send_time = 4;
+  string audio_file = 5;
+  string extra_param = 6;
+  uint32 audio_duration = 7;
+  string recognize_text = 8;
+  bool is_from_server = 9;
+}
+
+message JoinMultiChannelRequest {
+  repeated string channels = 1;
+}
+
+message JoinMultiChannelResponse {
+  bool chat_result = 1;
+}
+
+message NotifyNewTextChatMessage {
+  Tencent.IM.TextChatMessage msg = 1;
+}
+
+message NotifyNewAudioMessage {
+  Tencent.IM.AudioChatMessage msg = 1;
+}
+
+message LeaveAllChannelsRequest {
+}
+
+message LeaveAllChannelResponse {
+  bool chat_result = 1;
+}
+
+message SwitchToChannelsRequest {
+  repeated string channels = 1;
+}
+
+message SwitchToChannelsResponse {
+  bool chat_result = 1;
+}
+
+message JoinChannelRequest {
+  string channel_id = 1;
+}
+
+message JoinChannelResponse {
+  bool chat_result = 1;
+  string channel_id = 2;
+}
+
+message QuitChannelRequest {
+  string channel_id = 1;
+}
+
+message QuitChannelResponse {
+  bool chat_result = 1;
+  string channel_id = 2;
+}
+
+message GetJoinedChannelRequest {
+}
+
+message GetJoinedChannelResponse {
+  bool chat_result = 1;
+  repeated string channel_list = 2;
+}
+
+message SendTextChatMessageRequest {
+  string receive_id = 1;
+  uint32 chat_type = 2;
+  string content = 3;
+  string extra_param = 4;
+}
+
+message SendTextChatMessageResponse {
+  bool chat_result = 1;
+  Tencent.IM.TextChatMessage msg = 2;
+}
+
+message RoomHistoryMessageFromServerRequest {
+  string room_id = 1;
+  uint32 count = 2;
+  uint32 direction = 3;
+}
+
+message RoomHistoryMessageFromServerResponse {
+  bool chat_result = 1;
+  repeated Tencent.IM.TextChatMessage msg_list = 2;
+  repeated Tencent.IM.AudioChatMessage audio_msg_list = 3;
+}
+
+message StartRecordAudioRequest {
+  string receive_id = 1;
+  uint32 chat_type = 2;
+  string extra_param = 3;
+  bool recognizeText = 4;
+}
+
+message StartRecordAudioResponse {
+  bool chat_result = 1;
+}
+
+message StopRecordAndSendAudioRequest {
+}
+
+message StopRecordAndSendAudioResponse {
+  bool chat_result = 1;
+  Tencent.IM.AudioChatMessage msg = 2;
+}
+
+message CancelRecordAudioRequest {
+}
+
+message CancelRecordAudioResponse {
+  bool chat_result = 1;
+}
+
+message PlayAudioRequest {
+  string audio_file = 1;
+}
+
+message PlayAudioResponse {
+  bool chat_result = 1;
+}
+
+message StopAudioRequest {
+}
+
+message StopAudioResponse {
+  bool chat_result = 1;
+}
+
+message TranslateTextRequest {
+  string text = 1;
+  uint32 dest_code = 2;
+  uint32 src_code = 3;
+}
+
+message TranslateTextResponse {
+  bool chat_result = 1;
+  string text = 2;
+}
+
+message SetRoomHistoryMessageSwitchRequest {
+  repeated string channels = 1;
+  bool save = 2;
+}
+
+message SetRoomHistoryMessageSwitchResponse {
+  bool chat_result = 1;
+}
+
+message GetHistoryMessageRequest {
+  string target_id = 1;
+  uint32 chat_type = 2;
+  uint32 start_message_id = 3;
+  uint32 count = 4;
+  uint32 direction = 5;
+}
+
+message GetHistoryMessageResponse {
+  bool chat_result = 1;
+  string target_id = 2;
+  uint32 remain_cnt = 3;
+  repeated Tencent.IM.TextChatMessage msg_list = 4;
+  repeated Tencent.IM.AudioChatMessage audio_msg_list = 5;
+  uint32 chat_type = 6;
+}
+
+message DeleteHistoryMessageRequest {
+  string target_id = 1;
+  uint32 chat_type = 2;
+  uint32 start_message_id = 3;
+  uint32 count = 4;
+}
+
+message DeleteHistoryMessageResponse {
+  bool chat_result = 1;
+  uint32 chat_type = 2;
+}
+
+message SendAudioChatMessageRequest {
+  string audio_file = 1;
+  string receive_id = 2;
+  uint32 chat_type = 3;
+  string extra_param = 4;
+}
+
+message SendAudioChatMessageResponse {
+  bool chat_result = 1;
+  uint32 chat_type = 2;
+}
+

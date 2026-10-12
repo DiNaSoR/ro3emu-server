@@ -1,0 +1,21 @@
+syntax = "proto3";
+package romsg;
+
+message FirstHeartGetTaskRewardReq {
+  int32 type = 1;
+  int32 taskId = 2;
+}
+
+message FirstHeartGetTaskRewardResp {
+  int32 result = 1;
+}
+
+message FirstHeartGetScoreRewardReq {
+  int32 type = 1;
+  int32 rewardId = 2;
+}
+
+message FirstHeartGetScoreRewardResp {
+  int32 result = 1;
+}
+

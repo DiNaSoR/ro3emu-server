@@ -1,0 +1,23 @@
+syntax = "proto3";
+package romsg;
+
+message PublicChatNewEmojiNtf {
+  repeated int64 ids = 1;
+}
+
+message PublicChatEmojiReq {
+}
+
+message PublicChatEmojiRsp {
+  repeated int64 ids = 1;
+}
+
+message DungeonEmojiInstallReq {
+  int32 dungeonId = 1;
+  repeated int32 emojiIds = 2;
+}
+
+message DungeonEmojiInstallResp {
+  int32 result = 1;
+}
+

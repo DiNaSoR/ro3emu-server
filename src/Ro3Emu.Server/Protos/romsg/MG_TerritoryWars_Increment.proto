@@ -1,0 +1,726 @@
+syntax = "proto3";
+package romsg;
+import "APIError.proto";
+import "client2service.proto";
+import "FieldOption.proto";
+import "GM_Chat.proto";
+import "MG_Achievement.proto";
+import "MG_Activity.proto";
+import "MG_Adventure.proto";
+import "MG_AdventureGroup.proto";
+import "MG_AFK.proto";
+import "MG_AreaConcur.proto";
+import "MG_Auction.proto";
+import "MG_Barroom.proto";
+import "MG_Base.proto";
+import "MG_BaseMgr.proto";
+import "MG_BlueDbg.proto";
+import "MG_BroadCast.proto";
+import "MG_Card.proto";
+import "MG_CareerSpecial.proto";
+import "MG_Cell.proto";
+import "MG_CellMgr.proto";
+import "MG_Chat.proto";
+import "MG_Chicken.proto";
+import "MG_Common_Increment.proto";
+import "MG_Common.proto";
+import "MG_DB.proto";
+import "MG_Define.proto";
+import "MG_DragonIsland.proto";
+import "MG_Dungeon.proto";
+import "MG_Emblem.proto";
+import "MG_EmojiPlay.proto";
+import "MG_Entity.proto";
+import "MG_Equipment.proto";
+import "MG_FirstHeart.proto";
+import "MG_FlyingDragon.proto";
+import "MG_Friend.proto";
+import "MG_Function.proto";
+import "MG_Gateway.proto";
+import "MG_Genre.proto";
+import "MG_GlobalCache.proto";
+import "MG_Guide.proto";
+import "MG_Guild_Increment.proto";
+import "MG_Guild.proto";
+import "MG_GuildBlackMarket.proto";
+import "MG_GuildCampFire.proto";
+import "MG_GuildDraculaWedding_Init.proto";
+import "MG_GuildDraculaWedding.proto";
+import "MG_GuildLeague.proto";
+import "MG_GuildVoiceChannel.proto";
+import "MG_HeroicSpirit.proto";
+import "MG_HiddenTreasure.proto";
+import "MG_IDIP.proto";
+import "MG_IDIPSerialNumber.proto";
+import "MG_Interact.proto";
+import "MG_LeaderBoardClient.proto";
+import "MG_Library.proto";
+import "MG_Lifejob.proto";
+import "MG_Login.proto";
+import "MG_Lottery.proto";
+import "MG_Mail.proto";
+import "MG_MapData.proto";
+import "MG_Match.proto";
+import "MG_Mount.proto";
+import "MG_Mover.proto";
+import "MG_MultiDungeon.proto";
+import "MG_MVP.proto";
+import "MG_NewActivity.proto";
+import "MG_Pack.proto";
+import "MG_Paragon.proto";
+import "MG_Pay.proto";
+import "MG_Personal.proto";
+import "MG_Pet.proto";
+import "MG_Player.proto";
+import "MG_PlayerOfflineMessage.proto";
+import "MG_PlayMethod.proto";
+import "MG_PlotActing.proto";
+import "MG_PublicChat.proto";
+import "MG_PublicServer.proto";
+import "MG_RainbowKoi_Init.proto";
+import "MG_Relationship.proto";
+import "MG_Scene.proto";
+import "MG_SceneStream.proto";
+import "MG_Season_Increment.proto";
+import "MG_Season.proto";
+import "MG_SeasonPage.proto";
+import "MG_SeasonRefine.proto";
+import "MG_SeasonTalent.proto";
+import "MG_ServerClientMsg.proto";
+import "MG_Setting.proto";
+import "MG_Shop.proto";
+import "MG_Siege.proto";
+import "MG_Skill.proto";
+import "MG_SkillGrowth.proto";
+import "MG_SocialOutfit.proto";
+import "MG_SpecialEffect.proto";
+import "MG_StageRewards.proto";
+import "MG_Stalls.proto";
+import "MG_State.proto";
+import "MG_Statistics.proto";
+import "MG_StorageHole.proto";
+import "MG_Task.proto";
+import "MG_Team.proto";
+import "MG_TerritoryAuction.proto";
+import "MG_TerritoryWars.proto";
+import "MG_ThreeDay.proto";
+import "MG_Title.proto";
+import "MG_Totem.proto";
+import "MG_TradeCenter.proto";
+import "MG_TradeMarket.proto";
+import "MG_Training.proto";
+import "MG_TransAction.proto";
+import "MG_TypeWriter.proto";
+import "MG_WardRobe.proto";
+import "MG_WorldExploration.proto";
+import "MG_Zone.proto";
+
+message DBTerritoryWarDataIncrement {
+  message zoneDataFieldIncrement {
+    oneof value {
+      romsg.TerritoryZoneData all = 1;
+      romsg.TerritoryZoneDataIncrement inc = 2;
+    }
+  }
+
+  message battleZoneDataFieldIncrement {
+    oneof value {
+      romsg.TerritoryZoneData all = 1;
+      romsg.TerritoryZoneDataIncrement inc = 2;
+    }
+  }
+
+  message stageFieldIncrement {
+    oneof value {
+      romsg.TerritoryStage all = 1;
+      romsg.TerritoryStageIncrement inc = 2;
+    }
+  }
+
+  romsg.DBTerritoryWarDataIncrement.zoneDataFieldIncrement zoneData = 10;
+  romsg.DBTerritoryWarDataIncrement.battleZoneDataFieldIncrement battleZoneData = 20;
+  romsg.DBTerritoryWarDataIncrement.stageFieldIncrement stage = 30;
+  optional int64 auctionId = 40;
+}
+
+message DBTerritoryWarsDataIncrement {
+  message mapDataFieldIncrement {
+    oneof value {
+      romsg.TerritoryWarsMapData all = 1;
+      romsg.TerritoryWarsMapDataIncrement inc = 2;
+    }
+  }
+
+  message statisticDataFieldIncrement {
+    oneof value {
+      romsg.TerritoryWarsHistoryStatistics all = 1;
+      romsg.TerritoryWarsHistoryStatisticsIncrement inc = 2;
+    }
+  }
+
+  message flowDataFieldIncrement {
+    oneof value {
+      romsg.TerritoryWarsFlowData all = 1;
+      romsg.TerritoryWarsFlowDataIncrement inc = 2;
+    }
+  }
+
+  romsg.DBTerritoryWarsDataIncrement.mapDataFieldIncrement mapData = 10;
+  romsg.DBTerritoryWarsDataIncrement.statisticDataFieldIncrement statisticData = 20;
+  romsg.DBTerritoryWarsDataIncrement.flowDataFieldIncrement flowData = 30;
+}
+
+message DBTerritoryWarsInfoIncrement {
+  message auctionInfoFieldIncrement {
+    oneof value {
+      romsg.TerritoryWarsAuctionInfo all = 1;
+      romsg.TerritoryWarsAuctionInfoIncrement inc = 2;
+    }
+  }
+
+  message scoreBoardFieldIncrement {
+    oneof value {
+      romsg.TerritoryWarsGuildScoreBoard all = 1;
+      romsg.TerritoryWarsGuildScoreBoardIncrement inc = 2;
+    }
+  }
+
+  message escortInfoFieldIncrement {
+    oneof value {
+      romsg.TerritoryWarsEscortInfo all = 1;
+      romsg.TerritoryWarsEscortInfoIncrement inc = 2;
+    }
+  }
+
+  message seasonStateFieldIncrement {
+    oneof value {
+      romsg.SeasonState all = 1;
+      romsg.SeasonStateIncrement inc = 2;
+    }
+  }
+
+  optional int32 seasonAreaId = 20;
+  romsg.DBTerritoryWarsInfoIncrement.auctionInfoFieldIncrement auctionInfo = 30;
+  romsg.DBTerritoryWarsInfoIncrement.scoreBoardFieldIncrement scoreBoard = 40;
+  romsg.DBTerritoryWarsInfoIncrement.escortInfoFieldIncrement escortInfo = 50;
+  romsg.DBTerritoryWarsInfoIncrement.seasonStateFieldIncrement seasonState = 60;
+}
+
+message TerritoryStageIncrement {
+  optional int32 StageType = 10;
+  optional int64 StartTime = 20;
+  optional int64 EndTime = 30;
+  optional int64 StageAction = 40;
+}
+
+message TerritoryWarsAuctionGuildInfoIncrement {
+  message guildInfoFieldIncrement {
+    oneof value {
+      romsg.GuildSnapInfo all = 1;
+      romsg.GuildSnapInfoIncrement inc = 2;
+    }
+  }
+
+  message occupyPointIdFieldIncrement {
+    oneof value {
+      int32 all = 1;
+      int32 inc = 2;
+      bool del = 3;
+    }
+  }
+
+  optional int64 guildId = 10;
+  romsg.TerritoryWarsAuctionGuildInfoIncrement.guildInfoFieldIncrement guildInfo = 20;
+  optional int64 auctionPrice = 30;
+  map<int32, romsg.TerritoryWarsAuctionGuildInfoIncrement.occupyPointIdFieldIncrement> occupyPointId = 40;
+  optional int64 auctionTime = 50;
+}
+
+message TerritoryWarsAuctionInfoIncrement {
+  message stateInfosFieldIncrement {
+    oneof value {
+      romsg.TerritoryWarsAuctionStateInfo all = 1;
+      romsg.TerritoryWarsAuctionStateInfoIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  map<int32, romsg.TerritoryWarsAuctionInfoIncrement.stateInfosFieldIncrement> stateInfos = 10;
+}
+
+message TerritoryWarsAuctionStateInfoIncrement {
+  message guildInfosFieldIncrement {
+    oneof value {
+      romsg.TerritoryWarsAuctionGuildInfo all = 1;
+      romsg.TerritoryWarsAuctionGuildInfoIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  optional int32 stateId = 10;
+  map<int64, romsg.TerritoryWarsAuctionStateInfoIncrement.guildInfosFieldIncrement> guildInfos = 20;
+}
+
+message TerritoryWarsEscortGoodsMapIncrement {
+  message goodsMapFieldIncrement {
+    oneof value {
+      romsg.TerritoryWarsEscortGuildSellingGoods all = 1;
+      romsg.TerritoryWarsEscortGuildSellingGoodsIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  map<int64, romsg.TerritoryWarsEscortGoodsMapIncrement.goodsMapFieldIncrement> goodsMap = 10;
+}
+
+message TerritoryWarsEscortGuildApplyBuyerIncrement {
+  optional int64 guildId = 10;
+  optional int64 timestamp = 20;
+  optional string message = 30;
+}
+
+message TerritoryWarsEscortGuildInfoIncrement {
+  message playInfoFieldIncrement {
+    oneof value {
+      romsg.TerritoryWarsEscortGuildPlayInfo all = 1;
+      romsg.TerritoryWarsEscortGuildPlayInfoIncrement inc = 2;
+    }
+  }
+
+  romsg.TerritoryWarsEscortGuildInfoIncrement.playInfoFieldIncrement playInfo = 10;
+}
+
+message TerritoryWarsEscortGuildPlayInfoIncrement {
+  message headIconFieldIncrement {
+    oneof value {
+      romsg.GuildHeadIcon all = 1;
+      romsg.GuildHeadIconIncrement inc = 2;
+    }
+  }
+
+  optional int64 guildId = 10;
+  optional bool isBuyer = 20;
+  optional int64 buyNum = 30;
+  optional int64 sellNum = 40;
+  optional int64 startPlayTime = 50;
+  optional int64 transportNum = 60;
+  optional int64 robNum = 70;
+  optional int64 toTransportNum = 80;
+  optional int32 startCartNum = 90;
+  optional int32 transportCartNum = 100;
+  optional int32 destoryCartNum = 110;
+  optional int32 pointId = 120;
+  optional int64 lostNum = 130;
+  optional int64 pickNum = 140;
+  optional string guildName = 150;
+  romsg.TerritoryWarsEscortGuildPlayInfoIncrement.headIconFieldIncrement headIcon = 160;
+  optional int32 startAdvancedCartNum = 170;
+  optional int32 transportAdvancedCartNum = 180;
+}
+
+message TerritoryWarsEscortGuildRejectBuyerIncrement {
+  optional int64 guildId = 10;
+  optional int64 timestamp = 20;
+  optional romsg.TerritoryWarsEscortTradeRejectReason reason = 30;
+}
+
+message TerritoryWarsEscortGuildSellingGoodsIncrement {
+  message stateDataFieldIncrement {
+    oneof value {
+      romsg.TerritoryWarsEscortGuildSellingGoodsOrderData all = 1;
+      romsg.TerritoryWarsEscortGuildSellingGoodsOrderDataIncrement inc = 2;
+    }
+  }
+
+  optional int64 goodsUid = 10;
+  optional int64 guildId = 20;
+  optional int32 sellingNum = 30;
+  optional int32 unitPrice = 40;
+  optional string sellingMessage = 50;
+  optional romsg.TerritoryWarsEscortGoodsState state = 60;
+  optional int64 timestamp = 70;
+  romsg.TerritoryWarsEscortGuildSellingGoodsIncrement.stateDataFieldIncrement stateData = 80;
+}
+
+message TerritoryWarsEscortGuildSellingGoodsOrderDataIncrement {
+  message applyBuyersRepeatedOrigin {
+    repeated romsg.TerritoryWarsEscortGuildApplyBuyer value = 1;
+  }
+
+  message applyBuyersRepeatedIncrement {
+    repeated romsg.TerritoryWarsEscortGuildApplyBuyerIncrement value = 1;
+  }
+
+  message applyBuyersFieldIncrement {
+    oneof value {
+      romsg.TerritoryWarsEscortGuildSellingGoodsOrderDataIncrement.applyBuyersRepeatedOrigin all = 1;
+      romsg.TerritoryWarsEscortGuildSellingGoodsOrderDataIncrement.applyBuyersRepeatedIncrement inc = 2;
+    }
+  }
+
+  message rejectBuyersRepeatedOrigin {
+    repeated romsg.TerritoryWarsEscortGuildRejectBuyer value = 1;
+  }
+
+  message rejectBuyersRepeatedIncrement {
+    repeated romsg.TerritoryWarsEscortGuildRejectBuyerIncrement value = 1;
+  }
+
+  message rejectBuyersFieldIncrement {
+    oneof value {
+      romsg.TerritoryWarsEscortGuildSellingGoodsOrderDataIncrement.rejectBuyersRepeatedOrigin all = 1;
+      romsg.TerritoryWarsEscortGuildSellingGoodsOrderDataIncrement.rejectBuyersRepeatedIncrement inc = 2;
+    }
+  }
+
+  message successBuyerFieldIncrement {
+    oneof value {
+      romsg.TerritoryWarsEscortGuildSuccessBuyer all = 1;
+      romsg.TerritoryWarsEscortGuildSuccessBuyerIncrement inc = 2;
+    }
+  }
+
+  message rejectHistoryRepeatedOrigin {
+    repeated romsg.TerritoryWarsEscortGuildRejectBuyer value = 1;
+  }
+
+  message rejectHistoryRepeatedIncrement {
+    repeated romsg.TerritoryWarsEscortGuildRejectBuyerIncrement value = 1;
+  }
+
+  message rejectHistoryFieldIncrement {
+    oneof value {
+      romsg.TerritoryWarsEscortGuildSellingGoodsOrderDataIncrement.rejectHistoryRepeatedOrigin all = 1;
+      romsg.TerritoryWarsEscortGuildSellingGoodsOrderDataIncrement.rejectHistoryRepeatedIncrement inc = 2;
+    }
+  }
+
+  romsg.TerritoryWarsEscortGuildSellingGoodsOrderDataIncrement.applyBuyersFieldIncrement applyBuyers = 10;
+  romsg.TerritoryWarsEscortGuildSellingGoodsOrderDataIncrement.rejectBuyersFieldIncrement rejectBuyers = 20;
+  romsg.TerritoryWarsEscortGuildSellingGoodsOrderDataIncrement.successBuyerFieldIncrement successBuyer = 30;
+  romsg.TerritoryWarsEscortGuildSellingGoodsOrderDataIncrement.rejectHistoryFieldIncrement rejectHistory = 40;
+}
+
+message TerritoryWarsEscortGuildSuccessBuyerIncrement {
+  optional int64 guildId = 10;
+  optional int64 timestamp = 20;
+}
+
+message TerritoryWarsEscortInfoIncrement {
+  message zoneEscortInfoMapFieldIncrement {
+    oneof value {
+      romsg.TerritoryWarsZoneEscortInfo all = 1;
+      romsg.TerritoryWarsZoneEscortInfoIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  map<int32, romsg.TerritoryWarsEscortInfoIncrement.zoneEscortInfoMapFieldIncrement> zoneEscortInfoMap = 10;
+}
+
+message TerritoryWarsEscortPlayerPlayInfoIncrement {
+  optional int64 roleId = 10;
+  optional int32 killNum = 20;
+  optional int32 assistNum = 30;
+  optional int64 transferNum = 40;
+  optional int64 robNum = 50;
+  optional int32 deadNum = 60;
+  optional int64 partRobNum = 70;
+  optional int64 score = 80;
+  optional string playerName = 90;
+  optional int64 awardStates = 100;
+  optional int64 pickNum = 110;
+}
+
+message TerritoryWarsEscortPlayInfoIncrement {
+  message guildInfosFieldIncrement {
+    oneof value {
+      romsg.TerritoryWarsEscortGuildInfo all = 1;
+      romsg.TerritoryWarsEscortGuildInfoIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message playerInfosFieldIncrement {
+    oneof value {
+      romsg.TerritoryWarsEscortPlayerPlayInfo all = 1;
+      romsg.TerritoryWarsEscortPlayerPlayInfoIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  map<int64, romsg.TerritoryWarsEscortPlayInfoIncrement.guildInfosFieldIncrement> guildInfos = 10;
+  map<int64, romsg.TerritoryWarsEscortPlayInfoIncrement.playerInfosFieldIncrement> playerInfos = 20;
+}
+
+message TerritoryWarsEscortPlayInfoHistoryIncrement {
+  message playInfoFieldIncrement {
+    oneof value {
+      romsg.TerritoryWarsEscortPlayInfo all = 1;
+      romsg.TerritoryWarsEscortPlayInfoIncrement inc = 2;
+    }
+  }
+
+  optional int64 playTime = 10;
+  romsg.TerritoryWarsEscortPlayInfoHistoryIncrement.playInfoFieldIncrement playInfo = 20;
+}
+
+message TerritoryWarsEscortTradeInfoIncrement {
+  message guildGoodsMapFieldIncrement {
+    oneof value {
+      romsg.TerritoryWarsEscortGoodsMap all = 1;
+      romsg.TerritoryWarsEscortGoodsMapIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  map<int64, romsg.TerritoryWarsEscortTradeInfoIncrement.guildGoodsMapFieldIncrement> guildGoodsMap = 10;
+}
+
+message TerritoryWarsFlowDataIncrement {
+  optional int32 curState = 10;
+  optional int64 startTime = 20;
+}
+
+message TerritoryWarsGroupStatisticsIncrement {
+  message statisticIdsFieldIncrement {
+    oneof value {
+      int64 all = 1;
+      int64 inc = 2;
+      bool del = 3;
+    }
+  }
+
+  map<int64, romsg.TerritoryWarsGroupStatisticsIncrement.statisticIdsFieldIncrement> statisticIds = 10;
+}
+
+message TerritoryWarsGuildScoreBoardIncrement {
+  message occupyScoreFieldIncrement {
+    oneof value {
+      int64 all = 1;
+      int64 inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message playerHonorFieldIncrement {
+    oneof value {
+      int64 all = 1;
+      int64 inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message playerValorFieldIncrement {
+    oneof value {
+      int64 all = 1;
+      int64 inc = 2;
+      bool del = 3;
+    }
+  }
+
+  map<int64, romsg.TerritoryWarsGuildScoreBoardIncrement.occupyScoreFieldIncrement> occupyScore = 10;
+  map<int64, romsg.TerritoryWarsGuildScoreBoardIncrement.playerHonorFieldIncrement> playerHonor = 20;
+  map<int64, romsg.TerritoryWarsGuildScoreBoardIncrement.playerValorFieldIncrement> playerValor = 30;
+}
+
+message TerritoryWarsHistoryStatisticsIncrement {
+  message groupStatisticFieldIncrement {
+    oneof value {
+      romsg.TerritoryWarsGroupStatistics all = 1;
+      romsg.TerritoryWarsGroupStatisticsIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  map<int32, romsg.TerritoryWarsHistoryStatisticsIncrement.groupStatisticFieldIncrement> groupStatistic = 10;
+}
+
+message TerritoryWarsMapDataIncrement {
+  message ZoneDatasFieldIncrement {
+    oneof value {
+      romsg.TerritoryWarsZoneMapData all = 1;
+      romsg.TerritoryWarsZoneMapDataIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message StateDatasFieldIncrement {
+    oneof value {
+      romsg.TerritoryWarsStateMapData all = 1;
+      romsg.TerritoryWarsStateMapDataIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message PointDatasFieldIncrement {
+    oneof value {
+      romsg.TerritoryWarsPointMapData all = 1;
+      romsg.TerritoryWarsPointMapDataIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  map<int32, romsg.TerritoryWarsMapDataIncrement.ZoneDatasFieldIncrement> ZoneDatas = 10;
+  map<int64, romsg.TerritoryWarsMapDataIncrement.StateDatasFieldIncrement> StateDatas = 20;
+  map<int64, romsg.TerritoryWarsMapDataIncrement.PointDatasFieldIncrement> PointDatas = 30;
+}
+
+message TerritoryWarsPointMapDataIncrement {
+  message strategyGuildInfoFieldIncrement {
+    oneof value {
+      romsg.GuildSnapInfo all = 1;
+      romsg.GuildSnapInfoIncrement inc = 2;
+    }
+  }
+
+  optional int32 pointId = 10;
+  optional int64 strategyGuildId = 20;
+  romsg.TerritoryWarsPointMapDataIncrement.strategyGuildInfoFieldIncrement strategyGuildInfo = 30;
+  optional int32 zoneId = 40;
+  optional int64 stateId = 50;
+}
+
+message TerritoryWarsStateMapDataIncrement {
+  message strategyGuildInfoFieldIncrement {
+    oneof value {
+      romsg.GuildSnapInfo all = 1;
+      romsg.GuildSnapInfoIncrement inc = 2;
+    }
+  }
+
+  message pointIdsRepeatedOrigin {
+    repeated int64 value = 1;
+  }
+
+  message pointIdsRepeatedIncrement {
+    repeated int64 value = 1;
+  }
+
+  message pointIdsFieldIncrement {
+    oneof value {
+      romsg.TerritoryWarsStateMapDataIncrement.pointIdsRepeatedOrigin all = 1;
+      romsg.TerritoryWarsStateMapDataIncrement.pointIdsRepeatedIncrement inc = 2;
+    }
+  }
+
+  optional int32 stateId = 10;
+  optional int64 strategyGuildId = 20;
+  romsg.TerritoryWarsStateMapDataIncrement.strategyGuildInfoFieldIncrement strategyGuildInfo = 30;
+  optional int32 zoneId = 40;
+  romsg.TerritoryWarsStateMapDataIncrement.pointIdsFieldIncrement pointIds = 50;
+}
+
+message TerritoryWarsZoneEscortInfoIncrement {
+  message tradeInfoFieldIncrement {
+    oneof value {
+      romsg.TerritoryWarsEscortTradeInfo all = 1;
+      romsg.TerritoryWarsEscortTradeInfoIncrement inc = 2;
+    }
+  }
+
+  message playInfoFieldIncrement {
+    oneof value {
+      romsg.TerritoryWarsEscortPlayInfo all = 1;
+      romsg.TerritoryWarsEscortPlayInfoIncrement inc = 2;
+    }
+  }
+
+  message historyPlayInfosRepeatedOrigin {
+    repeated romsg.TerritoryWarsEscortPlayInfoHistory value = 1;
+  }
+
+  message historyPlayInfosRepeatedIncrement {
+    repeated romsg.TerritoryWarsEscortPlayInfoHistoryIncrement value = 1;
+  }
+
+  message historyPlayInfosFieldIncrement {
+    oneof value {
+      romsg.TerritoryWarsZoneEscortInfoIncrement.historyPlayInfosRepeatedOrigin all = 1;
+      romsg.TerritoryWarsZoneEscortInfoIncrement.historyPlayInfosRepeatedIncrement inc = 2;
+    }
+  }
+
+  optional romsg.TerritoryWarsEscortStage stage = 10;
+  optional int64 startTime = 20;
+  romsg.TerritoryWarsZoneEscortInfoIncrement.tradeInfoFieldIncrement tradeInfo = 30;
+  romsg.TerritoryWarsZoneEscortInfoIncrement.playInfoFieldIncrement playInfo = 40;
+  romsg.TerritoryWarsZoneEscortInfoIncrement.historyPlayInfosFieldIncrement historyPlayInfos = 50;
+}
+
+message TerritoryWarsZoneMapDataIncrement {
+  message strategyGuildInfoFieldIncrement {
+    oneof value {
+      romsg.GuildSnapInfo all = 1;
+      romsg.GuildSnapInfoIncrement inc = 2;
+    }
+  }
+
+  message stateIdsRepeatedOrigin {
+    repeated int64 value = 1;
+  }
+
+  message stateIdsRepeatedIncrement {
+    repeated int64 value = 1;
+  }
+
+  message stateIdsFieldIncrement {
+    oneof value {
+      romsg.TerritoryWarsZoneMapDataIncrement.stateIdsRepeatedOrigin all = 1;
+      romsg.TerritoryWarsZoneMapDataIncrement.stateIdsRepeatedIncrement inc = 2;
+    }
+  }
+
+  message pointIdsRepeatedOrigin {
+    repeated int64 value = 1;
+  }
+
+  message pointIdsRepeatedIncrement {
+    repeated int64 value = 1;
+  }
+
+  message pointIdsFieldIncrement {
+    oneof value {
+      romsg.TerritoryWarsZoneMapDataIncrement.pointIdsRepeatedOrigin all = 1;
+      romsg.TerritoryWarsZoneMapDataIncrement.pointIdsRepeatedIncrement inc = 2;
+    }
+  }
+
+  optional int32 zoneId = 10;
+  optional int64 strategyGuildId = 20;
+  romsg.TerritoryWarsZoneMapDataIncrement.strategyGuildInfoFieldIncrement strategyGuildInfo = 30;
+  romsg.TerritoryWarsZoneMapDataIncrement.stateIdsFieldIncrement stateIds = 40;
+  romsg.TerritoryWarsZoneMapDataIncrement.pointIdsFieldIncrement pointIds = 50;
+}
+
+message TerritoryZoneDataIncrement {
+  message ZoneInfoFieldIncrement {
+    oneof value {
+      romsg.TerritoryZoneInfo all = 1;
+      romsg.TerritoryZoneInfoIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  map<int32, romsg.TerritoryZoneDataIncrement.ZoneInfoFieldIncrement> ZoneInfo = 10;
+}
+
+message TerritoryZoneInfoIncrement {
+  message guildIdRepeatedOrigin {
+    repeated int64 value = 1;
+  }
+
+  message guildIdRepeatedIncrement {
+    repeated int64 value = 1;
+  }
+
+  message guildIdFieldIncrement {
+    oneof value {
+      romsg.TerritoryZoneInfoIncrement.guildIdRepeatedOrigin all = 1;
+      romsg.TerritoryZoneInfoIncrement.guildIdRepeatedIncrement inc = 2;
+    }
+  }
+
+  romsg.TerritoryZoneInfoIncrement.guildIdFieldIncrement guildId = 10;
+}
+

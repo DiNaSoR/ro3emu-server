@@ -1,0 +1,171 @@
+syntax = "proto3";
+package romsg;
+import "MG_PublicServer.proto";
+import "FieldOption.proto";
+
+enum CollectOperateType {
+  CollectOperateType_None = 0;
+  CollectOperateType_Add = 1;
+  CollectOperateType_Remove = 2;
+}
+
+message BuyCommodityReq {
+  int32 commodityId = 1;
+  int32 count = 2;
+  int32 price = 3;
+  int64 npcId = 4;
+}
+
+message BuyCommodityResp {
+  int32 result = 1;
+  int32 commodityId = 2;
+  int32 count = 3;
+  int32 price = 4;
+  int32 buyTimes = 5;
+}
+
+message CommodityCollectReq {
+  int32 commodityId = 1;
+  int64 npcId = 2;
+  romsg.CollectOperateType opType = 3;
+}
+
+message CommodityCollectResp {
+  int32 result = 1;
+  int32 commodityId = 2;
+  int64 npcId = 3;
+  romsg.CollectOperateType opType = 4;
+}
+
+message GetDungeonShopReq {
+  int64 npcGuid = 1;
+  int64 shopId = 2;
+}
+
+message GetDungeonShopResp {
+  map<int64, romsg.DungeonCommodityInfo> commodityInfo = 1;
+}
+
+message DungeonCommodityInfo {
+  int64 commodityId = 1;
+  int64 remainCount = 2;
+  int64 canBuyCount = 3;
+}
+
+message CommodityPresentReq {
+  int64 targetId = 1;
+  romsg.BuyCommodityReq buyReq = 2;
+  string giftContent = 3;
+}
+
+message CommodityPresentResp {
+  int32 result = 1;
+  int64 orderId = 2;
+  int32 commodityId = 3;
+  int64 targetId = 4;
+  string giftContent = 5;
+}
+
+message CommodityGetInfoReq {
+  int32 commodityType = 1;
+}
+
+message CommodityGetInfoResp {
+  map<int32, romsg.CommityInfo> commodityInfos = 1;
+}
+
+message CommityInfo {
+  int64 beginTime = 1;
+  int64 endTime = 2;
+}
+
+message CommodityPickReq {
+  int64 orderId = 1;
+  map<int64, int64> UnLockApprances = 2;
+}
+
+message CommodityPickResp {
+  int32 result = 1;
+}
+
+message PresentOrderClientInfo {
+  int64 orderId = 1;
+  int64 senderId = 2;
+  string senderName = 3;
+  int64 appranceId = 4;
+  int64 appranceAwardId = 5;
+  int64 createTime = 6;
+  int32 state = 7;
+  string giftContent = 8;
+}
+
+message CommodityPresentListNtf {
+  repeated romsg.PresentOrderClientInfo orders = 1;
+}
+
+message SentGiftInfo {
+  int64 orderId = 1;
+  int64 recipientId = 2;
+  string recipientName = 3;
+  int64 appranceId = 4;
+  int64 appranceAwardId = 5;
+  int64 createTime = 6;
+  int32 state = 7;
+  string giftContent = 8;
+  int32 currencyId = 9;
+  int32 currencyCount = 10;
+}
+
+message SentGiftsListNtf {
+  repeated romsg.SentGiftInfo sentGifts = 1;
+}
+
+message CommodityPickGiveItemNtf {
+  int64 recipient = 1;
+  int64 orderId = 2;
+  int64 appranceId = 3;
+  int64 appranceAwardId = 4;
+  int64 senderId = 5;
+}
+
+message BatchBuyCommodityItem {
+  int32 commodityId = 1;
+  int32 count = 2;
+  int32 price = 3;
+}
+
+message BatchBuyCommodityReq {
+  repeated romsg.BatchBuyCommodityItem items = 1;
+  int64 npcId = 2;
+}
+
+message BatchBuyCommodityResp {
+  int32 result = 1;
+  repeated romsg.BatchBuyCommodityItemResult results = 2;
+}
+
+message BatchBuyCommodityItemResult {
+  int32 commodityId = 1;
+  int32 result = 2;
+  int32 count = 3;
+  int32 price = 4;
+  int32 buyTimes = 5;
+}
+
+message ShoppingCartAddReq {
+  int32 commodityId = 1;
+  int32 count = 2;
+}
+
+message ShoppingCartAddResp {
+  int32 result = 1;
+}
+
+message ShoppingCartRemoveReq {
+  int32 commodityId = 1;
+}
+
+message ShoppingCartRemoveResp {
+  int32 result = 1;
+}
+

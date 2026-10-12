@@ -1,0 +1,1578 @@
+syntax = "proto3";
+package romsg;
+import "MG_Define.proto";
+import "FieldOption.proto";
+
+enum LanguageParamType {
+  LanguageParamType_Str = 0;
+  LanguageParamType_Int = 1;
+}
+
+enum SwitchLayerReason {
+  SwitchLayerReasonNone = 0;
+  SwitchLayerReasonTask = 1;
+}
+
+enum GmOpEnum {
+  GmOpNone = 0;
+  GmOpAddItem = 1;
+  GmOpRemoveItem = 2;
+  GmOpBuildEquip = 3;
+  GmOpStrengthen = 4;
+  GmOpRefine = 5;
+  GmGetItem = 6;
+  GmOpTestEquip = 7;
+  GmOpAddAttrPnt = 8;
+  GmOpResetAttrPnt = 9;
+  GmSetPlayerLevel = 10;
+  GmAddMonster = 11;
+  GmDumpPlayerAttr = 12;
+  GmSetPlayerCamp = 13;
+  GmPerfSwitch = 14;
+  GmDumpMemory = 15;
+  GmOpSendMail = 16;
+  GmOpForbiddenPlayer = 17;
+  GmOpUnForbiddenPlayer = 18;
+  GmOpFriendChangeMaxFriend = 19;
+  GmOpFriendChangeMaxBlacklist = 20;
+  GmOpFriendChangeExp = 21;
+  GmOpFriendChangeMaxApply = 22;
+  GmChangeHp = 23;
+  GmSetLevel = 24;
+  GmAddExp = 25;
+  GmDropPool = 26;
+  GmAddNpc = 27;
+  GmShowCl = 28;
+  GmKillEntity = 30;
+  GmJumpMap = 31;
+  GmDumpEntityAttr = 32;
+  GmSetEntityAttr = 33;
+  GmChangeEntityAttr = 34;
+  GmAddBuff = 35;
+  GmRemoveBuff = 36;
+  GmSetJobAdvanceLv = 37;
+  GMSkillQueue = 38;
+  GmGVGActive = 50;
+  GmGVGReset = 51;
+  GmNoCD = 52;
+  GmDamageFix = 53;
+  GmCreateMuiltRole = 54;
+  GmCreateMonsterRobot = 55;
+  GmRobotBattleInit = 56;
+  GmRobotDebugCommand = 57;
+  GmReloadSkillBlueprint = 58;
+  GmPendantDebug = 59;
+  GmTradeMarketServer = 60;
+  GmTradeMarketScene = 61;
+  GmSetServerTime = 62;
+  GmSetServerOpenDay = 63;
+  GmDumpServerLevelInfo = 64;
+  GmSmServer = 65;
+  GmClearPack = 66;
+  GmSendMailPerson = 70;
+  GmSendMailSystemByCfgId = 71;
+  GmSendMailSystemByCustom = 72;
+  GmRevokeSystemMail = 73;
+  GmOperTimeStatistics = 74;
+  GmOperBaseServerTimeStatistics = 75;
+  GmShowBuff = 76;
+  GmShowAttr = 77;
+  GmFullHpMp = 78;
+  GmShowLocation = 79;
+  GmUnlimit = 80;
+  GmCastSkill = 81;
+  GmTargetCastSkill = 82;
+  GmFlyToTarget = 83;
+  GmSendMailPersonByCfgId = 84;
+  GmSendMailNum = 85;
+  GmChangeMailNumMax = 86;
+  GmChangeMailTextBytesMax = 87;
+  GmChangeMailTimeMax = 88;
+  GmChangeMailAttachmentTimeMax = 89;
+  GmHpaServer = 90;
+  GmListSystemMail = 91;
+  GmOpenLog = 92;
+  GmDungeonCmd = 93;
+  GmOpGuild = 94;
+  GmSetEntityCamp = 95;
+  GmQueryRoleDetailInfo = 96;
+  GmPassClimTower = 97;
+  GmGetServerTime = 98;
+  GmTask = 99;
+  GmAchievement = 100;
+  GmSetJob = 101;
+  GmMVPTestRank = 102;
+  GmYoumiChatGuildRecruit = 103;
+  GmGainStageReward = 104;
+  GmClearStageReward = 105;
+  GmSetHistoryMaxPower = 106;
+  GmGveDungeon = 107;
+  GmEnterDungeon = 108;
+  GmAuction = 109;
+  GmCurAllSkillLevUpMax = 110;
+  GmDeleteLeaderBoard = 111;
+  GmLeaderBoardDeleteScore = 112;
+  GmAddFriendRelationType = 113;
+  GmDelFriendRelationType = 114;
+  GmAddPetExp = 115;
+  GmLotterySim = 116;
+  GmStalls = 117;
+  GmBoardCastChat = 118;
+  GmUpdateLeaderBoardUserData = 119;
+  GmUpdateAIJson = 120;
+  GmAIBreakPoint = 121;
+  GmAIResetRun = 122;
+  GmLightUpAppearance = 123;
+  GmChangeDefElement = 124;
+  GmChangeBody = 125;
+  GmChangeRace = 126;
+  GmReLoadDungeonBlueprint = 127;
+  GmSendSavedMessagePing = 128;
+  GmAddLeaderBoardDungeonData = 129;
+  GmQueryConfig = 130;
+  GmEmblemTest = 131;
+  GmPersonalTest = 132;
+  GmBarrroom = 133;
+  GmPrintBarrroom = 134;
+  GMActivityServer = 135;
+  GmSetBarroomInfo = 136;
+  GMSetBarroomRedBag = 137;
+  GMAddBarroomPopularity = 138;
+  GMAddBarroomTaskFinishTimes = 139;
+  GMAddBarroomActDays = 140;
+  GMAddBarroomToDayStayTimes = 141;
+  GMAfk = 142;
+  GMJobResonanceTest = 143;
+  GMState = 144;
+  GMChicken = 145;
+  GMStatistic = 146;
+  GMPet = 147;
+  GMSkill = 148;
+  GMGenre = 149;
+  GMSeasonChange = 150;
+  GMAutoMatchSeasonArea = 151;
+  GMMatchEnterDungeon = 152;
+  GMSetPlayerListStronger = 153;
+  GMNewActivityPre = 154;
+  GMSkillDict = 155;
+  GMQueryLeaderBoard = 156;
+  GMSeasonPage = 157;
+  GMPatronLv = 158;
+  GMTerritoryWars = 159;
+  GMTrade = 160;
+  GmAddItemLimitedBind = 161;
+  GmPrintItemLog = 162;
+  GmGetThreeDayAward = 163;
+  GMSiegeSettlement = 164;
+  GMTreasure = 165;
+  GMCampFire = 166;
+  GMBroadCast = 167;
+  GMAward = 168;
+  GMLifeJobTest = 169;
+  GMJobProfessSkill = 170;
+  GMJobProfessAttr = 171;
+  GMSetSkillWheel = 172;
+  GMEquipWeapon = 173;
+  GMCreateLvEmblem = 174;
+  GMEquipMount = 175;
+  GMEquipPendant = 176;
+  GMHiddenTreasure = 177;
+  GMBattleGlory = 178;
+  GMSetCheckWordOpen = 179;
+  GMSetPlayerBehavior = 180;
+  GMRestrict = 181;
+  GMAdventure = 182;
+  GMShop = 183;
+  GMSystemEnabled = 184;
+  GMOpenNewActivity = 185;
+  GmSetMoveVerify = 186;
+  GMSetSystemRefresh = 187;
+  GMSkillFix = 188;
+  GMSocialOutfit = 189;
+  GMSceneExpand = 190;
+  GMCustomEquip = 191;
+  GMJourney = 192;
+  GMGetPower = 193;
+  GMHeroicSpirit = 194;
+  GMAreaConcur = 195;
+  GMSeasonEve = 198;
+  GMPronteraDefense = 199;
+  GMSetSkillMsgRateLimit = 196;
+  GMGetSkillMsgRateLimit = 197;
+  GMMonthCard = 200;
+  GmJobPosition = 201;
+  GmGrowthClass = 202;
+  GmSkillGrowth = 203;
+  GmEquipGrowth = 204;
+  GmDumpPlayerPrettyAttr = 205;
+  GmSeasonRefine = 206;
+  GmGetRace = 207;
+  GmGetBody = 208;
+  GmGetDefElement = 209;
+  GmMount = 210;
+  GmCareerSpecial = 211;
+  GmOpSetHpPercent = 212;
+  GmCondProgress = 213;
+  GmEnterMultiDungeon = 214;
+  GmAchievementNew = 215;
+  GMWarRobe = 251;
+  GmCard = 252;
+  GMFirstHeart = 253;
+  GMTestIMUserSig = 254;
+  GMTestIMJoinChannel = 255;
+  GMTestIMMute = 256;
+  GMTestIMUnmute = 257;
+  GMTotem = 258;
+  GmStressTest = 259;
+  GmOpAdventureGroup = 260;
+  GMSeasonTalent = 261;
+  GMRainbowKoi = 262;
+  GmLibrary = 263;
+  GmSetRoleAttr = 301;
+  GmDropPoolVerify = 302;
+  GmNpcDropVerify = 303;
+  GmMixVerify = 304;
+  GmHitPositionVerify = 305;
+  GmSceneSystemWithResp = 997;
+  GmSceneSystem = 998;
+  GmPlayerAsset = 999;
+  GmTransToPublic = 1001;
+  GmGrandMsgInfo = 1002;
+  GmMatchCommon = 1003;
+  GmCombination = 1004;
+  GmOpenBattleOptSwitch = 1005;
+  GmSpecialEffect = 1006;
+  GmCasualBattle = 1007;
+  GmOpDragonIsland = 1008;
+  GmControl = 9999;
+  GmProgram = 10000;
+  GmBattle = 20000;
+  GmSkillApiUnitTest = 20001;
+  GmBuffApiUnitTest = 20002;
+  GmAIApiUnitTest = 20003;
+  GmConditionTest = 20004;
+  GmDirtyDataTest = 20005;
+  GmSyncRobotData = 20006;
+}
+
+enum EntityCamp {
+  EntityCamp_AllEnemy = 0;
+  EntityCamp_Player = 1;
+  EntityCamp_Monster = 2;
+}
+
+enum BaseAttrDefine {
+  BaseAttrDefineNone = 0;
+  Str = 1;
+  Agi = 2;
+  Vit = 3;
+  Dex = 4;
+  Int = 5;
+  Luk = 6;
+}
+
+enum RangeType {
+  RangeTypeNone = 0;
+  Map = 1;
+  Rect = 2;
+  Circle = 3;
+  CircularSector = 4;
+}
+
+enum ManifestType {
+  ManifestTypeNone = 0;
+  ManifestTypeFloat = 1;
+  ManifestTypeCommon = 2;
+  ManifestTypeEquipment = 3;
+  ManifestTypeCard = 4;
+  ManifestTypeNewer = 5;
+  ManifestTypeGrowth = 6;
+  ManifestTypeSeason = 7;
+  ManifestTypeDrop = 8;
+  ManifestTypeOnePieceCommonBox = 9;
+  ManifestTypeOnePieceSuperBox = 10;
+  ManifestTypeOnePieceGift = 11;
+  ManifestTypeChickenRank = 12;
+  ManifestTypeUnlockAppearance = 13;
+  ManifestTypeMiniGame = 14;
+  ManifestTypeJourneyNodeAward = 15;
+  ManifestTypeSeasonEveChapter = 16;
+  ManifestTypeSeasonActivity = 17;
+  ManifestTypeRunRing = 18;
+  ManifestTypeBattlePass = 19;
+}
+
+enum ItemBindType {
+  EItemBindTypeNotBind = 0;
+  EItemBindTypeIsBind = 1;
+  EItemBindTypeTimeLimitedBind = 2;
+}
+
+enum DungeonScoreType {
+  DungeonScoreType_Score = 0;
+  DungeonScoreType_Damage = 1;
+  DungeonScoreType_Cure = 2;
+  DungeonScoreType_BeDamage = 3;
+  DungeonScoreType_Cannon = 4;
+  DungeonScoreType_EquipCanon = 5;
+  DungeonScoreType_RepairCanon = 6;
+  DungeonScoreType_KillDragon = 7;
+}
+
+enum DungeonScoreInfoType {
+  DungeonScoreInfoType_Default = 0;
+  DungeonScoreInfoType_GveOut = 1;
+  DungeonScoreInfoType_GveInner = 2;
+}
+
+enum AchievementStatusType {
+  AchievementStatusType_None = 0;
+  AchievementStatusType_Complete = 1;
+  AchievementStatusType_GetReward = 2;
+}
+
+enum FriendIntimacyType {
+  FriendIntimacyType_None = 0;
+  FriendIntimacyType_Intimacy = 1;
+  FriendIntimacyType_Popularity = 2;
+  FriendIntimacyType_Charity = 3;
+}
+
+enum ItemUseEffectType {
+  ItemUseEffectType_None = 0;
+  ItemUseEffectType_Soundtransmission = 105;
+}
+
+enum EquipGridType {
+  EquipGridType_None = 0;
+  EquipGridType_MainHand = 1;
+  EquipGridType_ViceHand = 2;
+  EquipGridType_Armor = 3;
+  EquipGridType_Cloak = 4;
+  EquipGridType_Shoes = 5;
+  EquipGridType_LeftAccessory = 6;
+  EquipGridType_RightAccessory = 7;
+  AppearanceGridType_Head = 8;
+  AppearanceGridType_Face = 9;
+  AppearanceGridType_Mouth = 10;
+  EquipGridType_CareerSpecial = 11;
+  AppearanceGridType_Clothing = 12;
+  AppearanceGridType_Back = 13;
+  AppearanceGridType_Mount = 14;
+  AppearanceGridType_Hair = 15;
+  AppearanceGridType_BodyEffects = 16;
+  AppearanceGridType_Foot = 17;
+}
+
+enum CardPartType {
+  CardPartType_None = 0;
+  CardPartType_MainHand = 1;
+  CardPartType_ViceHand = 2;
+  CardPartType_Armor = 3;
+  CardPartType_Cloak = 4;
+  CardPartType_Shoes = 5;
+  CardPartType_Accessory = 6;
+  CardPartType_Hand = 7;
+  CardPartType_Face = 8;
+  CardPartType_Mouth = 9;
+  CardPartType_Clothing = 10;
+  CardPartType_Back = 11;
+  CardPartType_Mount = 12;
+  CardPartType_Hair = 13;
+  CardPartType_BodyEffects = 14;
+  CardPartType_Foot = 15;
+}
+
+enum StorageHoleCategory {
+  StorageHoleCategory_None = 0;
+  StorageHoleCategory_Equip = 1;
+  StorageHoleCategory_CareerSpecial = 2;
+  StorageHoleCategory_WardRobe = 3;
+}
+
+enum DubugDamageFormulaEnum {
+  Formula_Value = 0;
+  Formula_APhysicsAtk = 1;
+  Formula_AParDef = 2;
+  Formula_BPhysicsDef = 3;
+  Formula_AIgnoreDef = 4;
+  Formula_AIgnoreDefPercent = 5;
+  Formula_AMagicAtk = 6;
+  Formula_AParMDef = 7;
+  Formula_BMDef = 8;
+  Formula_IgnoreMDef = 9;
+  Formula_IgnoreMDefPercent = 10;
+  Formula_DamageRatio = 11;
+  Formula_DamageFix = 12;
+  Formula_AtkAppend = 13;
+  Formula_AtkReduce = 14;
+  Formula_SkillDamageRatioFixed = 17;
+  Formula_SkillDamageRatioRatio = 18;
+  Formula_SkillDamageFixedFixed = 19;
+  Formula_ARaceAttr = 20;
+  Formula_BBeRaceAttr = 21;
+  Formula_ElementCorrection = 25;
+  Formula_AElementDamageAttr = 26;
+  Formula_BBeElementDamageAttr = 27;
+  Formula_AElementMonsterPercent = 28;
+  Formula_BBeElementMonsterPercent = 29;
+  Formula_FinalElementCorrection = 30;
+  Formula_ElementReduce = 31;
+  Formula_ElementDmg = 32;
+  Formula_WeaponType = 35;
+  Formula_BodyCorrection = 36;
+  Formula_ABodyAttr = 37;
+  Formula_BBeBodyAttr = 38;
+  Formula_ATitleDamageAdd = 40;
+  Formula_ADamagePercent = 41;
+  Formula_BBeDamagePercent = 42;
+  Formula_AAtkDmgPer = 43;
+  Formula_BBeAtkDmgPer = 44;
+  Formula_DistanceType = 45;
+  Formula_AMeleeDmgPer = 46;
+  Formula_BBeMeleeDmgPer = 47;
+  Formula_AMAtkDmgPer = 48;
+  Formula_BBeMAtkDmgPer = 49;
+  Formula_PecADamagePercent = 50;
+  Formula_PecBBeDamagePercent = 51;
+  Formula_PecAAtkDmgPer = 52;
+  Formula_PecBBeAtkDmgPer = 53;
+  Formula_PecAMeleeDmgPer = 55;
+  Formula_PecBBeMeleeDmgPer = 56;
+  Formula_PecAMAtkDmgPer = 57;
+  Formula_PecBBeMAtkDmgPer = 58;
+  Formula_ASkillDamagePercent = 60;
+  Formula_BBeSkillDamagePercent = 61;
+  Formula_APvpDmg = 62;
+  Formula_BPvpBeDmg = 63;
+  Formula_Pvpparam = 64;
+  Formula_APveDmg = 65;
+  Formula_BPveBeDmg = 66;
+  Formula_PvEaram = 67;
+  Formula_JobParam = 70;
+  Formula_FluctuateDamageDown = 75;
+  Formula_FluctuateDamageUp = 76;
+  Formula_FluctuateDamage = 77;
+  Formula_CriParameterA = 79;
+  Formula_ACritical = 80;
+  Formula_CriticalResistance = 81;
+  Formula_ParCri = 82;
+  Formula_ACriticalRevise = 83;
+  Formula_ASkillCri = 84;
+  Formula_ACriticalProbability = 85;
+  Formula_BBeCriticalProbability = 86;
+  Formula_ASkillCriExtra = 87;
+  Formula_EffSkillCriticalProb = 88;
+  Formula_SkillCriticalRate = 89;
+  Formula_Rate = 90;
+  Formula_CriticalDamage = 91;
+  Formula_BeCriticalDamage = 92;
+  Formula_BaseDamage = 93;
+  Formula_DamageAdditional = 95;
+  Formula_SkillDamageAdd = 96;
+  Formula_HitObjNum = 100;
+  Formula_ShareParam = 101;
+  Formula_DamageCeil = 105;
+  Formula_BEva = 106;
+  Formula_AHit = 107;
+  Formula_AParHit = 108;
+  Formula_ABaseHit = 109;
+  Formula_AHitProbability = 110;
+  Formula_BeAffectedHitRate = 111;
+  Formula_HitRate = 112;
+  Formula_Rand = 113;
+  Formula_AMagAttack = 150;
+  Formula_CureDamageRatio = 151;
+  Formula_CureDamageFix = 152;
+  Formula_CurePercent = 155;
+  Formula_BeCurePercent = 156;
+  Formula_PerTreat = 157;
+  Formula_BePerCure = 158;
+  Formula_CureCritical = 160;
+  Formula_CureCriticalProbability = 161;
+  Formula_CureSetCriParam = 162;
+  Formula_CureCriticalRevise = 163;
+  Formula_CureSkillCri = 164;
+  Formula_CureSkillCriExtra = 165;
+  Formula_CureSkillCriticalRate = 166;
+  Formula_CureRate = 167;
+  Formula_CureCriticalDamage = 170;
+  Formula_CureBaseDamage = 171;
+  Formula_CureDamageAdditional = 172;
+}
+
+enum RoleSceneState {
+  RoleSceneStateOffline = 0;
+  RoleSceneStateConnect = 1;
+  RoleSceneStateLogin = 2;
+  RoleSceneStateInScene = 3;
+  RoleSceneStateSwitchLeave = 4;
+  RoleSceneStateSwitchEnter = 5;
+  RoleSceneStateLogout = 6;
+}
+
+enum EAttrModType {
+  EAttrModTypeBase = 0;
+  EAttrModTypeEquip = 1;
+  EAttrModTypeSkill = 2;
+  EAttrModTypeBuff = 3;
+  EAttrModTypeTitle = 4;
+  EAttrModTypeCardBinding = 5;
+  EAttrModTypeMount = 6;
+  EAttrModTypePet = 7;
+  EAttrModTypeWardRobe = 8;
+  EAttrModTypeLevelOneTransform = 9;
+  EAttrModTypeGm = 10;
+  EEAttrModTypeTotem = 11;
+  EAttrModTypeLibrary = 12;
+  EAttrModTypeEmblem = 13;
+  EAttrModTypeJobResonance = 14;
+  EAttrModTypeInheritTrans = 15;
+  EAttrModTypeChickenCareer = 16;
+  EAttrModTypeChickenBuff = 17;
+  EAttrModTypeChickenEquip = 18;
+  EAttrModTypeChickenSkill = 19;
+  EAttrModTypePatronLv = 20;
+  EAttrModTypeSeasonRefine = 21;
+  EAttrModTypeUnEffectEquip = 22;
+  EAttrModTypeRefine = 23;
+  EAttrModTypeHeroicSpirit = 24;
+  EAttrModTypeSeasonTalent = 25;
+  EAttrModTypeLifeJobMagicFood = 26;
+  EAttrModTypeSkillSpecialEffect = 27;
+  EAttrModCard = 28;
+  EAttrModTypeBuffCoverd = 29;
+  EAttrModTypeMax = 30;
+}
+
+enum DungeonMarkType {
+  DungeonMarkNone = 0;
+  DungeonMarkCommander = 1;
+  DungeonMarkTeamLeader = 2;
+}
+
+enum EscortMarkType {
+  EscortMarkNone = 0;
+  EscortMarkCommander = 1;
+  EscortMarkTeamLeader = 2;
+}
+
+enum DungeonGatherType {
+  DungeonGatherNone = 0;
+  DungeonGatherMark = 1;
+  DungeonGatherBuilding = 2;
+}
+
+enum WartimeToolType {
+  WartimeToolTypeNone = 0;
+  WartimeToolTypeFirearm = 1;
+  WartimeToolTypeVehicle = 2;
+}
+
+enum ELeaderBoardSendRewardType {
+  ELeaderBoardSendRewardTypeNone = 0;
+  ELeaderBoardSendRewardTypeDaily = 1;
+  ELeaderBoardSendRewardTypeWeekly = 2;
+  ELeaderBoardSendRewardTypeAfterActivity = 3;
+}
+
+enum EItemValidityType {
+  EItemValidityTypeNone = 0;
+  EItemValidityTypeValidTime = 1;
+  EItemValidityTypeFixedTime = 2;
+  EItemValidityTypeOldActivityEnd = 3;
+  EItemValidityTypeNewActivityEnd = 4;
+}
+
+enum EPlayerLifeStatus {
+  EPlayerLifeStatus_Alive = 0;
+  EPlayerLifeStatus_Dead = 1;
+  EPlayerLifeStatus_Help = 2;
+  EPlayerLifeStatus_Revive = 3;
+  EPlayerLifeStatus_ImmuneDead = 4;
+}
+
+enum ERestrictSourceFirstType {
+  ERestrictSourceFirstType_None = 0;
+  ERestrictSourceFirstType_DailyTask = 1;
+  ERestrictSourceFirstType_LifeJobEnery = 2;
+  ERestrictSourceFirstType_PublicAward = 3;
+  ERestrictSourceFirstType_OnePiece = 4;
+  ERestrictSourceFirstType_PlayerAward = 5;
+  ERestrictSourceFirstType_MultiDungeonDailyTask = 6;
+  ERestrictSourceFirstType_WorldExploration = 7;
+  ERestrictSourceFirstType_Test = 999;
+}
+
+enum RestrictRecoverType {
+  RestrictRecoverType_Never = 0;
+  RestrictRecoverType_Daily = 1;
+  RestrictRecoverType_Weekly = 2;
+  RestrictRecoverType_Monthly = 3;
+  RestrictRecoverType_Hourly = 4;
+  RestrictRecoverType_MiniuteRandom = 5;
+}
+
+enum PlayerBanType {
+  BanTypeNone = 0;
+  AccountLogin = 1;
+  RoleLogin = 2;
+  RoleChat = 3;
+  RoleKick = 4;
+}
+
+enum PublicVarChangeType {
+  PublicVarChangeType_None = 0;
+  PublicVarChangeType_Change = 1;
+  PublicVarChangeType_All = 2;
+}
+
+message UnUsedRsp {
+}
+
+message NullArg {
+}
+
+message LanguageParam {
+  romsg.LanguageParamType tp = 1;
+  string strParam = 2;
+  int64 intParam = 3;
+}
+
+message LanguageData {
+  repeated romsg.LanguageParam param = 1;
+}
+
+message UserDataType {
+  enum Type {
+    Player = 0;
+    Guild = 1;
+  }
+
+  romsg.UserDataType.Type type = 1;
+}
+
+message TimeSegment {
+  string stateName = 1;
+  int64 startTime = 2;
+  int64 endTime = 3;
+}
+
+message RolePublicBaseInfo {
+  int64 roleid = 1;
+  string name = 2;
+  int64 guildID = 3;
+  int64 headtitle = 5;
+  int64 title = 6;
+  int32 career = 8;
+  int64 offlinetime = 9;
+  int64 guildOfficial = 10;
+  int64 guildHonorOffcial = 11;
+  romsg.GuildHeadIcon guildIcon = 12;
+  int32 baseLevel = 13;
+  int32 jobLevel = 14;
+  bool isShowDetail = 15;
+  int32 AchievementLevel = 16;
+  int32 Gender = 17;
+  string ServerId = 18;
+  int32 dailyActivity = 19;
+  bool bSaveCharge = 20;
+  int32 avatarId = 21;
+  int32 avatarFrameId = 22;
+  int32 personalTitleId = 23;
+  romsg.PowerUnit power = 24;
+  map<int32, int32> appearances = 25;
+  romsg.SocialOutfitData socialOutfitData = 26;
+  reserved 7 to 7;
+}
+
+message SocialOutfitData {
+  map<int32, int64> socialOutfit = 1;
+}
+
+message GuildHeadIcon {
+  int64 backgroundType = 1;
+  int64 iconType = 2;
+  int32 star = 3;
+}
+
+message Vec3 {
+  float x = 1;
+  float y = 2;
+  float z = 3;
+}
+
+message StepSyncInfo {
+  uint64 entity_id = 1;
+  romsg.Vec3 position = 2;
+  float face = 3;
+  bool moving = 4;
+  uint64 time_tick = 5;
+  romsg.Vec3 target_position = 6;
+  float speed = 7;
+  uint32 move_type = 8;
+}
+
+message StepSyncList {
+  repeated romsg.StepSyncInfo units = 1;
+}
+
+message PropertySyncInfo {
+  uint64 entity_uuid = 1;
+  uint32 comp_id = 2;
+  uint32 prop_id = 3;
+  bytes data = 4;
+}
+
+message MailBoxAddr {
+  int32 type = 1;
+  int64 id = 2;
+}
+
+message LuaInnerInterface {
+  romsg.MailBoxAddr src = 1;
+  romsg.MailBoxAddr dst = 2;
+}
+
+message RoleLoginReq {
+  int64 gsID = 1;
+  int64 selectRoleID = 2;
+  string name = 3;
+  int32 sex = 4;
+  int32 career = 5;
+}
+
+message RoleLogin_Cell {
+  int64 gsID = 1;
+  int64 selectRoleID = 2;
+  string name = 3;
+  int32 sex = 4;
+  int32 career = 5;
+}
+
+message RoleLogin_Base {
+  int64 gsID = 1;
+  int64 selectRoleID = 2;
+}
+
+message RoleLoginResp {
+  int32 result = 1;
+}
+
+message ServiceRegisterReq {
+  romsg.EServerType sType = 1;
+  int64 serverID = 2;
+}
+
+message ServiceRegisterResp {
+  int32 result = 1;
+  int64 serverID = 2;
+}
+
+message FetchLoginRewardReq {
+  int32 dayIndex = 1;
+}
+
+message FetchLoginRewardResp {
+  int64 coins = 1;
+  int64 miaomiaoCoins = 2;
+}
+
+message SceneIDReq {
+  int64 SceneHash = 1;
+  int64 GSLine = 2;
+}
+
+message SceneIDResp {
+  int64 SceneHash = 1;
+  int64 SceneID = 2;
+  int64 GSLine = 3;
+}
+
+message LogoutReq {
+}
+
+message LogoutResp {
+}
+
+message EnterScene {
+  int64 SceneID = 1;
+  int64 RoleID = 2;
+  int32 Camp = 3;
+}
+
+message SwitchParam {
+  int32 taskId = 1;
+}
+
+message SwitchLayerNotify {
+  int32 layerId = 1;
+  romsg.SwitchLayerReason switchReason = 2;
+  romsg.SwitchParam params = 3;
+}
+
+message GeneralGMProcReq {
+  romsg.GmOpEnum gm_type = 1;
+  string paramString = 2;
+  int32 gmListId = 3;
+}
+
+message GeneralGMProcRsp {
+  int32 result = 1;
+  string err_info = 2;
+}
+
+message GMProcReq {
+  int32 gm_type = 1;
+  repeated int32 params1 = 2;
+  repeated int32 params2 = 3;
+}
+
+message GMProcRes {
+  int32 result = 1;
+}
+
+message DestroyScene {
+  int64 SceneID = 1;
+}
+
+message LeaveScene {
+  int64 SceneID = 1;
+}
+
+message SceneInfo {
+  int64 sceneHash = 1;
+  int64 sceneID = 2;
+}
+
+message CellScenes {
+  int64 gameID = 1;
+  repeated romsg.SceneInfo scenes = 2;
+}
+
+message Property {
+  string name = 1;
+  oneof val {
+    int64 vi64 = 2;
+    double vd64 = 3;
+    string vstr = 4;
+  }
+  int32 property_id = 5;
+  int64 data = 6;
+  int64 baseData = 7;
+}
+
+message AoIProperty {
+  int64 idx = 1;
+  int64 data = 2;
+  int64 baseData = 3;
+}
+
+message AllProperty {
+  int64 entityID = 1;
+  repeated romsg.Property propertys = 2;
+}
+
+message PlanBaseProperty {
+  map<int32, int32> baseProperty = 1;
+  string planName = 2;
+  int32 attrPoints = 3;
+  int32 usedAttrPoints = 4;
+  romsg.PowerUnit power = 5;
+  int32 skillGenre = 6;
+}
+
+message BaseAttrInfo {
+  int64 ro3Define_SyncVersion = 9998;
+  map<int32, romsg.PlanBaseProperty> allPlanBaseProperty = 1;
+  int32 curPlanIndex = 2;
+  int32 allAttrPoints = 3;
+}
+
+message OnePropertyChange {
+  romsg.AllProperty property = 1;
+  repeated int32 attrModTypes = 2;
+}
+
+message AOIEntityAllProperty {
+  repeated romsg.AllProperty all = 1;
+}
+
+message RectShape {
+  romsg.Vec3 center = 1;
+  float length = 2;
+  float height = 3;
+  float angle = 4;
+}
+
+message CircleShape {
+  romsg.Vec3 center = 1;
+  float radius = 2;
+}
+
+message CircularSectorShape {
+  romsg.Vec3 center = 1;
+  float radius = 2;
+  float face = 3;
+  float section = 4;
+}
+
+message ShapeRange {
+  romsg.RangeType type = 1;
+  romsg.CircleShape circleRange = 2;
+  romsg.RectShape rectRange = 3;
+  romsg.CircularSectorShape sectorRange = 4;
+}
+
+message RoleBaseInfo {
+  int64 ro3Define_SyncVersion = 9998;
+  int64 id = 1;
+  string name = 2;
+  int32 sex = 3;
+  int32 career = 4;
+  int32 level = 5;
+  int64 flags1 = 6;
+  int32 jobLevel = 8;
+  int64 exp = 9;
+  int64 jobExp = 10;
+  int64 vipLevel = 12;
+  int64 lastFriendRecommendTime = 14;
+  int64 createTime = 15;
+  int64 lastLoginTime = 16;
+  int64 lastLogoutTime = 17;
+  int64 lastLoginSceneHash = 18;
+  romsg.Vec3 lastLoginSceneVec3 = 19;
+  int32 lastLoginSceneLineNum = 20;
+  int32 loginDayCumulativeNum = 21;
+  int32 achievementLevel = 22;
+  string account = 23;
+  string accountNick = 24;
+  romsg.PowerUnit curPower = 26;
+  romsg.PowerUnit historyMaxPower = 27;
+  int64 lastAtkPlayerTime = 28;
+  int64 bornArea = 29;
+  int64 patchVersion = 30;
+  bool excutedPatch = 31;
+  string country = 32;
+}
+
+message ServerBasicInfo {
+  uint64 server_open_time = 1;
+  uint64 server_logic_time = 2;
+}
+
+message RoleAssets {
+  romsg.RoleBaseInfo basicInfo = 1;
+  romsg.BaseAttrInfo baseAttrInfo = 2;
+  uint64 server_time_ms = 3;
+  romsg.ServerBasicInfo server_info = 4;
+}
+
+message OneMessage {
+  uint32 msg_id = 1;
+  bytes message_bytes = 2;
+}
+
+message MultiMessage {
+  repeated romsg.OneMessage messages = 1;
+}
+
+message NpcInteractionReq {
+  int64 npc_uid = 1;
+  int32 interaction_id = 2;
+  romsg.Vec3 pos = 3;
+  int64 timestamp = 4;
+  int64 scene_config_id = 5;
+  int64 target_scene_entry = 6;
+  romsg.Vec3 target_scene_pos = 7;
+}
+
+message NpcInteractionRsp {
+  int32 result = 1;
+  romsg.NpcInteractionReq req = 2;
+}
+
+message UpdateCannonNotify {
+  int64 cannon_uid = 1;
+}
+
+message DebugErrorNotify {
+  string info = 1;
+}
+
+message ItemAttrValue {
+  oneof val {
+    int64 longVal = 1;
+    string strVal = 2;
+  }
+}
+
+message ItemBindInfo {
+  romsg.ItemBindType itemBindType = 1;
+  int64 expireTimeStamp = 2;
+}
+
+message ItemBaseInfo {
+  int64 itemGuid = 1;
+  int32 itemEntry = 2;
+  int32 stack = 3;
+  int64 expireTm = 4;
+  bool isLocked = 5;
+  romsg.ItemBindInfo itemBindInfo = 6;
+  int64 season = 7;
+  int32 playBook = 8;
+  map<int32, romsg.ItemAttrValue> itemInfos = 9;
+  map<int32, romsg.EnchantAttr> enchantment = 10;
+  map<int32, romsg.EnchantAttr> playBookEnchantment = 11;
+  int64 ownerGuildId = 12;
+}
+
+message RepeatedItemBaseInfo {
+  repeated romsg.ItemBaseInfo items = 1;
+}
+
+message EnchantAttr {
+  map<int32, int32> attr = 1;
+  int64 getTime = 2;
+}
+
+message GetRewardNotify {
+  repeated romsg.ItemBaseInfo rewards = 1;
+  romsg.Vec3 position = 2;
+  repeated int32 rewardType = 3;
+  int64 targetUid = 4;
+  int64 targetEntry = 5;
+  int32 rewardIndex = 6;
+  repeated int32 rewardIndexes = 7;
+}
+
+message PointInAreaReq {
+  int32 areaId = 1;
+  bool isEnter = 2;
+}
+
+message ClientNpcInteractReq {
+  int64 npcUid = 1;
+  int32 dialogID = 2;
+  int64 areapointid = 3;
+  int64 sortId = 4;
+}
+
+message DialogueActionTriggerReq {
+  int64 npcUid = 1;
+  int64 areapointid = 2;
+  int32 dialogID = 3;
+  int64 sortId = 4;
+}
+
+message ClientEnterAreaReq {
+  int64 areaId = 1;
+}
+
+message AwardCheckData {
+  int32 serverLevel = 1;
+  int32 playerLevel = 2;
+  int32 job = 3;
+  repeated int64 listTask = 4;
+  int64 dropChange = 5;
+  romsg.AwardConditionParam params = 6;
+}
+
+message ObjScoreBaseInfo {
+  int64 id = 1;
+  int32 area = 2;
+  string name = 3;
+  int32 job = 4;
+  romsg.AwardCheckData rewardData = 5;
+}
+
+message ObjScoreInfo {
+  map<int64, int64> score = 1;
+}
+
+message DungeonScoreInfo {
+  map<int64, romsg.ObjScoreInfo> scoreinfo = 1;
+}
+
+message DungeonTotalScoreInfo {
+  map<int32, romsg.DungeonAllRoleInfo> dungeonScoreInfo = 1;
+}
+
+message DungeonStatisticsReq {
+}
+
+message DungeonRoleInfo {
+  romsg.ObjScoreBaseInfo roleBase = 1;
+  int64 totalDamage = 2;
+  int64 totalBeDamage = 3;
+  int64 totalCure = 4;
+  int64 totalscore = 5;
+  map<int32, int64> dicParams = 6;
+  int64 guildId = 7;
+}
+
+message DungeonAllRoleInfo {
+  map<int64, romsg.DungeonRoleInfo> roleinfo = 1;
+}
+
+message DungeonGuildGvGInfo {
+  int64 guildId = 1;
+  repeated int64 playIds = 2;
+  int64 guildOccPoint = 3;
+  int64 guildScore = 4;
+  map<int32, int64> dicParams = 5;
+}
+
+message DungeonReportSpecialData {
+  repeated int64 params = 1;
+}
+
+message DungeonTitleData {
+  repeated int64 playerList = 1;
+  repeated int64 sortList = 2;
+  map<int32, int64> titleData = 3;
+}
+
+message DungeonStatisticsInfo {
+  int64 dungeonMapId = 1;
+  repeated romsg.DungeonRoleInfo dungeonRolesInfo = 2;
+  map<int64, romsg.DungeonGuildGvGInfo> dungeonGuildGvGInfos = 3;
+  map<int64, romsg.DungeonReportSpecialData> dungeonReportSpecialData = 4;
+  map<int64, romsg.DungeonTitleData> dungeonTitleData = 5;
+}
+
+message DungeonStatisticsRes {
+  int32 result = 1;
+  map<int64, romsg.DungeonStatisticsInfo> dungeonRolesInfo = 2;
+}
+
+message ExtraValueData {
+  int64 longValue = 1;
+  repeated int64 longListValue = 2;
+}
+
+message StatisticsAwardCheckData {
+  int32 serverLevel = 1;
+  int32 playerLevel = 2;
+  int32 job = 3;
+  repeated int64 listTask = 4;
+  int64 dropChange = 5;
+}
+
+message StatisticsRoleBaseInfo {
+  int64 id = 1;
+  int32 area = 2;
+  string name = 3;
+  int32 job = 4;
+  int64 guildId = 5;
+  int64 teamId = 6;
+  int32 groupId = 7;
+  romsg.StatisticsAwardCheckData rewardData = 8;
+  int32 campId = 9;
+  int32 avatarId = 10;
+}
+
+message RoleStatisticsInfo {
+  romsg.StatisticsRoleBaseInfo baseInfo = 1;
+  int64 totalDamage = 2;
+  int64 totalBeDamage = 3;
+  int64 totalCure = 4;
+  int64 totalscore = 5;
+  map<int32, romsg.ExtraValueData> extraData = 6;
+  map<int32, romsg.ExtraValueData> killNpcData = 7;
+}
+
+message TeamStatisticsInfo {
+  int64 teamId = 1;
+  string teamName = 2;
+  map<int32, romsg.ExtraValueData> extraData = 3;
+  map<int32, romsg.GroupStatisticsInfo> groupStatistics = 4;
+  map<int32, romsg.ExtraValueData> killNpcData = 5;
+  repeated int64 memberIds = 6;
+}
+
+message GroupStatisticsInfo {
+  int64 groupId = 1;
+  map<int32, romsg.ExtraValueData> extraData = 2;
+  map<int32, romsg.ExtraValueData> killNpcData = 3;
+  repeated int64 memberIds = 4;
+}
+
+message GuildStatisticsInfo {
+  int64 guildId = 1;
+  string guildName = 2;
+  map<int32, romsg.ExtraValueData> extraData = 3;
+  map<int32, romsg.ExtraValueData> killNpcData = 4;
+  romsg.GuildHeadIcon guildIcon = 5;
+}
+
+message CampStatisticsInfo {
+  int64 campId = 1;
+  map<int32, romsg.ExtraValueData> extraData = 2;
+  map<int32, romsg.ExtraValueData> killNpcData = 3;
+}
+
+message SceneStatisticsInfo {
+  int64 sceneId = 1;
+  int32 dungeonId = 2;
+  map<int64, romsg.RoleStatisticsInfo> roleStatistics = 3;
+  map<int64, romsg.TeamStatisticsInfo> teamStatistics = 4;
+  map<int64, romsg.GuildStatisticsInfo> guildStatistics = 5;
+  map<int32, romsg.ExtraValueData> sceneStatistics = 6;
+  map<int32, romsg.ExtraValueData> killNpcData = 7;
+  map<int64, romsg.CampStatisticsInfo> campStatistics = 8;
+}
+
+message DungeonStatisticsInfoWithDungeon {
+  int64 ro3Define_SaveVersion = 9999;
+  int64 ro3Define_DbTerm = 10000;
+  int64 statisticsId = 1;
+  map<int64, romsg.SceneStatisticsInfo> sceneStatistics = 2;
+  int32 dungeonId = 3;
+  int64 statisticsTime = 4;
+}
+
+message DungeonResultInfo {
+  int32 firstResultType = 1;
+  int32 result = 2;
+  int64 winEntityId = 3;
+  int64 statisticsId = 4;
+  map<int64, romsg.SceneStatisticsInfo> sceneStatistics = 5;
+  int32 dungeonId = 6;
+  int64 statisticsTime = 7;
+  map<int64, romsg.DungeonTitleData> dungeonTitleData = 8;
+  int32 winCamp = 9;
+  int32 secondResultType = 10;
+  repeated int64 resultParam = 11;
+  map<string, string> metaData = 12;
+  romsg.DungeonMetaData dungeonMetaData = 13;
+  int64 dungeonStartTimestamp = 14;
+}
+
+message DungeonMetaData {
+}
+
+message DungeonSnapshotData {
+  string snapshotId = 1;
+  int32 type = 2;
+  int32 reason = 3;
+  int32 stageId = 4;
+  int64 sceneEntryId = 5;
+  int64 timestamp = 6;
+  map<int64, romsg.SceneStatisticsInfo> sceneStatistics = 7;
+  int32 dungeonId = 8;
+  int64 statisticsId = 9;
+  map<string, string> extraData = 10;
+  int64 dungeonStartTimestamp = 11;
+}
+
+message CdData {
+  map<int64, int64> data = 1;
+}
+
+message AchievementInfo {
+  int64 achieveId = 1;
+  romsg.AchievementStatusType status = 2;
+  repeated int64 scores = 3;
+  int64 stamptime = 4;
+  repeated string names = 5;
+}
+
+message AchievementLevelInfo {
+  int64 type = 1;
+  int64 point = 2;
+  int32 level = 3;
+  int32 curLevelRewardLevel = 4;
+  int32 curHintLevel = 5;
+}
+
+message CommonBigMask {
+  repeated uint64 values = 1;
+}
+
+message ClientCompleteGuideReq {
+  int64 guildId = 1;
+}
+
+message PlayerAvatarInfo {
+  int64 avatar = 1;
+  int64 avatarframe = 2;
+  int64 sendid = 3;
+  string sendername = 4;
+  int32 area = 5;
+  int32 level = 6;
+  int32 job = 7;
+}
+
+message OfflineMessageData {
+  romsg.MSG_Type msgType = 1;
+  bytes data = 2;
+}
+
+message SyncClientPlayerReviveInfoNtf {
+  bool bDead = 1;
+  int32 freeReviveNum = 2;
+  int64 extraReviveTime = 3;
+  int64 reviveTime = 4;
+  int64 sceneEntry = 5;
+}
+
+message GMCommandTransmitReq {
+  int64 lAreaId = 1;
+  int64 lPlayerId = 2;
+  string data = 3;
+}
+
+message InspectCommandReq {
+  int32 serverEntityType = 1;
+  int64 serverEntityId = 2;
+  string cmd = 3;
+}
+
+message InspectCommandResp {
+  int32 serverEntityType = 1;
+  int64 serverEntityId = 2;
+  string res = 3;
+}
+
+message HotfixClientNotify {
+  int32 version = 1;
+  string info = 2;
+}
+
+message GateBroadCastInfo {
+  string gateNode = 1;
+  repeated uint64 uids = 2;
+}
+
+message GateBroadCast {
+  repeated romsg.GateBroadCastInfo broadCastList = 1;
+}
+
+message EquipCardInfo {
+  map<int32, romsg.ItemBaseInfo> cardSlotInfo = 1;
+}
+
+message FormulaStep {
+  enum DubugStepEnum {
+    Hit = 0;
+    Atk = 1;
+    Skill = 2;
+    Element = 3;
+    Body = 4;
+    Race = 5;
+    Damage = 6;
+    SkillAdditional = 7;
+    PveAndPvp = 8;
+    Job = 9;
+    Fluctuate = 10;
+    CriticalProb = 11;
+    Critical = 12;
+    DamageAdditional = 13;
+    SkillDamageAdd = 14;
+    DamageSharing = 15;
+    FinalDamage = 16;
+    Cure = 17;
+    CureAddUp = 18;
+    CureCriticalProb = 19;
+    CureCritical = 20;
+    FinalCure = 21;
+  }
+
+  double finalValue = 1;
+  romsg.FormulaStep.DubugStepEnum setpEnum = 2;
+  map<int32, int64> formulaValue = 3;
+}
+
+message FormulaInfo {
+  int64 skillId = 1;
+  int64 buffId = 2;
+  repeated romsg.FormulaStep step = 3;
+}
+
+message CheckSensitiveWordReq {
+  string content = 1;
+  int32 key = 2;
+}
+
+message CheckSensitiveWordResp {
+  uint32 result = 1;
+  int32 key = 2;
+  string content = 3;
+}
+
+message PlayerSceneLocation {
+  int64 sceneID = 1;
+  int64 sceneEntryID = 2;
+  romsg.Vec3 postion = 3;
+  float face = 4;
+  int64 area = 5;
+}
+
+message StateParam {
+  oneof param {
+    romsg.StateParamEmojiPlay emojiPlay = 1;
+  }
+}
+
+message StateParamEmojiPlay {
+  repeated int64 targetPlayerIds = 1;
+  int32 emojiId = 2;
+  romsg.Vec3 pos = 3;
+  bool isReady = 4;
+  int32 playIndex = 5;
+}
+
+message PowerUnit {
+  int64 normalPower = 1;
+  int64 seasonPower = 2;
+}
+
+message DungeonMarkPos {
+  int32 id = 1;
+  romsg.Vec3 pos = 2;
+  romsg.DungeonMarkType markType = 3;
+}
+
+message DungeonGatherData {
+  romsg.DungeonGatherType GatherType = 1;
+  romsg.DungeonMarkPos pos = 2;
+  int32 GatherGuid = 3;
+}
+
+message EscortMarkPos {
+  int32 id = 1;
+  romsg.Vec3 pos = 2;
+}
+
+message EscortGatherData {
+  romsg.EscortMarkType markType = 1;
+  romsg.EscortMarkPos pos = 2;
+  int32 gatherGuid = 3;
+  int64 teamId = 4;
+}
+
+message AwardConditionParam {
+  repeated int64 activeActivities = 1;
+  int64 baseLevel = 2;
+  int64 job = 3;
+  int64 area = 4;
+  int64 season = 5;
+  int64 playBook = 6;
+  repeated int32 seeds = 7;
+}
+
+message DungeonStatisticsModuleReq {
+}
+
+message DungeonStatisticsModuleRsp {
+  int32 result = 1;
+  int64 statisticsId = 2;
+  map<int64, romsg.SceneStatisticsInfo> sceneStatistics = 3;
+  int32 dungeonId = 4;
+  int64 statisticsTime = 5;
+  map<int64, romsg.DungeonTitleData> dungeonTitleData = 6;
+}
+
+message PlayerHonor {
+  int32 warzoneStar = 1;
+  map<int32, int32> warzoneStarGainTime = 2;
+}
+
+message BroadCastNotify {
+  int64 effectId = 1;
+  string content = 2;
+  int64 localizationCfgId = 3;
+}
+
+message GuildChallengeInitData {
+  int32 difficult = 1;
+  int32 gameStage = 2;
+  int64 guildId = 3;
+}
+
+message LongLongPair {
+  int64 key = 1;
+  int64 value = 2;
+}
+
+message CommonErrorNtf {
+  int32 errorCode = 1;
+  repeated int64 longParams = 2;
+  repeated string strParams = 3;
+}
+
+message PlayerBanNotify {
+  romsg.PlayerBanType banType = 1;
+  int64 banEndTime = 2;
+}
+
+message PlayerKickNotify {
+  int32 errorCode = 1;
+  romsg.PlayerBanNotify banNotify = 2;
+}
+
+message EventParams {
+  repeated int64 intParams = 1;
+  repeated string strParams = 2;
+  repeated double doubleParams = 3;
+  repeated bool boolParams = 4;
+  map<int32, int32> dicParams = 5;
+  repeated romsg.Vec3 vec3Params = 6;
+}
+
+message CommonPublicVar {
+  int32 var_id = 1;
+  repeated int64 vi64 = 2;
+  repeated double vd64 = 3;
+  repeated string vstr = 4;
+  bytes customMessage = 5;
+  repeated romsg.Vec3 listVec3 = 6;
+  int32 groupType = 7;
+  int64 groupId = 8;
+  bool isDelete = 9;
+}
+
+message GveHuntingMatchGroup {
+  int64 groupId = 1;
+  repeated int64 guildIds = 2;
+  bool isSettled = 3;
+}
+
+message QueryEquipRankReq {
+  int32 rankid = 1;
+  int64 itemuid = 2;
+}
+
+message QueryEquipRankRes {
+  int32 rankid = 1;
+  int64 itemuid = 2;
+  int32 rank = 3;
+}
+
+message CustomData {
+  int64 id = 1;
+  romsg.CustomParam customParam = 2;
+  int64 longMin = 3;
+  int64 longMax = 4;
+}
+
+message CustomParam {
+  enum ParamType {
+    ParamType_Str = 0;
+    ParamType_Int = 1;
+    ParamType_Double = 2;
+    ParamType_Long = 3;
+    ParamType_ListLong = 4;
+    ParamType_Vec3 = 5;
+  }
+
+  romsg.CustomParam.ParamType tp = 1;
+  string strParam = 2;
+  int64 intParam = 3;
+  double doubleParam = 4;
+  int64 longParam = 5;
+  repeated int64 listLongParam = 6;
+  romsg.Vec3 vec3Param = 7;
+}
+

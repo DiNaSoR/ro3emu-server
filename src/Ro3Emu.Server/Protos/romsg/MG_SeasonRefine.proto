@@ -1,0 +1,34 @@
+syntax = "proto3";
+package romsg;
+import "FieldOption.proto";
+
+message SeasonRefineRecastReq {
+  int32 equipType = 1;
+  int32 refineId = 2;
+}
+
+message SeasonRefineRecastResp {
+  int32 equipType = 1;
+  int32 result = 2;
+}
+
+message SeasonRefineSelectAttrReq {
+  int32 equipType = 1;
+  int32 refineId = 2;
+  int32 groupId = 3;
+}
+
+message SeasonRefineSelectAttrResp {
+  int32 equipType = 1;
+  int32 result = 2;
+}
+
+message SeasonRefineGiveUpReq {
+  int32 equipType = 1;
+  int32 refineId = 2;
+}
+
+message SeasonRefineGiveUpResp {
+  int32 result = 1;
+}
+

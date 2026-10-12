@@ -1,0 +1,221 @@
+syntax = "proto3";
+package romsg;
+import "APIError.proto";
+import "client2service.proto";
+import "FieldOption.proto";
+import "GM_Chat.proto";
+import "MG_Achievement.proto";
+import "MG_Activity.proto";
+import "MG_Adventure.proto";
+import "MG_AdventureGroup.proto";
+import "MG_AFK.proto";
+import "MG_AreaConcur.proto";
+import "MG_Auction.proto";
+import "MG_Barroom.proto";
+import "MG_Base.proto";
+import "MG_BaseMgr.proto";
+import "MG_BlueDbg.proto";
+import "MG_BroadCast.proto";
+import "MG_Card.proto";
+import "MG_CareerSpecial.proto";
+import "MG_Cell.proto";
+import "MG_CellMgr.proto";
+import "MG_Chat.proto";
+import "MG_Chicken.proto";
+import "MG_Common.proto";
+import "MG_DB_Increment.proto";
+import "MG_DB.proto";
+import "MG_Define.proto";
+import "MG_DragonIsland.proto";
+import "MG_Dungeon.proto";
+import "MG_Emblem.proto";
+import "MG_EmojiPlay.proto";
+import "MG_Entity.proto";
+import "MG_Equipment.proto";
+import "MG_FirstHeart.proto";
+import "MG_FlyingDragon.proto";
+import "MG_Friend.proto";
+import "MG_Function.proto";
+import "MG_Gateway.proto";
+import "MG_Genre.proto";
+import "MG_GlobalCache.proto";
+import "MG_Guide.proto";
+import "MG_Guild.proto";
+import "MG_GuildBlackMarket.proto";
+import "MG_GuildCampFire.proto";
+import "MG_GuildDraculaWedding_Init.proto";
+import "MG_GuildDraculaWedding.proto";
+import "MG_GuildLeague.proto";
+import "MG_GuildVoiceChannel.proto";
+import "MG_HeroicSpirit.proto";
+import "MG_HiddenTreasure.proto";
+import "MG_IDIP.proto";
+import "MG_IDIPSerialNumber.proto";
+import "MG_Interact.proto";
+import "MG_LeaderBoardClient.proto";
+import "MG_Library.proto";
+import "MG_Lifejob.proto";
+import "MG_Login.proto";
+import "MG_Lottery.proto";
+import "MG_Mail.proto";
+import "MG_MapData.proto";
+import "MG_Match.proto";
+import "MG_Mount.proto";
+import "MG_Mover.proto";
+import "MG_MultiDungeon.proto";
+import "MG_MVP.proto";
+import "MG_NewActivity.proto";
+import "MG_Pack.proto";
+import "MG_Paragon.proto";
+import "MG_Pay.proto";
+import "MG_Personal.proto";
+import "MG_Pet.proto";
+import "MG_Player.proto";
+import "MG_PlayerOfflineMessage.proto";
+import "MG_PlayMethod.proto";
+import "MG_PlotActing.proto";
+import "MG_PublicChat.proto";
+import "MG_PublicServer_Increment.proto";
+import "MG_PublicServer.proto";
+import "MG_RainbowKoi_Init.proto";
+import "MG_Relationship.proto";
+import "MG_Scene.proto";
+import "MG_SceneStream.proto";
+import "MG_Season.proto";
+import "MG_SeasonPage.proto";
+import "MG_SeasonRefine.proto";
+import "MG_SeasonTalent.proto";
+import "MG_ServerClientMsg.proto";
+import "MG_Setting.proto";
+import "MG_Shop.proto";
+import "MG_Siege.proto";
+import "MG_Skill.proto";
+import "MG_SkillGrowth.proto";
+import "MG_SocialOutfit.proto";
+import "MG_SpecialEffect.proto";
+import "MG_StageRewards.proto";
+import "MG_Stalls.proto";
+import "MG_State.proto";
+import "MG_Statistics.proto";
+import "MG_StorageHole.proto";
+import "MG_Task.proto";
+import "MG_Team.proto";
+import "MG_TerritoryAuction.proto";
+import "MG_TerritoryWars.proto";
+import "MG_ThreeDay.proto";
+import "MG_Title.proto";
+import "MG_Totem.proto";
+import "MG_TradeCenter.proto";
+import "MG_TradeMarket.proto";
+import "MG_Training.proto";
+import "MG_TransAction.proto";
+import "MG_TypeWriter.proto";
+import "MG_WardRobe.proto";
+import "MG_WorldExploration.proto";
+import "MG_Zone.proto";
+
+message DBMultiDungeonHallOfFameIncrement {
+  message roleInfoRepeatedOrigin {
+    repeated romsg.RoleDetailInfo value = 1;
+  }
+
+  message roleInfoRepeatedIncrement {
+    repeated romsg.RoleDetailInfoIncrement value = 1;
+  }
+
+  message roleInfoFieldIncrement {
+    oneof value {
+      romsg.DBMultiDungeonHallOfFameIncrement.roleInfoRepeatedOrigin all = 1;
+      romsg.DBMultiDungeonHallOfFameIncrement.roleInfoRepeatedIncrement inc = 2;
+    }
+  }
+
+  optional int32 multiDungeonBossId = 10;
+  optional int32 passTime = 20;
+  romsg.DBMultiDungeonHallOfFameIncrement.roleInfoFieldIncrement roleInfo = 30;
+  optional int64 passTimestamp = 40;
+  optional string teamLeaderName = 50;
+  optional int64 teamLeaderId = 60;
+}
+
+message DBMultiDungeonServerInfoIncrement {
+  message fivePeakChallengeBossIdsRepeatedOrigin {
+    repeated int32 value = 1;
+  }
+
+  message fivePeakChallengeBossIdsRepeatedIncrement {
+    repeated int32 value = 1;
+  }
+
+  message fivePeakChallengeBossIdsFieldIncrement {
+    oneof value {
+      romsg.DBMultiDungeonServerInfoIncrement.fivePeakChallengeBossIdsRepeatedOrigin all = 1;
+      romsg.DBMultiDungeonServerInfoIncrement.fivePeakChallengeBossIdsRepeatedIncrement inc = 2;
+    }
+  }
+
+  message difficultBuffBossIdsRepeatedOrigin {
+    repeated int32 value = 1;
+  }
+
+  message difficultBuffBossIdsRepeatedIncrement {
+    repeated int32 value = 1;
+  }
+
+  message difficultBuffBossIdsFieldIncrement {
+    oneof value {
+      romsg.DBMultiDungeonServerInfoIncrement.difficultBuffBossIdsRepeatedOrigin all = 1;
+      romsg.DBMultiDungeonServerInfoIncrement.difficultBuffBossIdsRepeatedIncrement inc = 2;
+    }
+  }
+
+  message hallOfFameFieldIncrement {
+    oneof value {
+      romsg.DBMultiDungeonHallOfFame all = 1;
+      romsg.DBMultiDungeonHallOfFameIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message firstBroadCastFieldIncrement {
+    oneof value {
+      bool all = 1;
+      bool inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message sacredBlessingsFieldIncrement {
+    oneof value {
+      romsg.DBMultiDungeonSacredBlessings all = 1;
+      romsg.DBMultiDungeonSacredBlessingsIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message fiveDungeonMaxMarkFieldIncrement {
+    oneof value {
+      int32 all = 1;
+      int32 inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message gveDifficultyPassTimeFieldIncrement {
+    oneof value {
+      int32 all = 1;
+      int32 inc = 2;
+      bool del = 3;
+    }
+  }
+
+  optional int32 week = 10;
+  romsg.DBMultiDungeonServerInfoIncrement.fivePeakChallengeBossIdsFieldIncrement fivePeakChallengeBossIds = 20;
+  romsg.DBMultiDungeonServerInfoIncrement.difficultBuffBossIdsFieldIncrement difficultBuffBossIds = 30;
+  map<int32, romsg.DBMultiDungeonServerInfoIncrement.hallOfFameFieldIncrement> hallOfFame = 60;
+  map<int32, romsg.DBMultiDungeonServerInfoIncrement.firstBroadCastFieldIncrement> firstBroadCast = 70;
+  map<int32, romsg.DBMultiDungeonServerInfoIncrement.sacredBlessingsFieldIncrement> sacredBlessings = 80;
+  map<int32, romsg.DBMultiDungeonServerInfoIncrement.fiveDungeonMaxMarkFieldIncrement> fiveDungeonMaxMark = 90;
+  map<int32, romsg.DBMultiDungeonServerInfoIncrement.gveDifficultyPassTimeFieldIncrement> gveDifficultyPassTime = 100;
+}
+

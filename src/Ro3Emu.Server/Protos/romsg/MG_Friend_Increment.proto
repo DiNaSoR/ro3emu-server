@@ -1,0 +1,290 @@
+syntax = "proto3";
+package romsg;
+import "APIError.proto";
+import "client2service.proto";
+import "FieldOption.proto";
+import "GM_Chat.proto";
+import "MG_Achievement.proto";
+import "MG_Activity.proto";
+import "MG_Adventure.proto";
+import "MG_AdventureGroup.proto";
+import "MG_AFK.proto";
+import "MG_AreaConcur.proto";
+import "MG_Auction.proto";
+import "MG_Barroom.proto";
+import "MG_Base.proto";
+import "MG_BaseMgr.proto";
+import "MG_BlueDbg.proto";
+import "MG_BroadCast.proto";
+import "MG_Card.proto";
+import "MG_CareerSpecial.proto";
+import "MG_Cell.proto";
+import "MG_CellMgr.proto";
+import "MG_Chat.proto";
+import "MG_Chicken.proto";
+import "MG_Common.proto";
+import "MG_DB.proto";
+import "MG_Define.proto";
+import "MG_DragonIsland.proto";
+import "MG_Dungeon.proto";
+import "MG_Emblem.proto";
+import "MG_EmojiPlay.proto";
+import "MG_Entity.proto";
+import "MG_Equipment.proto";
+import "MG_FirstHeart.proto";
+import "MG_FlyingDragon.proto";
+import "MG_Friend.proto";
+import "MG_Function.proto";
+import "MG_Gateway.proto";
+import "MG_Genre.proto";
+import "MG_GlobalCache.proto";
+import "MG_Guide.proto";
+import "MG_Guild.proto";
+import "MG_GuildBlackMarket.proto";
+import "MG_GuildCampFire.proto";
+import "MG_GuildDraculaWedding_Init.proto";
+import "MG_GuildDraculaWedding.proto";
+import "MG_GuildLeague.proto";
+import "MG_GuildVoiceChannel.proto";
+import "MG_HeroicSpirit.proto";
+import "MG_HiddenTreasure.proto";
+import "MG_IDIP.proto";
+import "MG_IDIPSerialNumber.proto";
+import "MG_Interact.proto";
+import "MG_LeaderBoardClient.proto";
+import "MG_Library.proto";
+import "MG_Lifejob.proto";
+import "MG_Login.proto";
+import "MG_Lottery.proto";
+import "MG_Mail.proto";
+import "MG_MapData.proto";
+import "MG_Match.proto";
+import "MG_Mount.proto";
+import "MG_Mover.proto";
+import "MG_MultiDungeon.proto";
+import "MG_MVP.proto";
+import "MG_NewActivity.proto";
+import "MG_Pack.proto";
+import "MG_Paragon.proto";
+import "MG_Pay.proto";
+import "MG_Personal.proto";
+import "MG_Pet.proto";
+import "MG_Player.proto";
+import "MG_PlayerOfflineMessage.proto";
+import "MG_PlayMethod.proto";
+import "MG_PlotActing.proto";
+import "MG_PublicChat.proto";
+import "MG_PublicServer.proto";
+import "MG_RainbowKoi_Init.proto";
+import "MG_Relationship.proto";
+import "MG_Scene.proto";
+import "MG_SceneStream.proto";
+import "MG_Season.proto";
+import "MG_SeasonPage.proto";
+import "MG_SeasonRefine.proto";
+import "MG_SeasonTalent.proto";
+import "MG_ServerClientMsg.proto";
+import "MG_Setting.proto";
+import "MG_Shop.proto";
+import "MG_Siege.proto";
+import "MG_Skill.proto";
+import "MG_SkillGrowth.proto";
+import "MG_SocialOutfit.proto";
+import "MG_SpecialEffect.proto";
+import "MG_StageRewards.proto";
+import "MG_Stalls.proto";
+import "MG_State.proto";
+import "MG_Statistics.proto";
+import "MG_StorageHole.proto";
+import "MG_Task.proto";
+import "MG_Team.proto";
+import "MG_TerritoryAuction.proto";
+import "MG_TerritoryWars.proto";
+import "MG_ThreeDay.proto";
+import "MG_Title.proto";
+import "MG_Totem.proto";
+import "MG_TradeCenter.proto";
+import "MG_TradeMarket.proto";
+import "MG_Training.proto";
+import "MG_TransAction.proto";
+import "MG_TypeWriter.proto";
+import "MG_WardRobe.proto";
+import "MG_WorldExploration.proto";
+import "MG_Zone.proto";
+
+message DBFriendSystemInfoIncrement {
+  message groupIdsRepeatedOrigin {
+    repeated string value = 1;
+  }
+
+  message groupIdsRepeatedIncrement {
+    repeated string value = 1;
+  }
+
+  message groupIdsFieldIncrement {
+    oneof value {
+      romsg.DBFriendSystemInfoIncrement.groupIdsRepeatedOrigin all = 1;
+      romsg.DBFriendSystemInfoIncrement.groupIdsRepeatedIncrement inc = 2;
+    }
+  }
+
+  message recentlyChatsFieldIncrement {
+    oneof value {
+      romsg.FriendChatRecordList all = 1;
+      romsg.FriendChatRecordListIncrement inc = 2;
+    }
+  }
+
+  message topChatsFieldIncrement {
+    oneof value {
+      romsg.FriendChatRecordList all = 1;
+      romsg.FriendChatRecordListIncrement inc = 2;
+    }
+  }
+
+  message friendPartitionsFieldIncrement {
+    oneof value {
+      romsg.FriendGroupList all = 1;
+      romsg.FriendGroupListIncrement inc = 2;
+    }
+  }
+
+  message sendGiftRecordsRepeatedOrigin {
+    repeated romsg.FriendGiftRecord value = 1;
+  }
+
+  message sendGiftRecordsRepeatedIncrement {
+    repeated romsg.FriendGiftRecordIncrement value = 1;
+  }
+
+  message sendGiftRecordsFieldIncrement {
+    oneof value {
+      romsg.DBFriendSystemInfoIncrement.sendGiftRecordsRepeatedOrigin all = 1;
+      romsg.DBFriendSystemInfoIncrement.sendGiftRecordsRepeatedIncrement inc = 2;
+    }
+  }
+
+  message receiveGiftRecordsRepeatedOrigin {
+    repeated romsg.FriendGiftRecord value = 1;
+  }
+
+  message receiveGiftRecordsRepeatedIncrement {
+    repeated romsg.FriendGiftRecordIncrement value = 1;
+  }
+
+  message receiveGiftRecordsFieldIncrement {
+    oneof value {
+      romsg.DBFriendSystemInfoIncrement.receiveGiftRecordsRepeatedOrigin all = 1;
+      romsg.DBFriendSystemInfoIncrement.receiveGiftRecordsRepeatedIncrement inc = 2;
+    }
+  }
+
+  message recentlyDataFieldIncrement {
+    oneof value {
+      romsg.FriendChatRecordList all = 1;
+      romsg.FriendChatRecordListIncrement inc = 2;
+    }
+  }
+
+  message ownerGroupIdsRepeatedOrigin {
+    repeated string value = 1;
+  }
+
+  message ownerGroupIdsRepeatedIncrement {
+    repeated string value = 1;
+  }
+
+  message ownerGroupIdsFieldIncrement {
+    oneof value {
+      romsg.DBFriendSystemInfoIncrement.ownerGroupIdsRepeatedOrigin all = 1;
+      romsg.DBFriendSystemInfoIncrement.ownerGroupIdsRepeatedIncrement inc = 2;
+    }
+  }
+
+  romsg.DBFriendSystemInfoIncrement.groupIdsFieldIncrement groupIds = 10;
+  romsg.DBFriendSystemInfoIncrement.recentlyChatsFieldIncrement recentlyChats = 20;
+  romsg.DBFriendSystemInfoIncrement.topChatsFieldIncrement topChats = 30;
+  romsg.DBFriendSystemInfoIncrement.friendPartitionsFieldIncrement friendPartitions = 40;
+  romsg.DBFriendSystemInfoIncrement.sendGiftRecordsFieldIncrement sendGiftRecords = 50;
+  romsg.DBFriendSystemInfoIncrement.receiveGiftRecordsFieldIncrement receiveGiftRecords = 60;
+  romsg.DBFriendSystemInfoIncrement.recentlyDataFieldIncrement recentlyData = 70;
+  romsg.DBFriendSystemInfoIncrement.ownerGroupIdsFieldIncrement ownerGroupIds = 80;
+}
+
+message FriendChatListItemIncrement {
+  optional romsg.FriendChatType type = 10;
+  optional int64 roleId = 20;
+  optional string groupId = 30;
+}
+
+message FriendChatRecordListIncrement {
+  message itemsRepeatedOrigin {
+    repeated romsg.FriendChatListItem value = 1;
+  }
+
+  message itemsRepeatedIncrement {
+    repeated romsg.FriendChatListItemIncrement value = 1;
+  }
+
+  message itemsFieldIncrement {
+    oneof value {
+      romsg.FriendChatRecordListIncrement.itemsRepeatedOrigin all = 1;
+      romsg.FriendChatRecordListIncrement.itemsRepeatedIncrement inc = 2;
+    }
+  }
+
+  romsg.FriendChatRecordListIncrement.itemsFieldIncrement items = 10;
+}
+
+message FriendGiftRecordIncrement {
+  optional int64 sender = 10;
+  optional int64 receiver = 20;
+  optional int64 itemId = 30;
+  optional int32 count = 40;
+  optional bool isAnonymous = 50;
+  optional string message = 60;
+  optional int64 sendTime = 70;
+  optional int32 affection = 80;
+  optional int32 popularity = 90;
+  optional int32 intimacy = 100;
+}
+
+message FriendGroupIncrement {
+  message memberListRepeatedOrigin {
+    repeated int64 value = 1;
+  }
+
+  message memberListRepeatedIncrement {
+    repeated int64 value = 1;
+  }
+
+  message memberListFieldIncrement {
+    oneof value {
+      romsg.FriendGroupIncrement.memberListRepeatedOrigin all = 1;
+      romsg.FriendGroupIncrement.memberListRepeatedIncrement inc = 2;
+    }
+  }
+
+  optional string groupName = 10;
+  romsg.FriendGroupIncrement.memberListFieldIncrement memberList = 20;
+}
+
+message FriendGroupListIncrement {
+  message customGroupListRepeatedOrigin {
+    repeated romsg.FriendGroup value = 1;
+  }
+
+  message customGroupListRepeatedIncrement {
+    repeated romsg.FriendGroupIncrement value = 1;
+  }
+
+  message customGroupListFieldIncrement {
+    oneof value {
+      romsg.FriendGroupListIncrement.customGroupListRepeatedOrigin all = 1;
+      romsg.FriendGroupListIncrement.customGroupListRepeatedIncrement inc = 2;
+    }
+  }
+
+  romsg.FriendGroupListIncrement.customGroupListFieldIncrement customGroupList = 10;
+}
+

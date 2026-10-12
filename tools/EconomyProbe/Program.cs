@@ -1,0 +1,1 @@
+return EconomyProbeCli.Run(args);

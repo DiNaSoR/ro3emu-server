@@ -1,0 +1,48 @@
+syntax = "proto3";
+package romsg;
+
+message BlueAIListReq {
+}
+
+message BlueAINode {
+  int64 monsterId = 1;
+  int32 npcConfigId = 2;
+  string name = 3;
+}
+
+message BlueAIListRsp {
+  repeated romsg.BlueAINode nodes = 1;
+}
+
+message BlueAINodeDbgReq {
+  romsg.BlueAINode node = 1;
+  bool debug = 2;
+}
+
+message BlueAINodeDbgRsp {
+  int32 ecode = 1;
+}
+
+message BlueAIDataInfo {
+  int32 nodeid = 1;
+  string nodeParam = 2;
+  string methodParam = 3;
+  string localParam = 4;
+  string startLocalParam = 5;
+}
+
+message BlueAIRunInfo {
+  int64 monsterId = 1;
+  int64 runTime = 2;
+  repeated romsg.BlueAIDataInfo listNodes = 3;
+}
+
+message SetAIBreakPoint {
+  romsg.BlueAINode aiNode = 1;
+  repeated int32 breakNodeIds = 2;
+}
+
+message SetAIConsume {
+  romsg.BlueAINode aiNode = 1;
+}
+

@@ -1,0 +1,244 @@
+syntax = "proto3";
+package romsg;
+import "MG_Common.proto";
+import "FieldOption.proto";
+
+message StallsBaseInfo {
+  string stallsTitle = 1;
+  int64 StallsID = 2;
+  int64 SceneID = 3;
+  int64 openTs = 4;
+  int64 sceneEntryID = 5;
+  int64 sceneLineNum = 6;
+  int64 SystemStallID = 7;
+}
+
+message StallsRecord {
+  int64 itemEntryID = 1;
+  int64 itemNum = 2;
+  int64 buytime = 3;
+  int64 tradetax = 4;
+  int64 gainmoney = 5;
+  int32 areaid = 6;
+  int64 buyerid = 7;
+  string buyername = 8;
+  int64 coinEntryID = 9;
+}
+
+message StallsItemInfo {
+  int64 stallsItemID = 1;
+  romsg.ItemBaseInfo itembase = 2;
+  int32 price = 3;
+  int32 pricetype = 4;
+  int64 systemStallCfgID = 5;
+}
+
+message StallsInfo {
+  romsg.StallsBaseInfo baseinfo = 1;
+  repeated romsg.StallsItemInfo itembase = 2;
+  int64 timeout = 3;
+  map<int32, int64> allgainmoney = 4;
+  romsg.Vec3 pos = 5;
+  int32 maxgrid = 6;
+  repeated romsg.StallsRecord record = 7;
+  bool bEnd = 8;
+  int32 endMailid = 9;
+  romsg.LongLongPair curTax = 10;
+}
+
+message EndStallsMailContent {
+  map<int32, int64> allgainmoney = 1;
+  int64 existTime = 2;
+}
+
+message PlayerStallsInfoReq {
+}
+
+message PlayerStallsInfoResp {
+  int64 currentStallsID = 1;
+  romsg.StallsInfo info = 2;
+  romsg.LongLongPair curTax = 3;
+}
+
+message PlayerStallsChangeNtf {
+  int64 lastAliveTime = 1;
+  romsg.StallsInfo info = 2;
+}
+
+message StallsSyncToBuyerInfo {
+  romsg.StallsBaseInfo baseinfo = 1;
+  repeated romsg.StallsItemInfo itembase = 2;
+  int64 timeout = 3;
+  romsg.Vec3 pos = 4;
+  romsg.PlayerAvatarInfo avatarinfo = 5;
+  int64 sceneEntryID = 6;
+  int32 sceneLineNum = 7;
+  bool bEnd = 8;
+}
+
+message PlayerStallsSyncBuyerStallsInfoReq {
+  int64 StallsID = 1;
+  int64 SystemStallID = 3;
+  int64 sceneEntryID = 4;
+  int32 sceneLineNum = 5;
+}
+
+message PlayerStallsSyncBuyerStallsInfoResp {
+  int32 result = 1;
+  romsg.StallsSyncToBuyerInfo info = 2;
+}
+
+message PlayerStallsBuyerLeaveStallsReq {
+}
+
+message ServerStallsBuyerLeaveStallsReq {
+  int64 StallsID = 1;
+  int64 RoleID = 2;
+  int64 SystemStallID = 3;
+}
+
+message PlayerStallsSyncBuyerStallsInfoNtf {
+  romsg.StallsSyncToBuyerInfo info = 1;
+}
+
+message DBPlayerStallsInfo {
+  int64 ro3Define_SaveVersion = 9999;
+  int64 ro3Define_DbTerm = 10000;
+  int64 lastAliveTime = 1;
+  romsg.StallsInfo info = 2;
+  romsg.LongLongPair weekMoney = 10;
+}
+
+message PlayerStartStallsReq {
+  string stallsTitle = 1;
+  repeated romsg.StallsPutItem itembase = 2;
+}
+
+message PlayerStartStallsRsp {
+  int32 result = 1;
+  romsg.StallsInfo info = 2;
+}
+
+message StallsPutItem {
+  int64 itemid = 1;
+  int64 itemnum = 2;
+  int32 price = 3;
+  int32 pricetype = 4;
+}
+
+message PlayerStallsPutItemReq {
+  romsg.StallsPutItem putItem = 1;
+}
+
+message PlayerStallsPutItemRsp {
+  int32 result = 1;
+  romsg.StallsItemInfo baseinfo = 2;
+}
+
+message PlayerStallsTopItemReq {
+  int64 stallItemID = 1;
+}
+
+message PlayerStallsTopItemRsp {
+  int32 result = 1;
+  romsg.StallsInfo info = 2;
+}
+
+message PlayerStallsRemoveItemReq {
+  int64 stallsItemID = 1;
+}
+
+message PlayerStallsRemoveItemRsp {
+  int32 result = 1;
+}
+
+message PlayerStallsUpdateItemPriceReq {
+  int64 stallsItemID = 1;
+  bool bAdd = 2;
+  int32 num = 3;
+  int32 price = 4;
+}
+
+message PlayerStallsUpdateItemPriceItemRsp {
+  int32 result = 1;
+}
+
+message PlayerStallsBuyItemReq {
+  int64 stallsID = 1;
+  int64 stallsItemID = 2;
+  int32 num = 3;
+  int32 price = 4;
+  int64 SystemStallID = 5;
+}
+
+message PlayerStallsBuyItemResp {
+  int32 result = 1;
+}
+
+message PlayerUpdateStallsNameReq {
+  string stallsTitle = 1;
+}
+
+message PlayerUpdateStallsNameResp {
+  int32 result = 1;
+  string stallsTitle = 2;
+}
+
+message ServerUpdateStallsNameReq {
+  int64 stallsID = 1;
+  string stallsTitle = 2;
+}
+
+message ServerUpdateStallsNameResp {
+  int32 result = 1;
+  int64 stallsID = 2;
+  string stallsTitle = 3;
+}
+
+message PlayerStallsEndReq {
+}
+
+message PlayerStallsEndResp {
+  int32 result = 1;
+}
+
+message StallsSyncPlayerAvatarInfo {
+  int64 stallsID = 1;
+  int64 sceneID = 2;
+  romsg.PlayerAvatarInfo avatarinfo = 3;
+}
+
+message ServerStallsEndReq {
+  int64 stallsID = 1;
+}
+
+message ServerStallsEndResp {
+  int32 result = 1;
+}
+
+message EndStallsInfoNtf {
+  romsg.StallsInfo info = 1;
+}
+
+message PlayerStallsQueryItemPriceReq {
+  repeated int64 itemID = 1;
+}
+
+message StallItemPrice {
+  int32 minPercent = 1;
+  int32 maxPercent = 2;
+}
+
+message PlayerStallsQueryItemPriceResp {
+  int32 result = 1;
+  map<int64, romsg.StallItemPrice> itemPrice = 2;
+}
+
+message PlayerStallsShareCheckReq {
+  string shareData = 1;
+}
+
+message PlayerStallsShareCheckResp {
+  int32 result = 1;
+}
+

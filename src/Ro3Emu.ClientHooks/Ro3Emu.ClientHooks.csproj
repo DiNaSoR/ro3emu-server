@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Code loaded INTO the RO3 client (Unity Mono): compiled against the client's own managed DLLs.
+    ClientManaged points at <client>\ro3_Data\Managed; ClientPatcher copies the output there.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- The client's managed DLLs: -p:ClientManaged=..., or the RO3_CLIENT_DIR environment variable (the ROO_PC folder). -->
+    <ClientManaged Condition="'$(ClientManaged)' == '' and '$(RO3_CLIENT_DIR)' != ''">$(RO3_CLIENT_DIR)\ro3_Data\Managed</ClientManaged>
+    <ClientManaged Condition="'$(ClientManaged)' == ''">C:\RO3\ROO_PC\ro3_Data\Managed</ClientManaged>
+    <!-- The client's DLLs reference mscorlib-era types the netstandard facades cover; don't warn about it. -->
+    <NoWarn>$(NoWarn);MSB3277;CS1701;CS1702</NoWarn>
+    <!-- Build against the player's own base class library (Unity's mscorlib carries Span/Memory types). -->
+    <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
+    <NoStdLib>true</NoStdLib>
+    <NoCompilerStandardLib>true</NoCompilerStandardLib>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="mscorlib"><HintPath>$(ClientManaged)\mscorlib.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="netstandard"><HintPath>$(ClientManaged)\netstandard.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="System"><HintPath>$(ClientManaged)\System.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="System.Core"><HintPath>$(ClientManaged)\System.Core.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Assembly-CSharp"><HintPath>$(ClientManaged)\Assembly-CSharp.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Happyengine.Network"><HintPath>$(ClientManaged)\Happyengine.Network.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Happyengine.Base.Runtime"><HintPath>$(ClientManaged)\Happyengine.Base.Runtime.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Phonest.ClientForUnity"><HintPath>$(ClientManaged)\Phonest.ClientForUnity.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.CoreModule"><HintPath>$(ClientManaged)\UnityEngine.CoreModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Unity.TextMeshPro"><HintPath>$(ClientManaged)\Unity.TextMeshPro.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.UI"><HintPath>$(ClientManaged)\UnityEngine.UI.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.UIModule"><HintPath>$(ClientManaged)\UnityEngine.UIModule.dll</HintPath><Private>false</Private></Reference>
+    <!-- English replacements for Chinese-text UI textures (TextureSwap), carried inside this DLL. -->
+    <EmbeddedResource Include="Textures\*.png" LogicalName="textures/%(Filename)%(Extension)" />
+    <Reference Include="UnityEngine.ImageConversionModule"><HintPath>$(ClientManaged)\UnityEngine.ImageConversionModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.TextRenderingModule"><HintPath>$(ClientManaged)\UnityEngine.TextRenderingModule.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+
+</Project>

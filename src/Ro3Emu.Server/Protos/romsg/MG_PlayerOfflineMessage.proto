@@ -1,0 +1,93 @@
+syntax = "proto3";
+package romsg;
+import "MG_Auction.proto";
+import "MG_Team.proto";
+
+enum PlayerOfflineMsgID {
+  OfflinePing = 0;
+  GMT = 1;
+  Push = 2;
+  BarRoom = 3;
+  Genre = 4;
+  DeleteGenre = 5;
+  TaskProgress = 6;
+  SiegeSettlement = 7;
+  GuildAuctionBonus = 8;
+  Trade = 9;
+  TradeApproval = 10;
+  GuildAuctionOwner = 11;
+  BattleGloryRank = 12;
+  SendReward = 13;
+  TradeSendReward = 14;
+  AuctionJoinBiddingHistory = 15;
+  FriendChatGroup = 16;
+  FriendGiftSend = 17;
+  TeamIdChanged = 18;
+  TradeStrategyOrder = 19;
+  SystemSwitch = 20;
+  ShopPresent = 21;
+  GmtSetPosition = 22;
+}
+
+message PlayerOfflineMesagePing {
+  string ping = 1;
+}
+
+message PlayerGMTMessage {
+  string jsonStr = 1;
+}
+
+message PlayerPushMessage {
+  uint32 msgId = 1;
+  bytes msgBytes = 2;
+}
+
+message TaskProgressOfflineNotify {
+  int64 progressType = 1;
+  bytes taskParam = 2;
+}
+
+message LeaderBoardRankTaskProgressParam {
+  int64 leaderBoardId = 1;
+  int64 rank = 2;
+}
+
+message GVGTeamScoreTaskProgressParam {
+  int64 guildId = 1;
+  int64 score = 2;
+}
+
+message SiegeSettlementOfflineMsg {
+  int32 seasonId = 1;
+  int32 playBookId = 2;
+  bool isHegemony = 3;
+  bool isWarzoneStar = 4;
+}
+
+message GuildAuctionBonusOfflineMsg {
+  int64 auctionId = 1;
+  int64 bonus = 2;
+  int64 srcType = 3;
+  int64 guildID = 4;
+}
+
+message BattleGlorySeasonRankMsg {
+  int32 seasonId = 1;
+  int64 rankId = 2;
+}
+
+message AuctionJoinBiddingHistoryOfflineMsg {
+  repeated romsg.HistoryAuctionItem auctionItems = 1;
+}
+
+message PlayerSystemSwitchOfflineMsg {
+  repeated int64 systemTypeList = 1;
+  int64 systemSubType = 2;
+  int64 closeEndTime = 3;
+  bool isEnable = 4;
+}
+
+message GmtSetPlayerPositionMsg {
+  int32 mapId = 1;
+}
+

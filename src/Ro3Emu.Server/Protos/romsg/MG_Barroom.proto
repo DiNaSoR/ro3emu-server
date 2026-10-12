@@ -1,0 +1,325 @@
+syntax = "proto3";
+package romsg;
+import "FieldOption.proto";
+
+enum SpeakAuthorityType {
+  Free = 0;
+  Manual = 1;
+  Order = 2;
+}
+
+enum RoomTagType {
+  RedBag = 0;
+  Activity = 1;
+  Spark = 2;
+  Boom = 3;
+}
+
+message RoomTagInfo {
+  romsg.RoomTagType type = 1;
+  int64 endtime = 2;
+}
+
+message CurSpeakUsers {
+  int64 userId = 1;
+  int32 micOrder = 2;
+}
+
+message HistoryHotInfo {
+  int32 lastHot = 1;
+  int32 lastHotAdd = 2;
+}
+
+message MemberInfo {
+  int64 memberId = 1;
+  int64 areaId = 2;
+  int64 joinTime = 3;
+}
+
+message BarRoomSummary {
+  int64 barRoomGuid = 1;
+  int32 barRoomType = 2;
+  int32 languageType = 3;
+  string barRoomName = 4;
+  repeated romsg.RoomTagInfo barRoomTags = 5;
+  int32 hotValue = 6;
+  int32 regionId = 7;
+  repeated romsg.MemberInfo memberList = 8;
+}
+
+message BarRoomTotalDetail {
+  romsg.BarRoomSummary barRoomSummary = 1;
+  map<int64, int64> blackList = 2;
+  map<int64, int64> forbiddenSpeaker = 3;
+  map<int64, string> applyUsers = 4;
+  repeated romsg.CurSpeakUsers curSpeaks = 6;
+  romsg.HistoryHotInfo historyHot = 7;
+  romsg.SpeakAuthorityType controlMicType = 8;
+  bool isCloseMic = 9;
+  int64 ownerGuid = 10;
+  int64 createTime = 11;
+  int64 transferCd = 12;
+  int32 gmSpRoomCount = 13;
+}
+
+message BarRoomInfoUpdateNotify {
+  int64 barRoomGuid = 1;
+}
+
+message BarRoomUserEnterNotify {
+  int64 userId = 1;
+  int32 spxType = 2;
+}
+
+message CreateBarRoomReq {
+  int32 barRoomType = 1;
+  int32 languageType = 2;
+  string barRoomName = 3;
+  int64 areaId = 4;
+}
+
+message CreateBarRoomResp {
+  int32 result = 1;
+  romsg.BarRoomTotalDetail info = 2;
+}
+
+message SetBarRoomInfoReq {
+  int32 barRoomType = 1;
+  int32 languageType = 2;
+  string barRoomName = 3;
+  int64 barRoomGuid = 4;
+}
+
+message SetBarRoomInfoResp {
+  int32 result = 1;
+}
+
+message EnterBarRoomReq {
+  int64 barRoomGuid = 1;
+  int64 areaId = 2;
+}
+
+message EnterBarRoomResp {
+  int32 result = 1;
+  romsg.BarRoomTotalDetail info = 2;
+}
+
+message ExitBarRoomReq {
+  int64 barRoomGuid = 1;
+}
+
+message ExitBarRoomResp {
+  int32 result = 1;
+}
+
+message InviteEnterBarRoomReq {
+  int64 barRoomGuid = 1;
+  repeated int64 targetGuidList = 2;
+  string roomName = 3;
+  string inviterName = 4;
+  int32 inviterJob = 5;
+  int32 inviterLevel = 6;
+}
+
+message InviteEnterBarRoomResp {
+  int32 result = 1;
+  int64 barRoomGuid = 2;
+  repeated int64 targetGuidList = 3;
+}
+
+message InviteEnterBarRoomNotify {
+  int64 barRoomGuid = 1;
+  int64 inviterGuid = 2;
+  string roomName = 3;
+  string inviterName = 4;
+  int32 inviterJob = 5;
+  int32 inviterLevel = 6;
+}
+
+message ResponseInviteEnterBarRoomReq {
+  int64 barRoomGuid = 1;
+  int64 inviterGuid = 2;
+  bool isAccept = 3;
+}
+
+message ResponseInviteEnterBarRoomResp {
+  int32 result = 1;
+  int64 barRoomGuid = 2;
+  int64 inviterGuid = 3;
+  bool isAccept = 4;
+  romsg.BarRoomTotalDetail info = 5;
+}
+
+message SetMicOrderReq {
+  repeated romsg.CurSpeakUsers SpeakUsers = 1;
+  int64 barRoomGuid = 2;
+}
+
+message SetMicOrderResp {
+  int32 result = 1;
+}
+
+message ApplyOpenMicReq {
+  int64 barRoomGuid = 1;
+  string reason = 2;
+}
+
+message ApplyOpenMicResp {
+  int32 result = 1;
+}
+
+message OwnerHandleOpenMicReq {
+  int64 applyerId = 1;
+  int64 barRoomGuid = 2;
+  bool IsAgree = 3;
+}
+
+message OwnerHandleOpenMicResp {
+  int32 result = 1;
+  bool IsAgree = 2;
+}
+
+message DownMicReq {
+  int64 barRoomGuid = 1;
+}
+
+message DownMicResp {
+  int32 result = 1;
+}
+
+message ModifyControlMicTypeReq {
+  romsg.SpeakAuthorityType controlMicType = 1;
+  int64 barRoomGuid = 2;
+  romsg.SetMicOrderReq micOrder = 3;
+}
+
+message ModifyControlMicTypeResp {
+  int32 result = 1;
+  romsg.SetMicOrderReq micOrder = 2;
+}
+
+message TransferOwnerReq {
+  int64 targetGuid = 1;
+  int64 barRoomGuid = 2;
+}
+
+message TransferOwnerResp {
+  int32 result = 1;
+}
+
+message PresentGiftReq {
+  int64 targetGuid = 1;
+  int32 giftId = 2;
+  int32 giftNum = 3;
+  int64 barRoomGuid = 4;
+}
+
+message PresentGiftResp {
+  int32 result = 1;
+  int32 itemId = 2;
+  int32 itemNum = 3;
+  string gifterUser = 4;
+  int64 receiveUser = 5;
+  int32 userBarRoomHot = 6;
+  int32 hotAdd = 7;
+}
+
+message AddUserPopularityReq {
+  int32 barRoomPopularityNum = 1;
+  int32 StarNum = 2;
+}
+
+message ForbiddenUserReq {
+  int64 barRoomGuid = 1;
+  int64 targetGuid = 2;
+}
+
+message ForbiddenUserResp {
+  int32 result = 1;
+}
+
+message CanecelForbiddenUserReq {
+  int64 barRoomGuid = 1;
+  int64 targetGuid = 2;
+}
+
+message CanecelForbiddenUserResp {
+  int32 result = 1;
+}
+
+message KickUserReq {
+  int64 barRoomGuid = 1;
+  int64 targetGuid = 2;
+}
+
+message KickUserResp {
+  int32 result = 1;
+}
+
+message CancelKickUserReq {
+  int64 barRoomGuid = 1;
+  int64 targetGuid = 2;
+}
+
+message CancelKickUserResp {
+  int32 result = 1;
+}
+
+message ShutUpAllReq {
+  int64 barRoomGuid = 1;
+}
+
+message ShutUpAllResp {
+  int32 result = 1;
+}
+
+message CancelShutUpAllReq {
+  int64 barRoomGuid = 1;
+}
+
+message CancelShutUpAllResp {
+  int32 result = 1;
+}
+
+message BarRoomGetReq {
+}
+
+message BarRoomGetResp {
+  int32 result = 1;
+  romsg.BarRoomTotalDetail info = 2;
+}
+
+message AddBarRoomTagReq {
+  int64 barRoomGuid = 1;
+  romsg.RoomTagInfo tag = 2;
+  int32 opType = 3;
+}
+
+message AddBarRoomTagResp {
+  int32 result = 1;
+}
+
+message SetGmBarRoomInfoReq {
+  int64 barRoomGuid = 1;
+  int32 hotvalue = 2;
+  int32 hotvalueAdd = 3;
+  int32 gmSpRoomCount = 4;
+}
+
+message SetGmBarRoomInfoResp {
+  int32 result = 1;
+}
+
+message MuteBarRoomPlayerReq {
+  int64 barRoomUid = 1;
+  int64 targetPlayerUid = 2;
+  bool isMute = 3;
+}
+
+message MuteBarRoomPlayerResp {
+  int32 result = 1;
+  string groupId = 2;
+  bool isMute = 3;
+  int64 targetPlayerUid = 4;
+}
+

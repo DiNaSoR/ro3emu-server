@@ -1,0 +1,62 @@
+syntax = "proto3";
+package romsg;
+import "MG_Common.proto";
+
+enum EProductType {
+  EProductType_None = 0;
+  EProductType_GiftPack = 1;
+  EProductType_MonthCard = 2;
+  EProductType_BattlePass = 3;
+}
+
+message CreateOrderReq {
+  string packageName = 1;
+  string payType = 2;
+  string tradeType = 3;
+  float amount = 4;
+  string subject = 5;
+  int64 chargeType = 6;
+  int64 chargeId = 7;
+  string regionCode = 8;
+}
+
+message CreateOrderResp {
+  int64 result = 1;
+  string ErrMsg = 2;
+  int64 chargeType = 3;
+  int64 chargeId = 4;
+  string orderId = 5;
+  string orderData = 6;
+}
+
+message PayResultReq {
+  string orderId = 1;
+}
+
+message PayResultResp {
+  int64 result = 1;
+  string ErrMsg = 2;
+  string orderId = 3;
+}
+
+message GetRechargeFirstAwardReq {
+}
+
+message GetRechargeFirstAwardResp {
+  int64 result = 1;
+  repeated int64 idList = 2;
+}
+
+message UpdateRechargeFirstAwardResp {
+  int64 rechargeId = 1;
+}
+
+message ItemExchangeReq {
+  int64 itemId = 1;
+  int64 count = 2;
+}
+
+message ItemExchangeResp {
+  int64 result = 1;
+}
+

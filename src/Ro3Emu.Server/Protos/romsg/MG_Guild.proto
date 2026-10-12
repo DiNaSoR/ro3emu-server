@@ -1,0 +1,1786 @@
+syntax = "proto3";
+package romsg;
+import "MG_Common.proto";
+import "MG_Mail.proto";
+import "MG_Season.proto";
+import "FieldOption.proto";
+import "MG_GuildVoiceChannel.proto";
+import "MG_GuildBlackMarket.proto";
+
+enum GuildStatus {
+  GuildStatus_None = 0;
+  GuildStatus_PreCreate = 1;
+  GuildStatus_Normal = 2;
+  GuildStatus_Revolution = 3;
+}
+
+enum GuildCatShopItemStatu {
+  GuildCatShopItemStatus_None = 0;
+  GuildCatShopItemStatus_Done = 1;
+  GuildCatShopItemStatus_Help = 2;
+}
+
+enum GuildLeagueRankLift {
+  GuildLeagueRankLift_None = 0;
+  GuildLeagueRankLift_Up = 1;
+  GuildLeagueRankLift_Down = 2;
+}
+
+enum EnumLabelType {
+  LeagueLabel = 0;
+}
+
+enum GVEActivityState {
+  GVEActivityState_None = 0;
+  GVEActivityState_NotSetLevel = 1;
+  GVEActivityState_OpenDungeon = 2;
+  GVEActivityState_PassDungeon = 3;
+}
+
+enum EGuildSpecialSkillType {
+  EGuildSpecialSkillType_None = 0;
+  EGuildSpecialSkillType_WarTech = 1;
+  EGuildSpecialSkillType_TimedStrategy = 2;
+}
+
+enum EGuildPlayMode {
+  EGuildPlayMode_None = 0;
+  EGuildPlayMode_Common = 1;
+  EGuildPlayMode_TerritoryWar = 1000;
+  EGuildPlayMode_Escort = 1001;
+  EGuildPlayMode_Siege = 1002;
+  EGuildPlayMode_Max = 1003;
+}
+
+message DBEnterGuildAppyInfo {
+  int64 playerID = 1;
+  string name = 2;
+  int64 level = 3;
+  int64 title = 4;
+  int64 fightPower = 5;
+  int64 applyTime = 6;
+  int64 historyContribute = 7;
+  int64 career = 8;
+  int64 lastContributeGuildID = 9;
+  int64 lastShowCatShopDay = 10;
+  int64 baseActivity = 11;
+  int32 createAccountTime = 12;
+  int64 bornAreaId = 13;
+}
+
+message DBEnterGuildInviteInfo {
+  int64 playerID = 1;
+  int64 inviteTime = 2;
+}
+
+message snapshotPositionAndBonus {
+  int64 activityid = 1;
+  int32 position = 2;
+  map<int64, int32> itemBonus = 5;
+  map<int64, int32> lastWeekItemBonus = 6;
+}
+
+message GuildBonusInfo {
+  repeated romsg.ItemBaseInfo bonusItems = 1;
+  repeated romsg.snapshotPositionAndBonus snapshotPBonusData = 2;
+  bool hasSendActivityBonus = 3;
+}
+
+message DBGuildMember {
+  int64 playerID = 1;
+  string name = 2;
+  int64 level = 3;
+  int64 fightPower = 4;
+  int64 career = 5;
+  int64 curContribute = 6;
+  int64 historyContribute = 7;
+  int64 offlineTime = 8;
+  int64 title = 9;
+  map<int64, int64> activityInfo = 10;
+  int64 baseActivity = 11;
+  int64 enterTime = 12;
+  int64 lastWeekContribute = 13;
+  int64 lastWeekContribute2 = 14;
+  int64 lastGuildId = 16;
+  int64 mapId = 18;
+  int64 contributeMoney = 19;
+  repeated romsg.ItemBaseInfo bonusItems = 20;
+  repeated romsg.snapshotPositionAndBonus snapshotPBonusData = 21;
+  bool hasSendActivityBonus = 22;
+  int64 totalActive = 25;
+  int32 createAccountTime = 26;
+  int64 bornAreaId = 27;
+}
+
+message DBGuildActivityData {
+  int64 curActivity = 1;
+  repeated int64 historyActivity = 2;
+}
+
+message DBGuildActivityPlayState {
+  int64 openTime = 1;
+  int64 endTime = 2;
+  bool isStart = 3;
+}
+
+message DBGuildOfficialData_OfficialPlayer {
+  repeated int64 playerID = 1;
+}
+
+message DBGuildOfficialData {
+  map<int64, romsg.DBGuildOfficialData_OfficialPlayer> officialData = 1;
+  int64 leaderID = 2;
+}
+
+message DBGuildCreateHelperInfo {
+  int64 playerID = 1;
+  string name = 2;
+  int64 level = 3;
+  int64 fightPower = 4;
+  int64 createTime = 5;
+  int64 career = 6;
+  int64 baseActivity = 7;
+  int32 createAccountTime = 8;
+  int64 bornAreaId = 9;
+}
+
+message DBGuildCreateHelper {
+  repeated romsg.DBGuildCreateHelperInfo createHelper = 1;
+  int64 finishCreateTime = 2;
+}
+
+message OfficalRight {
+  int64 rightType = 1;
+  repeated int64 abledOfficial = 2;
+}
+
+message GuildOfficalRight {
+  repeated romsg.OfficalRight data = 1;
+}
+
+message GuildNewsData {
+  int64 newsCfgID = 1;
+  int64 playerID = 2;
+  romsg.LanguageData param = 3;
+  int64 time = 7;
+}
+
+message GuildEventData {
+  int64 eventCfgID = 1;
+  repeated int64 playerID = 2;
+  romsg.LanguageData param = 3;
+  int64 time = 8;
+}
+
+message DBGuildImpeachData {
+  int64 beginTime = 1;
+  int64 lastImpeachTime = 2;
+  int64 needCount = 3;
+  repeated int64 memberID = 4;
+  int64 impeachOwner = 5;
+  int64 beOwnerTime = 6;
+  bool sendMail = 7;
+}
+
+message singleInviteData {
+  int64 time = 1;
+  int64 playerID = 2;
+}
+
+message DBGuildInviteData {
+  repeated romsg.singleInviteData data = 1;
+}
+
+message ShopCommodityInfo {
+  int64 commodityid = 1;
+  int32 buycount = 2;
+}
+
+message DBGuildResource {
+  int64 money = 1;
+  int64 contribute = 2;
+  int64 materials = 3;
+  int64 reputation = 4;
+  int64 historyContribute = 5;
+  int64 auctionMaterials = 6;
+}
+
+message DBGuildBuilding {
+  int64 buildingID = 1;
+  int64 level = 2;
+  int64 endLevelUpTime = 3;
+  string OpeName = 4;
+  int64 playerid = 5;
+}
+
+message MemberPrayData {
+  int64 memberID = 1;
+  int64 prayValue = 2;
+}
+
+message DBGuildPrayData {
+  repeated romsg.MemberPrayData data = 1;
+  int64 curWeekPrayValue = 2;
+}
+
+message DBGuildCatShopSku {
+  romsg.GuildCatShopItemStatu status = 1;
+  int64 index = 2;
+  int64 cfgId = 3;
+  string helperName = 4;
+  int64 reqHelpTime = 5;
+  int64 helperId = 6;
+}
+
+message DBGuildCatShopInfo {
+  repeated romsg.DBGuildCatShopSku skuData = 1;
+  bool isAwardGot = 2;
+  int64 playerID = 3;
+  int64 lastRefleshTime = 4;
+  int64 dayVersion = 5;
+  int64 helperOtherCount = 6;
+  int64 curRound = 7;
+  int64 refreshTimes = 8;
+  int64 reqHelperOtherCount = 9;
+}
+
+message DBGuildHome {
+  int64 sceneID = 1;
+}
+
+message GuildLeagueGuildDungeonData {
+  int64 guildID = 1;
+  string name = 2;
+  romsg.GuildHeadIcon icon = 3;
+  int32 rank = 4;
+  int32 rankOrder = 5;
+  int32 rankNum = 6;
+  int32 matcharea = 7;
+  int32 score = 8;
+  romsg.GuildLeagueRankLift rankLift = 9;
+  romsg.GuildHistoryHonor honor = 10;
+}
+
+message LeagueResultInfo {
+  int32 rankType = 1;
+  romsg.GuildLeagueGuildDungeonData blueGuild = 2;
+  romsg.GuildLeagueGuildDungeonData redGuild = 3;
+  int32 result = 4;
+  int64 time = 5;
+  int32 curStage = 6;
+}
+
+message GuildLeagueHistory {
+  romsg.LeagueResultInfo resultInfo = 1;
+  map<int64, romsg.DungeonStatisticsInfo> dungeonRolesInfo = 2;
+  string resultId = 3;
+  string ownerId = 4;
+}
+
+message GuildLeagueInfo {
+  repeated romsg.GuildLeagueHistory history = 1;
+}
+
+message GuildSiegeInfo {
+  map<int32, int32> siegeWinInfo = 1;
+}
+
+message GuildWartimeItem {
+  int32 itemId = 1;
+  int32 itemCount = 2;
+}
+
+message GuildWartimeToolBelongInfo {
+  int64 roleGuildId = 1;
+  int64 roleUsingToolId = 2;
+}
+
+message GuildWartimeItemPermission {
+  map<int32, romsg.GuildWartimeToolBelongInfo> guildWartimeToolBelongInfo = 1;
+}
+
+message GuildWartimeInfo {
+  map<int32, int32> itemInfo = 1;
+  map<int64, romsg.GuildWartimeItem> prepayInfo = 2;
+  map<int32, romsg.GuildWartimeItemPermission> itemRoleUseInfo = 3;
+}
+
+message UnLockHeadIcon {
+  int32 id = 1;
+  int64 removetime = 2;
+}
+
+message PlayerHistoryInfo {
+  int64 playerId = 1;
+  int64 contributeMoney = 2;
+  int32 official = 3;
+  int32 leaveTime = 4;
+  int32 historyContribute = 5;
+}
+
+message GuildRefreshInfo {
+  int64 refreshBroadEmailLimitTime = 1;
+  int64 refreshHistoryContributeTime = 2;
+}
+
+message EliteUnit {
+  int32 Index = 1;
+  int64 PlayerId = 2;
+}
+
+message EliteGroup {
+  romsg.EnumLabelType LabelType = 1;
+  int32 Version = 2;
+  repeated romsg.EliteUnit elitUnitData = 3;
+}
+
+message mergeInfo {
+  int64 guildId = 1;
+  int64 recvTime = 2;
+  string announce = 3;
+  repeated int64 memberids = 4;
+}
+
+message MergeGuildInfo {
+  repeated romsg.mergeInfo mergeData = 1;
+  int64 lastMergeTime = 2;
+  int64 pendingMergeGuildId = 3;
+}
+
+message LeagueDungeonResultInfo {
+  string resultId = 1;
+  int32 ranking = 2;
+  int32 rankorder = 3;
+}
+
+message DBGuildData {
+  int64 ro3Define_SaveVersion = 9999;
+  int64 ro3Define_DbTerm = 10000;
+  int64 guid = 1;
+  string name = 2;
+  int32 level = 3;
+  string announce = 4;
+  int64 createTime = 5;
+  repeated string historyNames = 6;
+  romsg.GuildStatus status = 7;
+  int64 lastChangeNameTime = 8;
+  string notice = 9;
+  int32 lastChangeNoticeTime = 10;
+  romsg.GuildHeadIcon iconInfo = 11;
+  romsg.DBGuildCreateHelper createHelper = 13;
+  map<int64, romsg.DBGuildMember> member = 14;
+  romsg.DBGuildActivityData activityData = 15;
+  repeated romsg.DBEnterGuildAppyInfo enterApplyData = 16;
+  romsg.DBGuildOfficialData officialData = 17;
+  romsg.GuildOfficalRight officalRight = 18;
+  repeated romsg.GuildEventData eventData = 20;
+  romsg.DBGuildImpeachData impeachData = 21;
+  bool autoAcceptApply = 23;
+  int64 nextBroadEmailTime = 24;
+  romsg.DBGuildResource resource = 25;
+  map<int64, romsg.DBGuildBuilding> building = 26;
+  repeated romsg.DBGuildCatShopInfo catShopInfo = 28;
+  romsg.DBGuildGveInfo guildGveInfo = 32;
+  map<int64, int64> mapLastRefleshTime = 33;
+  romsg.GuildSiegeInfo guildSiegeInfo = 35;
+  romsg.GuildWartimeInfo guildWartimeInfo = 36;
+  romsg.TerritoryWarsGuildData territoryWarsData = 37;
+  romsg.GuildItemData itemData = 38;
+  romsg.GuildHistoryHonor honor = 39;
+  romsg.DBGuildChallengeInfo guildChallengeInfo = 40;
+  bool autoCreateHelper = 41;
+  repeated romsg.UnLockHeadIcon unLockHeadIconData = 42;
+  int32 joinLevelLimit = 43;
+  repeated romsg.PlayerHistoryInfo playerHistoryData = 45;
+  int64 shortUid = 46;
+  repeated romsg.DBGuildCreateHelperInfo createHelperApplyData = 47;
+  int32 broadEmailLimit = 48;
+  int32 lastConveneTime = 49;
+  repeated romsg.ShopCommodityInfo shopCommodityData = 50;
+  repeated romsg.EliteGroup eliteGroupData = 51;
+  int32 areaID = 52;
+  romsg.GuildTechInfo guildTechInfo = 53;
+  romsg.GuildTimedStrategyInfo guildTimedStrategyInfo = 54;
+  romsg.SeasonState seasonState = 55;
+  romsg.MergeGuildInfo mergeGuildData = 56;
+  romsg.GuildVoiceAllData guildvoiceData = 57;
+  romsg.BlackMarketGuildData blackMarketData = 58;
+  repeated romsg.LeagueDungeonResultInfo leagueDungeonResultData = 59;
+  romsg.TerritoryWarsWarHallDonateData warHallDonateData = 60;
+  int32 firstLeagueNotice = 61;
+  map<int64, romsg.DBGuildActivityPlayState> guildActivityPlayStates = 62;
+}
+
+message PullMergeGuildDataReq {
+}
+
+message PullMergeGuildDataRes {
+  repeated romsg.GuildSnapInfo recvInvite = 1;
+  repeated romsg.GuildSnapInfo sendInvite = 2;
+  int32 result = 3;
+}
+
+message PullRecommendMergeGuildDataReq {
+}
+
+message PullRecommendMergeGuildDataRes {
+  repeated romsg.GuildSnapInfo data = 1;
+  int32 result = 2;
+}
+
+message MergeGuildDetailDataReq {
+  int64 guildid = 1;
+  bool isInvite = 2;
+}
+
+message GuildMergeInfo {
+  int64 guid = 1;
+  string name = 2;
+  int32 level = 3;
+  int32 memberCount = 4;
+  int32 activity = 5;
+  romsg.GuildHeadIcon iconInfo = 6;
+  repeated romsg.GuildBuilding buildind = 7;
+}
+
+message MergeGuildDetailDataRes {
+  romsg.GuildMergeInfo targetGuildData = 1;
+  romsg.GuildMergeInfo invitedGuildData = 2;
+  romsg.GuildMergeInfo newGuildData = 3;
+  int32 canMergeCount = 4;
+  string announce = 5;
+  repeated int64 memberids = 6;
+  int32 result = 7;
+  int64 lastMergeTime = 8;
+}
+
+message SaveMergeMemberReq {
+  int64 guildid = 1;
+  repeated int64 memberids = 2;
+}
+
+message SaveMergeMemberRes {
+  int64 guildid = 1;
+  repeated int64 memberids = 2;
+  int32 result = 3;
+}
+
+message MergeGuildOpeReq {
+  bool isAgree = 1;
+  int64 guildid = 2;
+}
+
+message MergeGuildOpeRes {
+  int32 result = 1;
+  int64 guildid = 2;
+}
+
+message InviteMergeGuildReq {
+  int64 guildid = 1;
+  bool isAgree = 2;
+  string announce = 3;
+  string language = 4;
+}
+
+message InviteMergeGuildRes {
+  int64 guildid = 1;
+  bool isAgree = 2;
+  int32 result = 3;
+}
+
+message PullCreateHelperApplyReq {
+}
+
+message PullCreateHelperApplyRes {
+  repeated romsg.GuildCreateHelperInfo createHelperApplyData = 1;
+}
+
+message CreateHelperApplyOpeReq {
+  repeated int64 playerIDList = 1;
+  bool agree = 2;
+  bool isBatch = 3;
+}
+
+message CreateHelperApplyOpeRes {
+  repeated int64 playerIDList = 1;
+  int32 result = 2;
+  bool agree = 3;
+  bool isBatch = 4;
+}
+
+message InviteCreateHelperTokenReq {
+  int64 invitePlayerId = 1;
+}
+
+message InviteCreateHelperTokenRes {
+  int64 token = 1;
+  int32 result = 2;
+}
+
+message InviteCreateHelperNotify {
+  int64 token = 1;
+  int64 playerId = 2;
+  int64 guildId = 3;
+  int32 helperCount = 4;
+  string guildName = 5;
+}
+
+message InviteCreateHelperOpeReq {
+  int64 token = 1;
+  bool agree = 2;
+  romsg.DBEnterGuildAppyInfo applyer = 3;
+}
+
+message InviteCreateHelperOpeRes {
+  int32 result = 1;
+}
+
+message ChallengeDifficultyInfo {
+  map<int32, bool> stageReward = 1;
+  int32 difficulty = 2;
+}
+
+message GuildChallenge {
+  map<int32, romsg.ChallengeDifficultyInfo> difficultyInfo = 1;
+  int32 curTimeMaxDiffiulty = 2;
+  int32 lastTimeMaxDiffiulty = 3;
+  repeated int32 auctionRewards = 4;
+}
+
+message PassDifficultyInfo {
+  map<int32, int32> stageTime = 1;
+  int32 passTime = 2;
+}
+
+message DBGuildChallengeInfo {
+  bool isSave = 1;
+  romsg.GuildChallenge challengeInfo = 2;
+  int32 nextTimeMaxDiffiulty = 3;
+  int64 curStartTime = 4;
+  int64 curEndTime = 5;
+  repeated int64 auctionDividendPlayerIds = 6;
+  map<int32, romsg.PassDifficultyInfo> historyPassDifficultyInfo = 7;
+  map<int32, romsg.PassDifficultyInfo> curPassDifficultyInfo = 8;
+  bool isJoinRacing = 9;
+  int64 dailyActivityId = 10;
+}
+
+message GuildGveDungeonScoreBaseInfo {
+  int32 difficultLevel = 1;
+  int64 passTime = 2;
+  int64 passCostTime = 3;
+  int64 endTime = 4;
+}
+
+message GuildGveDungeonScoreInfo {
+  romsg.GuildGveDungeonScoreBaseInfo baseinfo = 1;
+  romsg.DungeonTotalScoreInfo scoreinfo = 2;
+}
+
+message GuildGveDungeonInfo {
+  romsg.GuildGveDungeonScoreInfo historyInfo = 1;
+  romsg.GuildGveDungeonScoreBaseInfo bestScore = 2;
+  romsg.GuildGveDungeonScoreInfo curInfo = 3;
+  bool reward = 4;
+}
+
+message GVEActivityInfo {
+  romsg.GVEActivityState state = 1;
+  int64 startTime = 2;
+  int64 endTime = 3;
+  int64 difficulty = 4;
+  int64 historyMaxDifficulty = 5;
+  int64 currentMaxDifficulty = 6;
+  int64 sceneentry = 7;
+}
+
+message GuildGveOpenInfo {
+  romsg.GuildGveDungeonScoreInfo curInfo = 1;
+  romsg.GVEActivityInfo activityInfo = 2;
+}
+
+message DBGuildGveInfo {
+  romsg.GuildGveDungeonScoreInfo historyInfo = 1;
+  romsg.GuildGveOpenInfo openInfo = 2;
+}
+
+message GVEActivityInfoNtf {
+  romsg.GVEActivityInfo info = 1;
+}
+
+message GuildGveInfo {
+  romsg.DungeonTotalScoreInfo historyInfo = 1;
+  int64 timeout = 2;
+  int64 sceneid = 3;
+  bool reward = 4;
+  int64 difficulty = 5;
+  int64 historyMaxDifficulty = 6;
+  int64 currentMaxDifficulty = 7;
+}
+
+message DungeonCallMemberReq {
+  int64 dungeonID = 1;
+}
+
+message DungeonCallMemberRsp {
+  int64 dungeonID = 1;
+  int32 result = 2;
+}
+
+message GuildChallengeCallData {
+  int32 configId = 1;
+}
+
+message SceneCallData {
+  oneof val {
+    romsg.GuildChallengeCallData guildChallengeData = 1;
+  }
+}
+
+message DungeonCallMemberNtf {
+  int64 endtime = 1;
+  int32 difficulty = 5;
+  int64 sceneEntryID = 6;
+  romsg.SceneCallData callData = 7;
+  int64 uId = 8;
+}
+
+message GuildSyncPlayerNewGveDungeonNtf {
+  romsg.GuildGveDungeonScoreInfo curInfo = 1;
+}
+
+message GuildMemberInfo {
+  int64 playerID = 1;
+  string name = 2;
+  int64 level = 3;
+  int64 fightPower = 4;
+  int64 career = 5;
+  int64 curContribute = 6;
+  int64 historyContribute = 7;
+  int64 offlineTime = 8;
+  int64 official = 9;
+  int64 contributeTitle = 10;
+  map<int64, int64> activityDetail = 12;
+  int64 baseActivity = 13;
+  int64 enterTime = 15;
+  int64 mapId = 16;
+  int32 lastWeekActivity = 17;
+}
+
+message GuildCreateHelperInfo {
+  int64 playerID = 1;
+  string name = 2;
+  int64 level = 3;
+  int64 fightPower = 4;
+  int64 createTime = 5;
+  int64 career = 6;
+  int64 baseActivity = 7;
+  int32 createAccountTime = 8;
+  int64 bornAreaId = 9;
+  bool isOnline = 10;
+}
+
+message GuildApplyEnterInfo {
+  int64 playerID = 1;
+  string name = 2;
+  int64 level = 3;
+  int64 fightPower = 4;
+  int64 career = 5;
+  int64 applyTime = 6;
+}
+
+message GuildPeachInfo {
+  bool isPeaching = 1;
+  int64 nextPeachTime = 2;
+  bool canPeach = 3;
+  int64 peachOwnerID = 4;
+  int64 needCount = 5;
+  int64 peachEndTime = 6;
+  repeated int64 peachPlayerIDs = 7;
+}
+
+message GuildActivityInfo {
+  int64 curActivity = 1;
+  int64 lastWeekActivity = 2;
+}
+
+message GuildResource {
+  int64 money = 1;
+  int64 contribute = 2;
+  int64 materials = 3;
+  int64 reputation = 4;
+  int64 auctionMaterials = 5;
+}
+
+message GuildBuilding {
+  int64 buildingID = 1;
+  int64 level = 2;
+  int64 endLevelUpTime = 3;
+}
+
+message GuildFullInfoNtf {
+  int64 guid = 1;
+  string name = 2;
+  int32 level = 3;
+  string announce = 4;
+  int64 createTime = 5;
+  repeated string historyNames = 6;
+  romsg.GuildStatus status = 7;
+  int64 lastChangeNameTime = 8;
+  string notice = 9;
+  int64 maxMemberCount = 10;
+  romsg.GuildHeadIcon iconInfo = 11;
+  repeated romsg.GuildMemberInfo memberInfo = 12;
+  romsg.GuildOfficalRight officalRight = 13;
+  repeated romsg.GuildCreateHelperInfo createHelperInfo = 20;
+  int64 createHelperEndTime = 21;
+  int64 maxCreateHelperNum = 22;
+  bool autoAcceptApply = 23;
+  repeated romsg.GuildApplyEnterInfo applyInfo = 30;
+  int64 lastEventIndex = 32;
+  romsg.GuildPeachInfo peachInfo = 33;
+  romsg.GuildActivityInfo activityInfo = 34;
+  int64 curCreateHelperID = 40;
+  int64 nextBroadEmailTime = 41;
+  romsg.GuildResource resource = 50;
+  repeated romsg.GuildBuilding building = 51;
+  romsg.GuildItemData items = 52;
+  romsg.TerritoryWarsGuildData territoryWarData = 53;
+  romsg.GuildHistoryHonor honor = 54;
+  bool autoCreateHelper = 55;
+  int32 joinLevelLimit = 56;
+  int64 shortUid = 58;
+  repeated romsg.GuildCreateHelperInfo createHelperApplyData = 59;
+  repeated romsg.UnLockHeadIcon unLockHeadIconData = 60;
+  int32 broadEmailLimit = 61;
+  int64 pendingMergeGuildId = 62;
+  bool isJoin = 63;
+  int32 lastChangeNoticeTime = 64;
+  bool isLeagueElite = 65;
+  repeated romsg.ShopCommodityInfo shopCommodityData = 66;
+}
+
+message GuildManagerInfo {
+  int64 playerID = 1;
+  int32 rightType = 2;
+}
+
+message GuildSnapInfo {
+  int64 guid = 1;
+  string name = 2;
+  int32 level = 3;
+  string announce = 4;
+  repeated string historyNames = 5;
+  int64 activity = 6;
+  int64 memberCount = 7;
+  int64 totalMemberCount = 8;
+  romsg.GuildHeadIcon icon = 9;
+  string leaderName = 10;
+  bool isApplyed = 11;
+  string strategistName = 12;
+  int64 leaderId = 13;
+  int64 guildPower = 14;
+  romsg.GuildHistoryHonor honor = 15;
+  int32 areaId = 16;
+  int32 joinLevelLimit = 17;
+  int64 reputation = 18;
+  repeated romsg.GuildManagerInfo guildManagerData = 19;
+  bool autoAcceptApply = 20;
+  int64 shortUid = 21;
+}
+
+message GuildSpecialSkills {
+  int64 guildId = 1;
+  map<int64, romsg.GuildPlaySpecialSkills> skills = 2;
+}
+
+message GuildPlaySpecialSkills {
+  map<int64, romsg.GuildSpecialSkillItem> specialSkills = 1;
+}
+
+message GuildDetailInfoReq {
+  int64 guildId = 1;
+  bool isRecruit = 2;
+}
+
+message GuildDetailInfoResp {
+  int32 result = 1;
+  repeated romsg.DBGuildBuilding buildData = 2;
+  repeated romsg.PlayerHistoryInfo playerHistoryData = 3;
+  int64 guildId = 4;
+  romsg.GuildSnapInfo snapshotData = 5;
+}
+
+message GuildMoneyRankReq {
+}
+
+message GuildMoneyRankResp {
+  repeated romsg.PlayerHistoryInfo playerHistoryData = 1;
+}
+
+message GuildCreateReq {
+  string name = 1;
+  string announce = 2;
+  romsg.GuildHeadIcon icon = 3;
+  romsg.DBEnterGuildAppyInfo creater = 4;
+  bool onlyCheck = 5;
+  bool autoCreateHelper = 6;
+  string language = 7;
+}
+
+message GuildCreateResp {
+  int32 result = 1;
+}
+
+message GuildCancelCreateReq {
+}
+
+message GuildCancleCreateResp {
+  int32 result = 1;
+}
+
+message GuildRecommendListReq {
+  string searchName = 1;
+  int32 count = 2;
+  int64 lastGuildShortId = 3;
+  bool isCanJoin = 4;
+}
+
+message GuildRecommendListResp {
+  int32 result = 1;
+  repeated romsg.GuildSnapInfo guilds = 2;
+  string searchName = 3;
+  int32 totalGuildCount = 4;
+}
+
+message QuickCreateEliteTeamReq {
+}
+
+message QuickCreateEliteTeamRes {
+  int32 result = 1;
+}
+
+message GetEliteGroupDataReq {
+}
+
+message GetEliteGroupDataRes {
+  repeated romsg.EliteGroup eliteGroupData = 1;
+}
+
+message QuickJoinEliteGroupReq {
+  romsg.EliteGroup CurrentEliteData = 1;
+}
+
+message QuickJoinEliteGroupRes {
+  int32 result = 1;
+  romsg.EliteGroup CurrentEliteData = 2;
+}
+
+message SwitchSceneSyncGuildId {
+  int64 guildid = 1;
+}
+
+message SyncGuildDataOnceReq {
+  int64 guildid = 1;
+}
+
+message SyncGuildDataOnceRes {
+}
+
+message EliteGroupChangeNotify {
+  repeated romsg.EliteGroup CurrentEliteData = 1;
+}
+
+message GuildCreateHelperListReq {
+  string searchName = 1;
+}
+
+message GuildCreateHelperListResp {
+  message GuildHelperInfo {
+    romsg.GuildSnapInfo guild = 1;
+    int64 finishTime = 2;
+  }
+
+  int32 result = 1;
+  repeated romsg.GuildCreateHelperListResp.GuildHelperInfo data = 2;
+  string searchName = 3;
+}
+
+message GuildEnterApplyReq {
+  repeated int64 guildIds = 1;
+  romsg.DBEnterGuildAppyInfo applyer = 2;
+  bool cancel = 3;
+  bool batchApply = 4;
+}
+
+message GuildEnterApplyResp {
+  message ApplyResult {
+    int32 result = 1;
+    int64 guildId = 2;
+  }
+
+  int32 result = 1;
+  repeated romsg.GuildEnterApplyResp.ApplyResult applyResult = 2;
+  int64 punishTime = 3;
+  bool batchApply = 4;
+  bool cancel = 5;
+}
+
+message GuildEnterApplyOpeReq {
+  bool agree = 1;
+  repeated int64 playerIds = 2;
+  bool isBatch = 3;
+}
+
+message GuildEnterApplyOpeResp {
+  message ApplyRes {
+    int32 result = 1;
+    int64 playerId = 2;
+  }
+
+  int32 result = 1;
+  repeated romsg.GuildEnterApplyOpeResp.ApplyRes data = 2;
+  bool agree = 3;
+  bool isBatch = 4;
+}
+
+message GuildEnterApplyChangeNtf {
+  enum ChangeType {
+    ChangeType_Update = 0;
+    ChangeType_Add = 1;
+    ChangeType_Delete = 2;
+  }
+
+  message ApplyChangeInfo {
+    romsg.GuildEnterApplyChangeNtf.ChangeType changeType = 1;
+    romsg.GuildApplyEnterInfo info = 2;
+  }
+
+  repeated romsg.GuildEnterApplyChangeNtf.ApplyChangeInfo change = 1;
+}
+
+message GuildCreateHelperOpeReq {
+  repeated int64 guildIds = 1;
+  romsg.DBEnterGuildAppyInfo apply = 2;
+}
+
+message GuildCreateHelperOpeResp {
+  message helperResultData {
+    int64 guildId = 1;
+    bool success = 2;
+  }
+
+  int32 result = 1;
+  repeated romsg.GuildCreateHelperOpeResp.helperResultData helperResult = 2;
+}
+
+message GuildCreateHelperLeaveReq {
+  int64 guildId = 1;
+}
+
+message GuildCreateHelperLeaveResp {
+  int32 result = 1;
+  int64 guildId = 2;
+}
+
+message GuildCreateHelperMemberChangeNtf {
+  enum ChangeType {
+    ChangeType_Update = 0;
+    ChangeType_Add = 1;
+    ChangeType_Delete = 2;
+  }
+
+  romsg.GuildCreateHelperMemberChangeNtf.ChangeType status = 1;
+  romsg.GuildCreateHelperInfo info = 2;
+}
+
+message GuildMemberInfoChangeNtf {
+  enum ChangeType {
+    ChangeType_Join = 0;
+    ChangeType_Update = 1;
+    ChangeType_Leave = 2;
+    ChangeType_Kick = 3;
+  }
+
+  romsg.GuildMemberInfoChangeNtf.ChangeType status = 1;
+  repeated romsg.GuildMemberInfo info = 2;
+}
+
+message GuildEditReq {
+  enum EditType {
+    Edit_None = 0;
+    Edit_Announce = 1;
+    Edit_Name = 2;
+    Edit_HeadIcon = 3;
+    Edit_OfficalRight = 4;
+    Edit_Notice = 5;
+    Edit_AutoAcceptApply = 6;
+    Edit_AutoCreateHelper = 7;
+    Edit_JoinLevelLimit = 8;
+    Edit_CantBeInvited = 9;
+    Edit_Recruit = 10;
+  }
+
+  romsg.GuildEditReq.EditType tp = 1;
+  string announce = 2;
+  string name = 3;
+  romsg.GuildHeadIcon icon = 4;
+  romsg.GuildOfficalRight right = 5;
+  bool isCheck = 6;
+  int64 guildId = 7;
+  string notice = 8;
+  bool autoAcceptApply = 9;
+  bool autoCreateHelper = 10;
+  int32 joinLevelLimit = 11;
+  bool cantBeInvited = 12;
+  bool isOpeRecruit = 13;
+  string language = 14;
+}
+
+message GuildEditResp {
+  int32 result = 1;
+  int64 tp = 2;
+  string announce = 3;
+  string name = 4;
+  romsg.GuildHeadIcon icon = 5;
+  romsg.GuildOfficalRight right = 6;
+  string notice = 7;
+  bool autoAcceptApply = 8;
+  bool autoCreateHelper = 9;
+  int32 joinLevelLimit = 10;
+  bool cantBeInvited = 11;
+  bool isOpeRecruit = 12;
+}
+
+message GuildBaseInfoChangeNtf {
+  enum ChangeType {
+    Change_None = 0;
+    Change_Base = 1;
+    Change_HeadIcon = 2;
+    Change_OfficalRight = 3;
+    Change_Peach = 4;
+    Change_AutoAcceptApply = 5;
+    Change_BroadEmail = 6;
+    Change_Resource = 7;
+    Change_Building = 8;
+    Change_Item = 9;
+    Change_Honor = 10;
+    Change_AutoCreateHelper = 11;
+    Change_JoinLevelLimit = 12;
+    Change_UnLockHeadIcon = 13;
+    Change_ActivityBonus = 14;
+    Change_GuildActivity = 15;
+    Change_LeagueElite = 16;
+    Change_ShopCommodityInfo = 17;
+  }
+
+  message BaseChangeInfo {
+    string name = 1;
+    int32 level = 2;
+    string announce = 3;
+    repeated string historyNames = 4;
+    romsg.GuildStatus status = 5;
+    int64 lastChangeNameTime = 6;
+    string notice = 7;
+    int64 maxMemberCount = 8;
+    int64 pendingMergeGuildId = 9;
+    int32 lastChangeNoticeTime = 10;
+  }
+
+  romsg.GuildBaseInfoChangeNtf.ChangeType tp = 1;
+  romsg.GuildBaseInfoChangeNtf.BaseChangeInfo base = 2;
+  romsg.GuildHeadIcon icon = 3;
+  romsg.GuildOfficalRight right = 4;
+  romsg.GuildPeachInfo peach = 5;
+  bool autoAcceptApply = 6;
+  int64 nextBroadEmailTime = 7;
+  romsg.GuildResource resource = 8;
+  romsg.GuildBuilding build = 9;
+  romsg.GuildItemData items = 10;
+  romsg.GuildHistoryHonor honor = 11;
+  bool autoCreateHelper = 12;
+  int32 joinLevelLimit = 13;
+  repeated romsg.UnLockHeadIcon unLockHeadIconData = 14;
+  romsg.GuildBonusInfo guildBonusData = 15;
+  int32 broadEmailLimit = 16;
+  romsg.GuildActivityInfo activity = 17;
+  bool isLeagueElite = 18;
+  repeated romsg.ShopCommodityInfo shopCommodityData = 19;
+}
+
+message GuildNewsReq {
+  int64 fromIndex = 1;
+  int64 count = 2;
+  bool getUp = 3;
+  repeated int64 validType = 4;
+}
+
+message GuildNewsResp {
+  message newsData {
+    romsg.GuildNewsData data = 1;
+    int64 index = 2;
+  }
+
+  int32 result = 1;
+  repeated romsg.GuildNewsResp.newsData datas = 2;
+  int64 fromIndex = 3;
+  int64 count = 4;
+  bool getUp = 5;
+  bool toTop = 6;
+  bool toBottom = 7;
+  int64 lastIndex = 8;
+}
+
+message GuildNewsNtf {
+  int64 lastIndex = 1;
+}
+
+message GuildEventReq {
+  int64 fromIndex = 1;
+  int64 count = 2;
+  bool getUp = 3;
+  repeated int64 validType = 4;
+  bool onlyShowMe = 5;
+}
+
+message GuildEventResp {
+  message eventData {
+    romsg.GuildEventData data = 1;
+    int64 index = 2;
+  }
+
+  int32 result = 1;
+  repeated romsg.GuildEventResp.eventData datas = 2;
+  int64 fromIndex = 3;
+  int64 count = 4;
+  bool getUp = 5;
+  bool toTop = 6;
+  bool onlyShowMe = 7;
+  bool toBottom = 8;
+  int64 lastIndex = 9;
+}
+
+message GuildEventNtf {
+  int64 lastIndex = 1;
+}
+
+message GuildChangeOfficialReq {
+  int64 tarPlayerID = 1;
+  int64 tarOfficial = 2;
+  bool resetElit = 3;
+  repeated int64 elitIds = 4;
+}
+
+message GuildChangeOfficialResp {
+  int32 result = 1;
+  int64 tarPlayerID = 2;
+  int64 tarOfficial = 3;
+  bool resetElit = 4;
+  repeated int64 elitIds = 5;
+}
+
+message GuildMemberKickReq {
+  repeated int64 tarPlayerIDs = 1;
+  bool ifSingleKick = 2;
+}
+
+message GuildMemberKickResp {
+  int32 result = 1;
+  repeated int64 tarPlayerIDs = 2;
+}
+
+message GuildMemberLeaveReq {
+}
+
+message GuildMemberLeaveResp {
+  int32 result = 1;
+  int64 punishTime = 2;
+}
+
+message GuildPeachReq {
+  bool onlyCheck = 1;
+  bool isCancle = 2;
+}
+
+message GuildPeachResp {
+  int32 result = 1;
+  bool isCancle = 2;
+}
+
+message GuildPeachApplyReq {
+}
+
+message GuildPeachApplyResp {
+  int32 result = 1;
+}
+
+message GuildPlayerDataSyn {
+  int64 playerID = 1;
+  int64 guildID = 2;
+  string guildName = 3;
+  int64 official = 4;
+  romsg.GuildHeadIcon icon = 5;
+  int64 contribute = 6;
+  romsg.GuildOfficalRight right = 8;
+  romsg.WartimeToolType wartimeUseToolPermission = 9;
+  int64 guildLeaderId = 10;
+  string guildLeaderName = 11;
+  int64 guildLeaderJob = 12;
+  romsg.GuildStatus status = 13;
+}
+
+message GuildDungeonChallengeSync {
+  romsg.GuildChallenge dataInfo = 1;
+  romsg.DungeonCallMemberNtf dungeonNtf = 2;
+  int32 curDifficulty = 3;
+  int32 curStage = 4;
+  int32 recommendDifficulty = 5;
+  bool lockState = 6;
+}
+
+message GuildDungeonChallengeReq {
+}
+
+message GuildDungeonChallengeResp {
+  int32 result = 1;
+  romsg.GuildDungeonChallengeSync data = 2;
+}
+
+message GuildDungeonChallengeOpenReq {
+  int32 difficulty = 1;
+  int32 stage = 2;
+}
+
+message GuildDungeonChallengeOpenResp {
+  int32 result = 1;
+  int32 difficulty = 2;
+  int32 stage = 3;
+}
+
+message GuildResourceAddReq {
+  message PlayerContribute {
+    int64 playerID = 1;
+    int64 contribute = 2;
+  }
+
+  message PlayerActivity {
+    int64 playerID = 1;
+    int64 activityType = 2;
+    int64 addActivity = 3;
+  }
+
+  int64 guildId = 2;
+  romsg.GuildResourceAddReq.PlayerContribute contribute = 3;
+  romsg.ItemBaseInfo resource = 4;
+  romsg.GuildResourceAddReq.PlayerActivity activity = 5;
+}
+
+message GuildResourceAddResp {
+  int32 result = 1;
+}
+
+message TakeActivityBonusReq {
+}
+
+message TakeActivityBonusRes {
+  int32 result = 1;
+  repeated romsg.ItemBaseInfo baseInfo = 2;
+}
+
+message GuildInviteReq {
+  repeated int64 tarPlayerID = 1;
+  bool isBatch = 2;
+}
+
+message GuildInviteResp {
+  message InviteResult {
+    int32 result = 1;
+    int64 targetPlayerId = 2;
+  }
+
+  int32 result = 1;
+  repeated romsg.GuildInviteResp.InviteResult inviteResult = 2;
+  bool isBatch = 3;
+}
+
+message GuildInviteNtf {
+  romsg.GuildSnapInfo info = 1;
+  int64 token = 2;
+  int64 playerId = 3;
+}
+
+message GuildInviteAckReq {
+  int64 guildID = 1;
+  bool accept = 2;
+  romsg.DBEnterGuildAppyInfo apply = 3;
+  int64 token = 4;
+  bool reject = 5;
+}
+
+message GuildInviteAckResp {
+  int32 result = 1;
+  int64 guildID = 2;
+  bool accept = 3;
+}
+
+message GuildBroadEmailReq {
+  romsg.MailPersonSenderInfo info = 1;
+  romsg.SendGuildMailReq req = 2;
+  string language = 3;
+}
+
+message GuildBroadEmailResp {
+  int32 result = 1;
+  int64 nextBroadEmailTime = 2;
+  int64 broadEmailLimit = 3;
+}
+
+message GuildBroadEmailByGuildReq {
+  int64 guildId = 1;
+  int64 mailId = 2;
+  romsg.LanguageData params = 3;
+  int32 official = 4;
+}
+
+message GuildMemberIDListReq {
+  int64 guildID = 1;
+}
+
+message GuildMemberIDListResp {
+  int32 result = 1;
+  repeated int64 playerIDList = 2;
+}
+
+message GuildBuildLevelUpReq {
+  int64 buildingID = 1;
+}
+
+message GuildBuildLevelUpResp {
+  int32 result = 1;
+  int64 buildingID = 2;
+  int64 endLevelUpTime = 3;
+}
+
+message GuildPrayShowReq {
+  int64 prayRankVersion = 1;
+}
+
+message PrayRankData {
+  int64 playerID = 1;
+  int64 prayValue = 2;
+}
+
+message GuildPrayShowResp {
+  int32 result = 1;
+  int64 prayRankVersion = 2;
+  repeated romsg.PrayRankData prayRank = 3;
+  int64 prayCount = 4;
+  int64 totalPrayValue = 5;
+  repeated int64 totalPrayAwardUsed = 6;
+}
+
+message GuildCatShopShowReq {
+}
+
+message GuildCatShopShowResp {
+  int32 result = 1;
+  repeated romsg.DBGuildCatShopSku skuData = 2;
+  bool isAwardGot = 3;
+  int64 dayVersion = 4;
+  int64 helpOtherCount = 5;
+  int64 curRound = 6;
+  int64 refreshTimes = 7;
+  int64 reqHelpOtherCount = 8;
+}
+
+message GuildCatShopItemSubmitReq {
+  int64 skuIndex = 1;
+  int64 dayVersion = 2;
+}
+
+message GuildCatShopItemSubmitResp {
+  int32 result = 1;
+  int64 skuIndex = 2;
+  romsg.DBGuildCatShopSku data = 3;
+  romsg.GetRewardNotify award = 4;
+  int64 reqHelperOtherCount = 5;
+  int64 submittedCount = 6;
+  int64 curRound = 7;
+}
+
+message GuildCatShopItemWantHelpReq {
+  int64 skuIndex = 1;
+  bool isCancle = 2;
+  int64 dayVersion = 3;
+}
+
+message GuildCatShopItemWantHelpResp {
+  int32 result = 1;
+  int64 skuIndex = 2;
+  romsg.DBGuildCatShopSku data = 3;
+  int64 reqHelperOtherCount = 4;
+}
+
+message GuildCatShopItemHelpOtherReq {
+  int64 skuIndex = 1;
+  int64 playerID = 2;
+  int64 dayVersion = 3;
+}
+
+message GuildCatShopItemHelpOtherResp {
+  int64 skuIndex = 1;
+  int64 playerID = 2;
+  int32 result = 3;
+  int32 itemId = 4;
+  int32 itemNum = 5;
+}
+
+message GuildCatShopItemHelpListReq {
+}
+
+message GuildCatShopItemHelpSku {
+  int64 playerID = 1;
+  romsg.DBGuildCatShopSku data = 2;
+  string playerName = 3;
+}
+
+message GuildCatShopItemHelpListResp {
+  repeated romsg.GuildCatShopItemHelpSku skus = 1;
+  int32 result = 2;
+  int64 dayVersion = 3;
+  int64 helpOtherCount = 4;
+}
+
+message GuildCatShopDepartReq {
+}
+
+message GuildCatShopDepartResp {
+  int32 result = 1;
+  romsg.GetRewardNotify award = 2;
+  int64 awardId = 3;
+}
+
+message GuildCatShopRefreshReq {
+  int64 dayVersion = 1;
+}
+
+message GuildCatShopRefreshResp {
+  int32 result = 1;
+}
+
+message GuildCatShopHelpNotify {
+  string helperName = 1;
+}
+
+message GuildConveneReq {
+}
+
+message GuildConveneRes {
+  int32 result = 1;
+}
+
+message GuildConveneNtf {
+  int64 playerId = 1;
+  int64 token = 2;
+}
+
+message ConfirmConveneReq {
+  int64 token = 1;
+}
+
+message ConfirmConveneRes {
+  int32 result = 1;
+}
+
+message GuildEnterHomeReq {
+}
+
+message GuildEnterHomeResp {
+  int32 result = 1;
+  int64 guildSceneId = 2;
+}
+
+message GuildGetGveStageReq {
+  int64 playerID = 1;
+}
+
+message GuildGetGveStageResp {
+  int32 result = 1;
+  int64 sceneEntry = 2;
+  romsg.GuildGveDungeonScoreInfo info = 3;
+}
+
+message GuildRecruitReq {
+  string content = 1;
+  string language = 2;
+}
+
+message GuildRecruitResp {
+  int32 result = 1;
+  string content = 2;
+  int64 nextTime = 3;
+  bool IsNormal = 4;
+}
+
+message GuildWartimeStorePrepayReq {
+  romsg.GuildWartimeItem item = 1;
+}
+
+message GuildWartimeStorePrepayResp {
+  int32 result = 1;
+  romsg.GuildWartimeItem prepayItem = 2;
+}
+
+message GuildAttackCityBuildReq {
+  romsg.Vec3 pos = 1;
+  float face = 2;
+}
+
+message GuildAttackCityBuildResp {
+  int32 result = 1;
+  romsg.GuildWartimeItem item = 2;
+}
+
+message GuildWartimeStoreItemCancelUseReq {
+}
+
+message GuildWartimeStoreItemCancelUseResp {
+  int32 result = 1;
+  romsg.GuildWartimeItem item = 2;
+}
+
+message GuildWartimeStoreItemNtf {
+  repeated romsg.GuildWartimeItem wartimeItems = 1;
+}
+
+message GuildWartimeStoreItemAddReq {
+  repeated romsg.GuildWartimeItem wartimeItems = 1;
+}
+
+message GuildWartimeStoreItemAddResp {
+  int32 result = 1;
+}
+
+message GuildVehicleUseReq {
+  romsg.GuildWartimeItem vehicleItem = 1;
+}
+
+message GuildVehicleUseRsp {
+  int32 result = 1;
+}
+
+message GuildWartimeToolBelongOperReq {
+  romsg.WartimeToolType toolType = 1;
+  int32 bagIndex = 2;
+  int64 roleGuildId = 3;
+  int32 dungeonId = 4;
+}
+
+message GuildWartimeToolBelongOperRsp {
+  int32 result = 1;
+  romsg.WartimeToolType toolType = 2;
+  int32 bagIndex = 3;
+  int64 roleGuildId = 4;
+}
+
+message GuildWartimeToolExchangeOperReq {
+  romsg.WartimeToolType toolType = 1;
+  int32 srcBagIndex = 2;
+  int32 targetBagIndex = 3;
+}
+
+message GuildWartimeToolExchangeOperRsp {
+  int32 result = 1;
+  romsg.WartimeToolType toolType = 2;
+  int32 srcBagIndex = 3;
+  int32 targetBagIndex = 4;
+}
+
+message GuildWartimeItemPermissionClient {
+  romsg.WartimeToolType toolType = 1;
+  repeated romsg.GuildWartimeToolBelongInfo infoList = 2;
+}
+
+message GetGuildWartimeToolBelongListReq {
+}
+
+message GetGuildWartimeToolBelongListRsp {
+  int32 result = 1;
+  repeated romsg.GuildWartimeItemPermissionClient itemPermissionAllData = 2;
+}
+
+message GuildWartimeToolBelongDetailInfo {
+  romsg.WartimeToolType toolType = 1;
+  int32 bagIndex = 2;
+  romsg.GuildWartimeToolBelongInfo toolBelongInfo = 3;
+}
+
+message GuildWartimeToolBelongInfoChangeNtf {
+  repeated romsg.GuildWartimeToolBelongDetailInfo infoList = 1;
+}
+
+message GuildWartimeToolRolePermissionNtf {
+  romsg.WartimeToolType toolType = 1;
+  int64 roleUsingToolId = 2;
+}
+
+message TerritoryWarsWarHallDonateRecord {
+  int64 weekDonate = 1;
+  int64 monthDonate = 2;
+  int64 seasonDonate = 3;
+}
+
+message WarHallPeriodCount {
+  int32 week = 1;
+  int32 month = 2;
+  int32 season = 3;
+}
+
+message TerritoryWarsWarHallDonateData {
+  map<int64, romsg.TerritoryWarsWarHallDonateRecord> records = 1;
+  romsg.WarHallPeriodCount cannonConsume = 2;
+  romsg.WarHallPeriodCount vehicleConsume = 3;
+}
+
+message TerritoryWarsGuildData {
+  int32 zoneId = 1;
+  int32 auctionStateId = 3;
+  map<int32, bool> occupyWarzone = 4;
+  int64 auctionFinishTime = 5;
+  int32 failedStateId = 6;
+  int64 guildScore = 7;
+  reserved 2 to 2;
+}
+
+message GuildItemData {
+  map<int32, romsg.ItemBaseInfo> items = 1;
+}
+
+message GetGuildItemDataReq {
+}
+
+message GetGuildItemDataResp {
+  int32 result = 1;
+  romsg.GuildItemData info = 2;
+}
+
+message GuildHistoryHonor {
+  int32 warzoneStar = 1;
+}
+
+message GuildHomeInitData {
+  int64 guildId = 1;
+  romsg.GveHuntingMatchGroup activeGveHuntingGroup = 2;
+  int64 gveHuntingCandidateEndMs = 4;
+  int64 gveHuntingStartPhaseEndMs = 5;
+  int64 gveHuntingSettlementPhaseEndMs = 6;
+}
+
+message BuyGuildCommodityReq {
+  int32 commodityId = 1;
+  int64 playBook = 2;
+  int32 count = 3;
+}
+
+message BuyGuildCommodityRes {
+  int32 result = 1;
+  int32 commodityId = 2;
+  int32 count = 3;
+}
+
+message GuildTechInfo {
+  map<int64, int64> techLevel = 1;
+}
+
+message QueryGuildTechReq {
+}
+
+message QueryGuildTechRes {
+  int32 result = 1;
+  romsg.GuildTechInfo techInfo = 2;
+}
+
+message OperateGuildTechReq {
+  int64 techId = 1;
+  int32 level = 2;
+}
+
+message OperateGuildTechRes {
+  int32 result = 1;
+  romsg.GuildTechInfo techInfo = 2;
+}
+
+message GuildTimedStrategyInfo {
+  map<int64, bool> strategyPool = 1;
+  map<int64, romsg.StrategyItemInfo> strategyItems = 2;
+  map<int64, int64> stageUnlock = 3;
+  int64 weeklyDrawCount = 4;
+  int64 lastResetTime = 5;
+  int64 nextResetTime = 6;
+}
+
+message StrategyItemInfo {
+  int64 expireTime = 1;
+}
+
+message QueryGuildTimedStrategyReq {
+}
+
+message QueryGuildTimedStrategyRes {
+  int32 result = 1;
+  romsg.GuildTimedStrategyInfo guildTimedStrategyInfo = 2;
+}
+
+message RefreshGuildTimedStrategyPoolReq {
+}
+
+message RefreshGuildTimedStrategyPoolRes {
+  int32 result = 1;
+  romsg.GuildTimedStrategyInfo guildTimedStrategyInfo = 2;
+}
+
+message ActivateGuildTimedStrategyReq {
+  int64 strategyId = 1;
+}
+
+message ActivateGuildTimedStrategyRes {
+  int32 result = 1;
+  romsg.GuildTimedStrategyInfo guildTimedStrategyInfo = 2;
+}
+
+message UnloadGuildTimedStrategyReq {
+  int64 strategyId = 1;
+}
+
+message UnloadGuildTimedStrategyRes {
+  int32 result = 1;
+  romsg.GuildTimedStrategyInfo guildTimedStrategyInfo = 2;
+}
+
+message GuildSpecialSkillItem {
+  romsg.EGuildSpecialSkillType type = 1;
+  int64 skillId = 2;
+  int64 expireTime = 3;
+}
+
+message ReceiveGuildWeekActiveRewardReq {
+  int64 rewardId = 1;
+}
+
+message ReceiveGuildWeekActiveRewardRes {
+  int32 result = 1;
+  int64 rewardId = 2;
+}
+
+message RequestTerritoryWarsTechWarehouseReq {
+}
+
+message GuildRedotNotify {
+  enum ChangeType {
+    ChangeType_CreateHelper = 0;
+  }
+
+  romsg.GuildRedotNotify.ChangeType changeType = 1;
+  int32 count = 2;
+}
+

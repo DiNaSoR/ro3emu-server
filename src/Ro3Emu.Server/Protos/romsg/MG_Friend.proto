@@ -1,0 +1,210 @@
+syntax = "proto3";
+package romsg;
+import "FieldOption.proto";
+
+enum ChatGroupTitle {
+  ChatGroupTitle_None = 0;
+  ChatGroupTitle_Master = 1;
+  ChatGroupTitle_Member = 2;
+}
+
+enum FriendChatType {
+  FriendChatType_None = 0;
+  FriendChatType_Friend = 1;
+  FriendChatType_Group = 2;
+}
+
+enum FriendChatGroupNotifyType {
+  FriendChatGroupNotifyType_None = 0;
+  FriendChatGroupNotifyType_Join = 1;
+  FriendChatGroupNotifyType_Leave = 2;
+  FriendChatGroupNotifyType_Dismiss = 3;
+  FriendChatGroupNotifyType_Rename = 4;
+}
+
+message DBFriendSystemInfo {
+  repeated string groupIds = 1;
+  romsg.FriendChatRecordList recentlyChats = 2;
+  romsg.FriendChatRecordList topChats = 3;
+  romsg.FriendGroupList friendPartitions = 4;
+  repeated romsg.FriendGiftRecord sendGiftRecords = 5;
+  repeated romsg.FriendGiftRecord receiveGiftRecords = 6;
+  romsg.FriendChatRecordList recentlyData = 7;
+  repeated string ownerGroupIds = 8;
+}
+
+message ChatGroupMemberData {
+  romsg.ChatGroupTitle title = 1;
+  bool doNotDisturb = 2;
+}
+
+message ChatGroupData {
+  string groupName = 1;
+  int64 createTimeSec = 2;
+}
+
+message FriendGroupList {
+  repeated romsg.FriendGroup customGroupList = 1;
+}
+
+message FriendGroup {
+  string groupName = 1;
+  repeated int64 memberList = 2;
+}
+
+message CreateFriendChatGroupReq {
+  string groupName = 1;
+  repeated int64 inviteGuids = 2;
+}
+
+message CreateFriendChatGroupResp {
+  int32 result = 1;
+  string uid = 2;
+}
+
+message RenameFriendChatGroupReq {
+  string groupId = 1;
+  string newName = 2;
+}
+
+message RenameFriendChatGroupResp {
+  int32 result = 1;
+}
+
+message InviteFriendChatGroupReq {
+  string groupId = 1;
+  repeated int64 inviteRoleIds = 2;
+}
+
+message InviteFriendChatGroupResp {
+  int32 result = 1;
+}
+
+message KickFriendChatGroupReq {
+  string groupId = 1;
+  repeated int64 kickRoleIds = 2;
+}
+
+message KickFriendChatGroupResp {
+  int32 result = 1;
+}
+
+message DismissFriendChatGroupReq {
+  string groupId = 1;
+}
+
+message DismissFriendChatGroupResp {
+  int32 result = 1;
+}
+
+message LeaveFriendChatGroupReq {
+  string groupId = 1;
+}
+
+message LeaveFriendChatGroupResp {
+  int32 result = 1;
+}
+
+message SetFriendChatGroupDNDReq {
+  string groupId = 1;
+  bool doNotDisturb = 2;
+}
+
+message SetFriendChatGroupDNDResp {
+  int32 result = 1;
+  string groupId = 2;
+  bool doNotDisturb = 3;
+}
+
+message FriendChatListItem {
+  romsg.FriendChatType type = 1;
+  int64 roleId = 2;
+  string groupId = 3;
+}
+
+message FriendChatRecordList {
+  repeated romsg.FriendChatListItem items = 1;
+}
+
+message FriendChatGroupNotify {
+  romsg.FriendChatGroupNotifyType type = 1;
+  string groupId = 2;
+  string groupName = 3;
+  repeated int64 roleId = 4;
+  bool isSelf = 5;
+}
+
+message FetchFriendSystemMetadataReq {
+}
+
+message FetchFriendSystemMetadataResp {
+  int32 result = 1;
+  repeated string groupIds = 2;
+  romsg.FriendChatRecordList recentlyChats = 3;
+  romsg.FriendChatRecordList topChats = 4;
+  romsg.FriendGroupList friendPartitions = 5;
+  repeated romsg.FriendGiftRecord sendGiftRecords = 6;
+  repeated romsg.FriendGiftRecord receiveGiftRecords = 7;
+  romsg.FriendChatRecordList recentlyData = 8;
+}
+
+message SetFriendSystemMetadataReq {
+  romsg.FriendChatRecordList recentlyChats = 1;
+  romsg.FriendChatRecordList topChats = 2;
+  romsg.FriendGroupList friendPartitions = 3;
+  romsg.FriendChatRecordList recentlyData = 4;
+}
+
+message SetFriendSystemMetadataResp {
+  int32 result = 1;
+  romsg.FriendChatRecordList recentlyChats = 2;
+  romsg.FriendChatRecordList topChats = 3;
+  romsg.FriendGroupList friendPartitions = 4;
+  romsg.FriendChatRecordList recentlyData = 5;
+}
+
+message GiveFriendGiftReq {
+  int64 roleId = 1;
+  int64 itemId = 2;
+  int32 count = 3;
+  string message = 4;
+  bool isAnonymous = 5;
+}
+
+message GiveFriendGiftResp {
+  int32 result = 1;
+  romsg.FriendGiftRecord friendGiftRecord = 2;
+}
+
+message FetchRecommendFriendsReq {
+}
+
+message FetchRecommendFriendsResp {
+  int32 result = 1;
+  repeated int64 recentTeam = 2;
+  repeated int64 diffSex = 3;
+  repeated int64 sameJob = 4;
+  repeated int64 levelRange = 5;
+}
+
+message FriendGiftRecord {
+  int64 sender = 1;
+  int64 receiver = 2;
+  int64 itemId = 3;
+  int32 count = 4;
+  bool isAnonymous = 5;
+  string message = 6;
+  int64 sendTime = 7;
+  int32 affection = 8;
+  int32 popularity = 9;
+  int32 intimacy = 10;
+}
+
+message PopularityStarData {
+  int32 affection = 1;
+  int32 popularity = 2;
+  int32 popularityWeekly = 3;
+  int64 updateTime = 4;
+  int32 barStar = 5;
+}
+

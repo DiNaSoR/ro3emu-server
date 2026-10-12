@@ -1,0 +1,164 @@
+syntax = "proto3";
+package romsg;
+import "MG_Common.proto";
+import "MG_Pack.proto";
+import "FieldOption.proto";
+
+enum EquipPosType {
+  EquipPosType_None = 0;
+  EquipPosType_TwoHand = 1;
+  EquipPosType_MainHand = 2;
+  EquipPosType_ViceHand = 3;
+  EquipPosType_Armor = 4;
+  EquipPosType_Cloak = 5;
+  EquipPosType_Shoes = 6;
+  EquipPosType_Accessory = 7;
+  EquipPosType_CareerSpecial = 11;
+}
+
+enum EquipItemOprType {
+  EquipOprType_Equip = 0;
+  EquipOprType_UnEquip = 1;
+}
+
+enum BuildTypeEnum {
+  BuildTypeNone = 0;
+  BuildTypeNormal = 1;
+  BuildTypeStrengthen = 2;
+}
+
+message EquipBaseNtf {
+  map<int32, int64> itemsEquipPos = 1;
+  map<int32, int32> itemsrefine = 2;
+  map<int64, romsg.ItemBaseInfo> items = 3;
+  map<int32, int32> itemsStrength = 4;
+  map<int32, int32> refineLuckyAdd = 5;
+  int32 refineEffectLv = 6;
+  int32 strengthenEffectLv = 7;
+  map<int32, romsg.EquipCardInfo> cardInfo = 8;
+}
+
+message EquipAppraiseReq {
+  repeated int64 itemGuids = 3;
+}
+
+message EquipAppraiseResp {
+  int32 result = 1;
+  repeated romsg.ItemBaseInfo appraiseResult = 2;
+}
+
+message EquipItemOprReq {
+  romsg.EquipItemOprType opr = 1;
+  romsg.EquipGridType pos = 2;
+  int64 itemGUID = 3;
+}
+
+message EquipItemOprResp {
+  int32 result = 1;
+  romsg.EquipItemOprType opr = 2;
+  romsg.EquipGridType pos = 3;
+  int64 itemGUID = 4;
+  romsg.ItemBaseInfo item = 5;
+  int32 refineEffectLv = 6;
+  int32 strengthenEffectLv = 7;
+}
+
+message EquipItemUpdate {
+  romsg.EquipGridType pos = 1;
+  int64 itemGUID = 2;
+  romsg.ItemBaseInfo item = 3;
+}
+
+message EquipItemOprNtf {
+  int64 roleID = 1;
+  romsg.EquipGridType pos = 2;
+  int32 itemEntry = 3;
+}
+
+message BuildEquipmentReq {
+  int32 itemEntry = 1;
+  romsg.BuildTypeEnum buildType = 2;
+}
+
+message BuildEquipmentRsp {
+  int32 result = 1;
+}
+
+message DissolveEquipmentReq {
+  int64 itemGUID = 1;
+}
+
+message DissolveEquipmentRsp {
+  int32 result = 1;
+}
+
+message StrengthenEquipmentReq {
+  romsg.EquipGridType equipPos = 1;
+  int32 strengthenNum = 2;
+}
+
+message StrengthenEquipmentRsp {
+  int32 result = 1;
+  romsg.EquipGridType equipPos = 2;
+  int32 strengthenLv = 3;
+  int32 strengthenEffectLv = 4;
+}
+
+message RefineItemHelperStruct {
+  int32 itemEntry = 1;
+  int32 itemCount = 2;
+  romsg.ConsumeItemBindType bindType = 3;
+}
+
+message RefineEquipmentReq {
+  romsg.EquipGridType equipPos = 1;
+  repeated romsg.RefineItemHelperStruct extraItems = 2;
+}
+
+message RefineEquipmentRsp {
+  int32 result = 1;
+  romsg.EquipGridType equipPos = 2;
+  int32 refineLv = 3;
+  int32 refineEffectLv = 4;
+  int32 refineLuckyAdd = 5;
+}
+
+message EquipCraftReq {
+  int32 rank = 1;
+  int32 subtype = 2;
+}
+
+message EquipCraftResp {
+  int32 result = 1;
+  romsg.ItemBaseInfo item = 2;
+}
+
+message EquipSwitchPlanReq {
+  int32 targetIndex = 1;
+}
+
+message EquipSwitchPlanResp {
+  int32 result = 1;
+  int32 currentPlan = 2;
+}
+
+message EquipChangePlanNameReq {
+  int32 targetIndex = 1;
+  string name = 2;
+}
+
+message EquipChangePlanNameResp {
+  int32 result = 1;
+}
+
+message EnchantReq {
+  int64 equipGuid = 1;
+  int64 itemGuid = 2;
+}
+
+message EnchantResp {
+  int32 result = 1;
+  int32 enchantId = 2;
+  int32 type = 3;
+}
+

@@ -1,0 +1,24 @@
+syntax = "proto3";
+package clientromsg;
+
+message MapElement {
+  repeated float m_kWorldMatrix4X4 = 1;
+  repeated string m_kMeshPaths = 2;
+  repeated string m_kMaterialPaths = 3;
+  repeated float m_LightmapScaleOffset = 4;
+  repeated float m_RealtimeLightmapScaleOffset = 5;
+  repeated int32 m_ilightmapIndex = 6;
+  repeated int32 m_irealtimeLightmapIndex = 7;
+  repeated int32 m_kID = 8;
+  repeated float m_kRange = 9;
+}
+
+message MapInfo {
+  float m_fWidth = 1;
+  float m_fHeigth = 2;
+  int32 m_iSplitCount = 3;
+  int32 m_iCol = 4;
+  int32 m_iRow = 5;
+  repeated clientromsg.MapElement m_kMapElements = 6;
+}
+

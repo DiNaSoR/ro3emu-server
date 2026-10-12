@@ -1,0 +1,10 @@
+syntax = "proto3";
+package romsg;
+
+message RainbowKoiInitData {
+  repeated int64 candidate_player_ids = 1;
+  repeated int32 question_ids = 2;
+  string activity_key = 3;
+  int64 activity_instance = 4;
+}
+

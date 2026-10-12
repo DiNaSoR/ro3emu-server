@@ -1,0 +1,231 @@
+syntax = "proto3";
+package romsg;
+import "FieldOption.proto";
+import "MG_Common.proto";
+
+enum MVP_STATE {
+  MVP_STATE_INVALID = 0;
+  MVP_STATE_BORN = 1;
+  MVP_STATE_DEAD = 2;
+  MVP_STATE_REBORN = 6;
+}
+
+enum MVP_AWARD_TYPE {
+  MVP_AWARD_TYPE_INVALID = 0;
+  MVP_AWARD_TYPE_FIRST = 1;
+  MVP_AWARD_TYPE_END = 2;
+  MVP_AWARD_TYPE_JOIN = 3;
+  MVP_AWARD_TYPE_TEAM = 4;
+  MVP_AWARD_TYPE_PROBABILITY = 5;
+}
+
+enum MVPRankType {
+  MVPRankType_Total = 0;
+  MVPRankType_Attack = 1;
+  MVPRankType_BeAttack = 2;
+  MVPRankType_Cure = 3;
+  MVPRankType_Dead = 4;
+}
+
+message MVPPlayerStatisticsInfo {
+  int64 player_id = 1;
+  int64 team_id = 2;
+  int32 team_idx = 3;
+  int64 attack = 4;
+  int64 attack_time = 5;
+  int64 be_attack = 6;
+  int64 be_attack_time = 7;
+  int64 cure = 8;
+  int64 cure_time = 9;
+  int64 dead = 10;
+  int32 level = 11;
+  int32 job = 12;
+  romsg.AwardConditionParam params = 13;
+  int64 sceneEntryId = 14;
+  int32 lineId = 15;
+}
+
+message MVPInfo {
+  int64 ro3Define_SaveVersion = 9999;
+  int64 ro3Define_DbTerm = 10000;
+  int64 server_open_time = 2;
+  int64 cfg_id = 3;
+  int32 level = 4;
+  int64 map_id = 5;
+  int64 hp = 6;
+  int64 max_hp = 7;
+  romsg.MVP_STATE state = 8;
+  int64 change_time = 9;
+  int64 first_player_id = 10;
+  int64 end_player_id = 11;
+  map<int64, romsg.MVPPlayerStatisticsInfo> player_info = 12;
+  int64 create_time = 13;
+  int64 seasonArea = 15;
+  repeated int64 dead_ms = 16;
+}
+
+message MVPPlayerInfo {
+  int64 ro3Define_SaveVersion = 9999;
+  int64 ro3Define_DbTerm = 10000;
+  int64 player_id = 1;
+  int64 first_num = 2;
+  int64 end_num = 3;
+  int64 join_num = 4;
+  int64 team_num = 5;
+  int64 last_time = 6;
+}
+
+message MVPPlayerAwardItem {
+  int64 item_id = 1;
+  int64 count = 2;
+  romsg.MVP_AWARD_TYPE tp = 3;
+}
+
+message MVPPlayerHurtInfo {
+  int64 player_id = 1;
+  int64 hurt_value = 2;
+}
+
+message MVPStatisticsReportNotify {
+  int64 scene_uuid = 1;
+  int64 sceneEntryId = 2;
+  int32 lineId = 3;
+  repeated romsg.MVPPlayerHurtInfo hurt_infos = 4;
+  map<int64, romsg.MVPPlayerStatisticsInfo> other_infos = 5;
+  int64 cfg_id = 6;
+  int64 server_open_time = 7;
+  bool bossInBattle = 9;
+}
+
+message MVPCreateMvpReq {
+  int64 scene_uuid = 1;
+  int64 sceneEntryId = 2;
+  int64 lineId = 3;
+  int64 cfg_id = 4;
+  int64 server_open_time = 5;
+}
+
+message MVPCreateMvpRsp {
+  int32 result = 1;
+  romsg.MVPCreateMvpReq req = 2;
+  int64 max_hp = 3;
+  int32 level = 4;
+  romsg.MVP_STATE state = 5;
+  int64 hp = 6;
+}
+
+message MVPStatusNotify {
+  int64 map_id = 1;
+  int64 cfg_id = 2;
+  int64 hp = 3;
+  romsg.MVP_STATE state = 4;
+  int64 state_time = 5;
+  int32 level = 7;
+  int64 max_hp = 8;
+  int64 scene_id = 9;
+}
+
+message P2SMVPPlayerAwardReq {
+  int64 player_id = 1;
+  int32 drop_id = 2;
+  romsg.MVP_AWARD_TYPE tp = 3;
+}
+
+message P2SMVPPlayerAwardRsp {
+  int32 result = 1;
+  repeated romsg.MVPPlayerAwardItem items = 2;
+}
+
+message MVPRareAwardNotify {
+  int64 cfg_id = 1;
+  int64 map_id = 2;
+  int64 scene_id = 4;
+}
+
+message MVPBriefInfoReq {
+  int64 area = 1;
+}
+
+message MVPBriefInfo {
+  int64 cfg_id = 1;
+  romsg.MVP_STATE state = 2;
+  int64 state_time = 3;
+  int32 level = 4;
+}
+
+message MVPBriefInfoRsp {
+  int32 result = 1;
+  repeated romsg.MVPBriefInfo infos = 2;
+}
+
+message MVPAwardDropNtf {
+  int32 drop_id = 1;
+}
+
+message MVPAwardNumReq {
+  int64 player_id = 1;
+  int64 area = 2;
+}
+
+message MVPAwardNumRsp {
+  int32 result = 1;
+  romsg.MVPPlayerInfo info = 2;
+}
+
+message MVPReportPlayerInfo {
+  int64 player_id = 1;
+  repeated romsg.MVPPlayerAwardItem items = 2;
+  int64 param1 = 3;
+  int64 param2 = 4;
+}
+
+message MVPReportTeamInfo {
+  int64 team_id = 1;
+  int64 leader_id = 2;
+  repeated romsg.MVPReportPlayerInfo players = 3;
+  int64 param1 = 4;
+  int64 param2 = 5;
+}
+
+message MVPReportRankInfo {
+  int64 ro3Define_SaveVersion = 9999;
+  int64 ro3Define_DbTerm = 10000;
+  int64 cfg_id = 1;
+  romsg.MVPRankType tp = 2;
+  int64 first_player_id = 3;
+  int64 end_player_id = 4;
+  int64 time_stamp = 5;
+  repeated romsg.MVPReportTeamInfo teams = 6;
+  int64 dead_ms = 7;
+  int64 rare_player_id = 8;
+  int64 rare_team_id = 9;
+}
+
+message MVPReportRankReq {
+  int64 cfg_id = 1;
+  romsg.MVPRankType tp = 2;
+  int64 area = 3;
+  int64 report_version = 4;
+}
+
+message MVPReportRankRsp {
+  int32 result = 1;
+  romsg.MVPReportRankInfo info = 2;
+  repeated int64 version_list = 3;
+}
+
+message MVPP2SNotice {
+  int64 cfg_id = 1;
+  int64 scene_id = 2;
+}
+
+message MVPResultNtf {
+  int64 cfg_id = 1;
+  repeated romsg.MVPPlayerAwardItem awards = 2;
+  romsg.MVPPlayerInfo playerInfo = 3;
+}
+
+message MVPDeadNotify {
+  int64 cfg_id = 1;
+}
+

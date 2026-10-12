@@ -1,0 +1,136 @@
+syntax = "proto3";
+package romsg;
+import "MG_DB.proto";
+import "MG_Common.proto";
+import "FieldOption.proto";
+
+enum RecommendType {
+  RecommendType_None = 0;
+  RecommendType_Friend = 1;
+  RecommendType_Normal = 2;
+}
+
+enum RecommendLabel {
+  RecommendLabel_None = 0;
+  RecommendLabel_RecentTeam = 1;
+  RecommendLabel_LevelSimilar = 2;
+  RecommendLabel_InviteJoinGuild = 3;
+  RecommendLabel_InviteJoinGuildHelper = 4;
+}
+
+enum EPresentOrderState {
+  EPresentOrderState_Pending = 0;
+  EPresentOrderState_Picked = 1;
+  EPresentOrderState_WaitingRefund = 2;
+  EPresentOrderState_Refunded = 3;
+}
+
+message RoleBriefInfo {
+  romsg.RolePublicBaseInfo rolebase = 1;
+  int32 teamstatus = 2;
+  int32 teamnum = 3;
+  string teamName = 4;
+  int64 teamId = 5;
+}
+
+message RoleDetailInfo {
+  romsg.RolePublicBaseInfo rolebase = 1;
+  romsg.DBEquipInfo equipInfo = 2;
+  romsg.AllProperty selfproperty = 3;
+}
+
+message GmSetServerOpenDayNtf {
+  romsg.DBServerInfo info = 1;
+}
+
+message RecommendPlayerData {
+  int64 playerId = 1;
+  int64 area = 2;
+  int32 level = 3;
+  int32 jobId = 4;
+  int32 gender = 5;
+}
+
+message PullRecommendPlayersReq {
+  romsg.RecommendType type = 1;
+  romsg.RecommendLabel label = 2;
+}
+
+message RecommendPlayerInfo {
+  int64 playerId = 1;
+  int64 area = 2;
+  bool isInvited = 3;
+}
+
+message PullRecommendPlayersRes {
+  int32 result = 1;
+  romsg.RecommendType type = 2;
+  romsg.RecommendLabel label = 3;
+  repeated romsg.RecommendPlayerInfo recommendList = 4;
+}
+
+message DBPublicRestrictInfo {
+  int64 ro3Define_SaveVersion = 9999;
+  int64 ro3Define_DbTerm = 10000;
+  map<int32, romsg.RestrictInfo> restrictInfoMap = 1;
+}
+
+message PresentOrderInfo {
+  int64 orderId = 1;
+  int64 senderId = 2;
+  int64 receiverId = 3;
+  int64 appranceId = 4;
+  int64 appranceAwardId = 5;
+  int64 currencyId = 6;
+  int32 currencyCount = 7;
+  int64 createTime = 8;
+  romsg.EPresentOrderState state = 9;
+  string giftContent = 10;
+}
+
+message DBPresentInfo {
+  int64 ro3Define_SaveVersion = 9999;
+  int64 ro3Define_DbTerm = 10000;
+  map<int64, romsg.PresentOrderInfo> orders = 1;
+  map<int64, romsg.ReceiverOrders> receiverOrdersMap = 2;
+  int64 nextOrderId = 3;
+  map<int64, romsg.SenderOrders> senderOrdersMap = 4;
+}
+
+message ReceiverOrders {
+  repeated int64 orderIds = 1;
+}
+
+message SenderOrders {
+  repeated int64 orderIds = 1;
+}
+
+message DBPublicOnlineCount {
+  int64 ro3Define_SaveVersion = 9999;
+  int64 ro3Define_DbTerm = 10000;
+  map<int64, romsg.PublicOnlineHourInfo> hourInfo = 1;
+}
+
+message PublicOnlineHourInfo {
+  int64 hourId = 1;
+  int64 maxOnlineNum = 2;
+  int64 minOnlineNum = 3;
+}
+
+message FirstPassRecord {
+  int64 layer = 1;
+  int64 playerId = 2;
+  string playerName = 3;
+  int64 passTime = 4;
+  int64 recordTime = 5;
+  int32 headImage = 6;
+  int32 job = 7;
+  int32 gender = 8;
+}
+
+message DBClimbTowerFirstPass {
+  int64 ro3Define_SaveVersion = 9999;
+  int64 ro3Define_DbTerm = 10000;
+  map<int64, romsg.FirstPassRecord> recordMap = 1;
+}
+

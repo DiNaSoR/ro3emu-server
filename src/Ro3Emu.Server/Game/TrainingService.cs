@@ -1,0 +1,315 @@
+using System.Text.Json;
+using Google.Protobuf;
+using Microsoft.Extensions.Options;
+using Romsg;
+using Ro3Emu.Server.Accounts;
+using Ro3Emu.Server.Data;
+using Ro3Emu.Server.Economy;
+using Ro3Emu.Server.Game.Ownership;
+using Ro3Emu.Server.Maps;
+
+namespace Ro3Emu.Server.Game;
+
+/// <summary>
+/// Activity119: 5069, 84061–84067 and LC_DAL_Piling's start/reset/acknowledgement events on30106.
+/// DungeonConfig2100009/10/11, authored spawn points16/25, NPC3500000/1, CTrainFinishTime3500000 and
+/// TrainingChallengeTimeLimit60 provide the encounter. DPS = authoritative total / full challenge duration
+/// (inferred), never client damage reports. A normal dummy uses the requested race/element/size; challenge
+/// stats stay fixed, so changing practice settings cannot qualify rewards.
+/// </summary>
+public sealed class TrainingService : IGameTicker
+{
+    public const uint Sync = 5069;
+    private readonly GameData data;
+    private readonly RoleStore roles;
+    private readonly CharacterService character;
+    private readonly FunctionService functions;
+    private readonly ActivityClock clock;
+    private readonly InstanceService instances;
+    private readonly MonsterService monsters;
+    private readonly AwardService awards;
+    private readonly GameLoop loop;
+    private readonly Dictionary<long, MapPoint> points = new();
+    private readonly Dictionary<GameSession, Attempt> attempts = new();
+    private sealed class Attempt
+    {
+        public required InstanceService.Room Room;
+        public MonsterUnit? Dummy;
+        public int Race = 2, Element = 1, Size = 2;
+        public bool Challenge;
+        public bool Running;
+        public long End;
+        public long Damage;
+        public bool Settling;
+    }
+    private long Now => clock.UtcNow.ToUnixTimeMilliseconds();
+    private int Duration => data.Table("PublicParamConfig").TryGetValue("TrainingChallengeTimeLimit", out var v)
+        ? checked((int)(GameData.Number(v) ?? 60)) : 60;
+
+    public TrainingService(GameData data, RoleStore roles, CharacterService character, FunctionService functions,
+        ActivityClock clock, InstanceService instances, SceneService scene, MonsterService monsters,
+        CombatService combat, AwardService awards, GameLoop loop, IOptions<ServerOptions> options)
+    {
+        this.data = data; this.roles = roles; this.character = character; this.functions = functions;
+        this.clock = clock; this.instances = instances; this.monsters = monsters; this.awards = awards; this.loop = loop;
+        foreach (long map in new long[] { 2100009, 2100010, 2100011 })
+            if (data.Row("DungeonConfig", map) is { } config && config.TryGetProperty("_kResSceneEditorName", out var editor))
+            {
+                string path = Path.Combine(options.Value.GameDataDir ?? options.Value.DataDir, "sceneeditor", editor.GetString() + ".json");
+                if (!File.Exists(path)) continue;
+                using var doc = JsonDocument.Parse(File.ReadAllBytes(path));
+                if (!doc.RootElement.TryGetProperty("m_kMonsterSpawnPoints", out var spawns)) continue;
+                foreach (var point in spawns.EnumerateObject())
+                {
+                    var position = point.Value.GetProperty("position");
+                    points[map] = new(position.GetProperty("x").GetSingle(), position.GetProperty("y").GetSingle(),
+                        position.GetProperty("z").GetSingle(), point.Value.GetProperty("direction").GetSingle());
+                    break;
+                }
+            }
+        scene.Loaded.Add(LoadedAsync);
+        scene.Leaving.Add(s => { attempts.Remove(s); return Task.CompletedTask; });
+        combat.EventDamageRecorded.Add((s, m, amount) =>
+        {
+            if (!attempts.TryGetValue(s, out var a) || a.Dummy != m || s.InstanceId != a.Room.Id || s.SceneLoading)
+                return Task.CompletedTask;
+            if (a.Running && Now < a.End && amount > 0) a.Damage = checked(a.Damage + amount);
+            // NPCConfig's auto-recovery buffs describe an enduring target. Keep it alive after measured hits (inferred).
+            m.Hp = m.Template.MaxHp; m.Target = null;
+            return Task.CompletedTask;
+        });
+        loop.Add(this);
+    }
+
+    public async Task LoginAsync(GameSession s)
+    {
+        s.Training = roles.LoadTraining(s.Role!.Id) is { } saved ? DBTrainingGroundInfo.Parser.ParseFrom(saved) : new();
+        await CharacterService.SyncAsync(s, Sync, s.Training.Clone());
+    }
+
+    public Task LeaveRoleAsync(GameSession s)
+    {
+        attempts.Remove(s);
+        return Task.CompletedTask;
+    }
+
+    private int Gate(GameSession s)
+    {
+        if (!s.ActivitiesReady || s.Role == null || s.Training == null || data.Row("NewActivityConfig", 119) is not { } row) return ErrorCodes.ActivityClosed;
+        if (!functions.ConditionMet(s, GameData.Int(row, "_kOpenCondition"))) return ErrorCodes.FunctionLocked;
+        return clock.ResolveActivity(row, Now / 1000, s.Role.CreateTime, 101).Contains(Now / 1000) ? 0 : ErrorCodes.ActivityPeriod;
+    }
+
+    /// <summary>Only training's branches of the shared dungeon routes use economic/runtime admission.</summary>
+    internal bool IsOwnerRequest(GameSession session, uint message, ReadOnlyMemory<byte> body)
+    {
+        if (session.Role == null) return false;
+        if (message == DungeonService.Enter)
+            return EnterDungeonReq.Parser.ParseFrom(body.Span).SceneEntry is 2100009 or 2100010 or 2100011;
+        if (message == DungeonService.ClientEvent)
+            return ClientDungeonEvent.Parser.ParseFrom(body.Span).StrCmd is
+                "OnPileChallengeStart" or "OnPileChallengeReset" or "OnPileChallengeEnterOrExit";
+        return false;
+    }
+
+    public async Task<bool> TryEnterAsync(GameSession s, EnterDungeonReq req)
+    {
+        if (req.SceneEntry is not (2100009 or 2100010 or 2100011)) return false;
+        using var scope = s.Role != null && loop.Owners is { } owners
+            ? await owners.EnterAsync("training/enter", ReservationKey.Role(s.Role.Id)) : null;
+        int result = Gate(s);
+        if (result == 0 && (s.SceneLoading || s.Dead)) result = ErrorCodes.SwitchingScenes;
+        if (result == 0 && s.InstanceId != 0 && !attempts.ContainsKey(s)) result = ErrorCodes.DungeonBusy;
+        if (result == 0 && !points.ContainsKey(req.SceneEntry)) result = ErrorCodes.SceneMissing;
+        await s.SendGameAsync(DungeonService.Enter, new EnterDungeonRsp { Result = result });
+        if (result == 0) await EnterAsync(s, req.SceneEntry);
+        return true;
+    }
+
+    private async Task EnterAsync(GameSession s, long map)
+    {
+        var room = instances.Create(map, [s]);
+        var old = attempts.GetValueOrDefault(s);
+        if (!await instances.EnterAsync(room, s, 3)) return;
+        attempts[s] = new Attempt { Room = room, Challenge = map == 2100011,
+            Race = old?.Race ?? 2, Element = old?.Element ?? 1, Size = old?.Size ?? 2 };
+    }
+
+    private async Task LoadedAsync(GameSession s)
+    {
+        if (!attempts.TryGetValue(s, out var a) || s.InstanceId != a.Room.Id) return;
+        await SpawnAsync(s, a);
+        await SnapshotAsync(s, a);
+    }
+
+    private async Task SpawnAsync(GameSession s, Attempt a)
+    {
+        await instances.ClearMonstersAsync(a.Room);
+        int npc = a.Challenge ? 3500001 : 3500000;
+        var template = monsters.Template(npc);
+        if (template == null) return;
+        // These NPCs have speed 0 and training AI3500000/1; they remain stationary and never retaliate (inferred).
+        template = template with { SpeedCm = 0, AttackRange = 0, Aggressive = false, RoamDistance = 0 };
+        if (!a.Challenge) template = template with { Race = a.Race, Element = a.Element, Size = a.Size };
+        a.Dummy = await instances.SpawnAsync(a.Room, npc, points[a.Room.SceneEntry], customTemplate: template);
+    }
+
+    private Task SnapshotAsync(GameSession s, Attempt a)
+    {
+        var snapshot = new DungeonBaseInfoNotify { DungeonEntry = a.Room.SceneEntry, DungeonId = a.Room.Id,
+            Level = 1, Stage = a.Running ? 105 : 104, ChangeType = (DungeonBaseInfoNotify.Types.eChangeType)2 };
+        snapshot.Vars.Add(new DungeonVar { VarId = 3500000, Vi64 = { a.Running ? a.End : 0 } });
+        return s.SendGameAsync(DungeonService.BaseInfo, snapshot);
+    }
+
+    public async Task<bool> TryEventAsync(GameSession s, ClientDungeonEvent req)
+    {
+        if (req.StrCmd is not ("OnPileChallengeStart" or "OnPileChallengeReset" or "OnPileChallengeEnterOrExit")) return false;
+        using var held = await CharacterService.Lock(s);
+        if (Gate(s) == 0 && attempts.TryGetValue(s, out var a) && a.Challenge && !s.SceneLoading && !s.Dead)
+        {
+            if (req.StrCmd == "OnPileChallengeStart" && !a.Running)
+            {
+                a.Damage = 0; a.End = Now + Duration * 1000L; a.Running = true;
+                await SnapshotAsync(s, a);
+            }
+            else if (req.StrCmd == "OnPileChallengeReset") await ResetAttemptAsync(s, a);
+            // LC_DunGeon_Pile sends EnterOrExit on timer/result changes. It is an acknowledgement,
+            // not a map transfer or a second start; accepting it must never restart the timer (inferred).
+        }
+        await s.SendGameAsync(DungeonService.ClientEvent, new NullArg());
+        return true;
+    }
+
+    public async Task ModeAsync(GameSession s, bool challenge)
+    {
+        using var scope = s.Role != null && loop.Owners is { } owners
+            ? await owners.EnterAsync("training/mode", ReservationKey.Role(s.Role.Id)) : null;
+        int result = Gate(s);
+        if (result == 0 && (!attempts.ContainsKey(s) || s.SceneLoading || s.Dead)) result = ErrorCodes.SceneMissing;
+        if (challenge) await s.SendGameAsync(84061, new TrainingChallengeModeResp { Result = result });
+        else await s.SendGameAsync(84063, new TrainingExitChallengeModeResp { Result = result });
+        if (result == 0) await EnterAsync(s, challenge ? 2100011 : 2100009);
+    }
+
+    public async Task UpdateAsync(GameSession s, TrainingUpdateWoodNpcAttrReq req)
+    {
+        using var scope = s.Role != null && loop.Owners is { } owners
+            ? await owners.EnterAsync("training/update", ReservationKey.Role(s.Role.Id)) : null;
+        int result = Gate(s);
+        if (result == 0 && (!attempts.TryGetValue(s, out var a) || a.Challenge || s.SceneLoading)) result = ErrorCodes.SceneMissing;
+        if (result == 0 && (req.Race is < 1 or > 12 || req.Element is < 1 or > 10 || req.BodyType is < 1 or > 3)) result = ErrorCodes.Parameter;
+        if (result == 0)
+        {
+            var attempt = attempts[s]; attempt.Race = req.Race; attempt.Element = req.Element; attempt.Size = req.BodyType;
+            await SpawnAsync(s, attempt);
+        }
+        await s.SendGameAsync(84064, new TrainingUpdateWoodNpcAttrResp { Result = result });
+    }
+
+    public async Task ReconnectAsync(GameSession s, bool challenge)
+    {
+        var a = attempts.GetValueOrDefault(s);
+        if (challenge) await s.SendGameAsync(84066, new TrainingChallengeReconnectRes
+        { EndTime = a is { Running: true } ? a.End : 0, TotalDamage = a?.Damage ?? 0 });
+        else await s.SendGameAsync(84065, new TrainingReconnectRes
+        { Race = a?.Race ?? 2, Ele = a?.Element ?? 1, Body = a?.Size ?? 2, IsChallenge = a is { Challenge: true } ? 1 : 0 });
+    }
+
+    public async Task ResetAsync(GameSession s)
+    {
+        using var held = await CharacterService.Lock(s);
+        int result = Gate(s);
+        if (result == 0 && (!attempts.TryGetValue(s, out var a) || !a.Challenge || s.SceneLoading)) result = ErrorCodes.SceneMissing;
+        if (result == 0)
+            await ResetAttemptAsync(s, attempts[s]);
+        await s.SendGameAsync(84067, new TrainingChallengeResetRes { Result = result });
+    }
+
+    private async Task ResetAttemptAsync(GameSession s, Attempt a)
+    {
+        a.Running = false; a.Damage = 0; a.End = 0; a.Settling = false;
+        await SpawnAsync(s, a); await SnapshotAsync(s, a);
+    }
+
+    public async Task ClaimAsync(GameSession s, TrainingAimAwardReq req)
+    {
+        using var held = await CharacterService.Lock(s,
+            [ReservationKey.Entity("training-claims", s.Role!.Id.ToString())]);
+        int result = Gate(s);
+        if (result == 0 && (req.AimAwardIds.Count == 0 || req.AimAwardIds.Distinct().Count() != req.AimAwardIds.Count)) result = ErrorCodes.Parameter;
+        long rootJob = RootJob(s.Progress?.Career ?? 0);
+        var grants = new List<AwardGrant>(); var next = s.Training?.Clone() ?? new DBTrainingGroundInfo();
+        if (result == 0)
+            foreach (long id in req.AimAwardIds)
+            {
+                if (data.Row("TrainingAimAwardConfig", id) is not { } row) { result = ErrorCodes.ActivityReward; break; }
+                if (next.ClaimedAwardIds.Contains(id)) { result = ErrorCodes.RewardClaimed; break; }
+                if (GameData.Int(row, "_iRootJob") != rootJob || next.MaxDps < GameData.Int(row, "_iDps"))
+                { result = ErrorCodes.TaskRequirements; break; }
+                long award = GameData.Int(row, "_iAward");
+                grants.AddRange((data.Row("MultiverseGroupConfig", award) != null ? awards.Resolve(s, award, 101) : awards.ResolveDirect(s, award)).Grants);
+                next.ClaimedAwardIds.Add(id);
+            }
+        if (result == 0)
+        {
+            byte[] claimed = next.ToByteArray();
+            string source = $"training/claim/{s.Role!.Id}/{string.Join('-', req.AimAwardIds.Order())}";
+            var economy = EventEconomy.ForRole(data, s, "training-claim", source,
+                Array.Empty<(int Entry, long Count)>(), grants,
+                new { Claimed = req.AimAwardIds.Order().ToArray(), MaxDps = next.MaxDps,
+                    Grants = grants.Select(g => new { g.Entry, g.Count, g.BindType, g.ExpireTimeStamp }).ToArray() });
+            if (!await character.ApplyAwardAsync(s, new AwardPlan(0, 0, grants), persist: tx =>
+                {
+                    tx.RoleBlob(s.Role.Id, "training", claimed);
+                    tx.WithEventEconomy(economy);
+                }, stateLockHeld: true, committed: () => s.Training = next))
+                result = ErrorCodes.BagFull;
+            else await CharacterService.SyncAsync(s, Sync, next.Clone());
+        }
+        await s.SendGameAsync(84062, new TrainingAimAwardResp { Result = result });
+    }
+
+    private long RootJob(long job)
+    {
+        // Lua_CFG_JobConfig.GetRootJob stops at the direct child of novice1000, at most ten ancestors.
+        for (int depth = 0; depth < 10; depth++)
+        {
+            if (job == 1000) return job;
+            if (data.Row("JobConfig", job) is not { } row) return 0;
+            long parent = GameData.Int(row, "_iParentId");
+            if (parent == 1000) return job;
+            job = parent;
+        }
+        return 0;
+    }
+
+    private async Task FinishAsync(GameSession s, Attempt a)
+    {
+        try
+        {
+            if (!a.Running || Now < a.End || !attempts.TryGetValue(s, out var active) || active != a || s.InstanceId != a.Room.Id) return;
+            long dps = a.Damage / Math.Max(1, Duration);
+            using var held = await CharacterService.Lock(s);
+            if (!a.Running || Now < a.End || !attempts.TryGetValue(s, out var current)
+                || current != a || s.InstanceId != a.Room.Id) return;
+            var next = s.Training!.Clone(); next.MaxDps = Math.Max(next.MaxDps, dps);
+            var builder = roles.NewTransaction();
+            builder.RoleBlob(s.Role!.Id, "training", next.ToByteArray());
+            await roles.CommitAsync(builder, "training/result", _ =>
+            { s.Training = next; a.Running = false; });
+            await s.SendGameAsync(DungeonService.Result, new DungeonResNotify { DungeonEntry = a.Room.SceneEntry,
+                Res = (DungeonRes)1, Data = new() { TrainingGroundData = new() { MaxDps = dps, SumDamage = a.Damage } } });
+            await CharacterService.SyncAsync(s, Sync, next.Clone()); await SnapshotAsync(s, a);
+        }
+        finally { a.Settling = false; }
+    }
+
+    public void Tick(GameTime time)
+    {
+        foreach (var (s, a) in attempts.ToArray())
+            if (a.Running && !a.Settling && Now >= a.End)
+            { a.Settling = true; loop.PostOwned(s, () => FinishAsync(s, a), "training finish",
+                discarded: () => a.Settling = false); }
+    }
+}

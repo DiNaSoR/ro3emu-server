@@ -1,0 +1,431 @@
+syntax = "proto3";
+package romsg;
+import "MG_Common.proto";
+import "MG_Season.proto";
+import "FieldOption.proto";
+
+enum DeclarationType {
+  NoneType = 0;
+  TextType = 1;
+  VoiceType = 2;
+}
+
+enum AdventureGroupEventType {
+  EventType_None = 0;
+  EventType_Create = 1;
+  EventType_Join = 2;
+  EventType_Leave = 3;
+  EventType_LevelUp = 4;
+  EventType_Watering = 5;
+  EventType_Rename = 6;
+  EventType_UnlockBg = 7;
+  EventType_Kick = 8;
+}
+
+enum AdventureGroupStatus {
+  NoneStatus = 0;
+  HelperStatus = 1;
+  TempStatus = 2;
+  NormalStatus = 3;
+}
+
+enum AdventureGroupCreateType {
+  CreateType_None = 0;
+  CreateType_Recruit = 1;
+  CreateType_Npc = 2;
+}
+
+enum OpeType {
+  Ope_None = 0;
+  Ope_Agree = 1;
+  Ope_Reject = 2;
+  Ope_Kick = 3;
+  Ope_Apply = 4;
+  Ope_Edit_NickName = 5;
+  Ope_Leave = 6;
+  Ope_Invite = 7;
+  Ope_Agree_Apply = 8;
+  Ope_Change_Owner = 9;
+  Ope_Change_Recruit = 10;
+  Ope_Helper_Apply = 11;
+  Ope_Helper_Cancel = 12;
+  Ope_TakenLevelUpReward = 13;
+  Ope_CancelApply = 14;
+}
+
+enum EditType {
+  Edit_None = 0;
+  Edit_Announce = 1;
+  Edit_Name = 2;
+  Edit_HeadIcon = 3;
+  Edit_AutoAcceptApply = 4;
+  Edit_AutoCreateHelper = 5;
+  Edit_CanSeeAnnounce = 6;
+  Edit_Label = 7;
+  Edit_Background = 8;
+}
+
+enum JoinLimit {
+  Join_None = 0;
+  Join_GreaterThanLevelFive = 1;
+  Join_LessThanFive = 2;
+}
+
+enum ChangeType {
+  Change_Apply_Add = 0;
+  Change_Apply_Del = 1;
+  Change_Member_Add = 2;
+  Change_Member_Del = 3;
+  Change_BaseData = 4;
+  Change_PlayerChange = 5;
+}
+
+message DeclarationInfo {
+  string content = 1;
+  romsg.DeclarationType declarationType = 2;
+  bytes voice = 3;
+  int32 voiceDuration = 4;
+}
+
+message PlayerBaseInfo {
+  int64 playerID = 1;
+  int32 enterTime = 2;
+  int32 bornAreaId = 3;
+  int32 offTime = 4;
+  string nickname = 5;
+  romsg.DeclarationInfo declarationData = 6;
+  int32 wateringCount = 7;
+  string userName = 8;
+}
+
+message Resource {
+  int64 adventGroupMoney = 1;
+  int32 weekMoney = 2;
+}
+
+message ConveneData {
+  int32 useTime = 1;
+  int32 lastConveneTime = 2;
+}
+
+message SaplingData {
+  int32 saplingId = 1;
+  int32 wateringCount = 2;
+  int32 upvoteCount = 3;
+}
+
+message AdventureGroupBaseInfo {
+  string name = 1;
+  int32 level = 2;
+  string announce = 3;
+  int32 createTime = 4;
+  int32 status = 5;
+  repeated int32 label = 6;
+  bool autoAgreeHelperApply = 7;
+  int32 background = 8;
+  int64 owner = 9;
+  bool autoAgreeApply = 10;
+  int32 recruitTime = 11;
+  int32 changeOwnerTime = 12;
+  string chatGroupid = 13;
+  bool canSeeMemberAnnounce = 14;
+  romsg.AdventureGroupCreateType createType = 15;
+  romsg.SaplingData saplingData = 16;
+  romsg.Resource resourceData = 17;
+  int32 weekResetTime = 18;
+  int32 dayResetTime = 19;
+  romsg.ConveneData conveneData = 20;
+  repeated int32 availablebackground = 21;
+  romsg.SeasonState seasonState = 22;
+  int32 lastUpdateTime = 23;
+}
+
+message EventData {
+  romsg.AdventureGroupEventType eventType = 1;
+  int32 eventTime = 2;
+  int64 eventFirstParam = 3;
+  int64 eventSecondParam = 4;
+  string eventThirdParam = 5;
+}
+
+message DBAdventureGroupData {
+  int64 ro3Define_SaveVersion = 9999;
+  int64 ro3Define_DbTerm = 10000;
+  int64 uuid = 1;
+  int32 bornAreaId = 2;
+  romsg.AdventureGroupBaseInfo baseData = 3;
+  repeated romsg.PlayerBaseInfo memberData = 4;
+  repeated romsg.PlayerBaseInfo applyData = 5;
+  repeated romsg.EventData eventData = 7;
+}
+
+message CreateAdventureGroupReq {
+  string name = 1;
+  repeated int32 label = 2;
+  string announce = 3;
+  bool autoAgreeHelperApply = 4;
+  int32 background = 5;
+  romsg.AdventureGroupCreateType createType = 6;
+}
+
+message CreateAdventureGroupRes {
+  int32 Result = 1;
+  romsg.CreateAdventureGroupReq req = 2;
+  int32 punishTime = 3;
+}
+
+message DeleteAdventureGroupReq {
+}
+
+message DeleteAdventureGroupRes {
+  int32 Result = 1;
+}
+
+message PullHelperAdventureGroupListReq {
+  string searchName = 1;
+  int32 count = 2;
+  int64 lastAdventureGroupId = 3;
+  romsg.ConditionJoin conditionJoinData = 4;
+}
+
+message AdventureGroupData {
+  int64 uuid = 1;
+  romsg.AdventureGroupBaseInfo data = 2;
+  repeated romsg.PlayerBaseInfo memberData = 3;
+  bool isApply = 4;
+}
+
+message PullHelperAdventureGroupListRes {
+  int32 result = 1;
+  repeated romsg.AdventureGroupData data = 2;
+  string searchName = 3;
+  int32 totalAdventureGroupCount = 4;
+  int32 alreadyHelperCount = 5;
+  romsg.ConditionJoin conditionJoinData = 6;
+}
+
+message PullHelperAdventureGroupApplyerReq {
+  int64 adventureGroupId = 1;
+}
+
+message PullHelperAdventureGroupApplyerRes {
+  int32 result = 1;
+  int64 adventureGroupId = 2;
+  repeated romsg.PlayerBaseInfo applyer = 3;
+}
+
+message HelperAdventureGroupApplyerOpeReq {
+  romsg.OpeType op = 1;
+  int64 targetPlayerid = 2;
+  int64 adventureGroupId = 3;
+}
+
+message HelperAdventureGroupApplyerOpeRes {
+  int32 Result = 1;
+  romsg.OpeType op = 2;
+  int64 targetPlayerid = 3;
+  int64 adventureGroupId = 4;
+  int32 punishTime = 5;
+}
+
+message editData {
+  string announce = 2;
+  string name = 3;
+  string notice = 4;
+  bool autoAcceptApply = 5;
+  bool autoCreateHelper = 6;
+  bool canSeeAnnounce = 7;
+  repeated int32 label = 8;
+  int32 background = 9;
+}
+
+message AdventureGroupEditReq {
+  romsg.EditType tp = 1;
+  romsg.editData data = 2;
+}
+
+message AdventureGroupEditRes {
+  int32 result = 1;
+  int64 tp = 2;
+  romsg.editData data = 3;
+}
+
+message ConditionJoin {
+  romsg.JoinLimit joinType = 1;
+  int32 label = 2;
+}
+
+message PullAdventureGroupReq {
+  string searchName = 1;
+  int32 count = 2;
+  int64 lastAdventureGroupId = 3;
+  romsg.ConditionJoin conditionJoinData = 4;
+}
+
+message PullAdventureGroupRes {
+  int32 result = 1;
+  repeated romsg.AdventureGroupData data = 2;
+  string searchName = 3;
+  int32 totalAdventureGroupCount = 4;
+  romsg.ConditionJoin conditionJoinData = 5;
+}
+
+message AdventureGroupDataNotify {
+  romsg.AdventureGroupData data = 1;
+  repeated romsg.PlayerBaseInfo applyData = 2;
+  bool isJoin = 3;
+}
+
+message AdventureGroupDataChangeNotify {
+  romsg.ChangeType tp = 1;
+  romsg.PlayerBaseInfo applyData = 2;
+  romsg.AdventureGroupBaseInfo changeBaseData = 3;
+}
+
+message CheckCanStartBecomeSwornBrothersReq {
+}
+
+message CheckCanStartBecomeSwornBrothersRes {
+  int32 result = 1;
+}
+
+message StartBecomeSwornBrothersReq {
+}
+
+message StartBecomeSwornBrothersRes {
+  int32 result = 1;
+}
+
+message EnterSwornBrothersDungeonReq {
+}
+
+message EnterSwornBrothersDungeonRes {
+  int32 result = 1;
+}
+
+message NormalOpeData {
+  int64 adventureId = 1;
+  bool isApply = 2;
+  string nickname = 3;
+  int64 invitedPlayerId = 4;
+  bool isAgree = 5;
+  string announce = 6;
+  repeated int32 label = 7;
+  bool isFriend = 8;
+  int64 inviteToken = 9;
+  int64 inviter = 10;
+  bool isRecruit = 11;
+  int32 levelReward = 12;
+}
+
+message NormalAdventureGroupOpeReq {
+  romsg.OpeType tp = 1;
+  romsg.NormalOpeData opedata = 2;
+}
+
+message NormalAdventureGroupOpeRes {
+  int32 Result = 1;
+  romsg.OpeType tp = 2;
+  romsg.NormalOpeData opedata = 3;
+  int32 punishTime = 4;
+}
+
+message PullNormalAdventureGroupMemberReq {
+}
+
+message PullNormalAdventureGroupMemberRes {
+  repeated romsg.PlayerBaseInfo memberData = 1;
+}
+
+message AdventureGroupDungeonInitData {
+  int64 adventure_group_id = 1;
+}
+
+message SelectSaplingReq {
+  int32 saplingId = 1;
+}
+
+message SelectSaplingRes {
+  int32 result = 1;
+  int32 saplingId = 2;
+}
+
+message WateringSaplingReq {
+  int32 saplingId = 1;
+}
+
+message WateringSaplingRes {
+  int32 result = 1;
+  romsg.PlayerBaseInfo updateBaseData = 2;
+}
+
+message AdventureGroupDeclarationReq {
+  romsg.DeclarationInfo declarationData = 1;
+}
+
+message AdventureGroupDeclarationRes {
+  int32 result = 1;
+  romsg.DeclarationInfo declarationData = 2;
+}
+
+message AdventureGroupConveneReq {
+}
+
+message AdventureGroupConveneRes {
+  int32 result = 1;
+  int32 useConveneTimes = 2;
+}
+
+message AdventureGroupConveneNtf {
+  int64 playerId = 1;
+  int64 token = 2;
+}
+
+message AdventureGroupConfirmConveneReq {
+  int64 token = 1;
+  bool isAgree = 2;
+}
+
+message AdventureGroupConfirmConveneRes {
+  int32 result = 1;
+}
+
+message AdventureCommemorateReq {
+}
+
+message AdventureCommemorateRes {
+  repeated romsg.EventData eventData = 1;
+}
+
+message AdventureGroupSaplingData {
+  int32 wateringCount = 1;
+  int32 upvoteCount = 2;
+  int64 adventureId = 3;
+  int32 background = 4;
+  string name = 5;
+}
+
+message GetSaplingDataReq {
+  int32 saplingId = 1;
+}
+
+message GetSaplingDataRes {
+  repeated romsg.AdventureGroupSaplingData saplingDataList = 1;
+}
+
+message GetAdventureGroupDetailDataReq {
+  int64 lastAdventureGroupId = 1;
+}
+
+message GetAdventureGroupDetailDataRes {
+  int32 result = 1;
+  romsg.AdventureGroupData data = 2;
+}
+
+message AdventureGroupCreateNotify {
+}
+
+message SyncSaplingData {
+  repeated romsg.SaplingData saplingDataList = 1;
+}
+

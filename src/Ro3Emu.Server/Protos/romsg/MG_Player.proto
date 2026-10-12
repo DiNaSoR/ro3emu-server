@@ -1,0 +1,161 @@
+syntax = "proto3";
+package romsg;
+import "MG_Common.proto";
+import "MG_DB.proto";
+import "FieldOption.proto";
+
+enum EFightStatus {
+  Idle = 0;
+  Fight = 1;
+  Dead = 2;
+}
+
+message AllocateAttrPointReq {
+  int32 planIndex = 1;
+  map<int32, int32> points = 2;
+}
+
+message AllocateAttrPointRsp {
+  int32 result = 1;
+  int32 planIndex = 2;
+  romsg.PlanBaseProperty planBaseProperty = 3;
+}
+
+message PlanAttrPointChangeReq {
+  int32 destPlanIndex = 1;
+}
+
+message PlanAttrPointChangeResq {
+  int32 result = 1;
+  int32 destPlanIndex = 2;
+  int32 flag = 3;
+}
+
+message PlanAttrPointNameChangeReq {
+  int32 planIndex = 1;
+  string planName = 2;
+}
+
+message PlanAttrPointNameChangeResq {
+  int32 result = 1;
+  int32 planIndex = 2;
+  string planName = 3;
+}
+
+message ResetAttrPointReq {
+  int32 planIndex = 1;
+}
+
+message ResetAttrPointResp {
+  int32 result = 1;
+  int32 planIndex = 2;
+  romsg.PlanBaseProperty planBaseProperty = 3;
+}
+
+message PlayerPowerPackage {
+  romsg.PowerUnit levelUpAddPointScore = 1;
+  romsg.PowerUnit SkillAddPointScore = 2;
+  romsg.PowerUnit titleScore = 3;
+  romsg.PowerUnit equipRankScore = 4;
+  romsg.PowerUnit equipRefineScore = 5;
+  romsg.PowerUnit equipStrengthenScore = 6;
+  romsg.PowerUnit cardSuitScore = 7;
+  romsg.PowerUnit cardFillInEquipScore = 8;
+  romsg.PowerUnit totemScore = 9;
+  romsg.PowerUnit EmblemScore = 10;
+}
+
+message PlayerPowerPackageNtf {
+  romsg.PlayerPowerPackage powerPackage = 1;
+}
+
+message PlayerChangePowerNtf {
+  romsg.PowerUnit curPower = 1;
+  romsg.PowerUnit changePower = 2;
+  romsg.PowerUnit maxHistoryPower = 3;
+  romsg.PlayerPowerPackage powerPackage = 4;
+}
+
+message SyncRoleVisitMapInfoNtf {
+  repeated int64 mapid = 1;
+}
+
+message PlayerLoginNotify {
+  bool offline = 1;
+  int64 roleid = 2;
+  int32 area = 3;
+}
+
+message AddItemsToPlayerReq {
+  repeated romsg.ItemBaseInfo award = 1;
+  int64 playerId = 2;
+  int32 firstType = 3;
+  repeated int64 extendParams = 4;
+  string extendStringParam = 5;
+  int32 subType = 6;
+}
+
+message AddAwardToPlayerReq {
+  repeated int64 awardIds = 1;
+  int64 playerId = 2;
+  int32 firstType = 3;
+  repeated int64 extendParams = 4;
+  string extendStringParam = 5;
+  int32 subType = 6;
+  int64 seasonId = 7;
+  int64 playbookId = 8;
+}
+
+message PlayerTransformJobReq {
+  int32 jobId = 1;
+}
+
+message PlayerTransformJobResp {
+  int32 result = 1;
+  int32 jobId = 2;
+}
+
+message PlayerFightStatusNotify {
+  int64 playerId = 1;
+  romsg.EFightStatus status = 2;
+}
+
+message PlayerBeHatredNotify {
+  repeated int64 AddEnemyList = 1;
+  repeated int64 RemoveEnemyList = 2;
+}
+
+message PlayerBeMonsterLockedNotify {
+  int64 AddEnemy = 1;
+  int64 RemoveEnemy = 2;
+}
+
+message LockEnemyReq {
+  int64 enemyId = 1;
+}
+
+message PlayerAssetReq {
+  repeated int64 assetType = 1;
+  map<int64, int64> assetVersions = 2;
+}
+
+message PlayerAssetResp {
+  repeated int64 assetType = 1;
+}
+
+message UploadClientSDKInfoReq {
+  bytes clientSDKInfo = 1;
+}
+
+message SetAutoBattleReq {
+  bool isAutoBattle = 1;
+}
+
+message StuckEscapeReq {
+  int32 param = 1;
+}
+
+message StuckEscapeRsp {
+  int32 result = 1;
+}
+

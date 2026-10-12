@@ -1,0 +1,90 @@
+syntax = "proto3";
+package romsg;
+import "FieldOption.proto";
+
+message SetIdleEmojiReq {
+  int32 emojiId = 1;
+}
+
+message SetIdleEmojiRsp {
+  int32 result = 1;
+  int32 emojiId = 2;
+}
+
+message EmojiInviteReq {
+  repeated uint64 uuids = 1;
+  int32 emojiId = 2;
+}
+
+message EmojiInviteRsp {
+  int32 result = 1;
+  int32 emojiId = 2;
+  int64 expireTime = 3;
+  repeated uint64 inviteeId = 4;
+}
+
+message EmojiStartPlayReq {
+  int32 emojiId = 1;
+}
+
+message EmojiStartPlayRsp {
+  int32 result = 1;
+}
+
+message EmojiStopPlayReq {
+}
+
+message EmojiStopPlayRsp {
+  int32 result = 1;
+}
+
+message EmojiInviteNtf {
+  int64 ownerId = 1;
+  string ownerName = 2;
+  int32 emojiId = 3;
+  int64 expireTime = 4;
+}
+
+message EmojiInviteResponseNtf {
+  bool isAccept = 1;
+  int32 emojiId = 2;
+  int64 inviteeId = 3;
+  int32 errorCode = 4;
+}
+
+message EmojiInviteAcceptReq {
+  int64 ownerId = 1;
+  int32 emojiId = 2;
+}
+
+message EmojiInviteAcceptRsp {
+  int32 result = 1;
+}
+
+message EmojiInviteRefuseReq {
+  int64 ownerId = 1;
+  int32 emojiId = 2;
+}
+
+message EmojiInviteRefuseRsp {
+  int32 result = 1;
+}
+
+message AddEmojiCollectionReq {
+  int32 emojiId = 1;
+}
+
+message AddEmojiCollectionRsp {
+  int32 result = 1;
+  int32 emojiId = 2;
+}
+
+message DelEmojiCollectionReq {
+  int32 emojiId = 1;
+}
+
+message DelEmojiCollectionRsp {
+  int32 result = 1;
+  int32 emojiId = 2;
+}
+

@@ -1,0 +1,278 @@
+syntax = "proto3";
+package romsg;
+import "APIError.proto";
+import "client2service.proto";
+import "FieldOption.proto";
+import "GM_Chat.proto";
+import "MG_Achievement.proto";
+import "MG_Activity.proto";
+import "MG_Adventure.proto";
+import "MG_AdventureGroup.proto";
+import "MG_AFK.proto";
+import "MG_AreaConcur.proto";
+import "MG_Auction.proto";
+import "MG_Barroom.proto";
+import "MG_Base.proto";
+import "MG_BaseMgr.proto";
+import "MG_BlueDbg.proto";
+import "MG_BroadCast.proto";
+import "MG_Card.proto";
+import "MG_CareerSpecial.proto";
+import "MG_Cell.proto";
+import "MG_CellMgr.proto";
+import "MG_Chat.proto";
+import "MG_Chicken.proto";
+import "MG_Common_Increment.proto";
+import "MG_Common.proto";
+import "MG_DB_Increment.proto";
+import "MG_DB.proto";
+import "MG_Define.proto";
+import "MG_DragonIsland.proto";
+import "MG_Dungeon.proto";
+import "MG_Emblem.proto";
+import "MG_EmojiPlay.proto";
+import "MG_Entity.proto";
+import "MG_Equipment.proto";
+import "MG_FirstHeart.proto";
+import "MG_FlyingDragon.proto";
+import "MG_Friend.proto";
+import "MG_Function.proto";
+import "MG_Gateway.proto";
+import "MG_Genre.proto";
+import "MG_GlobalCache.proto";
+import "MG_Guide.proto";
+import "MG_Guild.proto";
+import "MG_GuildBlackMarket.proto";
+import "MG_GuildCampFire.proto";
+import "MG_GuildDraculaWedding_Init.proto";
+import "MG_GuildDraculaWedding.proto";
+import "MG_GuildLeague.proto";
+import "MG_GuildVoiceChannel.proto";
+import "MG_HeroicSpirit.proto";
+import "MG_HiddenTreasure.proto";
+import "MG_IDIP.proto";
+import "MG_IDIPSerialNumber.proto";
+import "MG_Interact.proto";
+import "MG_LeaderBoardClient.proto";
+import "MG_Library.proto";
+import "MG_Lifejob.proto";
+import "MG_Login.proto";
+import "MG_Lottery.proto";
+import "MG_Mail.proto";
+import "MG_MapData.proto";
+import "MG_Match.proto";
+import "MG_Mount.proto";
+import "MG_Mover.proto";
+import "MG_MultiDungeon.proto";
+import "MG_MVP.proto";
+import "MG_NewActivity.proto";
+import "MG_Pack.proto";
+import "MG_Paragon.proto";
+import "MG_Pay.proto";
+import "MG_Personal.proto";
+import "MG_Pet.proto";
+import "MG_Player.proto";
+import "MG_PlayerOfflineMessage.proto";
+import "MG_PlayMethod.proto";
+import "MG_PlotActing.proto";
+import "MG_PublicChat.proto";
+import "MG_PublicServer.proto";
+import "MG_RainbowKoi_Init.proto";
+import "MG_Relationship.proto";
+import "MG_Scene.proto";
+import "MG_SceneStream.proto";
+import "MG_Season.proto";
+import "MG_SeasonPage.proto";
+import "MG_SeasonRefine.proto";
+import "MG_SeasonTalent.proto";
+import "MG_ServerClientMsg.proto";
+import "MG_Setting.proto";
+import "MG_Shop.proto";
+import "MG_Siege.proto";
+import "MG_Skill.proto";
+import "MG_SkillGrowth.proto";
+import "MG_SocialOutfit.proto";
+import "MG_SpecialEffect.proto";
+import "MG_StageRewards.proto";
+import "MG_Stalls.proto";
+import "MG_State.proto";
+import "MG_Statistics.proto";
+import "MG_StorageHole.proto";
+import "MG_Task.proto";
+import "MG_Team.proto";
+import "MG_TerritoryAuction.proto";
+import "MG_TerritoryWars.proto";
+import "MG_ThreeDay.proto";
+import "MG_Title.proto";
+import "MG_Totem.proto";
+import "MG_TradeCenter.proto";
+import "MG_TradeMarket.proto";
+import "MG_Training.proto";
+import "MG_TransAction.proto";
+import "MG_TypeWriter.proto";
+import "MG_WardRobe.proto";
+import "MG_WorldExploration.proto";
+import "MG_Zone.proto";
+
+message DBClimbTowerFirstPassIncrement {
+  message recordMapFieldIncrement {
+    oneof value {
+      romsg.FirstPassRecord all = 1;
+      romsg.FirstPassRecordIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  map<int64, romsg.DBClimbTowerFirstPassIncrement.recordMapFieldIncrement> recordMap = 10;
+}
+
+message DBPresentInfoIncrement {
+  message ordersFieldIncrement {
+    oneof value {
+      romsg.PresentOrderInfo all = 1;
+      romsg.PresentOrderInfoIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message receiverOrdersMapFieldIncrement {
+    oneof value {
+      romsg.ReceiverOrders all = 1;
+      romsg.ReceiverOrdersIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message senderOrdersMapFieldIncrement {
+    oneof value {
+      romsg.SenderOrders all = 1;
+      romsg.SenderOrdersIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  map<int64, romsg.DBPresentInfoIncrement.ordersFieldIncrement> orders = 10;
+  map<int64, romsg.DBPresentInfoIncrement.receiverOrdersMapFieldIncrement> receiverOrdersMap = 20;
+  optional int64 nextOrderId = 30;
+  map<int64, romsg.DBPresentInfoIncrement.senderOrdersMapFieldIncrement> senderOrdersMap = 40;
+}
+
+message DBPublicOnlineCountIncrement {
+  message hourInfoFieldIncrement {
+    oneof value {
+      romsg.PublicOnlineHourInfo all = 1;
+      romsg.PublicOnlineHourInfoIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  map<int64, romsg.DBPublicOnlineCountIncrement.hourInfoFieldIncrement> hourInfo = 10;
+}
+
+message DBPublicRestrictInfoIncrement {
+  message restrictInfoMapFieldIncrement {
+    oneof value {
+      romsg.RestrictInfo all = 1;
+      romsg.RestrictInfoIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  map<int32, romsg.DBPublicRestrictInfoIncrement.restrictInfoMapFieldIncrement> restrictInfoMap = 10;
+}
+
+message FirstPassRecordIncrement {
+  optional int64 layer = 10;
+  optional int64 playerId = 20;
+  optional string playerName = 30;
+  optional int64 passTime = 40;
+  optional int64 recordTime = 50;
+  optional int32 headImage = 60;
+  optional int32 job = 70;
+  optional int32 gender = 80;
+}
+
+message PresentOrderInfoIncrement {
+  optional int64 orderId = 10;
+  optional int64 senderId = 20;
+  optional int64 receiverId = 30;
+  optional int64 appranceId = 40;
+  optional int64 appranceAwardId = 50;
+  optional int64 currencyId = 60;
+  optional int32 currencyCount = 70;
+  optional int64 createTime = 80;
+  optional romsg.EPresentOrderState state = 90;
+  optional string giftContent = 100;
+}
+
+message PublicOnlineHourInfoIncrement {
+  optional int64 hourId = 10;
+  optional int64 maxOnlineNum = 20;
+  optional int64 minOnlineNum = 30;
+}
+
+message ReceiverOrdersIncrement {
+  message orderIdsRepeatedOrigin {
+    repeated int64 value = 1;
+  }
+
+  message orderIdsRepeatedIncrement {
+    repeated int64 value = 1;
+  }
+
+  message orderIdsFieldIncrement {
+    oneof value {
+      romsg.ReceiverOrdersIncrement.orderIdsRepeatedOrigin all = 1;
+      romsg.ReceiverOrdersIncrement.orderIdsRepeatedIncrement inc = 2;
+    }
+  }
+
+  romsg.ReceiverOrdersIncrement.orderIdsFieldIncrement orderIds = 10;
+}
+
+message RoleDetailInfoIncrement {
+  message rolebaseFieldIncrement {
+    oneof value {
+      romsg.RolePublicBaseInfo all = 1;
+      romsg.RolePublicBaseInfoIncrement inc = 2;
+    }
+  }
+
+  message equipInfoFieldIncrement {
+    oneof value {
+      romsg.DBEquipInfo all = 1;
+      romsg.DBEquipInfoIncrement inc = 2;
+    }
+  }
+
+  message selfpropertyFieldIncrement {
+    oneof value {
+      romsg.AllProperty all = 1;
+      romsg.AllPropertyIncrement inc = 2;
+    }
+  }
+
+  romsg.RoleDetailInfoIncrement.rolebaseFieldIncrement rolebase = 10;
+  romsg.RoleDetailInfoIncrement.equipInfoFieldIncrement equipInfo = 20;
+  romsg.RoleDetailInfoIncrement.selfpropertyFieldIncrement selfproperty = 30;
+}
+
+message SenderOrdersIncrement {
+  message orderIdsRepeatedOrigin {
+    repeated int64 value = 1;
+  }
+
+  message orderIdsRepeatedIncrement {
+    repeated int64 value = 1;
+  }
+
+  message orderIdsFieldIncrement {
+    oneof value {
+      romsg.SenderOrdersIncrement.orderIdsRepeatedOrigin all = 1;
+      romsg.SenderOrdersIncrement.orderIdsRepeatedIncrement inc = 2;
+    }
+  }
+
+  romsg.SenderOrdersIncrement.orderIdsFieldIncrement orderIds = 10;
+}
+

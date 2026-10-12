@@ -1,0 +1,109 @@
+syntax = "proto3";
+package EZ;
+
+enum RelationshipMsgID {
+  RelationshipMsgNone = 0;
+  RelationshipMsgAdd = 1;
+  RelationshipMsgDelete = 2;
+  RelationshipMsgQuery = 3;
+  RelationshipMsgBusinessDataUpdate = 4;
+  RelationshipMsgBusinessDataQuery = 5;
+}
+
+enum RelationshipError {
+  OK = 0;
+  InvalidArgument = 1;
+  NotImplement = 2;
+  InternalError = 3;
+  Duplicated = 4;
+  ReachLimit = 5;
+  NOTFound = 6;
+}
+
+enum RelationshipType {
+  RelationshipTypeNone = 0;
+  TwoWayFriend = 1;
+  OneWayFriend = 2;
+  BlackList = 3;
+  FriendApplyList = 4;
+}
+
+enum RelationshipUpdateStrategy {
+  RelationshipUpdateStrategyNone = 0;
+  Reject = 1;
+  ReplaceOld = 2;
+}
+
+message Timestamp {
+  int64 seconds = 1;
+  int32 nanos = 2;
+}
+
+message RelationshipQueryRequest {
+  EZ.RelationshipType type = 1;
+  int64 versionStart = 2;
+}
+
+message RelationshipFollowerData {
+  string followerUID = 1;
+  EZ.Timestamp CreateTime = 2;
+}
+
+message RelationshipQueryResponse {
+  EZ.RelationshipError error = 1;
+  EZ.RelationshipType type = 2;
+  int64 versionStart = 3;
+  int64 versionEnd = 4;
+  repeated EZ.RelationshipFollowerData followersAdd = 5;
+  repeated EZ.RelationshipFollowerData followersDelete = 6;
+}
+
+message UpdateStrategyData {
+  EZ.RelationshipUpdateStrategy updateStrategy = 1;
+  int64 limit = 2;
+}
+
+message RelationshipAddRequest {
+  EZ.RelationshipType type = 1;
+  string followerUID = 2;
+  EZ.UpdateStrategyData strategy = 3;
+}
+
+message RelationshipAddResponse {
+  EZ.RelationshipError error = 1;
+  int64 curVersion = 2;
+}
+
+message RelationshipDeleteRequest {
+  EZ.RelationshipType type = 1;
+  string followerUID = 2;
+}
+
+message RelationshipDeleteResponse {
+  EZ.RelationshipError error = 1;
+  int64 curVersion = 2;
+}
+
+message RelationshipKey {
+  EZ.RelationshipType type = 1;
+  string follower = 2;
+}
+
+message RelationshipUpdateBusinessDataRequest {
+  EZ.RelationshipKey key = 1;
+  bytes data = 2;
+}
+
+message RelationshipUpdateBusinessDataResponse {
+  EZ.RelationshipError error = 1;
+}
+
+message RelationshipQueryBusinessDataRequest {
+  EZ.RelationshipKey key = 1;
+}
+
+message RelationshipQueryBusinessDataResponse {
+  EZ.RelationshipError error = 1;
+  bytes data = 2;
+}
+

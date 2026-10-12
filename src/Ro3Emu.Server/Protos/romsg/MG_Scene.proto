@@ -1,0 +1,699 @@
+syntax = "proto3";
+package romsg;
+import "MG_Common.proto";
+import "MG_Define.proto";
+import "MG_DB.proto";
+import "MG_Skill.proto";
+
+enum MovementType {
+  MoveTypeNone = 0;
+  MoveTypeWalk = 1;
+  MoveTypeMove = 2;
+  MoveTypeAroundPoint = 3;
+  MoveTypeAroundObject = 4;
+  MoveTypeTrace = 5;
+  MoveTypeArchimedeanSpiral = 6;
+  MoveTypeEquiangularSpiral = 7;
+  MoveTypeMax = 8;
+}
+
+enum MovementTransitionType {
+  MoveTransNormal = 0;
+  MoveTransResetPos = 1;
+  MoveTransForceTeleport = 2;
+  MoveTransServerControl = 3;
+  MoveTransBlockPush = 4;
+  MoveTransJumpWall = 5;
+  MoveTransFallDown = 6;
+  MoveTransBeCarriedMove = 7;
+  MoveTransFlyUp = 8;
+  MoveTransLanding = 9;
+  MoveTransCollectionDrop = 10;
+  MoveTransFreeFall = 11;
+  MoveTransFixClientLand = 12;
+}
+
+enum MiniMapInfoSpecialType {
+  SpecialTypeNone = 0;
+  SpecialTypeEscortCart = 1;
+}
+
+enum SceneTeleportReasonType {
+  SceneTeleportReason_None = 0;
+  SceneTeleportReason_Task = 1;
+  SceneTeleportReason_TerritoryWar = 2;
+  SceneTeleportReason_TaskOnlyTemp = 3;
+  SceneTeleportReason_CliLeaveAuto = 4;
+}
+
+enum SwitchSceneReasonType {
+  SwitchSceneReason_Normal = 0;
+  SwitchSceneReason_SwitchLine = 1;
+  SwitchSceneReason_TeamRally = 2;
+  SwitchSceneReason_EnterDungeon = 3;
+  SwitchSceneReason_ClimbTowerStart = 4;
+  SwitchSceneReason_ConfirmTeamDungeon = 5;
+  SwitchSceneReason_Gmproc = 6;
+  SwitchSceneReason_Login = 7;
+  SwitchSceneReason_Convene = 8;
+  SwitchSceneReason_CrossCluster = 9;
+  SwitchSceneReason_SwitchRole = 10;
+  SwitchSceneReason_TeamFollow = 11;
+  SwitchSceneReason_HeroicSpirit = 12;
+}
+
+enum SwitchSceneSourceType {
+  SwitchSceneSourceNone = 0;
+  SwitchSceneSourceFollow = 1;
+  SwitchSceneSourceManual = 2;
+}
+
+enum ForceFieldType {
+  ForceFieldNone = 0;
+  Target = 1;
+  Direction = 2;
+}
+
+enum DUNGEON_STATE {
+  DUNGEON_STATE_NULL = 0;
+  DUNGEON_STATE_PRE_ACTIVE = 1;
+  DUNGEON_STATE_ACTIVE = 2;
+  DUNGEON_STATE_CLIENT_READY = 3;
+  DUNGEON_STATE_PRE_START = 4;
+  DUNGEON_STATE_START = 5;
+  DUNGEON_STATE_PRE_END = 6;
+  DUNGEON_STATE_END = 7;
+  DUNGEON_STATE_PRE_DESTORY = 8;
+  DUNGEON_STATE_DESTORY = 9;
+}
+
+enum EStatisticsModuleEnum {
+  nothing = 0;
+  Damage = 1001001;
+  TakeDamage = 1001002;
+  heal = 1001003;
+  KillPlayer = 1001004;
+  AssistKill = 1001005;
+  Death = 1001006;
+  KillMonster = 1001007;
+  KillBoss = 1001008;
+  Revived = 1001009;
+  Revive = 1001010;
+  Respawned = 1001011;
+  Respawn = 1001012;
+  KillPlayerList = 1001013;
+  KillStreakPlayer = 1001014;
+  AssistStreakPlayer = 1001015;
+  ReviveStreakPlayer = 1001016;
+  PlayerOccupyPoint = 1001017;
+  PlayerStreakOccupyPoint = 1001018;
+  PlayerKillLeaderCount = 1001019;
+  DupTaskScore = 1001020;
+  MaxKillStreakPlayer = 1001021;
+  BossMidHitCount = 1001022;
+  BossLastHitCount = 1001023;
+  BossFirstHitCount = 1001024;
+  BuffPickupCount = 1001025;
+  KillTitlePlayerCount = 1001026;
+  PlayerStayAreaScore = 1001027;
+  SceneRageRemainTime = 1005009;
+  SceneReviveTimes = 1005010;
+  ChickenLiveTime = 1011001;
+  ChickenTitleList = 1011002;
+  ChickenPersonalRank = 1011003;
+  ChickenMvp = 1011004;
+  ChickenCarrer = 1011005;
+  ChickenPointDelta = 1011006;
+  ChickenProtectDelta = 1011007;
+  ChickenPoint = 1011008;
+  ChickenProtect = 1011009;
+  ChickenTier = 1011010;
+  ChickenTierAfter = 1011011;
+  ChickenTeamRank = 1012001;
+  ChickenTeamMVP = 1012002;
+  ChickenTotalPlayers = 1015001;
+  ChickenTotalTeams = 1015002;
+  AttackCityValue = 1021001;
+  DestroyMachinery = 1021002;
+  MachineryDamage = 1021003;
+  DefenseValue = 1021004;
+  TotalScore = 1021005;
+  TitleHistoryList = 1021006;
+  CurrentScore = 1021007;
+  TitleRank = 1021008;
+  CurrentTitleList = 1021009;
+  TerritoryWarPersonIntegral = 1031001;
+  TerritoryWarPointChange = 1031002;
+  CampScore = 1041003;
+  DragonIslandMvp = 1051001;
+}
+
+message SceneLoadedReq {
+  int64 sceneId = 1;
+  uint64 viewMaxCount = 2;
+  uint64 nameBoardMaxCount = 3;
+  uint64 lodHighCount = 4;
+}
+
+message SceneLoadedResp {
+  int64 sceneId = 1;
+  uint64 viewMaxCount = 2;
+  uint64 nameBoardMaxCount = 3;
+  uint64 lodHighCount = 4;
+  int32 result = 5;
+}
+
+message ChangeViewCfgReq {
+  uint64 viewMaxCount = 1;
+  uint64 nameBoardMaxCount = 2;
+  uint64 lodHighCount = 3;
+}
+
+message ChangeViewCfgResp {
+  int32 result = 1;
+  uint64 viewMaxCount = 2;
+  uint64 nameBoardMaxCount = 3;
+  uint64 lodHighCount = 4;
+}
+
+message ChangeFaceReq {
+  float angle = 1;
+}
+
+message WalkReq {
+  romsg.Vec3 pos = 1;
+  float dir = 2;
+  bool bStop = 3;
+  float face = 4;
+  float speedRate = 5;
+}
+
+message FlySwitchReq {
+  bool isFly = 1;
+  float height = 2;
+}
+
+message FlyMoveReq {
+  romsg.Vec3 pos = 1;
+  romsg.Vec3 dir = 2;
+  bool bStop = 3;
+  float face = 4;
+}
+
+message FreeFallJumpReq {
+  romsg.Vec3 toPos = 1;
+  float face = 2;
+}
+
+message FixLandNtf {
+  int64 uuid = 1;
+  int32 fixLandTime = 2;
+}
+
+message SyncVehicleReq {
+  float face = 1;
+}
+
+message AoiTurningInfo {
+  float start_face = 1;
+  float end_face = 2;
+  uint64 duration_ms = 3;
+  bool is_stop = 4;
+  float speed = 5;
+  uint64 start_time = 6;
+}
+
+message AoIBuffInfo {
+  repeated romsg.BuffInfo add_buffs = 1;
+  repeated int64 remove_buffs = 2;
+}
+
+message MovementWalk {
+  float dir = 1;
+  float speed = 2;
+  float acc = 3;
+  float endHeight = 4;
+}
+
+message MovementMove {
+  romsg.Vec3 startVelocity = 1;
+  romsg.Vec3 accVelocity = 2;
+}
+
+message MovementAroundPoint {
+  romsg.Vec3 aroundPoint = 1;
+  float radius = 2;
+  float angleSpeed = 3;
+  float angle = 4;
+}
+
+message MovementAroundObject {
+  int64 aroundObject = 1;
+  float radius = 2;
+  float angleSpeed = 3;
+  float angle = 4;
+}
+
+message MovementTrace {
+  int64 traceTarget = 1;
+  romsg.Vec3 velocity = 2;
+  float angleSpeed = 3;
+}
+
+message MovementArchimedeanSpiral {
+  romsg.Vec3 center = 1;
+  float initialRadius = 2;
+  float initialAngle = 3;
+  float radiusGrowthSpeed = 4;
+  float angleSpeed = 5;
+  float speed = 6;
+}
+
+message MovementEquiangularSpiral {
+  romsg.Vec3 center = 1;
+  float initialRadius = 2;
+  float initialAngle = 3;
+  float radiusMultiplierPerRound = 4;
+  float angleSpeed = 5;
+  float speed = 6;
+}
+
+message MovementInfo {
+  romsg.Vec3 pos = 1;
+  int64 serverTime = 2;
+  int32 moveDuration = 3;
+  float face = 4;
+  bool faceMove = 5;
+  romsg.MovementType moveType = 6;
+  romsg.MovementWalk movementWalk = 7;
+  romsg.MovementMove movementMove = 8;
+  romsg.MovementAroundPoint movementAroundPoint = 9;
+  romsg.MovementAroundObject movementAroundObject = 10;
+  romsg.MovementTrace movementTrace = 11;
+  romsg.MovementArchimedeanSpiral movementArchimedeanSpiral = 12;
+  romsg.MovementEquiangularSpiral movementEquiangularSpiral = 13;
+}
+
+message MovementChangeNtf {
+  int64 uid = 1;
+  romsg.MovementTransitionType transType = 2;
+  romsg.MovementInfo movementInfo = 3;
+}
+
+message MovementConfigSyncNtf {
+  map<string, int64> params = 1;
+}
+
+message ContinueTurningInfo {
+  float face = 1;
+  int64 serverTime = 2;
+  float angleSpeed = 3;
+  int32 turnDuration = 4;
+  int64 faceTarget = 5;
+}
+
+message ContinueTurningChangeNtf {
+  int64 uid = 1;
+  romsg.ContinueTurningInfo turningInfo = 2;
+}
+
+message LocalPlayerFaceChangeNtf {
+  float face = 1;
+}
+
+message ClientTeleportObject {
+  int64 targetUid = 1;
+  romsg.Vec3 targetPos = 2;
+  float face = 3;
+}
+
+message AoIWidgetInfo {
+  repeated romsg.WidgetInfo add_widgets = 1;
+  repeated int64 remove_widgets = 2;
+}
+
+message AoIChangeGate {
+  bool gateState = 1;
+}
+
+message AoICarry {
+  uint64 id = 1;
+  int32 carry_slot = 2;
+  romsg.Vec3 carry_offset = 3;
+  int32 carry_type = 4;
+}
+
+message AoICarryInfo {
+  romsg.AoICarry be_carried = 1;
+  repeated romsg.AoICarry all_carries = 2;
+  repeated romsg.AoICarry add_carries = 3;
+  repeated romsg.AoICarry remove_carries = 4;
+}
+
+message AoIVehicleFireDirection {
+  int32 slot = 1;
+  float fire_dir = 2;
+}
+
+message AoIVehicleDetail {
+  repeated romsg.AoIVehicleFireDirection fire_dirs = 1;
+}
+
+message EntityEnforceInfo {
+  int32 enforceType = 1;
+  float enforceSpeed = 2;
+  float enforceDir = 3;
+  int32 shapeType = 4;
+  repeated float size = 5;
+}
+
+message BeEnforcedBy {
+  repeated int64 be_enforced_uids = 1;
+}
+
+message DynamicCollisionInfo {
+  int32 collisionType = 1;
+  repeated float collisionSize = 2;
+  bool isEnable = 3;
+  int32 blockLevel = 4;
+}
+
+message AoIInfoSingle {
+  uint64 entity_uuid = 1;
+  romsg.AoIWidgetInfo widget_data = 7;
+  romsg.AoICarryInfo carry_info = 8;
+  romsg.AoIVehicleDetail vehicle_detail = 9;
+}
+
+message EntityBeEnforcedChange {
+  int64 uuid = 1;
+  repeated int64 be_enforced_uids = 2;
+}
+
+message EntityEnforceChange {
+  int64 uuid = 1;
+  romsg.EntityEnforceInfo enforce_info = 2;
+}
+
+message AoICommonInfo {
+  enum AoiCommonType {
+    None = 0;
+    StateInfo = 1;
+    ForbidInfo = 2;
+    TurningInfo = 3;
+    BehaviorStateMachine = 4;
+    IdleInfo = 5;
+    StaggerInfo = 6;
+  }
+
+  uint64 bigType = 1;
+  uint64 smallType = 2;
+  romsg.AoiObjStateInfo stateInfo = 3;
+  romsg.AoiObjForbidInfo forbidInfo = 4;
+  romsg.AoiBehaviorStateMachineInfo behaviorStateMachineInfo = 6;
+  romsg.AoiIdleInfo idleInfo = 7;
+  romsg.AoiObjStaggerInfo staggerInfo = 8;
+}
+
+message AoiIdleInfo {
+  int32 emojiId = 1;
+}
+
+message AoiBehaviorStateMachineInfo {
+  romsg.ObjectState curState = 1;
+  romsg.ObjectState lastState = 2;
+  romsg.StateParam param = 3;
+  int64 startStateTime = 4;
+  romsg.StateParam lastParam = 5;
+}
+
+message AoiObjStateInfo {
+  romsg.CommonBigMask data = 1;
+}
+
+message AoiObjForbidInfo {
+  romsg.CommonBigMask data = 1;
+}
+
+message AoiObjStaggerInfo {
+  uint64 stagger_mask = 1;
+}
+
+message AoIInfoTotal {
+  repeated romsg.AoIInfoSingle aoi_data = 1;
+  uint64 AoITickMs = 2;
+  romsg.GateBroadCast gateInfo = 3;
+  uint64 TickNowMs = 4;
+  map<uint64, int32> entity_types = 5;
+}
+
+message SelfInfoEndFrameNotify {
+  romsg.AoiObjStateInfo state = 1;
+  romsg.AoiObjForbidInfo forbid = 2;
+  romsg.AoiObjStaggerInfo stagger = 3;
+}
+
+message MiniMapInfoEscortCart {
+  int64 ownerId = 1;
+  int64 guildId = 2;
+  int32 cartType = 3;
+  int32 damageLevel = 4;
+}
+
+message MiniMapInfo {
+  uint64 uid = 1;
+  romsg.Vec3 pos = 2;
+  uint64 camp = 3;
+  uint64 npcConfigId = 4;
+  uint64 hp = 5;
+  romsg.MiniMapInfoSpecialType specialType = 6;
+  romsg.MiniMapInfoEscortCart escortCartInfo = 7;
+  romsg.MiniMapInfoData miniMapInfoData = 8;
+}
+
+message MiniMapInfoData {
+  oneof var {
+    romsg.MiniMapInfoDataCustomData customData = 1;
+  }
+}
+
+message MiniMapInfoDataCustomData {
+  repeated romsg.CustomData syncCustomDatas = 1;
+}
+
+message MiniMapMsg {
+  repeated romsg.MiniMapInfo miniInfo = 1;
+}
+
+message EscortDetectMiniMapNtf {
+  repeated romsg.MiniMapInfo escortInfo = 1;
+}
+
+message MiniMapStatus {
+  bool IsOpen = 1;
+}
+
+message AoIPos {
+  uint64 entity_uuid = 1;
+  romsg.Vec3 position = 2;
+  float face = 3;
+}
+
+message AoIPosTest {
+  repeated romsg.AoIPos pos = 1;
+  bool state = 2;
+}
+
+message SceneTeleportReason {
+  romsg.SceneTeleportReasonType eType = 1;
+  repeated int64 param = 2;
+}
+
+message SceneTeleportReq {
+  romsg.SceneTeleportReason teleportReason = 1;
+  int64 targetMapId = 2;
+  romsg.Vec3 currentPos = 3;
+}
+
+message SceneTeleportRsp {
+  int32 result = 1;
+}
+
+message TaskTrackTeleportReq {
+  int64 taskId = 1;
+}
+
+message TaskTempTeleportReq {
+  int64 targetMapId = 1;
+  int64 pointId = 2;
+  int64 taskId = 3;
+}
+
+message SceneQueuingReq {
+  int64 sceneId = 1;
+}
+
+message SceneQueuingRes {
+  int64 sceneId = 1;
+  int64 sceneEntryId = 2;
+  int32 lineOrder = 3;
+  int32 estimateSeconds = 4;
+}
+
+message SceneQueuingCancel {
+  int64 sceneId = 1;
+}
+
+message SceneBossShoutNotify {
+  int64 monsterId = 1;
+  int32 shoutId = 2;
+}
+
+message GetSceneLineInfoReq {
+  uint64 playerUUID = 1;
+  int64 sceneEntry = 2;
+  uint64 area = 3;
+}
+
+message SceneLineInfo {
+  int64 sceneID = 1;
+  int32 linenum = 2;
+  int32 currolenum = 3;
+  int64 sceneEntry = 4;
+}
+
+message GetSceneLineInfoResp {
+  int32 result = 1;
+  uint64 playerUUID = 2;
+  int64 sceneEntry = 3;
+  repeated romsg.SceneLineInfo lineInfo = 4;
+}
+
+message SwitchSceneLineReq {
+  uint64 playerUUID = 1;
+  int64 sceneEntry = 2;
+  uint64 area = 3;
+  int32 linenum = 4;
+  romsg.SwitchSceneSourceType eSource = 5;
+}
+
+message SwitchSceneLineResp {
+  int32 result = 1;
+  int64 sceneEntry = 2;
+  int64 sceneID = 3;
+  int32 linenum = 4;
+  romsg.SwitchSceneReasonType reason = 5;
+  romsg.SwitchSceneSourceType eSource = 6;
+}
+
+message CustomForceField {
+  romsg.ForceFieldType field_type = 1;
+  float forceDir = 2;
+  romsg.Vec3 forceTargetPos = 3;
+  float forceSpeed = 4;
+  romsg.ShapeRange forceRangeInfo = 5;
+}
+
+message ForceFieldInfo {
+  uint32 uuid = 1;
+  bool remove = 2;
+  uint32 forceConfId = 3;
+  romsg.CustomForceField customField = 4;
+}
+
+message ForceFieldNotify {
+  repeated romsg.ForceFieldInfo forceFields = 1;
+}
+
+message DungeonStateChangeNtf {
+  romsg.DUNGEON_STATE nStateDungeon = 1;
+  int64 nTmActive = 2;
+  int64 nTmStart = 3;
+  int64 nTmEnd = 4;
+  int64 nTmCur = 5;
+}
+
+message TempLeaveNtf {
+  int32 CountdownSeconds = 1;
+}
+
+message RecureTempLeaveReq {
+}
+
+message ForceLeaveNtf {
+  int64 leaveFromSceneEntry = 1;
+  int32 errorCode = 2;
+}
+
+message DebugShowHeightNtf {
+  message PointHeight {
+    float x = 1;
+    float y = 2;
+    float height = 3;
+  }
+
+  repeated romsg.DebugShowHeightNtf.PointHeight data = 1;
+  bool clear = 2;
+}
+
+message DebugShow3DBox {
+  message Rect3DBox {
+    romsg.Vec3 vecCenter = 1;
+    float fXLength = 2;
+    float fYLength = 3;
+    float fZLength = 4;
+    float fAngle = 5;
+  }
+
+  repeated romsg.DebugShow3DBox.Rect3DBox datas = 1;
+}
+
+message DebugShowCylinder {
+  message Cylinder {
+    romsg.Vec3 vecCenter = 1;
+    float fRadius = 2;
+    float fHeight = 3;
+  }
+
+  repeated romsg.DebugShowCylinder.Cylinder datas = 1;
+}
+
+message DebugShowFan {
+  message Fan {
+    romsg.Vec3 vecCenter = 1;
+    float fRadius = 2;
+    float fAngle = 3;
+    float fSweepAngle = 4;
+    float fHeight = 5;
+  }
+
+  repeated romsg.DebugShowFan.Fan datas = 1;
+}
+
+message QueryCurrentNpcReq {
+  repeated int32 pointIDs = 1;
+  int64 npcConfigID = 2;
+}
+
+message QueryCurrentNpcResp {
+  repeated int32 pointIDs = 1;
+}
+
+message SceneBaseInfoNotify {
+  int64 sceneId = 1;
+  map<int32, romsg.CommonPublicVar> vars = 2;
+  map<int32, romsg.CommonPublicVar> playerVars = 3;
+  romsg.PublicVarChangeType changeType = 100;
+}
+
+message SceneEventNotify {
+  int64 sceneId = 1;
+  repeated romsg.EventParams params = 2;
+  map<int32, romsg.CommonPublicVar> vars = 3;
+  string cliFuncname = 4;
+}
+
+message ScenePerformaceWatchReq {
+  bool startWatch = 1;
+}
+

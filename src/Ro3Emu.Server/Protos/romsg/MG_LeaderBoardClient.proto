@@ -1,0 +1,68 @@
+syntax = "proto3";
+package romsg;
+import "MG_Common.proto";
+import "MG_Pet.proto";
+
+enum LeaderBoardSelfDefineDataType {
+  LdUserId = 0;
+  LdBossId = 1;
+  LdCarrer = 2;
+  LdTime = 3;
+}
+
+message LeaderBoardDada {
+  string LeaderBoardId = 1;
+  int64 CreateTime = 2;
+  int64 NextSendRewardTime = 3;
+  int64 NextWeekSendRewardTime = 4;
+  int64 NextActivitySendRewardTime = 5;
+}
+
+message GuildLeaderBoardGveUserData {
+  int64 GuildId = 1;
+  string GuildName = 2;
+  string GuildOwnerName = 3;
+  romsg.GuildHeadIcon HeadIcon = 4;
+  int64 GuildOwnerId = 5;
+  int64 GuildOwnerJob = 6;
+  int64 MaxMemberCount = 7;
+  int64 MemberCount = 8;
+  int64 Activity = 9;
+  string LeaderOfficial = 10;
+  string RecruitInfo = 11;
+  int64 GuildLevel = 12;
+}
+
+message ClimbTowerLeaderBoardUserData {
+  int32 TowerLayer = 1;
+  int32 DurationTime = 2;
+  int64 CompleteTime = 3;
+  repeated int64 petIds = 4;
+  repeated romsg.PetData petDatas = 5;
+}
+
+message Commondata {
+  map<int32, int64> UserDefineData = 1;
+}
+
+message TotemMetaData {
+  int64 userId = 1;
+  bytes itemBaseInfo = 2;
+}
+
+message EquipMetaData {
+  int64 userId = 1;
+  string craftName = 2;
+  bytes itemBaseInfo = 3;
+}
+
+message LeaderBoardUserDada {
+  oneof val {
+    romsg.GuildLeaderBoardGveUserData GveData = 1;
+    romsg.ClimbTowerLeaderBoardUserData ClimbTowerData = 2;
+    romsg.Commondata UserCommonData = 3;
+    romsg.TotemMetaData totemMetaData = 4;
+    romsg.EquipMetaData equipMetaData = 5;
+  }
+}
+

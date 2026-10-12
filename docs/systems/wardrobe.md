@@ -1,0 +1,47 @@
+# Wardrobe implementation: 5034 and 31183-31189
+
+`WardrobeService` owns one persisted `DBWardRobeInfo` per role. The server loads it before ENTITYSELF/AOI, routes 31183-31188, and projects the committed `curUseAppearances` map for self, viewers, later entrants and offline role data. Each wear/plan apply publishes a complete 31049 `WardRobe` map. `MG_DB.proto:1248-1269` is authoritative; legacy `MG_WardRobe.proto:30-37` omits `LikeAppearance` and is not used. `LC_DAL_Fashion.lua:15-117` establishes the full 5034 asset, and its incremental handlers at lines 119-221 require nonnil child maps.
+
+## Proven client/config rules
+
+- `WardRobeConfig.json` has 158 IDs with `_iType` slots 1-9, `_iSexNeed`, `_iDisable`, `_iDefaultLightUp`, `_kMaterial`. The 30 default hairstyles are 15 male (70000000-70000014) and 15 female (72000000-72000014). The service owns all 15 for the role's sex and keeps the creation hair selected. `LC_FashionHelper.lua:312-344` checks sex; the client fashion score only counts permanent ownership (`:498-601`).
+- `UI_Sys_WardrobePanelCtrl.lua:1075-1126,1400-1408` sends nonzero, owned appearance IDs as one wardrobe save, so 31183 replaces the selected slot map. The service retains the current hair when a malformed/incomplete request omits it **(inferred safety rule)** and rejects duplicate types, unowned, expired, sex-incompatible, disabled or unknown IDs before mutation. The 31049 map includes all surviving slots. Wardrobe mount appearance ownership is separate from 5012 mount ownership; the client's close path also issues 32743 for mount selection. For type 6 the configured `MountsConfig._kJob` allowlist is checked.
+- `_iConflictField` is a hair-mesh selection rule, **not** a pair of incompatible wardrobe slots. `Logic/Unit/LC_ModelLoader.lua:2935-3030` reads its first value when adapting a head accessory to the selected hairstyle, or uses the bald model for negative values. Consequently 31183 preserves both head and hair; its configured visual conflict is resolved by the client model loader.
+- `PublicParamConfig.lua:1998` says `FashionMatchNum=5`; `UI_Sys_Wardrobe_PlanPanelCtrl.lua:1158-1198` sends UI index minus one. Plans 0-4 are seeded with a real hair entry because `LC_DAL_Fashion.lua:195-199` calls `pairs(plan.appearances)`. A missing plan is shown unlocked by the plan controller (lines 608-650); seeding all five as unlocked is **inferred compatible server state**. Save keeps each plan's name and applies only owned/valid selections. 31186 echoes `req` because `LC_DAL_Fashion.lua:223-241` dereferences `req.index`.
+- `enum_FashionLikeState` in `Lua_GameDefine.lua:12781-12786` is Like=0, Dislike=1. 31187 retains the wire typo `appreanceId`; `LikeAppearance` stores 0 for a favorite and removes its key for dislike. Favoriting a configured look without owning it is **inferred** from the wardrobe UI, where likes are a browsing aid.
+- `ActionConfig[200]` is server-host `ActivatedAppearance`; 121 `ItemConfig._iUseEffect` entries use it. For example item 3025701 targets appearance 70050010. The item-use hook validates the exact one-action item, consumes one GUID and writes 5034 ownership in one SQLite transaction, then issues 31189. Redeem 31188 likewise pays the exact configured `_kMaterial` pairs atomically with the wardrobe blob. No free unlock is created from an empty material list. `ExchangeLockedAsync` rolls back inventory and currency on a failed transaction.
+- `WardRobeConfig._kBasicAttribute` and `_kSpecialAttribute` are empty for all 158 exported rows, so 31184 persists its selected attribute source but currently changes no computed combat stat. Its sender, exact result codes and stat semantics are **inferred**. The service calls the ordinary stat refresh for future configuration.
+
+## Expiry, persistence and refusal
+
+`DBAppearanceInfo.overdueTimeMs=0` is permanent. Positive values expire at Unix milliseconds **(inferred time base)**. Login, every wardrobe/item mutation, a one-second connected-session tick, and SceneService's pre-ENTITYSELF hook remove expired collection entries, worn slots, attribute sources and plan references, restore the role's permanent base hair, persist 5034 and publish a full look change when already in world. The tick takes the character lock and coalesces checks per role; the scene hook runs before the first AOI snapshot. Merely owning a mount appearance ID does not start riding. Refusals use `ErrorCodes.Parameter`, `FeatureUnavailable`, `ItemsShort` or `CurrencyShort`; exact original-server code mapping is **inferred** from `ErrorCodeConfig.json`. All failure replies are nonzero; 31183-31186 echo the request where the schema supports it. No material or item is consumed for invalid, already owned or insufficient-cost unlocks.
+
+The owner/UI sync uses `CharacterService.SyncAsync` so initial 5034 is full and later 5034 packets are typed increments. The durable wardrobe write is a `RoleStore.SaveWardrobe` blob; material payment and action-200 item use pass that write as the `ExchangeLockedAsync.persist` callback to commit together. In-memory wardrobe changes only after committed payment. The repository currently has no wardrobe attribute values to contribute to `CharacterService.ExtraAttributes`.
+
+The first added favorite resends a full 5034 **(inferred compatibility)**. An empty protobuf `LikeAppearance` map was absent from the initial Lua asset, while `LC_DAL_Fashion.OnLikeUpdate` indexes that child table directly. Once present, ordinary increments and deletions follow.
+
+Mount appearances (type 6) are linked to mount ownership; see [mount-totem.md](mount-totem.md).
+
+## Dye/color search boundary
+
+The search covered all `data/config/*.json`, `data/sceneeditor/*` (including `*_monsteridmap.json`), `data/nav`, `data/loc`, the entire `re/lua-src` and `re/clientB/lua-src` (Config and Logic included), `re/decomp`, `src/Ro3Emu.Server/Protos` and `re/proto`. Patterns: `dye|dyed|dyeing|染色|wardrobe.?color|appearance.?color|color.?appearance|color.?wardrobe`, plus `_iConflictField|ConflictField|_iSexNeed|_iDefaultLightUp`, and targeted `ActivatedAppearance|_iUseEffect` in ActionConfig/ItemConfig. Scope counts and relevant hits are recorded below; a search hit is not itself a bound dye request.
+
+| Broad dye/color pattern scope | Files scanned | Matching files/lines | Classified result |
+| --- | ---: | ---: | --- |
+| `data/config/*.json` | 517 | 1 / 1 | Localization prose (`dyed red`); no wardrobe dye field |
+| `data/sceneeditor/*` | 381 | 0 / 0 | No match, including monster ID maps |
+| `data/nav` | 172 | 0 / 0 | No match |
+| `data/loc` | 2 | 1 / 1 | Same Morroc scenery prose |
+| `re/lua-src` | 13,488 | 11 / 42 | `ReadyEnterDungeonInfo`, `BodyEffects`, scenery prose and other substring collisions |
+| `re/clientB/lua-src` | 13,488 | 11 / 42 | Same client export, no wardrobe dye sender |
+| `re/decomp` | 2,277 | 4 / 8 | `AddYellowLog`, dictionary/field names; no wardrobe dye chain |
+| `src/Ro3Emu.Server/Protos` | 147 | 3 / 4 | `BodyEffects` / `WardRobeBodyEffects` substring collisions |
+| `re/proto` | 144 | 3 / 4 | Same protocol mirror |
+
+The separate conflict/default/sex pattern searched both Lua trees, decomp and both proto trees. Its only executable conflict-field use is `LC_ModelLoader.lua:2935-3030`; proto trees and decomp have 0 matches. The config was parsed row by row to check all 158 `WardRobeConfig` entries and every default/material field. `data/msgtable.tsv` and `MG_WardRobe.proto` were also inspected for the exact message IDs and payloads. A `data/msgtable.tsv` search for `DYE|DYEING|WARDROBE|COLOR|COLOUR` yielded only 5034 and 31181-31189 for wardrobe (no dye/color RPC); the only color-named config file is the unrelated `GuildIconColorConfig.json`.
+
+`Localization_en.json` has one `dyed` match in Morroc scenery prose, `loc_en.tsv:15334` carries the same text, and `WardRobeConfig` has no dye/color field. Matches in Lua and decomp from the broad regex are `ReadyEnterDungeonInfo`, `BodyEffects`, `AddYellowLog`, and similar substrings. The client tint/color utilities are visual presentation, without a 3118x color field. `AppearanceEtchConfig` has color IDs but is the separate mount etchant plan/part/config system (32748-32750), not a wardrobe dye transaction. `MG_WardRobe.proto`, `MG_DB.proto`, and the remaining scanned protos have no dye parameter or saved color in wardrobe messages. Thus this implementation stores configured appearance IDs and does not invent a dye RPC or color channel. A client sender and matching schema/persistence chain are required to add one.
+
+## Tests
+
+`WardrobeTests` exercises wire-level 5034 defaults, plans, likes, attribute source, reconnect, material shortages and redemption, 31189, item action 200, refusals and AOI 31049 full-look changes. Original-client runtime and packet-order acceptance remain unverified; these tests exercise the emulator and protobuf contract.

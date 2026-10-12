@@ -1,0 +1,105 @@
+syntax = "proto3";
+package romsg;
+import "FieldOption.proto";
+
+enum EAppearance_Type {
+  EAppearance_None = 0;
+  EAppearance_Head = 1;
+  EAppearance_Face = 2;
+  EAppearance_Mouth = 3;
+  EAppearance_Clothing = 4;
+  EAppearance_Back = 5;
+  EAppearance_Mount = 6;
+  EAppearance_Hair = 7;
+  EAppearance_BodyEffects = 8;
+  EAppearance_Foot = 9;
+}
+
+message AppearanceInfo {
+  int32 appearanceId = 1;
+  int64 overdueTimeMs = 2;
+}
+
+message AppearancePlan {
+  int32 index = 1;
+  bool isUnlock = 2;
+  map<int32, int32> appearances = 3;
+  string name = 4;
+}
+
+message WardRobeInfo {
+  bool isInit = 1;
+  map<int32, romsg.AppearanceInfo> allLightUpAppearances = 2;
+  map<int32, int32> curUseAppearances = 3;
+  map<int32, int32> curUseAppearanceAttrs = 4;
+  map<int32, romsg.AppearancePlan> appearancePlans = 5;
+  map<int32, int32> lastUseForeverAppearanceAttrs = 6;
+}
+
+message WardRobeInfoNtf {
+  romsg.WardRobeInfo wardRobeInfo = 1;
+}
+
+message WardRobeAppearanceUpdateNtf {
+  romsg.AppearanceInfo appearance = 1;
+  bool isLightUp = 2;
+}
+
+message WardRobeUseAppearanceReq {
+  repeated int32 appearanceIds = 1;
+}
+
+message WardRobeUseAppearanceRes {
+  int32 result = 1;
+  romsg.WardRobeUseAppearanceReq req = 2;
+}
+
+message WardRobeUseAppearanceAttrReq {
+  int32 appearanceId = 1;
+}
+
+message WardRobeUseAppearanceAttrRes {
+  int32 result = 1;
+  romsg.WardRobeUseAppearanceAttrReq req = 2;
+}
+
+message WardRobeSaveAppearancePlanReq {
+  int32 index = 1;
+  map<int32, int32> appearances = 2;
+}
+
+message WardRobeSaveAppearancePlanRes {
+  int32 result = 1;
+  romsg.WardRobeSaveAppearancePlanReq req = 2;
+}
+
+message WardRobeApplyAppearancePlanReq {
+  int32 index = 1;
+}
+
+message WardRobeApplyAppearancePlanRes {
+  int32 result = 1;
+  romsg.WardRobeApplyAppearancePlanReq req = 2;
+}
+
+message WardRobeSetLikeReq {
+  int32 appreanceId = 1;
+  int32 opType = 2;
+}
+
+message WardRobeSetLikeResp {
+  int32 result = 1;
+}
+
+message WardRobeRedeemUnlockAppearanceReq {
+  int32 appearanceId = 1;
+}
+
+message WardRobeRedeemUnlockAppearanceResp {
+  int32 result = 1;
+}
+
+message WardRobeUnLockNtf {
+  int32 appearanceId = 1;
+}
+

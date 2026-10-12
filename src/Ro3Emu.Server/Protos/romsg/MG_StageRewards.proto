@@ -1,0 +1,43 @@
+syntax = "proto3";
+package romsg;
+
+enum FunctionStageReward {
+  FunctionStageReward_None = 0;
+  FunctionStageReward_BeStrongerPower = 1;
+  FunctionStageReward_Activity = 2;
+  FunctionStageReward_Fashion = 3;
+  FunctionStageReward_Library = 4;
+  FunctionStageReward_PetGacha = 5;
+  FunctionStageReward_ChickenRank = 6;
+  FunctionStageReward_DailyActivity = 7;
+  FunctionStageReward_Treasure = 8;
+  FunctionStageReward_Max = 9;
+}
+
+message StageRewardGainReq {
+  int32 stageId = 1;
+}
+
+message StageRewardGainResp {
+  int32 result = 1;
+  int32 stageId = 2;
+}
+
+message StageRewardBatchGainReq {
+  repeated int32 stageIds = 1;
+}
+
+message StageRewardBatchGainResp {
+  int32 result = 1;
+  romsg.StageRewardBatchGainReq req = 2;
+}
+
+message GrowthClassGetRankRewardReq {
+  int32 rankId = 1;
+}
+
+message GrowthClassGetRankRewardRsp {
+  int32 result = 1;
+  int32 rankId = 2;
+}
+

@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Ro3Emu.Bot/Ro3Emu.Bot.csproj" />
+    <Project Path="src/Ro3Emu.BotCli/Ro3Emu.BotCli.csproj" />
+    <Project Path="src/Ro3Emu.LoadTest/Ro3Emu.LoadTest.csproj" />
+    <Project Path="src/Ro3Emu.ClientHooks/Ro3Emu.ClientHooks.csproj" />
+  <Project Path="src/Ro3Emu.Loc/Ro3Emu.Loc.csproj" />
+    <Project Path="src/Ro3Emu.ClientTools/Ro3Emu.ClientTools.csproj" />
+    <Project Path="src/Ro3Emu.Launcher/Ro3Emu.Launcher.csproj" />
+    <Project Path="src/Ro3Emu.Patcher/Ro3Emu.Patcher.csproj" />
+    <Project Path="src/Ro3Emu.Server/Ro3Emu.Server.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Ro3Emu.Patcher.Tests/Ro3Emu.Patcher.Tests.csproj" />
+    <Project Path="tests/Ro3Emu.Tests/Ro3Emu.Tests.csproj" />
+  </Folder>
+</Solution>

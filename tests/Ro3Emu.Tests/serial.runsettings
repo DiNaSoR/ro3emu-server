@@ -1,0 +1,7 @@
+<RunSettings>
+  <xUnit>
+    <ParallelizeTestCollections>false</ParallelizeTestCollections>
+    <MaxParallelThreads>1</MaxParallelThreads>
+    <DiagnosticMessages>true</DiagnosticMessages>
+  </xUnit>
+</RunSettings>

@@ -1,0 +1,9 @@
+{
+  // Ro3Emu.Patcher repository (static HTTP) and the channel this launcher follows. Point these at your own host
+  // (docs/guide/launcher.md); a launcher.json beside the exe overrides the built-in one.
+  "repository": "http://localhost:8790/",
+  "channel": "test",
+  // The game server's HTTP base; the launcher pings it for the online pill.
+  "server": "http://127.0.0.1:5380",
+  "serverName": "RO3Emu"
+}

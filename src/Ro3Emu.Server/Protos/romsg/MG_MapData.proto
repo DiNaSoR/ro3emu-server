@@ -1,0 +1,48 @@
+syntax = "proto3";
+package MapProto;
+
+message NodeData {
+  message LayerData {
+    int32 LayerId = 1;
+    int32 Height = 2;
+    int32 GridLevel = 3;
+    int32 Walkable = 4;
+  }
+
+  int32 X = 1;
+  int32 Z = 2;
+  int32 Walkable = 3;
+  int32 Area = 4;
+  int32 MeshY = 5;
+  int32 GridLevel = 6;
+  int32 BaseLayer = 7;
+  repeated MapProto.NodeData.LayerData Layers = 8;
+}
+
+message MapData {
+  int32 Width = 1;
+  int32 Height = 2;
+  int32 NodeSize = 3;
+  float CenterX = 4;
+  float CenterZ = 5;
+  repeated MapProto.NodeData Nodes = 6;
+  int32 MaxLayer = 7;
+}
+
+message MaskNodeData {
+  int32 X = 1;
+  int32 Z = 2;
+  int32 Height = 3;
+  bool bHeightValid = 4;
+  bool bWalkAble = 5;
+  int32 GridLevel = 6;
+}
+
+message SurfaceMaskData {
+  int32 CenterX = 1;
+  int32 CenterZ = 2;
+  int32 XLength = 3;
+  int32 ZLength = 4;
+  repeated MapProto.MaskNodeData nodeDatas = 5;
+}
+

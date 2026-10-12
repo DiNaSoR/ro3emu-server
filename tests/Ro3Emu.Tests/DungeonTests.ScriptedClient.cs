@@ -1,0 +1,228 @@
+using System.Text.Json;
+using Romsg;
+using Ro3Emu.Bot;
+using Ro3Emu.Server.Data;
+using Ro3Emu.Server.Game;
+using Ro3Emu.Server.Maps;
+
+namespace Ro3Emu.Tests;
+
+/// <summary>
+/// The scripted scenes seen from the client: every interaction a step waits on is checked against the wire data the
+/// client actually received (31037 entities, 31104/31105 buff syncs) with the client's own rules for offering it
+/// (LC_InteractManager: a unit registers for interaction when NPCConfig _iInteractID[1] is set, LC_Unit_NPC/Monster
+/// StartLogic; every 0.2 s it is in range when the player is within its _iInteractDistance, and of the units in range
+/// the one with the highest _iInteractRank, then the nearest, is possessed; an interaction is offered when its
+/// _iNPCCondition holds, here 1004 CheckHaveBuff on the unit's buff groups, keyed by BuffConfig _iBuffID).
+/// </summary>
+public sealed partial class DungeonTests
+{
+    [Theory]
+    [MemberData(nameof(ScriptedScenes))]
+    public async Task EveryInteractionAStepWaitsOnIsOfferedByTheClientsOwnRules(long scene)
+    {
+        await using var alice = await InWorld("Alice");
+        Assert.Equal(0, await Enter(alice, new EnterDungeonReq { SceneEntry = scene }));
+        await Load(alice, scene);
+        var plan = Session(alice).DungeonAttempt!.Plan;
+        var catalog = Service<DungeonCatalog>();
+        var map = Service<WorldData>().Map(scene)!;
+        for (int wave = 0; wave < plan.Waves.Count; wave++)
+        {
+            var step = plan.Waves[wave].Step!;
+            await Stage(alice, wave + 1, quest: step.Quest);
+            await ActorsWhen(alice, shown => shown.Count == step.Actors.Count && step.Actors.All(spec => shown.Any(u =>
+                u.NpcId == spec.NpcId && u.Point == spec.Point && u.Buffs.Select(b => b.ConfigId).Order().SequenceEqual(spec.Buffs.Order()))));
+            var t = step.Complete[0];
+            switch (t.Kind)
+            {
+                case ReconstructedDungeons.TriggerKind.Interaction or ReconstructedDungeons.TriggerKind.Message:
+                {
+                    var (actor, interaction) = await Service<GameLoop>().InvokeAsync(() => Task.FromResult(
+                        Session(alice).DungeonAttempt!.SceneActors.SelectMany(u => catalog.Interactions(u.NpcId)
+                            .Where(i => t.Kind == ReconstructedDungeons.TriggerKind.Interaction ? i == t.Id : catalog.DungeonMessage(i) == t.Id)
+                            .Select(i => (u, i))).First()));
+                    var npc = Service<GameData>().Row("NPCConfig", actor.NpcId)!.Value;
+                    var view = await ClientSees(alice, actor.Uid, step.Actors.First(a => a.NpcId == actor.NpcId && a.Point == actor.Point).Buffs);
+                    // The entity the client creates: its unit class, template and place.
+                    Assert.Equal((int)GameData.Int(npc, "_iNPCType"), view.Entity.EntityType);
+                    Assert.Equal((ulong)actor.NpcId, view.Entity.EntityTemplateID);
+                    // An NPC is shaped like the world NPCs the live client interacts with (portals, Kafras): no born time.
+                    if (view.Entity.EntityType == 2) Assert.Equal(0, view.Entity.BornTimeMs);
+                    var point = map.Points[actor.Point];
+                    Assert.Equal(point.X, view.Entity.MovementInfo.Pos.X, 0.01f);
+                    Assert.Equal(point.Z, view.Entity.MovementInfo.Pos.Z, 0.01f);
+                    // It registers for interaction and offers the step's interaction (directly, or from its dialogue).
+                    Assert.NotEqual(0, catalog.Interactions(actor.NpcId).FirstOrDefault());
+                    int offered = Reachable(actor.NpcId, interaction);
+                    Assert.True(ConditionHolds(offered, view.BuffGroups),
+                        $"interaction {offered} of {actor.NpcId}: NPC condition fails with buff groups [{string.Join(',', view.BuffGroups)}]");
+                    // The GM aid puts the player on the actor; the client's next 0.2 s check finds it in range and
+                    // possesses it (no other interactive unit is preferred).
+                    await Gm(alice, $"!actors {actor.NpcId}");
+                    var at = await Service<GameLoop>().InvokeAsync(() => Task.FromResult(Session(alice).Position));
+                    for (int i = 0; i < 100 && MonsterService.Distance(at.X, at.Z, actor.X, actor.Z) > 1.5f; i++)
+                    {
+                        await Task.Delay(20);
+                        at = await Service<GameLoop>().InvokeAsync(() => Task.FromResult(Session(alice).Position));
+                    }
+                    Assert.Equal(actor.Uid, Possessed(alice, at.X, at.Y, at.Z));
+                    Assert.Equal(0, await Interact(alice, actor, (int)interaction));
+                    break;
+                }
+                case ReconstructedDungeons.TriggerKind.Plot:
+                    await Story(alice, t.Id);
+                    // 84012 (the plot's action 150 PlotActingTrigger) completes it as well as 84011 does.
+                    await alice.SendGameAsync(TaskService.ExitCutSceneState, new ExitCutSceneStateReq());
+                    await alice.SendGameAsync(DungeonService.PlotSceneEvent, new PlotActingTriggerReq { PlotId = t.Id });
+                    break;
+                default:
+                    // The GM aid's arrival runs the walk report's check (the scene tests above walk for real).
+                    var p = t.Kind == ReconstructedDungeons.TriggerKind.Region
+                        ? new MapPoint(map.Regions[t.Id].X, 0, map.Regions[t.Id].Z, 0) : map.Points[t.Id];
+                    await Gm(alice, FormattableString.Invariant($"!actors walk {p.X} {p.Z}"));
+                    break;
+            }
+        }
+        Assert.Equal((DungeonRes)1, (await Next(alice, DungeonService.Result, DungeonResNotify.Parser)).Res);
+    }
+
+    [Fact]
+    public void SceneActorUidsSurviveTheClientsDoubleArray()
+    {
+        // LC_InteractManager passes unit ids to the scene object manager as doubles: every actor uid must stay exact.
+        const long limit = 1L << 53;
+        Assert.True((DungeonService.SceneActorUidBase << 1) <= limit);
+        Assert.NotEqual((double)DungeonService.SceneActorUidBase, (double)(DungeonService.SceneActorUidBase | 1));
+        // The other dynamic NPC namespaces the client can stand next to (guild campfire seeds: prefix | 24-bit room | 12-bit
+        // point; treasure hunt NPCs: prefix | role id; the One Piece treasure).
+        Assert.True((GuildCampfireService.UidPrefix << 1) <= limit);
+        Assert.True((SceneService.TreasureUidPrefix << 1) <= limit);
+        Assert.True(TimedBattleService.TreasureNpcUid < limit);
+    }
+
+    [Theory]
+    [MemberData(nameof(ScriptedScenes))]
+    public async Task TheUseTestAidFinishesAScriptedSceneServerSide(long scene)
+    {
+        await using var alice = await InWorld("Alice");
+        await Gm(alice, "!actors use"); // outside a scene: refused, nothing happens
+        Assert.Equal(0, await Enter(alice, new EnterDungeonReq { SceneEntry = scene }));
+        await Load(alice, scene);
+        var plan = Session(alice).DungeonAttempt!.Plan;
+        for (int wave = 0; wave < plan.Waves.Count; wave++)
+        {
+            var step = plan.Waves[wave].Step!;
+            await Stage(alice, wave + 1, quest: step.Quest);
+            await ActorsIn(alice, step.Actors.Count);
+            await Gm(alice, "!actors use");
+        }
+        Assert.Equal((DungeonRes)1, (await Next(alice, DungeonService.Result, DungeonResNotify.Parser)).Res);
+    }
+
+    private sealed record ClientUnit(EntityBase Entity, IReadOnlySet<long> BuffGroups);
+
+    /// <summary>
+    /// The unit as the client holds it: its last 31037 base, then the 31104/31105 buff syncs after it (the client's
+    /// buff component keys buffs by group, BuffConfig _iBuffID). Waits until its buffs are the step's.
+    /// </summary>
+    private async Task<ClientUnit> ClientSees(BotClient bot, long uid, IReadOnlyList<int> buffs)
+    {
+        ClientUnit? seen = null;
+        for (int i = 0; i < 150; i++)
+        {
+            EntityBase? entity = null;
+            var held = new Dictionary<long, int>();
+            foreach (var e in bot.Inbox.Snapshot())
+            {
+                if (e.IsGame(GameAoiSink.SyncAoiView))
+                {
+                    var view = AoIViewChangeData.Parser.ParseFrom(e.Body);
+                    if (view.LeaveAoi.Contains((ulong)uid)) { entity = null; held.Clear(); }
+                    if (view.Bases.LastOrDefault(b => b.Uuid == (ulong)uid) is { } b)
+                    {
+                        entity = b;
+                        held.Clear();
+                        foreach (var buff in b.BuffData?.AddBuffs ?? []) held[buff.BuffGuid] = buff.ConfigId;
+                    }
+                }
+                else if (e.IsGame(BuffService.BuffUpdate) && BuffUpdateNotify.Parser.ParseFrom(e.Body) is { } add && add.UnitId == uid)
+                    foreach (var buff in add.Buffs) held[buff.BuffGuid] = buff.ConfigId;
+                else if (e.IsGame(BuffService.BuffRemove) && BuffRemoveNotify.Parser.ParseFrom(e.Body) is { } gone && gone.UnitId == uid)
+                    foreach (long guid in gone.BuffGuids) held.Remove(guid);
+            }
+            if (entity != null)
+            {
+                seen = new ClientUnit(entity, held.Values.Select(id => GameData.Int(Service<GameData>().Row("BuffConfig", id)!.Value, "_iBuffID")).ToHashSet());
+                if (held.Values.Order().SequenceEqual(buffs.Order())) return seen;
+            }
+            await Task.Delay(20);
+        }
+        throw new TimeoutException($"The client never held unit {uid} with buffs [{string.Join(',', buffs)}]"
+            + (seen == null ? "" : $"; it holds groups [{string.Join(',', seen.BuffGroups)}]"));
+    }
+
+    /// <summary>
+    /// The interaction the client offers on the unit for <paramref name="interaction"/>: itself unless it is an
+    /// ActionTrigger (mode 4), which only a dialogue option's action 211 TriggerNpcInteract runs; then the unit's
+    /// interaction whose dialogue (action 53) holds that option.
+    /// </summary>
+    private int Reachable(int npcId, long interaction)
+    {
+        var data = Service<GameData>();
+        static int[] Modes(JsonElement row) => row.GetProperty("_iInteractionMode").EnumerateArray().Select(v => (int)(GameData.Number(v) ?? 0)).ToArray();
+        static IEnumerable<string[]> Actions(JsonElement row, string field) => row.TryGetProperty(field, out var a) && a.ValueKind == JsonValueKind.Array
+            ? a.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.Array).Select(x => x.EnumerateArray().Select(v => v.ToString()).ToArray()) : [];
+        var row = data.Row("NPCInteractConfig", interaction)!.Value;
+        if (!Modes(row).Contains(4)) return (int)interaction;
+        foreach (var other in Service<DungeonCatalog>().Interactions(npcId).Where(i => i != interaction))
+        {
+            var o = data.Row("NPCInteractConfig", other)!.Value;
+            foreach (var dialogue in Actions(o, "_iEXECAction").Where(a => a is ["53", _, ..]).Select(a => long.Parse(a[1])))
+                if (data.Row("DialogueConfig", dialogue) is { } lines && lines.EnumerateArray().Any(line => Actions(line, "_iEXECAction")
+                        .Any(a => a is ["211", var n, var i, ..] && n == npcId.ToString() && i == interaction.ToString())))
+                    return (int)other;
+        }
+        throw new Xunit.Sdk.XunitException($"ActionTrigger {interaction} of {npcId}: no dialogue of the unit runs it");
+    }
+
+    /// <summary>The interaction's _iNPCCondition as the client evaluates it here: its 1004 CheckHaveBuff parts.</summary>
+    private bool ConditionHolds(int interaction, IReadOnlySet<long> groups)
+    {
+        var data = Service<GameData>();
+        long id = GameData.Int(data.Row("NPCInteractConfig", interaction)!.Value, "_iNPCCondition");
+        if (id == 0) return true;
+        var condition = data.Row("LC_ConditionList", id)!.Value;
+        var parts = condition.TryGetProperty("m_kSubConditionList", out var list) ? list.EnumerateArray().ToArray() : [condition];
+        return parts.All(p =>
+        {
+            var d = p.GetProperty("m_kData");
+            if (GameData.Number(d[0]) != 1004) return true; // vehicle seat checks (12002/12003) are the client's own state
+            bool has = groups.Contains((long)GameData.Number(d[1])!);
+            return p.TryGetProperty("m_bInverse", out var inv) && inv.ValueKind == JsonValueKind.True ? !has : has;
+        });
+    }
+
+    /// <summary>The unit the client possesses at the player's position among the units it holds (LC_InteractManager).</summary>
+    private long Possessed(BotClient bot, float x, float y, float z)
+    {
+        var data = Service<GameData>();
+        var units = new Dictionary<ulong, EntityBase>();
+        foreach (var e in bot.Inbox.Snapshot().Where(e => e.IsGame(GameAoiSink.SyncAoiView)))
+        {
+            var view = AoIViewChangeData.Parser.ParseFrom(e.Body);
+            foreach (var gone in view.LeaveAoi) units.Remove(gone);
+            foreach (var b in view.Bases) units[b.Uuid] = b;
+        }
+        var inRange = units.Values.Select(u => (Unit: u, Npc: data.Row("NPCConfig", (long)u.EntityTemplateID)))
+            .Where(u => u.Unit.EntityType is 1 or 2 && u.Npc is { } n && n.TryGetProperty("_iInteractID", out var ids)
+                && ids.ValueKind == JsonValueKind.Array && ids.GetArrayLength() > 0 && GameData.Number(ids[0]) is > 0)
+            .Select(u => (u.Unit, Rank: GameData.Int(u.Npc!.Value, "_iInteractRank"),
+                Reach: GameData.Number(u.Npc.Value.GetProperty("_iInteractDistance")) ?? 0,
+                Distance: Math.Sqrt(Math.Pow(u.Unit.MovementInfo.Pos.X - x, 2) + Math.Pow(u.Unit.MovementInfo.Pos.Y - y, 2)
+                    + Math.Pow(u.Unit.MovementInfo.Pos.Z - z, 2))))
+            .Where(u => u.Distance <= u.Reach).ToArray();
+        Assert.NotEmpty(inRange);
+        return (long)inRange.OrderByDescending(u => u.Rank).ThenBy(u => u.Distance).First().Unit.Uuid;
+    }
+}

@@ -1,0 +1,11 @@
+syntax = "proto3";
+package romsg;
+
+message PlotActingEndReq {
+  int64 plotId = 1;
+}
+
+message PlotActingTriggerReq {
+  int64 plotId = 1;
+}
+

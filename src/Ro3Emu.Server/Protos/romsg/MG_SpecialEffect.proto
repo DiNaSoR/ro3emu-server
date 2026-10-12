@@ -1,0 +1,21 @@
+syntax = "proto3";
+package romsg;
+
+enum ESpecialEffectSource_Type {
+  ESpecialEffectSource_None = 0;
+  ESpecialEffectSource_Equip = 1;
+  ESpecialEffectSource_WardRobe = 2;
+  EspecialEffectSource_CardBinding = 3;
+  EspecialEffectSource_Totem = 4;
+  EspecialEffectSource_Emblem = 5;
+  EspecialEffectSource_GuildEscort = 6;
+  EspecialEffectSource_TerritoryWar = 7;
+  EspecialEffectSource_Siege = 8;
+  ESpecialEffectSource_Max = 9;
+}
+
+message SpecialEffectInfoNtf {
+  repeated int64 SkillId = 1;
+  int32 source = 2;
+}
+

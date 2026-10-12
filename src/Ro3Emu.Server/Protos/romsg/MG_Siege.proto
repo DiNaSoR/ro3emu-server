@@ -1,0 +1,114 @@
+syntax = "proto3";
+package romsg;
+import "FieldOption.proto";
+import "MG_Common.proto";
+import "MG_Guild.proto";
+
+enum SiegeCityActivityState {
+  SiegeCityActivityStateNone = 0;
+  SiegeCityActivityStateNotOpen = 1;
+  SiegeCityActivityStateFighting = 2;
+  SiegeCityActivityStateEnd = 3;
+}
+
+message SiegeEntityTotalInfo {
+  map<int32, romsg.SiegeCityBattleInfo> battleInfos = 1;
+  map<int32, romsg.SiegeCityHistoryInfoList> cityHistoryInfo = 2;
+  int32 week = 3;
+  map<int64, int64> guildSceneMap = 4;
+}
+
+message SiegeBaseInfoNtf {
+  int32 currentCityId = 3;
+  map<int32, romsg.SiegeCityBattleInfo> battleInfos = 4;
+}
+
+message GetSiegeBaseInfoReq {
+  int64 playerId = 1;
+  int64 guildId = 2;
+}
+
+message GetSiegeBaseInfoRsp {
+  int32 result = 1;
+  romsg.SiegeBaseInfoNtf siegeBaseInfo = 2;
+}
+
+message SiegeCityBattleInfo {
+  int32 cityId = 1;
+  romsg.GuildSnapInfo attackGuildInfo = 2;
+  romsg.GuildSnapInfo defenseGuildInfo = 3;
+  int64 startTime = 4;
+  int64 endTime = 5;
+  romsg.SiegeCityActivityState activityState = 6;
+}
+
+message SiegeCityHistoryInfoReq {
+  int32 cityId = 1;
+  repeated int32 cityIds = 2;
+}
+
+message SiegeCityHistoryInfoResp {
+  int32 result = 1;
+  int32 cityId = 2;
+  repeated romsg.SiegeCityHistoryInfo infos = 3;
+}
+
+message SiegeCityHistoryInfoList {
+  repeated romsg.SiegeCityHistoryInfo infos = 1;
+}
+
+message SiegeCityHistoryInfo {
+  int32 cityId = 1;
+  int32 week = 2;
+  map<int32, int32> siegeWinInfo = 3;
+  romsg.GuildSnapInfo guildInfo = 4;
+  romsg.SiegeHistoryBattleInfo battleInfo = 5;
+}
+
+message SiegeResultInfo {
+  int32 result = 1;
+  int64 time = 2;
+  romsg.GuildSnapInfo winGuildInfo = 3;
+  romsg.GuildSnapInfo loseGuildInfo = 4;
+}
+
+message SiegeHistoryBattleInfo {
+  romsg.SiegeResultInfo resultInfo = 1;
+  romsg.DungeonResultInfo commonResultInfo = 2;
+}
+
+message SiegeDungeonResultNtf {
+  int32 result = 1;
+  int32 cityId = 2;
+  romsg.SiegeHistoryBattleInfo history = 3;
+}
+
+message SiegeGuildApplyReq {
+  romsg.GuildSnapInfo guildSnapInfo = 1;
+  int32 cityId = 2;
+  bool isAttack = 3;
+}
+
+message SiegeGuildApplyRsp {
+  int32 result = 1;
+}
+
+message SiegeWinInfo {
+  map<int32, int32> siegeWinInfo = 4;
+}
+
+message SiegeGuildDungeonData {
+  int64 guildId = 1;
+}
+
+message SiegeInitData {
+  romsg.SiegeGuildDungeonData attackGuildData = 1;
+  romsg.SiegeGuildDungeonData defenseGuildData = 2;
+  int32 cityId = 3;
+}
+
+message GetGuildMatchSiegeInfoRsp {
+  int32 result = 1;
+  repeated romsg.GuildSnapInfo guildInfoList = 2;
+}
+

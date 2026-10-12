@@ -1,0 +1,124 @@
+syntax = "proto3";
+package romsg;
+import "FieldOption.proto";
+import "MG_Auction.proto";
+
+enum TerritoryAuctionPhase {
+  TERRITORY_PHASE_UNKNOWN = 0;
+  TERRITORY_PHASE_PREPARATION = 1;
+  TERRITORY_PHASE_FREE_AUCTION = 2;
+  TERRITORY_PHASE_FINAL_AUCTION = 3;
+  TERRITORY_PHASE_SETTLING = 4;
+}
+
+enum TerritoryAutoBidStyle {
+  TABS_NONE = 0;
+  TABS_AGGRESSIVE = 1;
+  TABS_STEADY = 2;
+  TABS_STEALTH = 3;
+}
+
+enum TerritoryAutoBidState {
+  TerritoryAutoBidState_None = 0;
+  TerritoryAutoBidState_Active = 1;
+  TerritoryAutoBidState_Evicted = 2;
+}
+
+message TerritoryAuctionBidReq {
+  int32 zoneId = 1;
+  int64 targetBid = 2;
+  int64 currentBid = 3;
+}
+
+message TerritoryAuctionBidRes {
+  int64 actualBid = 1;
+}
+
+message TerritoryAuctionQueryReq {
+}
+
+message TerritoryZoneRankData {
+  int32 zoneId = 1;
+  int32 seatCount = 2;
+  repeated romsg.TerritoryBidRankEntry entries = 3;
+  bool selfGuildBidded = 4;
+  bool selfGuildCanBid = 5;
+}
+
+message TerritoryBidRankEntry {
+  int32 rank = 1;
+  int64 guildId = 2;
+  int64 bidAmount = 3;
+  bool isOccupier = 4;
+}
+
+message TerritoryAutoBidSetReq {
+  int32 zoneId = 1;
+  int64 initialBid = 2;
+  int64 maxBid = 3;
+  romsg.TerritoryAutoBidStyle style = 4;
+}
+
+message TerritoryAutoBidSetRes {
+}
+
+message TerritoryAutoBidCancelReq {
+  int32 zoneId = 1;
+}
+
+message TerritoryAutoBidCancelRes {
+}
+
+message TerritoryAutoBidQueryReq {
+}
+
+message TerritoryAutoBidSettingChangeNtf {
+  int32 zoneId = 1;
+  romsg.TerritoryAutoBidState isActive = 2;
+  int64 initialBid = 3;
+  int64 maxBid = 4;
+  romsg.TerritoryAutoBidStyle style = 5;
+}
+
+message TerritoryAuctionRankDataNtf {
+  bool isSettled = 1;
+  repeated romsg.TerritoryZoneRankData zones = 2;
+}
+
+message DBTerritoryBidEntry {
+  int64 guildId = 1;
+  int64 bidAmount = 2;
+  int64 bidTime = 3;
+  bool isOccupier = 4;
+  int32 escortResult = 5;
+}
+
+message DBTerritoryAutoBid {
+  int64 guildId = 1;
+  int64 initialBid = 2;
+  int64 maxBid = 3;
+  romsg.TerritoryAutoBidStyle style = 4;
+  int64 scheduledBidTime = 5;
+  int32 zoneId = 6;
+  int32 escortResult = 7;
+  romsg.TerritoryAutoBidState state = 8;
+}
+
+message DBTerritoryZoneData {
+  int32 zoneId = 1;
+  int32 seatCount = 2;
+  repeated romsg.DBTerritoryBidEntry bidEntries = 3;
+  repeated int64 occupierGuildIds = 4;
+}
+
+message TerritoryAuctionStrategyData {
+  int64 minStartPrice = 1;
+  repeated romsg.DBTerritoryZoneData zones = 2;
+  repeated romsg.DBTerritoryAutoBid autoBids = 3;
+  int64 freeAuctionStartTime = 4;
+  int64 finalAuctionStartTime = 5;
+  int64 finalAuctionEndTime = 6;
+  map<int64, int32> guildEscortResults = 7;
+  romsg.TerritoryAuctionPhase currentPhase = 8;
+}
+

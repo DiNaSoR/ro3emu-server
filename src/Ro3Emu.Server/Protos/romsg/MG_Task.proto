@@ -1,0 +1,162 @@
+syntax = "proto3";
+package romsg;
+import "FieldOption.proto";
+
+enum TaskReceiveType {
+  TaskReciveType_Other = 0;
+  TaskReciveType_Auto = 1;
+  TaskReciveType_Npc = 2;
+  TaskReciveType_UI = 3;
+}
+
+enum TaskAutoFinishType {
+  TaskAutoFinish_Other = 0;
+  TaskAutoFinish_Auto = 1;
+  TaskAutoFinish_Npc = 2;
+  TaskAutoFinish_UI = 3;
+}
+
+enum TaskState {
+  TaskState_None = 0;
+  TaskState_CanAccept = 1;
+  TaskState_Running = 2;
+  TaskState_Finish = 3;
+  TaskState_Delivery = 4;
+  TaskState_Fail = 5;
+}
+
+enum ETaskRewardNum {
+  ETaskRewardNum_None = 0;
+  ETaskRewardNum_Chicken = 1;
+}
+
+message TaskInfo {
+  int64 taskId = 1;
+  romsg.TaskState status = 2;
+  repeated int64 completeNum = 3;
+  int64 startTime = 4;
+  bool follow = 5;
+  int64 limitStartTime = 6;
+  bool isChapterLocked = 7;
+}
+
+message TaskDeliveryReq {
+  repeated romsg.TaskDeliverySingleReq req = 1;
+}
+
+message TaskDeliverySingleReq {
+  int64 id = 1;
+  int64 npcId = 2;
+}
+
+message TaskDeliveryResp {
+  repeated romsg.TaskDeliverySingleResp data = 1;
+}
+
+message TaskDeliverySingleResp {
+  int32 result = 1;
+  int64 id = 2;
+  int64 npcId = 3;
+}
+
+message TaskGiveUpReq {
+  int64 id = 1;
+}
+
+message TaskGiveUpResp {
+  int32 result = 1;
+  int64 id = 2;
+}
+
+message TaskAcceptReq {
+  int64 id = 1;
+  int64 npcId = 2;
+}
+
+message TaskAcceptResp {
+  int32 result = 1;
+  int64 id = 2;
+  int64 npcId = 3;
+}
+
+message TaskResetReq {
+  int64 id = 1;
+}
+
+message TaskResetResp {
+  int32 result = 1;
+  int64 id = 2;
+}
+
+message TaskFollowReq {
+  int64 id = 1;
+  bool follow = 2;
+}
+
+message TaskFollowResp {
+  int32 result = 1;
+  int64 id = 2;
+  bool follow = 3;
+}
+
+message TaskRewardNotify {
+  romsg.ETaskRewardNum rewardType = 1;
+  int32 taskId = 2;
+}
+
+message TaskNpcChatReq {
+  int32 chatId = 1;
+}
+
+message TaskNpcChatResp {
+  int32 result = 1;
+  int32 chatId = 2;
+}
+
+message FinishPYDTaskReq {
+}
+
+message FinishPYDTaskResp {
+  int32 result = 1;
+}
+
+message TriggerTaskEventReq {
+  int32 taskId = 1;
+  int32 goalCount = 2;
+}
+
+message TriggerTaskEventResp {
+  int32 result = 1;
+  int32 taskId = 2;
+  int32 goalCount = 3;
+}
+
+message SelectTaskQuestBranchReq {
+  int64 branchId = 1;
+}
+
+message SelectTaskQuestBranchResp {
+  romsg.SelectTaskQuestBranchReq req = 1;
+}
+
+message TaskTrackReq {
+  int64 taskId = 1;
+}
+
+message TaskGoodsStackReq {
+}
+
+message TaskGoodsStackResp {
+  int32 result = 1;
+}
+
+message LuckyTurnReq {
+  int32 type = 1;
+  int32 version = 2;
+}
+
+message LuckyTurnResp {
+  int32 result = 1;
+  int32 version = 2;
+}
+

@@ -1,0 +1,23 @@
+syntax = "proto3";
+package romsg;
+
+message HeroicSpiritChallengeReq {
+  int64 challengeId = 1;
+}
+
+message HeroicSpiritChallengeRes {
+  int64 Err = 1;
+}
+
+message HeroicSpiritPrayReq {
+  int64 count = 1;
+}
+
+message HeroicSpiritPrayRes {
+  int64 Err = 1;
+}
+
+message HeroicSpiritDungeonInitData {
+  int64 challengeId = 1;
+}
+

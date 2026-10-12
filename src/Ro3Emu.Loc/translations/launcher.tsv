@@ -1,0 +1,40 @@
+确定	Confirm
+取消	Cancel
+重试	Retry
+退出	Quit
+忽略	Ignore
+重启	Restart
+{0}	{0}
+客户端更新完成，游戏将重新启动	Update complete. The game will now restart.
+客户端更新完成，请重新启动游戏	Update complete. Please restart the game.
+修复客户端	Repair Client
+修复客户端完成，游戏将关闭，请重新启动游戏。	Repair complete. The game will close; please restart it.
+修复客户端完成，游戏将重新启动	Repair complete. The game will now restart.
+是否清理客户端本地数据,将会自动重启客户端	Clear the client's local data? The client will restart automatically.
+是否清理客户端本地数据,关闭游戏后请手动启动游戏	Clear the client's local data? Please relaunch the game manually after it closes.
+正在下载文件 {0:00}/{1:00} MB	Downloading {0:00}/{1:00} MB
+下载速度{0:00}{1}	Speed: {0:00}{1}
+下载速度：{0:00}{1}，预计时间：{2}分{3}秒	Speed: {0:00}{1}, ETA: {2}m {3}s
+下载速度：{0:00}{1}，预计时间：{2}秒	Speed: {0:00}{1}, ETA: {2}s
+当前处于非wifi环境下，游戏有 {0:00}MB 内容更新，下载将产生流量费用，是否继续？	You're not on Wi-Fi. The game has a {0:00} MB update and downloading may incur data charges. Continue?
+正在努力加载……	Loading...
+您的客户端版本过低，已无法保证游戏的正常体验，请前去下载最新版本。 点确定跳转到对应商店的下载页，点取消则关掉游戏。	Your client version is too old to guarantee a proper game experience. Please download the latest version. Tap Confirm to open the store download page, or Cancel to close the game.
+您的客户端版本过低，已无法保证游戏的正常体验，请前去下载最新版本。	Your client version is too old to guarantee a proper game experience. Please download the latest version.
+正在加载远程配置文件...	Loading remote config...
+静音	Mute
+校验版本差异发生错误	Error while checking version differences
+客户端更新遇到异常，选择忽略可临时进入游戏，但可能会有体验问题	The client update ran into an error. Choose Ignore to enter the game for now, but you may run into issues.
+读取远程配置文件失败，也许是网络问题，请检查网络情况后重试....	Failed to read the remote config. This may be a network issue; check your connection and retry....
+下载资源包出错，也许是网络问题，请检查网络情况后重试....	Failed to download the resource pack. This may be a network issue; check your connection and retry....
+很抱歉，无法下载更新。您的设备存储空间不足。请释放一些空间后再试一次	Sorry, the update can't be downloaded. Your device is low on storage. Free up some space and try again.
+保存文件失败，也许是空间不足，请清理空间后重试....	Failed to save a file. You may be low on space; free some up and retry....
+网络异常	Network Error
+检查到有客户端缓存文件不完整，是否清理缓存并重新下载？	Some client cache files are incomplete. Clear the cache and download again?
+检查到有客户端缓存文件不完整，请重新下载。	Some client cache files are incomplete. Please download again.
+检查到有客户端配置更新，需要立即重启客户端。	A client config update was found. The client must restart now.
+刷新更新文件失败，可能有缓存文件被占用或权限问题	Failed to apply update files. A cache file may be in use, or there may be a permission issue.
+正在分析文件差异...	Analyzing file differences...
+文件差异分析完成	File analysis complete
+获取远程配置文件失败, 网络连接失败	Failed to get the remote config: network connection failed
+正在下载:	Downloading:
+请用启动器启动游戏	Please start the game from the launcher

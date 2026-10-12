@@ -1,0 +1,10 @@
+syntax = "proto3";
+package romsg;
+
+message DraculaWeddingInitData {
+  int64 bridePlayerId = 1;
+  int64 guildId = 2;
+  int64 guildHomeSceneId = 3;
+  int64 deadlineTimestamp = 4;
+}
+

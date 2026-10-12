@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The players' launcher: installs/updates the RO3 client patched for our server from a Ro3Emu.Patcher repository
+       (published with `Ro3Emu.ClientTools release`) and starts ro3.exe with the launch proof. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>Ro3EmuLauncher</AssemblyName>
+    <RootNamespace>Ro3Emu.Launcher</RootNamespace>
+    <Version>1.0.1</Version>
+    <Product>RO3Emu Launcher</Product>
+    <!-- Release: one self-contained exe, players need no .NET install. -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <DebugType>embedded</DebugType>
+    <AllowedReferenceRelatedFileExtensions>none</AllowedReferenceRelatedFileExtensions>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <LauncherConfigFile Condition="'$(LauncherConfigFile)' == ''">launcher.json</LauncherConfigFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4258.31" />
+    <ProjectReference Include="..\Ro3Emu.Patcher\Ro3Emu.Patcher.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The shipped settings live in the exe; a launcher.json beside it still wins. -->
+    <EmbeddedResource Include="$(LauncherConfigFile)" LogicalName="launcher.json" />
+    <!-- The page (ui/index.html + app.css/js + assets), served to WebView2 from the exe. -->
+    <EmbeddedResource Include="ui\**\*" LogicalName="ui/$([System.String]::Copy('%(RecursiveDir)').Replace('\', '/'))%(Filename)%(Extension)" />
+  </ItemGroup>
+
+</Project>

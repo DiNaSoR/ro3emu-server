@@ -1,0 +1,265 @@
+using Microsoft.Data.Sqlite;
+using Ro3Emu.Server.Accounts.Persistence;
+
+namespace Ro3Emu.Server.Accounts;
+
+/// <summary>Durable guild aggregate and exclusive role membership.</summary>
+public sealed class GuildStore
+{
+    private readonly AccountStore accounts;
+
+    public GuildStore(AccountStore accounts)
+    {
+        this.accounts = accounts;
+        accounts.WriteSync<int>(new GuildSchemaPlan());
+    }
+
+    public sealed class State
+    {
+        internal OwnerRevisionValue? CapturedRevision { get; set; }
+        public long Id { get; set; }
+        public string Name { get; set; } = "";
+        public string Announce { get; set; } = "";
+        public string Notice { get; set; } = "";
+        public long CreateTime { get; set; }
+        public int Status { get; set; } = 2;
+        public long HelperDeadlineMs { get; set; }
+        public int Level { get; set; } = 1;
+        public long Background { get; set; }
+        public long Icon { get; set; }
+        public bool AutoAccept { get; set; }
+        public bool AutoCreateHelper { get; set; }
+        public int JoinLevelLimit { get; set; }
+        public long Money { get; set; }
+        public long Contribute { get; set; }
+        public long Materials { get; set; }
+        public long Reputation { get; set; }
+        public long AuctionMaterials { get; set; }
+        public long LastChangeNameTime { get; set; }
+        public long LastChangeNoticeTime { get; set; }
+        public long LastRecruitMs { get; set; }
+        public List<string> HistoryNames { get; set; } = new();
+        public Dictionary<long, Member> Members { get; set; } = new();
+        public Dictionary<long, Application> Applications { get; set; } = new();
+        public Dictionary<int, List<int>> Rights { get; set; } = new();
+        public Dictionary<long, long> Buildings { get; set; } = new();
+        public Dictionary<long, long> BuildingEndTimes { get; set; } = new();
+    }
+
+    public sealed class Member
+    {
+        public long RoleId { get; set; }
+        public string Name { get; set; } = "";
+        public int Official { get; set; } = 20;
+        public int Level { get; set; }
+        public int Career { get; set; }
+        public long EnterTime { get; set; }
+        public long OfflineTime { get; set; }
+        public long CurContribute { get; set; }
+        public long HistoryContribute { get; set; }
+    }
+
+    public sealed class Application
+    {
+        public long RoleId { get; set; }
+        public string Name { get; set; } = "";
+        public int Level { get; set; }
+        public int Career { get; set; }
+        public long ApplyTime { get; set; }
+    }
+
+    /// <summary>Global 839xx order book. IDs remain opaque strings on the wire.</summary>
+    public sealed class MarketState
+    {
+        internal OwnerRevisionValue? CapturedRevision { get; set; }
+        public long NextId { get; set; }
+        public long RecentAvgPrice { get; set; } = 100;
+        public List<long> RecentPrices { get; set; } = new();
+        public List<MarketPrice> PriceHistory { get; set; } = new();
+        public List<MarketStall> Stalls { get; set; } = new();
+        /// <summary>E03: no refund/burn policy is implied by guild deletion; keep orphan stock out of the public book.</summary>
+        public List<MarketStall> RecoveryStalls { get; set; } = new();
+        public List<MarketTrade> Trades { get; set; } = new();
+        public Dictionary<long, long> LastListedMs { get; set; } = new();
+    }
+
+    public sealed class MarketPrice
+    {
+        public long Average { get; set; }
+        public int DateHour { get; set; }
+    }
+
+    public sealed class MarketStall
+    {
+        public string Id { get; set; } = "";
+        public long GuildId { get; set; }
+        public long UnitPrice { get; set; }
+        public long TotalCount { get; set; }
+        public long RemainCount { get; set; }
+        public long CreatedMs { get; set; }
+        public long AvailableMs { get; set; }
+        public long ExpiresMs { get; set; }
+    }
+
+    public sealed class MarketTrade
+    {
+        public string Id { get; set; } = "";
+        public long SellerGuildId { get; set; }
+        public long BuyerGuildId { get; set; }
+        public long UnitPrice { get; set; }
+        public long Count { get; set; }
+        public long Fee { get; set; }
+        public long TimeMs { get; set; }
+        public bool Read { get; set; }
+    }
+
+    public MarketState LoadMarket() => accounts.ReadSync<MarketState>(new GuildReadPlan(GuildReadKind.Market));
+
+    /// <summary>Market book and every affected guild balance commit together.</summary>
+    public bool SaveMarket(MarketState market, IEnumerable<State> affected)
+    {
+        var plan = MarketPlan(market, affected);
+        try { plan.Commit(accounts, "guild/market"); return true; }
+        catch (InvalidOperationException e) when (e.Message == "Guild disappeared during save.") { return false; }
+    }
+
+    /// <summary>Commit the complete market book, guild balances, and membership indexes as one value-only writer plan.</summary>
+    internal async Task<bool> SaveMarketAsync(MarketState market, IEnumerable<State> affected,
+        Economy.EscrowEconomyIntent economy)
+    {
+        var plan = MarketPlan(market, affected);
+        plan.WithEscrowEconomy(economy);
+        try { await plan.CommitAsync(accounts, "guild/market"); return true; }
+        catch (InvalidOperationException e) when (e.Message == "Guild disappeared during save.") { return false; }
+    }
+
+    private RoleItemPlanBuilder MarketPlan(MarketState market, IEnumerable<State> affected)
+    {
+        var plan = new RoleItemPlanBuilder(accounts);
+        foreach (var guild in affected.DistinctBy(g => g.Id))
+            EnlistSave(guild, plan);
+        EnlistMarket(market, plan);
+        return plan;
+    }
+
+    internal void EnlistMarket(MarketState market, RoleItemPlanBuilder plan)
+    {
+        var marketRevision = plan.CaptureEntity(RevisionStore.Entity("guild_market", 1), market.CapturedRevision);
+        if (market.CapturedRevision is null && marketRevision.Exists)
+            throw new InvalidOperationException("Guild market state lacks a source revision.");
+        plan.Add(new GuildMarketSavePlan(market), _ => market.CapturedRevision =
+            new OwnerRevisionValue(marketRevision.Key, marketRevision.Revision + 1, true));
+    }
+
+    public State? Get(long id)
+    {
+        lock (cacheLock)
+        {
+            Current();
+            if (byId.TryGetValue(id, out var cached)) return cached is { } hit ? Copy(hit) : null;
+        }
+        long generation = Volatile.Read(ref cacheGeneration);
+        var state = accounts.ReadSync<State?>(new GuildReadPlan(GuildReadKind.Guild, id));
+        lock (cacheLock)
+            if (Current() == generation) byId[id] = state == null ? null : Cache(state);
+        return state;
+    }
+
+    // C/D 16: committed guild aggregates and role membership served from memory instead of a synchronous SQL read on
+    // the loop per call (S1: 18k ForRole reads, 2.9 s of loop waits). Every caller still gets its own copy to
+    // mutate. Any writer job that touches the guild tables bumps the generation after it ends (DbWriter.AfterJob);
+    // a read during which the generation changed is returned but not cached. A read that began before a commit and ended before the bump
+    // is cached until the bump: callers may see pre-commit bytes in that window, and a save from them then
+    // conflicts on the revision (never a silent overwrite).
+    private static long cacheGeneration;
+    private readonly object cacheLock = new();
+    private long cachedGeneration = -1;
+    private readonly Dictionary<long, (byte[] Json, OwnerRevisionValue? Revision)?> byId = [];
+    private readonly Dictionary<long, long> guildOfRole = [];
+
+    /// <summary>Called by the writer after a job that wrote guild or guild_member rows.</summary>
+    internal static void Invalidate() => Interlocked.Increment(ref cacheGeneration);
+
+    private long Current()
+    {
+        long generation = Volatile.Read(ref cacheGeneration);
+        if (cachedGeneration != generation) { byId.Clear(); guildOfRole.Clear(); cachedGeneration = generation; }
+        return generation;
+    }
+
+    private static (byte[] Json, OwnerRevisionValue? Revision) Cache(State state) =>
+        (System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(state), state.CapturedRevision);
+
+    private static State Copy((byte[] Json, OwnerRevisionValue? Revision) cached)
+    {
+        var state = System.Text.Json.JsonSerializer.Deserialize<State>(cached.Json)!;
+        state.CapturedRevision = cached.Revision;
+        return state;
+    }
+
+    internal bool HasRecovery(long id) => accounts.ReadSync<bool>(new GuildRecoveryExistsPlan(id));
+
+    public State? ForRole(long roleId)
+    {
+        long? known;
+        lock (cacheLock) { Current(); known = guildOfRole.TryGetValue(roleId, out long guildId) ? guildId : null; }
+        if (known is { } member) return member == 0 ? null : Get(member);
+        long generation = Volatile.Read(ref cacheGeneration);
+        var state = accounts.ReadSync<State?>(new GuildReadPlan(GuildReadKind.ForRole, roleId));
+        lock (cacheLock)
+            if (Current() == generation)
+            {
+                guildOfRole[roleId] = state?.Id ?? 0;
+                if (state != null) byId[state.Id] = Cache(state);
+            }
+        return state;
+    }
+
+    public IReadOnlyList<State> List() => accounts.ReadSync<List<State>>(new GuildReadPlan(GuildReadKind.List));
+
+    public bool NameExists(string name, long exceptId = 0) =>
+        accounts.ReadSync<bool>(new GuildReadPlan(GuildReadKind.NameExists, exceptId, name));
+
+    /// <summary>Standalone aggregate save; generated identity is applied only after the writer commit.</summary>
+    public bool Save(State state)
+    {
+        var plan = new RoleItemPlanBuilder(accounts);
+        EnlistSave(state, plan);
+        try { plan.Commit(accounts, "guild/save"); return true; }
+        catch (SqliteException e) when (e.SqliteErrorCode == 19) { return false; }
+        catch (InvalidOperationException e) when (e.Message == "Guild disappeared during save.") { return false; }
+    }
+
+    /// <summary>Capture payment-enlisted guild state; publish a generated identity on the caller only after commit.</summary>
+    internal void EnlistSave(State state, RoleItemPlanBuilder transaction, string missingMessage = "Guild disappeared during save.")
+    {
+        var revision = state.Id == 0 ? (OwnerRevisionValue?)null :
+            transaction.CaptureEntity(RevisionStore.Entity("guild", state.Id), state.CapturedRevision);
+        if (state.Id != 0 && state.CapturedRevision is null && revision is { Exists: true })
+            throw new InvalidOperationException("Guild state lacks a source revision.");
+        transaction.Add(new GuildSavePlan(state, missingMessage), receipt =>
+        {
+            state.Id = (long)receipt!;
+            state.CapturedRevision = revision is { } current
+                ? new OwnerRevisionValue(current.Key, current.Revision + 1, true)
+                : new OwnerRevisionValue(RevisionStore.Entity("guild", state.Id), 1, true);
+        });
+    }
+
+    internal void EnlistMaterialContribution(long role, long guild, long amount, RoleItemPlanBuilder transaction)
+        => transaction.Add(new GuildMaterialContributionPlan(role, guild, amount));
+
+    internal void EnlistCaravanReward(long guild, long role, long funds, long contribution, RoleItemPlanBuilder transaction)
+        => transaction.Add(new GuildCaravanRewardPlan(guild, role, funds, contribution));
+
+    public void Delete(long guildId)
+    {
+        accounts.WriteLegacySync<int>(new GuildDeletePlan(guildId));
+    }
+
+    internal void EnlistRecoverDelete(State state, RoleItemPlanBuilder transaction, long escrowMaterials = 0)
+    {
+        transaction.CaptureEntity(RevisionStore.Entity("guild", state.Id), state.CapturedRevision);
+        transaction.Add(new GuildRecoverDeletePlan(state.Id, escrowMaterials));
+    }
+}

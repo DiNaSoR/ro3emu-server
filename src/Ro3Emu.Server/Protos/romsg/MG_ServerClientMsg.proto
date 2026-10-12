@@ -1,0 +1,21 @@
+syntax = "proto3";
+package romsg;
+
+message TokenVerifyReq {
+  string account = 1;
+  int64 id = 2;
+  int32 gsID = 3;
+}
+
+message TokenVerifyResp {
+  int32 result = 1;
+}
+
+message PickPlayerReq {
+  string token = 1;
+}
+
+message PickPlayerResp {
+  int32 result = 1;
+}
+

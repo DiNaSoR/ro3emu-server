@@ -1,0 +1,44 @@
+syntax = "proto3";
+package romsg;
+import "MG_Define.proto";
+import "MG_Common.proto";
+
+enum EClientCustomJumpMapType {
+  EClientCustomJumpMapType_TaskTrace = 0;
+  EClientCustomJumpMapType_TaskAccept = 1;
+  EClientCustomJumpMapType_TaskDelivery = 2;
+  EClientCustomJumpMapType_TypeWritterEnd = 3;
+  EClientCustomJumpMapType_DialogueEnd = 4;
+}
+
+message CellMsg {
+  romsg.MSG_Type msgType = 1;
+  bytes data = 2;
+}
+
+message CellMsgPlayerLoginReq {
+  int64 playerID = 1;
+  int64 sceneID = 2;
+}
+
+message CellMsgCreateSceneReq {
+  map<int64, romsg.CellScenes> cells = 1;
+}
+
+message CellMsgChangeSceneReq {
+  int64 playerID = 1;
+  int64 sceneID = 2;
+}
+
+message ClientCustomJumpMapReq {
+  int64 sceneId = 1;
+  int64 pointId = 2;
+  romsg.EClientCustomJumpMapType customType = 3;
+  int64 typeParam1 = 4;
+  int64 typeParam2 = 5;
+}
+
+message ClientCustomJumpMapResp {
+  int64 result = 1;
+}
+

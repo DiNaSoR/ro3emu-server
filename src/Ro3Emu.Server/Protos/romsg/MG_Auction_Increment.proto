@@ -1,0 +1,404 @@
+syntax = "proto3";
+package romsg;
+import "APIError.proto";
+import "client2service.proto";
+import "FieldOption.proto";
+import "GM_Chat.proto";
+import "MG_Achievement.proto";
+import "MG_Activity.proto";
+import "MG_Adventure.proto";
+import "MG_AdventureGroup.proto";
+import "MG_AFK.proto";
+import "MG_AreaConcur.proto";
+import "MG_Auction.proto";
+import "MG_Barroom.proto";
+import "MG_Base.proto";
+import "MG_BaseMgr.proto";
+import "MG_BlueDbg.proto";
+import "MG_BroadCast.proto";
+import "MG_Card.proto";
+import "MG_CareerSpecial.proto";
+import "MG_Cell.proto";
+import "MG_CellMgr.proto";
+import "MG_Chat.proto";
+import "MG_Chicken.proto";
+import "MG_Common.proto";
+import "MG_DB.proto";
+import "MG_Define.proto";
+import "MG_DragonIsland.proto";
+import "MG_Dungeon.proto";
+import "MG_Emblem.proto";
+import "MG_EmojiPlay.proto";
+import "MG_Entity.proto";
+import "MG_Equipment.proto";
+import "MG_FirstHeart.proto";
+import "MG_FlyingDragon.proto";
+import "MG_Friend.proto";
+import "MG_Function.proto";
+import "MG_Gateway.proto";
+import "MG_Genre.proto";
+import "MG_GlobalCache.proto";
+import "MG_Guide.proto";
+import "MG_Guild.proto";
+import "MG_GuildBlackMarket.proto";
+import "MG_GuildCampFire.proto";
+import "MG_GuildDraculaWedding_Init.proto";
+import "MG_GuildDraculaWedding.proto";
+import "MG_GuildLeague.proto";
+import "MG_GuildVoiceChannel.proto";
+import "MG_HeroicSpirit.proto";
+import "MG_HiddenTreasure.proto";
+import "MG_IDIP.proto";
+import "MG_IDIPSerialNumber.proto";
+import "MG_Interact.proto";
+import "MG_LeaderBoardClient.proto";
+import "MG_Library.proto";
+import "MG_Lifejob.proto";
+import "MG_Login.proto";
+import "MG_Lottery.proto";
+import "MG_Mail.proto";
+import "MG_MapData.proto";
+import "MG_Match.proto";
+import "MG_Mount.proto";
+import "MG_Mover.proto";
+import "MG_MultiDungeon.proto";
+import "MG_MVP.proto";
+import "MG_NewActivity.proto";
+import "MG_Pack.proto";
+import "MG_Paragon.proto";
+import "MG_Pay.proto";
+import "MG_Personal.proto";
+import "MG_Pet.proto";
+import "MG_Player.proto";
+import "MG_PlayerOfflineMessage.proto";
+import "MG_PlayMethod.proto";
+import "MG_PlotActing.proto";
+import "MG_PublicChat.proto";
+import "MG_PublicServer.proto";
+import "MG_RainbowKoi_Init.proto";
+import "MG_Relationship.proto";
+import "MG_Scene.proto";
+import "MG_SceneStream.proto";
+import "MG_Season.proto";
+import "MG_SeasonPage.proto";
+import "MG_SeasonRefine.proto";
+import "MG_SeasonTalent.proto";
+import "MG_ServerClientMsg.proto";
+import "MG_Setting.proto";
+import "MG_Shop.proto";
+import "MG_Siege.proto";
+import "MG_Skill.proto";
+import "MG_SkillGrowth.proto";
+import "MG_SocialOutfit.proto";
+import "MG_SpecialEffect.proto";
+import "MG_StageRewards.proto";
+import "MG_Stalls.proto";
+import "MG_State.proto";
+import "MG_Statistics.proto";
+import "MG_StorageHole.proto";
+import "MG_Task.proto";
+import "MG_Team.proto";
+import "MG_TerritoryAuction.proto";
+import "MG_TerritoryWars.proto";
+import "MG_ThreeDay.proto";
+import "MG_Title.proto";
+import "MG_Totem.proto";
+import "MG_TradeCenter.proto";
+import "MG_TradeMarket.proto";
+import "MG_Training.proto";
+import "MG_TransAction.proto";
+import "MG_TypeWriter.proto";
+import "MG_WardRobe.proto";
+import "MG_WorldExploration.proto";
+import "MG_Zone.proto";
+
+message DBAuctionGoodRecordIncrement {
+  message guildGenerateCountFieldIncrement {
+    oneof value {
+      int64 all = 1;
+      int64 inc = 2;
+      bool del = 3;
+    }
+  }
+
+  optional int64 lastGenerateTime = 10;
+  optional int64 lastSystemGenerateTime = 20;
+  map<int64, romsg.DBAuctionGoodRecordIncrement.guildGenerateCountFieldIncrement> guildGenerateCount = 30;
+  optional int64 generateTotalCount = 40;
+  optional int64 systemGenerateCount = 50;
+}
+
+message DBAuctionItemIncrement {
+  message bonusRoleIdsFieldIncrement {
+    oneof value {
+      bool all = 1;
+      bool inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message biddingRoleIdsFieldIncrement {
+    oneof value {
+      int64 all = 1;
+      int64 inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message autoBiddingsFieldIncrement {
+    oneof value {
+      romsg.DBAutoBidding all = 1;
+      romsg.DBAutoBiddingIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message curMaxAutoBiddingFieldIncrement {
+    oneof value {
+      romsg.DBAutoBidding all = 1;
+      romsg.DBAutoBiddingIncrement inc = 2;
+    }
+  }
+
+  message dungeonaucDataFieldIncrement {
+    oneof value {
+      romsg.DungeonAuctionData all = 1;
+      romsg.DungeonAuctionDataIncrement inc = 2;
+    }
+  }
+
+  message joinBiddingRoleIdsFieldIncrement {
+    oneof value {
+      int64 all = 1;
+      int64 inc = 2;
+      bool del = 3;
+    }
+  }
+
+  optional int64 auctionId = 10;
+  optional romsg.AuctionType auctionType = 20;
+  optional int64 guildId = 30;
+  optional int32 srcType = 40;
+  optional int64 actId = 50;
+  optional int64 actWeekDay = 60;
+  optional int64 actDayStartTime = 70;
+  optional int32 itemId = 80;
+  optional int32 itemPrice = 90;
+  optional int64 startTime = 100;
+  optional int64 endTime = 110;
+  optional romsg.AuctionState state = 120;
+  optional int64 ownerId = 130;
+  map<int64, romsg.DBAuctionItemIncrement.bonusRoleIdsFieldIncrement> bonusRoleIds = 140;
+  map<int64, romsg.DBAuctionItemIncrement.biddingRoleIdsFieldIncrement> biddingRoleIds = 150;
+  map<int64, romsg.DBAuctionItemIncrement.autoBiddingsFieldIncrement> autoBiddings = 160;
+  romsg.DBAuctionItemIncrement.curMaxAutoBiddingFieldIncrement curMaxAutoBidding = 170;
+  romsg.DBAuctionItemIncrement.dungeonaucDataFieldIncrement dungeonaucData = 180;
+  optional int64 lastBiddingTime = 190;
+  optional bool isEnterFastBidding = 200;
+  map<int64, romsg.DBAuctionItemIncrement.joinBiddingRoleIdsFieldIncrement> joinBiddingRoleIds = 210;
+  optional int64 GuildActivityId = 220;
+  optional bytes strategyData = 230;
+}
+
+message DBAuctionRoleBonusIncrement {
+  message groupBonusFieldIncrement {
+    oneof value {
+      romsg.DBBonus all = 1;
+      romsg.DBBonusIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  optional int64 roleId = 10;
+  map<string, romsg.DBAuctionRoleBonusIncrement.groupBonusFieldIncrement> groupBonus = 20;
+}
+
+message DBAuctionServerGlobalDataIncrement {
+  message goodRecordsFieldIncrement {
+    oneof value {
+      romsg.DBAuctionGoodRecord all = 1;
+      romsg.DBAuctionGoodRecordIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message historyAuctionItemsFieldIncrement {
+    oneof value {
+      romsg.DBHistoryQueue all = 1;
+      romsg.DBHistoryQueueIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  optional int64 areaId = 10;
+  map<int64, romsg.DBAuctionServerGlobalDataIncrement.goodRecordsFieldIncrement> goodRecords = 20;
+  map<int64, romsg.DBAuctionServerGlobalDataIncrement.historyAuctionItemsFieldIncrement> historyAuctionItems = 30;
+}
+
+message DBAutoBiddingIncrement {
+  optional int64 roleId = 10;
+  optional int32 maxPrice = 20;
+  optional int64 biddingTime = 30;
+  optional bool isPaused = 40;
+}
+
+message DBBonusIncrement {
+  optional int32 bonus = 10;
+  optional int64 guildId = 20;
+  optional int64 actId = 30;
+  optional int64 actWeekDay = 40;
+  optional int64 actDayStartTime = 50;
+  optional romsg.GroupBonusState state = 60;
+}
+
+message DBGuildAuctionActBonusIncrement {
+  message auctionItemBonusesFieldIncrement {
+    oneof value {
+      int32 all = 1;
+      int32 inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message bonusPlayerRatiosFieldIncrement {
+    oneof value {
+      int64 all = 1;
+      int64 inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message currencyBonusFieldIncrement {
+    oneof value {
+      int64 all = 1;
+      int64 inc = 2;
+      bool del = 3;
+    }
+  }
+
+  map<int64, romsg.DBGuildAuctionActBonusIncrement.auctionItemBonusesFieldIncrement> auctionItemBonuses = 20;
+  optional int64 expireTs = 30;
+  optional bool hasBidding = 40;
+  map<int64, romsg.DBGuildAuctionActBonusIncrement.bonusPlayerRatiosFieldIncrement> bonusPlayerRatios = 50;
+  map<int64, romsg.DBGuildAuctionActBonusIncrement.currencyBonusFieldIncrement> currencyBonus = 60;
+}
+
+message DBGuildAuctionBonusIncrement {
+  message actBonusesFieldIncrement {
+    oneof value {
+      romsg.DBGuildAuctionActBonus all = 1;
+      romsg.DBGuildAuctionActBonusIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  optional int64 guildId = 10;
+  map<int64, romsg.DBGuildAuctionBonusIncrement.actBonusesFieldIncrement> actBonuses = 30;
+}
+
+message DBHistoryQueueIncrement {
+  message historyFieldIncrement {
+    oneof value {
+      romsg.HistoryAuctionItem all = 1;
+      romsg.HistoryAuctionItemIncrement inc = 2;
+    }
+  }
+
+  message roleIdsRepeatedOrigin {
+    repeated int64 value = 1;
+  }
+
+  message roleIdsRepeatedIncrement {
+    repeated int64 value = 1;
+  }
+
+  message roleIdsFieldIncrement {
+    oneof value {
+      romsg.DBHistoryQueueIncrement.roleIdsRepeatedOrigin all = 1;
+      romsg.DBHistoryQueueIncrement.roleIdsRepeatedIncrement inc = 2;
+    }
+  }
+
+  romsg.DBHistoryQueueIncrement.historyFieldIncrement history = 10;
+  romsg.DBHistoryQueueIncrement.roleIdsFieldIncrement roleIds = 20;
+}
+
+message DungeonAuctionDataIncrement {
+  message cantbonusRoleIdsRepeatedOrigin {
+    repeated int64 value = 1;
+  }
+
+  message cantbonusRoleIdsRepeatedIncrement {
+    repeated int64 value = 1;
+  }
+
+  message cantbonusRoleIdsFieldIncrement {
+    oneof value {
+      romsg.DungeonAuctionDataIncrement.cantbonusRoleIdsRepeatedOrigin all = 1;
+      romsg.DungeonAuctionDataIncrement.cantbonusRoleIdsRepeatedIncrement inc = 2;
+    }
+  }
+
+  message giveupUsersRepeatedOrigin {
+    repeated int64 value = 1;
+  }
+
+  message giveupUsersRepeatedIncrement {
+    repeated int64 value = 1;
+  }
+
+  message giveupUsersFieldIncrement {
+    oneof value {
+      romsg.DungeonAuctionDataIncrement.giveupUsersRepeatedOrigin all = 1;
+      romsg.DungeonAuctionDataIncrement.giveupUsersRepeatedIncrement inc = 2;
+    }
+  }
+
+  optional int64 dungeonBeginTime = 10;
+  romsg.DungeonAuctionDataIncrement.cantbonusRoleIdsFieldIncrement cantbonusRoleIds = 20;
+  optional int64 quUniqueId = 30;
+  romsg.DungeonAuctionDataIncrement.giveupUsersFieldIncrement giveupUsers = 40;
+  optional bool preBidding = 50;
+}
+
+message DungeonAuctionQueueIncrement {
+  message dungeonQueueFieldIncrement {
+    oneof value {
+      romsg.RealQueue all = 1;
+      romsg.RealQueueIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  map<int64, romsg.DungeonAuctionQueueIncrement.dungeonQueueFieldIncrement> dungeonQueue = 10;
+}
+
+message HistoryAuctionItemIncrement {
+  optional int32 itemId = 10;
+  optional int32 itemPrice = 20;
+  optional int64 endTime = 30;
+  optional int32 srcType = 40;
+  optional int64 userId = 50;
+  optional int64 auctionId = 60;
+  optional int64 auctionType = 70;
+}
+
+message RealQueueIncrement {
+  message auctionIdRepeatedOrigin {
+    repeated int64 value = 1;
+  }
+
+  message auctionIdRepeatedIncrement {
+    repeated int64 value = 1;
+  }
+
+  message auctionIdFieldIncrement {
+    oneof value {
+      romsg.RealQueueIncrement.auctionIdRepeatedOrigin all = 1;
+      romsg.RealQueueIncrement.auctionIdRepeatedIncrement inc = 2;
+    }
+  }
+
+  romsg.RealQueueIncrement.auctionIdFieldIncrement auctionId = 10;
+}
+

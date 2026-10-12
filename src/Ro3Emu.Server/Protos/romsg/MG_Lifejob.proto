@@ -1,0 +1,153 @@
+syntax = "proto3";
+package romsg;
+import "MG_Common.proto";
+import "MG_Pack.proto";
+
+enum LifeJobType {
+  LifeJobType_None = 0;
+  LifeJobType_Miner = 1;
+  LifeJobType_Cooker = 2;
+  LifeJobType_Gardener = 3;
+  LifeJobType_Carver = 4;
+  LifeJobType_Tailor = 5;
+  LifeJobType_Blacksmith = 6;
+}
+
+enum LifeJobForgeProductType {
+  LifeJobForgeProductType_None = 0;
+  LifeJobForgeProductType_Success = 1;
+  LifeJobForgeProductType_BigSuccess = 2;
+  LifeJobForgeProductType_Failure = 3;
+}
+
+message SwitchLifeJobReq {
+  romsg.LifeJobType new_lifejob_id = 1;
+  int32 opJobType = 2;
+}
+
+message SwitchLifeJobResp {
+  int32 result = 1;
+  romsg.LifeJobType new_lifejob_id = 2;
+}
+
+message ChooseTitlePointReq {
+  int64 level = 1;
+  int64 title_point = 2;
+  romsg.LifeJobType lifejob_id = 3;
+}
+
+message ChooseTitlePointResp {
+  int32 result = 1;
+}
+
+message RefreshTitlePointReq {
+  int64 level = 1;
+  int64 LifejobId = 2;
+}
+
+message RefreshTitlePointResp {
+  int32 result = 1;
+}
+
+message ChooseTitlePointExReq {
+  int64 level = 1;
+  int64 title_point = 2;
+  romsg.LifeJobType lifejob_id = 3;
+}
+
+message ChooseTitlePointExResp {
+  int32 result = 1;
+}
+
+message RefreshTitlePointExReq {
+  int64 level = 1;
+  int64 LifejobId = 2;
+}
+
+message RefreshTitlePointExResp {
+  int32 result = 1;
+}
+
+message StartForgeReq {
+  int64 item_unique_id = 1;
+  int32 itemNum = 2;
+}
+
+message StartForgeResp {
+  int32 result = 1;
+  map<int64, romsg.RepeatedItemBaseInfo> outputItemMap = 2;
+  int32 forgeNum = 3;
+}
+
+message UpGradeJobTileReq {
+  int32 jobId = 1;
+}
+
+message UpGradeJobTileResp {
+  int32 result = 1;
+}
+
+message StudyRecipeReq {
+  int64 formulaID = 1;
+}
+
+message StudyRecipeResp {
+  int32 result = 1;
+  int64 formulaID = 2;
+}
+
+message StudyCollectionReq {
+  int64 collectionID = 1;
+}
+
+message StudyCollectionResp {
+  int32 result = 1;
+}
+
+message StudyCollectionDropReq {
+  int64 collectionID = 1;
+  int32 dropId = 2;
+}
+
+message StudyCollectionDropResp {
+  int32 result = 1;
+  int32 dropId = 2;
+}
+
+message CheckCanCollectNtf {
+  int32 result = 1;
+}
+
+message GetForgeCostTimeReq {
+  int32 forgeID = 1;
+}
+
+message GetForgeCostTimeResp {
+  int32 result = 1;
+  int32 costTime = 2;
+}
+
+message GetHealthCostAllReq {
+}
+
+message GetHealthCostReq {
+  int32 id = 1;
+  int32 type = 2;
+}
+
+message GetHealthCostNtf {
+  int32 result = 1;
+  map<int32, int32> CollectHealthCost = 2;
+  map<int32, int32> ForgeHealthCost = 3;
+}
+
+message FinishLifeJobGameReq {
+  int32 gameId = 1;
+  int64 npcGuid = 2;
+  int32 rating = 3;
+}
+
+message FinishLifeJobGameResp {
+  int32 result = 2;
+}
+

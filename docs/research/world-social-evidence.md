@@ -1,0 +1,44 @@
+# World social wire evidence
+
+This page binds the MG_Team and MG_Friend implementation to static client evidence. It is not a live-client compatibility claim. Exact-token searches covered all config JSON, sceneeditor files (including `*_monsteridmap.json`), nav, loc, both decompiled Lua trees in your local `re/` folder, the decompiled C# and the protos. Those searches support absence claims only for their exact patterns; the implementation below makes no broader absence assertion. Related system page: [dungeon.md](../systems/dungeon.md).
+
+## Team packet ownership
+
+`src/Ro3Emu.Server/Game/TeamService.cs` and `TeamService.Extra.cs` own the 42000-42052 group state. `MG_Team.proto` gives the flat member list, five/forty type, zero-based `teamIndex`, title, flags and applicant map. The client's senders are in `LC_TeamServer.lua` and its handlers in `LC_DAL_Team.lua`. Team creation and invitation keep the publication orders `42000 → 42026 → 42048` and `42004 → 42005 → 42006 → 42026/42048`.
+
+| IDs | Implemented behavior and client evidence |
+| --- | --- |
+| 42000, 42002-42008, 42026-42027, 42037, 42048, 42050-42052 | One roster with 5/40 capacity, target validation, metadata, invitation, title, kick, conversion and slot updates. The client changes slots from `42052.memberIndex` and titles from `42050.memberList` (`LC_DAL_Team.lua:1207-1276,3717-3764`). |
+| 42009-42011, 42023, 42031 | Leader rally popup and member response, follow state. `42010` is the client popup and `42023` is its response notice (`LC_DAL_Team.lua:2417-2740`). No movement is attributed to the rally; the original teleport/follow movement rule is unverified. |
+| 42012-42015, 42018, 42049 | Full directory/protobuf summary, application and leader decision, marker edit, and metadata publication. `42014` success is followed by a real `42049` applicant map or admission `42026/42048`; `42012` by `42052`. |
+| 42017, 42034, 42036 | Online invite suggestions; leader-only recruit link with 30 s cooldown; self AFK/chat and leader mute state published by `42050`. Lua senders and handlers: `LC_TeamServer.lua:1044-1060,1386-1506`, `LC_DAL_Team.lua:2370-2415,2874-2904,3186-3189`. |
+| 42033, 42046-42047 | `DungeonService` owns the pending ready vote. A reminder only succeeds for its leader and an unready member of the same vote, then sends `42046` to that member. The prepare panel calls `TeamConfirmReminder(selfGuid, targetGuid)` (`UI_Sys_Dungeon_PreparePanelCtrl.lua:1393-1400`), mapped to request `playerId, remindersGuid` by `LC_TeamServer.lua:1545-1572`; the receiver reads `memberGuid` (`LC_DAL_Team.lua:3641-3710`). |
+| 30107-30108 | `DungeonService` sends room allocation and successful scene handoff notifications with real instance/scene IDs; timing and the unused AreaId field are inferred because the client only registers these IDs with the protobuf layer. |
+| 30111 | Combat targeting state is produced by the combat owner, not by the social roster. `MG_Team.proto:577-580` carries leader target and team enemy list. |
+
+`PartyService.getPartysSummary` returns protobuf `TeamTotalSimpleInfo` bytes in `GameSummaryData`; `getParty` returns `PartyData` and member bytes for recruit links; `getSubPartysCountByType` returns target counts. These keys are read in `LC_DAL_Team.lua:1967-2123,3146-3282`. Browsing applies area/target/playBook/map conditions from `LC_TeamServer.lua:714-929,1088-1384`. An unresolved `getParty` uses micro `Ret:false`, never a malformed success. All three directory replies are built on `GameLoop`, where team rosters are owned, so concurrent joins/leaves cannot tear a micro snapshot. Five/forty type and target data come from `MG_Team.proto`, `TeamTargetConfig.json`, `PublicParamConfig.json`, and `LC_TeamHelper.lua:1051-1128`.
+
+## Friend packet ownership
+
+`FriendStore` persists relationship intimacy, friend metadata, group/member/DND state, gift records and recent team peers in the same SQLite database as roles. `Game/FriendExtraService.cs` owns 82200-82210 plus pushes 82250-82251; `Micro/FriendService.cs` handles the base add/accept/block path. The client wire contract is `MG_Friend.proto` with its consumers in `LC_DAL_Friend.lua`.
+
+| IDs | Implemented behavior and client evidence |
+| --- | --- |
+| 82200-82206, 82250 | Validated chat group create/rename/invite/kick/dismiss/leave/DND, persisted membership, per-recipient Join/Leave/Dismiss/Rename notifications. `LC_DAL_Friend.lua:1831-2097` uses `isSelf` to add/remove its local group. `PartyService.getPartysByIDs` returns `PartyList[].MemberList[].GameMemberData` and `PartyData` for the client's post-notify detail fetch (`LC_DAL_Friend.lua:2449-2618`), filtered by the authenticated micro account's active or owned role membership; an unrelated guessed group ID yields no detail. `ChatService` checks membership on `5_<groupId>` join/send and removes a revoked member's active channel. |
+| 82207-82208 | Persistent partial metadata update and echo, including present empty `recentlyChats`, `topChats`, `friendPartitions` parents. `LC_DAL_Friend.lua:2688-2705,2797-2874,2978-3052` dereferences those parents. |
+| 82209, 82251 | A gift pays the configured item cost through `CharacterService.ExchangeAsync`, commits sender/receiver history and intimacy in the same transaction, and notifies the receiver. A zero-result reply always contains `friendGiftRecord`, required by `LC_DAL_Friend.lua:2175-2230`; eligible IDs come from `FriendlyItemConfig.json`. |
+| 82210 | Candidates derive from online roles and persisted recent teammate records, filtered for existing friends, blocks and minimum friend level, then grouped by opposite sex, ±5 levels, recent team, and same job. `LC_DAL_Friend.lua:3057-3205` takes `#` of all four lists; a no-candidate case returns a nonzero result because empty repeated-field decoding remains unverified. |
+
+## Inferred policy and limits
+
+- Group owner/member permissions and the 10 group / 50 member / 7 character limits are inferred server enforcement of `PublicParamConfig.json`. No Tencent IM provisioning is inferred: the client joins the secured `5_<groupId>` channel after its group detail fetch.
+- Empty custom friend partitions are refused: `LC_DAL_Friend.lua:3005-3008` takes `#memberList` unguarded, and an empty protobuf repeated list may decode as nil. This is a client parser bound, not a statement of original product policy.
+- An application expiry of 30 seconds, auto-agree admission, application publication order, and resetting an incompatible target on team type conversion are inferred from the visible fields and `TeamInviteLastTime`; there is no captured original server exchange.
+- The recruitment chat payload uses `extra_param.templateId=1` and JSON `commonData` with `teamId`, `senderRoleId`, `descriptions`, `currNum`, `maxNum`, and numeric `teamMember` jobs. `LC_ChatMessageHandler.lua:780-803` parses the former fields; `UI_Sys_Chat_OtherNewWidgetCtrl.lua:1665-1740` reads the latter. Exact original delivery timing is unverified. The server sends it to active Recruit IM channels (chat channel 8).
+- Gift intimacy rises by the gifted count and caps at 180000; gift balance and daily limits are not recovered from the static client. Team recommendation history lasts one day and category order follows the client display sequence; both are inferred.
+- The team roster lives in process memory. Friend metadata and recent team peers persist. The original group/raid restart policy is unverified.
+- Dungeon revive policy uses `Lua_GameDefine.lua:8927-8934`: `OnClickRevive` may consume the configured boss count, while `NoRevive` refuses 31013, skill invitation acceptance and item revive. Treating the boss count as per participant is inferred. A successful revive reserves the dead player before network/payment awaits, commits alive HP/SP and cached entity properties once, then consumes one dungeon allowance; an item payment is not repeated by a competing revive request. Packet publication reads the committed current HP/SP so later damage is not overwritten.
+
+## Verification
+
+`tests/Ro3Emu.Tests/SocialTests.cs` covers the base friend/party exchange. `SocialExtraTests.cs` adds game+micro wire tests for 40-member metadata/directory/application/slot/refusal, competing 4/5 auto-agree admissions with concurrent micro reads, expired applicant refusal, friend group/metadata/gift/relog, an unrelated account's group-ID probe, and recommendation success/refusal. `DungeonTests` and `ReviveRaceTests` cover the dungeon vote and revive race. Protobuf/msgpack wire tests establish only the server packet behavior; a live client exchange, UI render and IM delivery capture are not part of them. See also [world-core-evidence.md](world-core-evidence.md).

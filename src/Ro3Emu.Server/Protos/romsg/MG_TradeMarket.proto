@@ -1,0 +1,419 @@
+syntax = "proto3";
+package romsg;
+import "MG_TransAction.proto";
+import "MG_Common.proto";
+
+message TMSkuInfo {
+  enum SkuStatus {
+    SkuStatus_None = 0;
+    SkuStatus_Publicity = 1;
+  }
+
+  message PublicityParam {
+    int64 endPublicityTime = 1;
+    int64 endPublicityRoll = 2;
+  }
+
+  string skuUuid = 1;
+  romsg.ItemBaseInfo item = 2;
+  int64 ownerId = 3;
+  int64 price = 4;
+  romsg.TMSkuInfo.SkuStatus status = 5;
+  romsg.TMSkuInfo.PublicityParam publicityParam = 6;
+}
+
+message TMPlayerCareReq {
+  bool isAdd = 1;
+  int64 itemEntry = 2;
+  string skuUuid = 3;
+  bool isPublicity = 4;
+}
+
+message TMPlayerCareResp {
+  int32 result = 1;
+  int64 itemEntry = 2;
+  string skuUuid = 3;
+  int64 careCount = 4;
+  bool isAdd = 5;
+  bool isPublicity = 6;
+}
+
+message TMMenuInfoReq {
+  int64 memuId = 1;
+  bool isPublicity = 2;
+  int64 filterRank = 3;
+  int64 filterQuality = 4;
+  int64 bigMenuId = 5;
+  int64 beginIndex = 6;
+  int64 size = 7;
+  bool onlyShowHaveData = 8;
+  int64 fighterCareer = 9;
+}
+
+message TMSpuSimpleInfo {
+  int64 itemEntry = 1;
+  int64 itemCount = 2;
+  bool isMyCare = 3;
+  int64 minPrice = 4;
+  int64 currencyType = 5;
+}
+
+message TMMenuInfoResp {
+  int32 result = 1;
+  repeated romsg.TMSpuSimpleInfo spuInfo = 2;
+  int64 menuId = 4;
+  bool isPublicity = 5;
+  int64 bigMenuId = 6;
+  int64 nextFreeRefleshTime = 7;
+  int64 totalRefleshCount = 8;
+  int64 beginIndex = 9;
+  int64 size = 10;
+  bool onlyShowHaveData = 11;
+  int64 totalSize = 12;
+}
+
+message TMAllSkuInfoReq {
+  int64 itemEntry = 1;
+  bool isPublicity = 2;
+  int64 beginIndex = 3;
+  int64 endIndex = 4;
+  bool fromCare = 5;
+  bool revertSort = 6;
+}
+
+message SkuShowInfo {
+  romsg.TMSkuInfo skuInfo = 1;
+  int64 careNum = 2;
+  bool isMyCare = 3;
+}
+
+message TMAllSkuInfoResp {
+  int32 result = 1;
+  bool isPublicity = 3;
+  int64 beginIndex = 4;
+  int64 endIndex = 5;
+  int64 totalCount = 6;
+  repeated romsg.SkuShowInfo skuInfo = 7;
+  int64 itemEntry = 8;
+  bool revertSort = 9;
+}
+
+message TMSpuSimpleCareInfo {
+  romsg.TMSpuSimpleInfo simpleInfo = 1;
+  bool isPublicity = 2;
+}
+
+message TMAllCareInfoReq {
+}
+
+message TMAllCareInfoResp {
+  int32 result = 1;
+  repeated romsg.TMSkuInfo skuInfo = 2;
+  repeated romsg.TMSpuSimpleCareInfo spuInfo = 3;
+}
+
+message TMRecordInfo {
+  romsg.ItemBaseInfo itemInfo = 1;
+  int64 price = 2;
+  int64 currencyType = 3;
+  int64 time = 4;
+}
+
+message TMExchangeRecordReq {
+  bool bSellRecord = 1;
+}
+
+message TMExchangeRecordResp {
+  int32 result = 1;
+  bool bSellRecord = 2;
+  repeated romsg.TMRecordInfo records = 3;
+}
+
+message TMFilterQueryReq {
+  repeated int64 itemEntrys = 1;
+  bool isPublicity = 2;
+}
+
+message TMFilterQueryResp {
+  int32 result = 1;
+  repeated int64 itemEntrys = 2;
+  bool isPublicity = 3;
+  repeated romsg.SkuShowInfo skuInfo = 4;
+}
+
+message TMAllMenusReq {
+  bool isPublicity = 1;
+}
+
+message TMAllMenusResp {
+  int32 result = 1;
+  bool isPublicity = 2;
+  repeated int64 itemEntrys = 3;
+}
+
+message TMSaleReq {
+  int64 itemGuid = 1;
+  int64 count = 2;
+  int64 price = 3;
+  int64 currencyType = 4;
+}
+
+message TMSaleResp {
+  int32 result = 1;
+  romsg.TMSkuInfo saleInfo = 2;
+  int64 index = 3;
+  int64 tax = 4;
+}
+
+message TMS2TMSaleCheckReq {
+  int64 itemID = 1;
+  int64 itemCount = 2;
+  int64 roleID = 3;
+  int64 price = 4;
+  int64 itemGuid = 5;
+  int64 currencyType = 6;
+}
+
+message TMS2TMSaleCheckResp {
+  int32 result = 1;
+  int64 itemCount = 2;
+  int64 roleID = 3;
+  int64 price = 4;
+  int64 itemGuid = 5;
+  int64 itemID = 6;
+  int64 tax = 7;
+  int64 currencyType = 8;
+}
+
+message TMS2TMSaleSureReq {
+  romsg.ItemBaseInfo itemInfo = 1;
+  int64 itemCount = 2;
+  int64 roleID = 3;
+  int64 price = 4;
+  romsg.TransAction action = 5;
+  int64 currencyType = 6;
+  int64 curVipLevel = 7;
+}
+
+message TMS2TMSaleSureResp {
+  int32 result = 1;
+  int64 itemCount = 2;
+  int64 roleID = 3;
+  int64 price = 4;
+  romsg.ItemBaseInfo itemInfo = 5;
+  romsg.TMSkuInfo info = 6;
+  int64 index = 7;
+}
+
+message TMSalePriceQueryReq {
+  repeated int64 itemID = 1;
+}
+
+message TMSalePriceQueryResp {
+  message SingleInfo {
+    int64 itemID = 1;
+    int64 currencyType = 2;
+    repeated int64 currencyPrice = 3;
+    int64 ableSaleCount = 4;
+    int64 standardPriceIndex = 5;
+  }
+
+  int32 result = 1;
+  repeated romsg.TMSalePriceQueryResp.SingleInfo datas = 2;
+}
+
+message TMBuyReq {
+  string skuUuid = 1;
+  int64 currencyType = 2;
+  int64 currencyPrice = 3;
+  int64 count = 4;
+  int64 itemID = 5;
+}
+
+message TMBuyResp {
+  int32 result = 1;
+  bool isPublicity = 2;
+  romsg.TMSkuInfo info = 3;
+}
+
+message TMS2TMBuyCheckReq {
+  string skuUuid = 1;
+  int64 currencyType = 2;
+  int64 currencyPrice = 3;
+  int64 count = 4;
+  int64 itemID = 5;
+}
+
+message TMS2TMBuyCheckResp {
+  int32 result = 1;
+  int64 currencyType = 2;
+  int64 currencyPrice = 3;
+  int64 count = 4;
+  int64 itemID = 5;
+  bool isPublicity = 6;
+  romsg.TMSkuInfo info = 7;
+  string skuUuid = 8;
+}
+
+message TMS2TMBuySureReq {
+  string skuUuid = 1;
+  int64 currencyType = 2;
+  int64 currencyPrice = 3;
+  int64 count = 4;
+  int64 itemID = 5;
+  romsg.TransAction action = 6;
+}
+
+message TMS2TMBuySureResp {
+  int32 result = 1;
+  int64 currencyType = 2;
+  int64 currencyPrice = 3;
+  int64 count = 4;
+  int64 itemID = 5;
+  string skuUuid = 6;
+}
+
+message TMTakeDownReq {
+  int64 index = 1;
+}
+
+message TMTakeDownResp {
+  int32 result = 1;
+  int64 index = 2;
+}
+
+message TMBuySalePositionReq {
+}
+
+message TMBuySalePositionCheckReq {
+}
+
+message TMBuySalePositionCheckResp {
+  int32 result = 1;
+  int64 newIndex = 2;
+}
+
+message TMBuySalePositionSureReq {
+  int64 newIndex = 1;
+}
+
+message TMBuySalePositionSureResp {
+  int32 result = 1;
+  int64 newIndex = 2;
+}
+
+message TMBuySalePositionResp {
+  int32 result = 1;
+  int64 maxSize = 2;
+}
+
+message TMShowMySaleReq {
+}
+
+message TMShowMySaleResp {
+  message SkuInPosition {
+    int64 index = 1;
+    romsg.TMSkuInfo sku = 2;
+  }
+
+  int32 result = 1;
+  repeated romsg.TMShowMySaleResp.SkuInPosition datas = 2;
+  int64 maxSize = 3;
+}
+
+message TMRefleshReq {
+  bool isFree = 1;
+}
+
+message TMRefleshCheckReq {
+}
+
+message TMRefleshCheckResp {
+  int32 result = 1;
+  int64 totalRefleshCount = 2;
+  bool isFree = 3;
+}
+
+message TMRefleshResp {
+  int32 result = 1;
+  int64 nextRefleshTime = 2;
+  int64 totalRefleshCount = 3;
+}
+
+message TMNotifyVipLevelReq {
+  int64 vipLevel = 1;
+}
+
+message TMNotifyVipLevelResp {
+}
+
+message TMBuyPublicityCheckReq {
+  map<int64, int64> needCurrency = 1;
+  bool doCost = 2;
+}
+
+message TMBuyPublicityCheckResp {
+  bool suc = 1;
+  bool doCost = 2;
+  string transActionID = 3;
+}
+
+message TMBuyPublicityResultNotify {
+  string skuUuid = 1;
+  int64 itemID = 2;
+  bool suc = 3;
+}
+
+message TMStallInfo {
+  int64 playerId = 1;
+  string playerName = 2;
+  string sceneServer = 3;
+  int64 sceneEntry = 4;
+  int64 sceneID = 5;
+  int64 entityID = 6;
+  romsg.Vec3 position = 7;
+  float face = 8;
+  int64 endTime = 9;
+}
+
+message TMCreateStallReq {
+}
+
+message TMCreateStallRsp {
+  int32 result = 1;
+  romsg.TMStallInfo info = 2;
+}
+
+message TMCreateStallCheckReq {
+  romsg.TMStallInfo info = 1;
+}
+
+message TMCreateStallCheckResp {
+}
+
+message TMStallChangeNtf {
+  romsg.TMStallInfo info = 1;
+  bool isAdd = 2;
+}
+
+message TMSceneStallInfoReq {
+}
+
+message TMSceneStallInfoResp {
+  repeated romsg.TMStallInfo infos = 1;
+}
+
+message TMQueryItemCountReq {
+  repeated int64 itemID = 1;
+}
+
+message TMQueryItemCountResp {
+  message ItemCount {
+    int64 itemID = 1;
+    int64 itemCount = 2;
+  }
+
+  int32 result = 1;
+  repeated romsg.TMQueryItemCountResp.ItemCount data = 2;
+}
+

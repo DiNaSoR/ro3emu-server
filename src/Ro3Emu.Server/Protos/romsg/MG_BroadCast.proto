@@ -1,0 +1,40 @@
+syntax = "proto3";
+package romsg;
+import "MG_Define.proto";
+import "MG_Chat.proto";
+import "google/protobuf/any.proto";
+import "FieldOption.proto";
+
+enum MsgSource {
+  MsgSource_none = 0;
+  MsgSource_gm = 1;
+  MsgSource_system = 2;
+  MsgSource_player = 3;
+  MsgSource_npc = 4;
+}
+
+message SystemBoardCastAll {
+  romsg.MSG_Type msgId = 1;
+  google.protobuf.Any msg = 2;
+  repeated int64 players = 3;
+}
+
+message SystemBoardCastMsgNtf {
+  romsg.MsgSource source = 1;
+  int32 chatId = 2;
+  int64 playerId = 4;
+  int32 campIndex = 5;
+  map<int32, romsg.ChatParameter> paramList = 6;
+  int64 guildId = 7;
+}
+
+message SoundTransmissionReq {
+  int32 itemId = 1;
+  string words = 2;
+}
+
+message SoundTransmissionRes {
+  int32 result = 1;
+  romsg.SoundTransmissionReq req = 2;
+}
+

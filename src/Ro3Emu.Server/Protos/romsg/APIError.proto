@@ -1,0 +1,32 @@
+syntax = "proto3";
+package romsg;
+import "MG_Common.proto";
+
+enum ErrorParamType {
+  ErrorParamUnknown = 0;
+  ErrorParamString = 1;
+  ErrorParamTenBoss = 2;
+  ErrorParamStringList = 3;
+  ErrorParamItem = 4;
+  ErrorParamNPC = 5;
+  ErrorParamMap = 6;
+  ErrorParamTask = 7;
+  ErrorParamSkill = 8;
+  ErrorParamBuff = 9;
+  ErrorParamTimeDate = 10;
+  ErrorParamFunctionId = 11;
+  ErrorParamRoleId = 12;
+  ErrorParamPunishTime = 13;
+}
+
+message APIErrorMsg {
+  int64 error_code = 1;
+  int64 origin_msg_id = 2;
+  repeated romsg.ErrorParam error_params = 3;
+}
+
+message ErrorParam {
+  romsg.ErrorParamType param_type = 1;
+  repeated string param_value = 2;
+}
+

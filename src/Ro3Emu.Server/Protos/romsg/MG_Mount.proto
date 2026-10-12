@@ -1,0 +1,86 @@
+syntax = "proto3";
+package romsg;
+
+enum eRiderType {
+  eRiderType_OffSystem = 0;
+  eRiderType_OnSystem = 1;
+  eRiderType_OffBattle = 2;
+  eRiderType_OnBattle = 3;
+}
+
+enum Ro3RiderType {
+  Ro3RiderType_None = 0;
+  Ro3RiderType_System = 1;
+  Ro3RiderType_Battle = 2;
+}
+
+message PlayerMountsSetCfgReq {
+  romsg.Ro3RiderType tp = 1;
+  int32 mountId = 2;
+}
+
+message PlayerMountsSetCfgResp {
+  int32 result = 1;
+  int64 changeTp = 2;
+  int32 mountId = 3;
+}
+
+message PlayerGetMountScoreAwardReq {
+  repeated int64 index = 1;
+}
+
+message PlayerGetMountScoreAwardResp {
+  int32 result = 1;
+  repeated int64 index = 2;
+}
+
+message PlayerRiderMountReq {
+  romsg.eRiderType tp = 1;
+}
+
+message PlayerRiderMountResp {
+  int32 result = 1;
+  int32 tp = 2;
+}
+
+message PlayerRiderMountNtf {
+  int64 CurRider = 1;
+}
+
+message PlayerMountUnLockNtf {
+  int64 riderId = 1;
+  int64 endTime = 2;
+}
+
+message MountEtchantRefreshReq {
+  int32 planId = 1;
+  int32 mountId = 2;
+  int32 part = 3;
+}
+
+message MountEtchantRefreshResp {
+  int32 result = 1;
+  int32 cfgId = 2;
+  romsg.MountEtchantRefreshReq req = 3;
+}
+
+message MountEtchantSaveReq {
+  int32 planId = 1;
+  int32 mountId = 2;
+  int32 part = 3;
+  int32 cfgId = 4;
+}
+
+message MountEtchantSaveResp {
+  int32 result = 1;
+}
+
+message MountSetEtchantPlanReq {
+  int32 mountId = 1;
+  int32 planId = 2;
+}
+
+message MountSetEtchantPlanResp {
+  int32 result = 1;
+}
+

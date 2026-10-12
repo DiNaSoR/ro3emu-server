@@ -1,0 +1,446 @@
+syntax = "proto3";
+package romsg;
+import "FieldOption.proto";
+
+enum AuctionType {
+  TNONE = 0;
+  GUILD = 1;
+  WORLD = 2;
+  ACT = 3;
+  DUNGEON = 4;
+  TERRITORY = 5;
+}
+
+enum AuctionState {
+  SNONE = 0;
+  PUBLIC = 1;
+  BIDDING = 2;
+  SETTLED = 3;
+}
+
+enum BiddingType {
+  BNONE = 0;
+  FIXED = 1;
+  MANUAL = 2;
+  AUTO = 3;
+}
+
+enum GroupBonusState {
+  GNONE = 0;
+  RUNNING = 1;
+  FINISHED = 2;
+  RECIEVED = 3;
+}
+
+enum AuctionPagingType {
+  NONE = 0;
+  PAGEDOWN = 1;
+  PAGEUP = 2;
+}
+
+enum AuctionReddotType {
+  AuctionReddotType_Nont = 0;
+  AuctionReddotType_NewUpload = 1;
+  AuctionReddotType_AllSettled = 2;
+  AuctionReddotType_NewRecord = 3;
+  AuctionReddotType_NewPrice = 4;
+}
+
+message DBAutoBidding {
+  int64 roleId = 1;
+  int32 maxPrice = 2;
+  int64 biddingTime = 3;
+  bool isPaused = 4;
+}
+
+message DBAuctionItem {
+  int64 ro3Define_SaveVersion = 9999;
+  int64 ro3Define_DbTerm = 10000;
+  int64 auctionId = 1;
+  romsg.AuctionType auctionType = 2;
+  int64 guildId = 3;
+  int32 srcType = 4;
+  int64 actId = 5;
+  int64 actWeekDay = 6;
+  int64 actDayStartTime = 7;
+  int32 itemId = 8;
+  int32 itemPrice = 9;
+  int64 startTime = 10;
+  int64 endTime = 11;
+  romsg.AuctionState state = 12;
+  int64 ownerId = 13;
+  map<int64, bool> bonusRoleIds = 14;
+  map<int64, int64> biddingRoleIds = 15;
+  map<int64, romsg.DBAutoBidding> autoBiddings = 16;
+  romsg.DBAutoBidding curMaxAutoBidding = 17;
+  romsg.DungeonAuctionData dungeonaucData = 18;
+  int64 lastBiddingTime = 19;
+  bool isEnterFastBidding = 20;
+  map<int64, int64> joinBiddingRoleIds = 21;
+  int64 GuildActivityId = 22;
+  bytes strategyData = 23;
+}
+
+message DBGuildAuctionBonus {
+  int64 ro3Define_SaveVersion = 9999;
+  int64 ro3Define_DbTerm = 10000;
+  int64 guildId = 1;
+  map<int64, romsg.DBGuildAuctionActBonus> actBonuses = 3;
+}
+
+message DBGuildAuctionActBonus {
+  map<int64, int32> auctionItemBonuses = 2;
+  int64 expireTs = 3;
+  bool hasBidding = 4;
+  map<int64, int64> bonusPlayerRatios = 5;
+  map<int64, int64> currencyBonus = 6;
+}
+
+message DBAuctionServerGlobalData {
+  int64 ro3Define_SaveVersion = 9999;
+  int64 ro3Define_DbTerm = 10000;
+  int64 areaId = 1;
+  map<int64, romsg.DBAuctionGoodRecord> goodRecords = 2;
+  map<int64, romsg.DBHistoryQueue> historyAuctionItems = 3;
+}
+
+message DBHistoryQueue {
+  romsg.HistoryAuctionItem history = 1;
+  repeated int64 roleIds = 2;
+}
+
+message DBAuctionGoodRecord {
+  int64 lastGenerateTime = 1;
+  int64 lastSystemGenerateTime = 2;
+  map<int64, int64> guildGenerateCount = 3;
+  int64 generateTotalCount = 4;
+  int64 systemGenerateCount = 5;
+}
+
+message DungeonAuctionData {
+  int64 dungeonBeginTime = 1;
+  repeated int64 cantbonusRoleIds = 2;
+  int64 quUniqueId = 3;
+  repeated int64 giveupUsers = 4;
+  bool preBidding = 5;
+}
+
+message RealQueue {
+  repeated int64 auctionId = 1;
+}
+
+message DungeonAuctionQueue {
+  int64 ro3Define_SaveVersion = 9999;
+  int64 ro3Define_DbTerm = 10000;
+  map<int64, romsg.RealQueue> dungeonQueue = 1;
+}
+
+message HistoryAuctionItem {
+  int32 itemId = 1;
+  int32 itemPrice = 2;
+  int64 endTime = 3;
+  int32 srcType = 4;
+  int64 userId = 5;
+  int64 auctionId = 6;
+  int64 auctionType = 7;
+}
+
+message QueryHistoryAuctionReq {
+  romsg.AuctionType auctionType = 1;
+  int64 guildId = 2;
+}
+
+message QueryHistoryAuctionRes {
+  romsg.AuctionType auctionType = 1;
+  repeated romsg.HistoryAuctionItem historyAuctions = 2;
+}
+
+message BiddingAuctionItem {
+  int64 auctionId = 1;
+  int32 itemId = 2;
+  int32 itemPrice = 3;
+  int64 endTime = 4;
+  int64 ownerId = 5;
+  int32 srcType = 6;
+  romsg.DBAutoBidding curMaxAutoBidding = 7;
+  bool isCanBidding = 8;
+  bool isBidded = 9;
+  bool isBidding = 10;
+  int32 index = 11;
+  romsg.AuctionState state = 12;
+  int64 guildId = 13;
+  int64 biddingPrice = 14;
+  bool isGiveup = 15;
+  int32 typeAttr = 17;
+  int64 lastBiddingTime = 18;
+  romsg.DungeonAuctionData dungeonAuctionData = 19;
+  reserved 16 to 16;
+}
+
+message GetAuctionReq {
+  romsg.AuctionType auctionType = 1;
+  repeated int64 auctionIds = 2;
+  int32 srcType = 3;
+  int64 guildId = 4;
+}
+
+message GetAuctionRes {
+  romsg.AuctionType auctionType = 1;
+  repeated int64 auctionIds = 2;
+  int32 srcType = 3;
+  repeated romsg.BiddingAuctionItem auctions = 4;
+  int32 totalNum = 5;
+}
+
+message QuerySelfAuctionReq {
+  romsg.AuctionType auctionType = 1;
+  int64 guildId = 2;
+}
+
+message QuerySelfAuctionRes {
+  romsg.AuctionType auctionType = 1;
+  repeated romsg.BiddingAuctionItem selfAuctions = 2;
+}
+
+message QueryAuctionReq {
+  romsg.AuctionType auctionType = 1;
+  int32 startIndex = 2;
+  int32 endIndex = 3;
+  int32 srcType = 4;
+  int64 guildId = 5;
+  repeated int64 auctionItemTypes = 6;
+}
+
+message QueryAuctionRes {
+  romsg.AuctionType auctionType = 1;
+  int32 startIndex = 2;
+  int32 endIndex = 3;
+  int32 srcType = 4;
+  repeated romsg.BiddingAuctionItem auctions = 5;
+  int32 totalNum = 6;
+  repeated int64 auctionItemTypes = 7;
+  repeated int64 srvAuctionItemTypes = 8;
+}
+
+message BiddingAuctionReq {
+  int64 auctionId = 1;
+  int32 price = 2;
+  romsg.BiddingType opType = 3;
+  int64 guildId = 4;
+  bool checkOnly = 5;
+  int32 extraPrice = 6;
+}
+
+message BiddingAuctionRes {
+  int32 result = 1;
+  int64 auctionId = 2;
+  romsg.BiddingType opType = 3;
+  int32 extraPrice = 4;
+  romsg.AuctionType auctionType = 5;
+  int64 endTime = 6;
+  int32 curPrice = 7;
+  romsg.DBAuctionItem auctionItem = 8;
+  romsg.BiddingAuctionItem biddingAuctionItem = 9;
+}
+
+message CancelBiddingAuctionReq {
+  int64 auctionId = 1;
+  int64 guildId = 2;
+}
+
+message CancelBiddingAuctionRes {
+  int32 result = 1;
+  int64 auctionId = 2;
+  int64 itemId = 3;
+}
+
+message BatchCancelBiddingAuctionReq {
+  repeated int64 auctionIds = 1;
+  map<int64, int64> afterCancelPreBuyNum = 2;
+  int64 auctionType = 3;
+  int64 srcType = 4;
+  int64 guildId = 5;
+  int64 optType = 6;
+}
+
+message BatchCancelBiddingAuctionRes {
+  int32 result = 1;
+  map<int64, int32> batchResults = 2;
+  int64 optType = 3;
+}
+
+message AuctionItemChangeNotify {
+  romsg.AuctionType auctionType = 1;
+  int64 auctionId = 2;
+  int32 srcType = 3;
+  int32 itemPrice = 4;
+  romsg.AuctionState state = 5;
+  int64 ownerId = 6;
+  int64 itemId = 7;
+}
+
+message DungeonAuctionItemChangeNotify {
+  int64 auctionId = 1;
+  int32 itemPrice = 2;
+  int64 ownerId = 3;
+  int64 endTime = 4;
+  bool isFix = 5;
+  int64 lastBiddingTime = 6;
+  bool preBidding = 7;
+}
+
+message BatchUploadAuctionReq {
+  romsg.AuctionType auctionType = 1;
+  int64 guildId = 2;
+  int32 srcType = 3;
+  repeated int32 itemIds = 4;
+  repeated int64 cantbonusRoleIds = 6;
+  bytes customData = 7;
+  int64 endPublicTime = 8;
+  int64 guildActId = 9;
+  map<int64, int64> bonusRoleRatios = 10;
+}
+
+message DBBonus {
+  int32 bonus = 1;
+  int64 guildId = 2;
+  int64 actId = 3;
+  int64 actWeekDay = 4;
+  int64 actDayStartTime = 5;
+  romsg.GroupBonusState state = 6;
+}
+
+message DBAuctionRoleBonus {
+  int64 ro3Define_SaveVersion = 9999;
+  int64 ro3Define_DbTerm = 10000;
+  int64 roleId = 1;
+  map<string, romsg.DBBonus> groupBonus = 2;
+}
+
+message QueryAuctionBonusReq {
+  int64 guildId = 1;
+}
+
+message QueryAuctionBonusRes {
+  map<string, romsg.DBBonus> groupBonus = 1;
+}
+
+message GetAuctionBonusReq {
+  string srcTypeGroupKey = 1;
+}
+
+message GetAuctionBonusRes {
+  string srcTypeGroupKey = 1;
+  int32 result = 2;
+  int32 bonus = 3;
+}
+
+message BatchBiddingAuctionItem {
+  int64 auctionId = 1;
+  int32 price = 2;
+  romsg.BiddingType opType = 3;
+  int32 extraPrice = 4;
+}
+
+message BatchBiddingAuctionReq {
+  repeated romsg.BatchBiddingAuctionItem biddingItems = 1;
+  romsg.AuctionType auctionType = 2;
+  int64 srcType = 3;
+  int64 itemID = 4;
+  int64 preBuyNum = 5;
+  int64 optType = 6;
+}
+
+message BatchBiddingAuctionRes {
+  int32 result = 1;
+  map<int64, romsg.BiddingAuctionRes> results = 2;
+  int64 optType = 3;
+}
+
+message BatchBiddingAuctionResOfflineMsg {
+  romsg.BatchBiddingAuctionReq req = 1;
+  romsg.BatchBiddingAuctionRes res = 2;
+  bool isBatch = 3;
+}
+
+message PreAuctionItemStackQueryReq {
+  romsg.AuctionType auctionType = 1;
+  int64 srcType = 2;
+  repeated int32 queryItemTypes = 3;
+}
+
+message PreAuctionItemStackQueryRes {
+  map<int64, romsg.PreAuctionItemStack> preItems = 1;
+}
+
+message PreAuctionItemStack {
+  int64 itemId = 1;
+  int64 preBuyNum = 2;
+  int64 ownCount = 3;
+  int64 firstEndTime = 4;
+  map<int64, romsg.PreBiddingAuctionItem> preAuctionItem = 5;
+  romsg.AuctionState state = 6;
+}
+
+message PreBiddingAuctionItem {
+  int64 auctionId = 1;
+  int64 biddingPrice = 2;
+  romsg.DBAutoBidding autoBidding = 3;
+  bool selfIsAutoBidding = 4;
+  int64 ownerId = 5;
+  int32 joinAutoBiddingPlayerNum = 6;
+}
+
+message QueryAuctionCountReq {
+  repeated int64 auctionTypes = 1;
+}
+
+message QueryAuctionCountRes {
+  map<int64, romsg.QueryAuctionSrcTypeCount> auctionSrcTypeCount = 1;
+}
+
+message QueryAuctionSrcTypeCount {
+  map<int64, int64> srcTypeCount = 1;
+  map<int64, int64> itemTypeCount = 2;
+}
+
+message QuitAuctionReq {
+  int64 auctionId = 1;
+}
+
+message QuitAuctionRes {
+  int32 result = 1;
+  int64 auctionId = 2;
+  int64 itemId = 3;
+}
+
+message DungeonAuctionDoneNtf {
+  repeated romsg.HistoryAuctionItem historyAuctions = 2;
+}
+
+message HasAutoBiddingAuctionNtf {
+  repeated int64 auctionIds = 1;
+}
+
+message ResumeAutoBiddingAuctionReq {
+}
+
+message ResumeAutoBiddingAuctionRes {
+  int32 result = 1;
+}
+
+message GuildAuctionOwnerOfflineMsg {
+  romsg.DBAuctionItem auctionItem = 1;
+}
+
+message AuctionReddotNtf {
+  romsg.AuctionReddotType reddotType = 1;
+  int64 auctionType = 2;
+  repeated int64 srcTypes = 3;
+  repeated int64 itemTypes = 4;
+  int64 itemId = 5;
+  int64 auctionId = 6;
+  int64 preBuyNum = 7;
+  int64 itemPrice = 8;
+}
+

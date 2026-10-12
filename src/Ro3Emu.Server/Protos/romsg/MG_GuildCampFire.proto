@@ -1,0 +1,116 @@
+syntax = "proto3";
+package romsg;
+import "MG_Common.proto";
+
+enum GuildCampFireHurrayType {
+  HurrayMin = 0;
+  Cheering = 1;
+  Appauding = 2;
+  Fireworks = 3;
+}
+
+enum GuildCampFireShowType {
+  GuildCampFireShowType_None = 0;
+  GuildCampFireShowType_Show = 1;
+  GuildCampFireShowType_Draw = 2;
+}
+
+message GuildCampFireStageInfo {
+  int64 nowStage = 1;
+  int64 startTime = 2;
+  int64 nowHenshinType = 3;
+  bool bossDead = 4;
+  romsg.GuildCampFireShowInfo nowShowInfo = 5;
+}
+
+message GuildCampFireTrigger {
+  int64 cfgId = 1;
+  romsg.GuildCampFireParams params = 2;
+}
+
+message GuildCampFireParams {
+  repeated int64 params = 1;
+}
+
+message GuildCampFireModifier {
+  int64 cfgId = 1;
+  repeated romsg.GuildCampFireParams params = 2;
+}
+
+message GuildCampFireAffix {
+  int64 affixId = 1;
+  int64 cfgId = 2;
+  romsg.GuildCampFireTrigger trigger = 3;
+  romsg.GuildCampFireModifier modifier = 4;
+}
+
+message GetGuildCampFireReq {
+}
+
+message CampFirePlayerInfo {
+  int32 addSeedCount = 1;
+  int64 fireBlessingEndTime = 2;
+  int32 bubblesRewardCount = 3;
+}
+
+message CampFireDraft {
+  int64 partnerA = 1;
+  int64 partnerB = 2;
+}
+
+message GetGuildCampFireRsp {
+  map<int64, romsg.GuildCampFireAffix> addAffixMap = 1;
+  repeated int64 removeAffixMap = 2;
+  romsg.GuildCampFireStageInfo nowStageInfo = 4;
+  repeated int64 showList = 5;
+  repeated romsg.CampFireDraft draftList = 6;
+}
+
+message GuildCampFireLuckyPlayerInfo {
+  int64 playerId = 1;
+  int64 buffId = 2;
+  repeated int64 awardList = 3;
+  int64 bonusShow = 4;
+}
+
+message GuildCampFireLuckyPlayerNotify {
+  int64 awardLevel = 1;
+  repeated romsg.GuildCampFireLuckyPlayerInfo playerList = 2;
+}
+
+message GuildCampFireAddAccelerantReq {
+  int64 campFireId = 1;
+  int64 acceleantCfgId = 2;
+  bool needInteract = 3;
+}
+
+message GuildCampFireAddAccelerantRsp {
+  int32 result = 1;
+}
+
+message CreateMonsterFruitInfo {
+  int64 npcGuid = 1;
+  romsg.Vec3 createPosition = 2;
+}
+
+message GuildCampFireCreateMonsterFruitNotify {
+  romsg.Vec3 deadPosiiton = 1;
+  repeated romsg.CreateMonsterFruitInfo infos = 2;
+}
+
+message GuildCampFireHurrayNotify {
+  romsg.GuildCampFireHurrayType hurrayType = 1;
+}
+
+message GuildCampFireBossDeadNotify {
+}
+
+message GuildCampFireFinishNotify {
+}
+
+message GuildCampFireShowInfo {
+  romsg.GuildCampFireShowType type = 1;
+  int64 param = 2;
+  int64 startTimeStamp = 3;
+}
+

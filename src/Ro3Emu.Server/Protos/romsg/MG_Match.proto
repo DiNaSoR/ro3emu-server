@@ -1,0 +1,147 @@
+syntax = "proto3";
+package romsg;
+import "FieldOption.proto";
+
+enum MatchReadyStatus {
+  MatchReadyStatus_None = 0;
+  MatchReadyStatus_Ready = 1;
+  MatchReadyStatus_Cancel = 2;
+}
+
+enum MatchPunishReason {
+  MatchPunishType_None = 0;
+  MatchPunishType_ReadyRefuse = 1;
+  MatchPunishType_LeaveDungeon = 2;
+  MatchPunishType_AFK = 3;
+}
+
+message MatchPenaltyData {
+  int64 count = 1;
+  int64 unlockTime = 2;
+  int64 remainingPunishTime = 3;
+}
+
+message StartMatchReq {
+  int32 matchEntryId = 1;
+  int64 operateId = 2;
+  romsg.MatchData matchData = 3;
+}
+
+message MatchData {
+  romsg.ChickenMatchData chicken = 1;
+  romsg.MultiDungeonMatchData multiDungeon = 2;
+  int64 matchEntryId = 3;
+}
+
+message ChickenMatchData {
+  int64 ownerId = 1;
+  repeated int64 playerGuids = 2;
+  int32 score = 3;
+  bool isFirstChicken = 4;
+}
+
+message MultiDungeonMatchData {
+  int64 dungeonId = 1;
+  int64 multiDungeonId = 2;
+  int64 markId = 3;
+}
+
+message StartMatchResp {
+  int32 result = 1;
+  int32 matchEntryId = 2;
+  romsg.MatchData matchData = 4;
+  int64 matchStartTime = 6;
+}
+
+message FailMatchNtf {
+  int32 result = 1;
+  int32 matchEntryId = 2;
+  int64 penaltyMemberGuid = 3;
+  romsg.MatchData matchData = 4;
+  int64 penaltyMemberUnlockTs = 5;
+  int64 matchStartTime = 6;
+  int64 failPlayer = 7;
+}
+
+message StartMatchNotify {
+  int32 matchEntryId = 1;
+  int64 penaltyMemberGuid = 2;
+  romsg.MatchData matchData = 3;
+}
+
+message CancelMatchReq {
+  int32 matchEntryId = 1;
+  int64 operateId = 2;
+  romsg.MatchData matchData = 3;
+  int32 nextMatchEntry = 4;
+  romsg.MatchData nextMatchData = 5;
+}
+
+message CancelMatchResp {
+  int32 result = 1;
+  int32 matchEntryId = 2;
+  int32 cancelError = 3;
+  int64 cancelPlayer = 4;
+}
+
+message CancelMatchNotify {
+  int32 matchEntryId = 1;
+  bool manualCancel = 2;
+}
+
+message MatchReadyReminders {
+  map<int64, int64> readyReminders = 1;
+}
+
+message MatchRoleReadyInfo {
+  int64 playerId = 1;
+  romsg.MatchReadyStatus status = 2;
+}
+
+message DragonIslandReadyProgress {
+  int32 readyCount = 1;
+  int32 expectedCount = 2;
+}
+
+message MatchReadyNotify {
+  int32 matchEntryId = 1;
+  map<int64, romsg.MatchReadyReminders> readyReminders = 3;
+  repeated romsg.MatchRoleReadyInfo readyInfos = 4;
+  int64 endTime = 5;
+  int64 dungeonId = 6;
+  int64 multiDungeonId = 7;
+  int64 markId = 8;
+  romsg.DragonIslandReadyProgress dragonIslandReadyProgress = 9;
+}
+
+message MatchReadyReq {
+  int32 matchEntryId = 1;
+  int64 playerId = 2;
+  bool isReady = 3;
+}
+
+message MatchReadyResp {
+  int32 result = 1;
+  int32 matchEntryId = 2;
+  int64 playerId = 3;
+  bool isReady = 4;
+}
+
+message MatchReadyReminderReq {
+  int32 matchEntryId = 1;
+  int64 playerId = 2;
+  int64 remindedPlayerId = 3;
+}
+
+message MatchReadyReminderResp {
+  int32 result = 1;
+  int32 matchEntryId = 2;
+  int64 playerId = 3;
+  int64 remindedPlayerId = 4;
+}
+
+message MatchReadyReminderNotify {
+  int32 matchEntryId = 1;
+  int64 reminderPlayerId = 2;
+}
+

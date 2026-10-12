@@ -1,0 +1,246 @@
+syntax = "proto3";
+package romsg;
+import "FieldOption.proto";
+
+enum EPetCamp_Type {
+  EPetCamp_None = 0;
+  EPetCamp_Destiny = 1;
+  EPetCamp_Growth = 2;
+  EPetCamp_Order = 3;
+  EPetCamp_Perception = 4;
+}
+
+enum EPetLvUpType {
+  EPetLvUpTypeNone = 0;
+  EPetLvUpTypeOne = 1;
+  EPetLvUpTypeTen = 2;
+}
+
+enum PetStateSource_Type {
+  PetStateSource_None = 0;
+  PetStateSource_SetUp = 1;
+  PetStateSource_Support = 2;
+}
+
+message PetData {
+  int32 petId = 1;
+  int32 level = 2;
+  int32 star = 3;
+  int32 starProgress = 4;
+  int64 levelExp = 5;
+  map<int64, int64> breakLv = 6;
+  bool isActiveCollect = 7;
+}
+
+message PetListUpdateNtf {
+  map<int32, romsg.PetData> mapPetData = 1;
+}
+
+message PetLvUpReq {
+  romsg.EPetLvUpType eType = 1;
+  int32 petId = 2;
+}
+
+message PetLvUpResp {
+  int32 result = 1;
+  romsg.EPetLvUpType eType = 2;
+  int32 petId = 3;
+  int32 newLevel = 4;
+  int64 levelExp = 5;
+}
+
+message PetRebirthReq {
+  int32 petId = 1;
+}
+
+message PetRebirthResp {
+  int32 result = 1;
+  int32 petId = 2;
+}
+
+message PetProgressUpReq {
+  int32 petId = 1;
+}
+
+message PetProgressUpResp {
+  int32 result = 1;
+  int32 petId = 2;
+  int32 starProgress = 3;
+}
+
+message PetStarUpReq {
+  int32 petId = 1;
+}
+
+message PetStarUpResp {
+  int32 result = 1;
+  int32 petId = 2;
+  int32 star = 3;
+  int32 starProgress = 4;
+}
+
+message PetFragment {
+  int32 fragmentId = 1;
+  int32 count = 2;
+}
+
+message PetFragmentsBrokenReq {
+  repeated romsg.PetFragment fragments = 1;
+}
+
+message PetFragmentsBrokenResp {
+  int32 result = 1;
+  romsg.PetFragmentsBrokenReq req = 2;
+}
+
+message PetBrokenDecomposeReq {
+  repeated int64 itemGuidList = 1;
+}
+
+message PetBrokenDecomposeResp {
+  int32 result = 1;
+}
+
+message PetStateUpdateReq {
+  int32 petId = 1;
+  romsg.PetStateSource_Type source = 2;
+  int32 sourceSlotIndex = 3;
+  romsg.PetStateSource_Type target = 4;
+  int32 targetSlotIndex = 5;
+}
+
+message PetStateUpdateResp {
+  int32 result = 1;
+  romsg.PetStateUpdateReq req = 2;
+  map<int32, int32> setUpPets = 3;
+  map<int32, int32> supportPets = 4;
+}
+
+message PetSetUpReq {
+  int32 petId = 1;
+  int32 slotIndex = 2;
+  int32 secondSlotIndex = 3;
+}
+
+message PetSetUpResp {
+  int32 result = 1;
+  int32 petId = 2;
+  int32 slotIndex = 3;
+  int32 secondSlotIndex = 4;
+  map<int32, int32> setUpPets = 5;
+}
+
+message PetCombineReq {
+  int32 petId = 1;
+}
+
+message PetCombineResp {
+  int32 result = 1;
+  int32 petId = 2;
+}
+
+message PetChooseNtf {
+  int32 petId = 1;
+}
+
+message PetSwitchPlanReq {
+  int32 targetIndex = 1;
+}
+
+message PetSwitchPlanResp {
+  int32 result = 1;
+  int32 currentPlan = 2;
+}
+
+message PetChangePlanNameReq {
+  int32 targetIndex = 1;
+  string name = 2;
+}
+
+message PetChangePlanNameResp {
+  int32 result = 1;
+}
+
+message PetIncubationLvUpRes {
+  int64 result = 1;
+}
+
+message PetIncubationLvUpInTimeRes {
+  int64 result = 1;
+}
+
+message PetGenEggReq {
+  int64 roundId = 1;
+  int64 slotId = 2;
+}
+
+message PetGenEggRes {
+  int64 result = 1;
+}
+
+message PetEggRewardReq {
+  int64 roundId = 1;
+  repeated int64 slotIds = 2;
+}
+
+message PetEggRewardItem {
+  int64 itemId = 1;
+  int64 count = 2;
+}
+
+message PetEggRewardRes {
+  int64 result = 1;
+  repeated romsg.PetEggRewardItem petItems = 2;
+  repeated romsg.PetEggRewardItem normalItems = 3;
+  repeated romsg.PetEggRewardItem brokenItems = 4;
+}
+
+message PetSetSkipAnimReq {
+  int64 status = 1;
+}
+
+message PetSetSkipAnimRes {
+  int64 result = 1;
+}
+
+message PetIncubationLvUpAccRes {
+  int64 result = 1;
+}
+
+message PetEggAccReq {
+  int64 roundId = 1;
+  int64 slotId = 2;
+}
+
+message PetEggAccRes {
+  int64 result = 1;
+}
+
+message PetBreakReq {
+  int32 petId = 1;
+}
+
+message PetBreakRes {
+  int64 result = 1;
+}
+
+message PetCollectActiveReq {
+  int64 petId = 1;
+}
+
+message PetCollectActiveRes {
+  int64 result = 1;
+  int64 petId = 2;
+}
+
+message FastIncubateReq {
+  int64 roundId = 1;
+}
+
+message FastIncubateRes {
+  int64 result = 1;
+  repeated romsg.PetEggRewardItem petItems = 2;
+  repeated romsg.PetEggRewardItem normalItems = 3;
+  repeated romsg.PetEggRewardItem brokenItems = 4;
+}
+

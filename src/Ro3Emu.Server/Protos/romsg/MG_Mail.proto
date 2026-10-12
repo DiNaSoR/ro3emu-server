@@ -1,0 +1,74 @@
+syntax = "proto3";
+package romsg;
+import "MG_Common.proto";
+import "FieldOption.proto";
+
+enum MailCategoryTypeEnum {
+  Invalid = 0;
+  System = 1;
+  Person = 2;
+  Guild = 3;
+  End = 4;
+}
+
+enum MailImportantTypeEnum {
+  Normal = 0;
+  Important = 1;
+  Payment = 2;
+}
+
+message MailHeaderInfo {
+  uint64 mail_uID = 1;
+  uint64 mail_recv_seq_id = 2;
+  uint64 send_time = 3;
+  uint64 expire_time = 4;
+  uint32 mail_category = 5;
+  string mutex_id = 6;
+  uint32 is_read = 7;
+  uint32 is_processed = 8;
+}
+
+message MailPersonSenderInfo {
+  uint64 avatar = 1;
+  uint64 avatar_frame = 2;
+  string sender = 3;
+  int64 sender_id = 4;
+}
+
+message MailBriefInfo {
+  string title = 1;
+  uint64 avatar = 2;
+  uint64 avatar_frame = 3;
+  bool has_items = 4;
+  uint32 npc_id = 5;
+  string sender = 6;
+  int64 sender_id = 7;
+  uint32 cfg_id = 8;
+  int64 mail_server_uid = 9;
+  uint32 title_id = 10;
+}
+
+message MailItemList {
+  repeated romsg.ItemBaseInfo items = 1;
+}
+
+message ClaimMailReq {
+  repeated string mail_uid = 1;
+}
+
+message ClaimMailRsp {
+  int32 result = 1;
+  repeated string mail_uid = 2;
+}
+
+message SendGuildMailReq {
+  string title = 1;
+  string content = 2;
+  uint32 expire_time = 3;
+}
+
+message SendGuildMailRsp {
+  int32 result = 1;
+  string mail_uid = 3;
+}
+

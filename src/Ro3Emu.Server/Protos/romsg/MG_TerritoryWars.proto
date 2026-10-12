@@ -1,0 +1,839 @@
+syntax = "proto3";
+package romsg;
+import "FieldOption.proto";
+import "MG_Guild.proto";
+import "MG_Common.proto";
+import "MG_Season.proto";
+import "MG_Interact.proto";
+
+enum EPvpRoleCampNum {
+  EPvpRoleCampNum_None = 0;
+  EPvpRoleCampNum_Peace = 1;
+  EPvpRoleCampNum_Free = 2;
+  EPvpRoleCampNum_Guild = 3;
+  EPvpRoleCampNum_AtkFree = 4;
+  EPvpRoleCampNum_AtkGuild = 5;
+}
+
+enum TerritoryWarStageType {
+  None_Type = 0;
+  Escort_Pre_Type = 1;
+  Escort_Type = 2;
+  Point_Auction_Pre_Type = 3;
+  Point_Free_Auction_Type = 4;
+  Point_War_Pre_Type = 5;
+  Point_War_Type = 6;
+  Capital_Auction_Pre_Type = 7;
+  Capital_Free_Auction_Type = 8;
+  Capital_War_Pre_Type = 9;
+  Capital_War_Type = 10;
+  Siege_Auction_Pre_Type = 11;
+  Siege_Free_Auction_Type = 12;
+  Siege_War_Pre_Type = 13;
+  Siege_War_Type = 14;
+  Siege_End_Type = 15;
+  Point_Final_Auction_Type = 16;
+  Capital_Final_Auction_Type = 17;
+  Siege_Final_Auction_Type = 18;
+  Off_Season_Type = 99;
+}
+
+enum TerritoryWarStageAction {
+  None_Action = 0;
+  Escort_Start = 1;
+  Escort_End = 2;
+  Auction_Start = 3;
+  Auction_End = 4;
+  Point_War_Start = 5;
+  Point_War_End = 6;
+  Capital_War_Start = 7;
+  Capital_War_End = 8;
+  Siege_War_Start = 9;
+  Siege_War_End = 10;
+}
+
+enum PvpSetRoleCampErrorCode {
+  PvpSetRoleCampErrorCode_Ok = 0;
+  PvpSetRoleCampErrorCode_ATK_TIME = 6012;
+}
+
+enum TerritoryWarsBattleState {
+  TerritoryWarsBattleState_None = 0;
+  TerritoryWarsBattleState_NotOpen = 1;
+  TerritoryWarsBattleState_OnAuction = 2;
+  TerritoryWarsBattleState_OnLastAuction = 3;
+  TerritoryWarsBattleState_AuctionEnd = 4;
+  TerritoryWarsBattleState_Fighting = 5;
+  TerritoryWarsBattleState_End = 6;
+}
+
+enum TerritoryWarsEscortStage {
+  TerritoryWarsEscortStage_None = 0;
+  TerritoryWarsEscortStage_WaitTrading = 1;
+  TerritoryWarsEscortStage_Trading = 2;
+  TerritoryWarsEscortStage_WaitPlaying = 3;
+  TerritoryWarsEscortStage_Playing = 4;
+}
+
+enum TerritoryWarsEscortGoodsState {
+  TerritoryWarsEscortGoodsState_Selling = 0;
+  TerritoryWarsEscortGoodsState_Finished = 1;
+  TerritoryWarsEscortGoodsState_TakeDown = 2;
+}
+
+enum TerritoryWarsEscortTradeRejectReason {
+  TerritoryWarsEscortTradeRejectReason_None = 0;
+  TerritoryWarsEscortTradeRejectReason_TakeDown = 1;
+  TerritoryWarsEscortTradeRejectReason_Modified = 2;
+  TerritoryWarsEscortTradeRejectReason_Finished = 3;
+  TerritoryWarsEscortTradeRejectReason_Reject = 4;
+}
+
+enum TerritoryWarEscortCartChangeReason {
+  SetFollow = 0;
+  RemoveFollow = 1;
+  Submit = 2;
+  Destroy = 3;
+}
+
+enum TerritoryWarQueueExitReason {
+  TerritoryWarQueueExitReason_None = 0;
+  TerritoryWarQueueExitReason_Disconnect = 1;
+  TerritoryWarQueueExitReason_EnterMatch = 2;
+  TerritoryWarQueueExitReason_Cancel = 3;
+  TerritoryWarQueueExitReason_GroupDisbanded = 4;
+  TerritoryWarQueueExitReason_SceneDestroyed = 5;
+  TerritoryWarQueueExitReason_Dead = 6;
+  TerritoryWarQueueExitReason_LeaveArea = 7;
+  TerritoryWarQueueExitReason_LeaveScene = 8;
+}
+
+message TerritoryWarsGetMapDataReq {
+  repeated int32 zoneIds = 1;
+  repeated int64 stateIds = 2;
+  repeated int64 pointIds = 3;
+}
+
+message TerritoryWarsGetMapDataResp {
+  int32 result = 1;
+  romsg.TerritoryWarsMapData data = 2;
+}
+
+message TerritoryWarsMapDataNotify {
+  romsg.TerritoryWarsMapData data = 1;
+}
+
+message DBTerritoryWarData {
+  romsg.TerritoryZoneData zoneData = 1;
+  romsg.TerritoryZoneData battleZoneData = 2;
+  romsg.TerritoryStage stage = 3;
+  int64 auctionId = 4;
+}
+
+message TerritoryStage {
+  int32 StageType = 1;
+  int64 StartTime = 2;
+  int64 EndTime = 3;
+  int64 StageAction = 4;
+}
+
+message TerritoryZoneData {
+  map<int32, romsg.TerritoryZoneInfo> ZoneInfo = 1;
+}
+
+message TerritoryZoneInfo {
+  repeated int64 guildId = 1;
+}
+
+message DBTerritoryWarsData {
+  romsg.TerritoryWarsMapData mapData = 1;
+  romsg.TerritoryWarsHistoryStatistics statisticData = 2;
+  romsg.TerritoryWarsFlowData flowData = 3;
+}
+
+message TerritoryWarsMapData {
+  map<int32, romsg.TerritoryWarsZoneMapData> ZoneDatas = 1;
+  map<int64, romsg.TerritoryWarsStateMapData> StateDatas = 2;
+  map<int64, romsg.TerritoryWarsPointMapData> PointDatas = 3;
+}
+
+message TerritoryWarsZoneMapData {
+  int32 zoneId = 1;
+  int64 strategyGuildId = 2;
+  romsg.GuildSnapInfo strategyGuildInfo = 3;
+  repeated int64 stateIds = 4;
+  repeated int64 pointIds = 5;
+}
+
+message TerritoryWarsStateMapData {
+  int32 stateId = 1;
+  int64 strategyGuildId = 2;
+  romsg.GuildSnapInfo strategyGuildInfo = 3;
+  int32 zoneId = 4;
+  repeated int64 pointIds = 5;
+}
+
+message TerritoryWarsPointMapData {
+  int32 pointId = 1;
+  int64 strategyGuildId = 2;
+  romsg.GuildSnapInfo strategyGuildInfo = 3;
+  int32 zoneId = 4;
+  int64 stateId = 5;
+}
+
+message TerritoryWarsGetGuildDataReq {
+}
+
+message TerritoryWarsGetGuildDataResp {
+  int32 result = 1;
+  romsg.TerritoryWarsGuildData guildData = 2;
+}
+
+message TerritoryWarsNotifySiegeCampChange {
+  romsg.TerritoryWarsGuildData guildData = 1;
+}
+
+message DBTerritoryWarsInfo {
+  int64 ro3Define_SaveVersion = 9999;
+  int64 ro3Define_DbTerm = 10000;
+  int32 seasonAreaId = 2;
+  romsg.TerritoryWarsAuctionInfo auctionInfo = 3;
+  romsg.TerritoryWarsGuildScoreBoard scoreBoard = 4;
+  romsg.TerritoryWarsEscortInfo escortInfo = 5;
+  romsg.SeasonState seasonState = 6;
+  reserved 1 to 1;
+}
+
+message PvpSetRoleCampReq {
+  romsg.EPvpRoleCampNum type = 1;
+}
+
+message PvpSetRoleCampResp {
+  int32 result = 1;
+  romsg.EPvpRoleCampNum type = 2;
+  int64 peaceTimeInterval = 3;
+}
+
+message TerritoryWarsAuctionInfo {
+  map<int32, romsg.TerritoryWarsAuctionStateInfo> stateInfos = 1;
+}
+
+message TerritoryWarsAuctionStateInfo {
+  int32 stateId = 1;
+  map<int64, romsg.TerritoryWarsAuctionGuildInfo> guildInfos = 2;
+}
+
+message TerritoryWarsAuctionGuildInfo {
+  int64 guildId = 1;
+  romsg.GuildSnapInfo guildInfo = 2;
+  int64 auctionPrice = 3;
+  map<int32, int32> occupyPointId = 4;
+  int64 auctionTime = 5;
+}
+
+message TerritoryWarsAuctionReq {
+  int64 auctionPrice = 1;
+  int32 stateId = 2;
+}
+
+message TerritoryWarsAuctionResp {
+  int32 result = 1;
+  romsg.TerritoryWarsAuctionStateInfo info = 2;
+}
+
+message GetTerritoryWarsAuctionInfoReq {
+  int32 zoneId = 1;
+  repeated int32 stateId = 2;
+}
+
+message GetTerritoryWarsAuctionInfoResp {
+  int32 result = 1;
+  romsg.TerritoryWarsAuctionInfo info = 2;
+}
+
+message TerritoryWarsFlowData {
+  int32 curState = 1;
+  int64 startTime = 2;
+}
+
+message TerritoryWarsHistoryStatistics {
+  map<int32, romsg.TerritoryWarsGroupStatistics> groupStatistic = 1;
+}
+
+message TerritoryWarsGroupStatistics {
+  map<int64, int64> statisticIds = 1;
+}
+
+message GetTerritoryWarsStageReq {
+}
+
+message GetTerritoryWarsStageResp {
+  int32 result = 1;
+  romsg.TerritoryWarsBattleState state = 2;
+  int64 startTime = 3;
+  int64 endTime = 4;
+}
+
+message TerritoryWarsInitData {
+  romsg.TerritoryWarsMapData mapData = 1;
+  map<int64, int64> guildIds = 2;
+  map<int64, romsg.GuildSnapInfo> guildInfos = 3;
+  int64 endTime = 4;
+  map<int64, int64> pointWarZoneIdGuild = 5;
+}
+
+message TerritoryWarsDungeonResultNotify {
+  romsg.DungeonResultInfo commonResultInfo = 1;
+}
+
+message GetTerritoryWarsHistoryStatisticsReq {
+  repeated int32 stateId = 1;
+}
+
+message GetTerritoryWarsHistoryStatisticsResp {
+  int32 result = 1;
+  romsg.TerritoryWarsHistoryStatistics history = 2;
+}
+
+message TerritoryWarsAuctionFinishTimeNotify {
+  int64 guildId = 1;
+  int64 finishTime = 2;
+  int32 stateId = 3;
+}
+
+message TerritoryWarsMapInfo {
+  int64 sceneConfigId = 1;
+  int32 pointId = 2;
+  romsg.InteractInfo data = 3;
+}
+
+message TerritoryWarsMapNotify {
+  repeated romsg.TerritoryWarsMapInfo mapInfo = 1;
+}
+
+message TerritoryWarsMapOpenMinimapStatus {
+  bool IsOpen = 1;
+}
+
+message TerritoryWarsGuildScoreBoard {
+  map<int64, int64> occupyScore = 1;
+  map<int64, int64> playerHonor = 2;
+  map<int64, int64> playerValor = 3;
+}
+
+message TerritoryWarsEscortRankReq {
+}
+
+message TerritoryWarsEscortRankRsp {
+  repeated romsg.TerritoryWarsEscortRankInfo submitRank = 1;
+  repeated romsg.TerritoryWarsEscortRankInfo robRank = 2;
+}
+
+message TerritoryWarsEscortRankInfo {
+  int64 guildId = 1;
+  int64 score = 2;
+}
+
+message TerritoryWarsEscortGuildApplyBuyer {
+  int64 guildId = 1;
+  int64 timestamp = 2;
+  string message = 3;
+}
+
+message TerritoryWarsEscortGuildRejectBuyer {
+  int64 guildId = 1;
+  int64 timestamp = 2;
+  romsg.TerritoryWarsEscortTradeRejectReason reason = 3;
+}
+
+message TerritoryWarsEscortGuildSuccessBuyer {
+  int64 guildId = 1;
+  int64 timestamp = 2;
+}
+
+message TerritoryWarsEscortGuildSellingGoodsOrderData {
+  repeated romsg.TerritoryWarsEscortGuildApplyBuyer applyBuyers = 1;
+  repeated romsg.TerritoryWarsEscortGuildRejectBuyer rejectBuyers = 2;
+  romsg.TerritoryWarsEscortGuildSuccessBuyer successBuyer = 3;
+  repeated romsg.TerritoryWarsEscortGuildRejectBuyer rejectHistory = 4;
+}
+
+message TerritoryWarsEscortGuildSellingGoods {
+  int64 goodsUid = 1;
+  int64 guildId = 2;
+  int32 sellingNum = 3;
+  int32 unitPrice = 4;
+  string sellingMessage = 5;
+  romsg.TerritoryWarsEscortGoodsState state = 6;
+  int64 timestamp = 7;
+  romsg.TerritoryWarsEscortGuildSellingGoodsOrderData stateData = 8;
+}
+
+message TerritoryWarsEscortGoodsMap {
+  map<int64, romsg.TerritoryWarsEscortGuildSellingGoods> goodsMap = 1;
+}
+
+message TerritoryWarsEscortTradeInfo {
+  map<int64, romsg.TerritoryWarsEscortGoodsMap> guildGoodsMap = 1;
+}
+
+message TerritoryWarsEscortPlayerPlayInfo {
+  int64 roleId = 1;
+  int32 killNum = 2;
+  int32 assistNum = 3;
+  int32 deadNum = 6;
+  int64 transferNum = 4;
+  int64 robNum = 5;
+  int64 partRobNum = 7;
+  int64 score = 8;
+  string playerName = 9;
+  int64 awardStates = 10;
+  int64 pickNum = 11;
+}
+
+message TerritoryWarsEscortGuildPlayInfo {
+  int64 guildId = 1;
+  bool isBuyer = 2;
+  int64 buyNum = 3;
+  int64 sellNum = 4;
+  int64 startPlayTime = 5;
+  int64 transportNum = 6;
+  int64 robNum = 7;
+  int64 toTransportNum = 8;
+  int32 startCartNum = 9;
+  int32 transportCartNum = 10;
+  int32 destoryCartNum = 11;
+  int32 pointId = 12;
+  int64 lostNum = 13;
+  int64 pickNum = 14;
+  string guildName = 15;
+  romsg.GuildHeadIcon headIcon = 16;
+  int32 startAdvancedCartNum = 17;
+  int32 transportAdvancedCartNum = 18;
+}
+
+message TerritoryWarsEscortGuildInfo {
+  romsg.TerritoryWarsEscortGuildPlayInfo playInfo = 1;
+}
+
+message TerritoryWarsEscortPlayInfo {
+  map<int64, romsg.TerritoryWarsEscortGuildInfo> guildInfos = 1;
+  map<int64, romsg.TerritoryWarsEscortPlayerPlayInfo> playerInfos = 2;
+}
+
+message TerritoryWarsEscortPlayInfoHistory {
+  int64 playTime = 1;
+  romsg.TerritoryWarsEscortPlayInfo playInfo = 2;
+}
+
+message TerritoryWarsZoneEscortInfo {
+  romsg.TerritoryWarsEscortStage stage = 1;
+  int64 startTime = 2;
+  romsg.TerritoryWarsEscortTradeInfo tradeInfo = 3;
+  romsg.TerritoryWarsEscortPlayInfo playInfo = 4;
+  repeated romsg.TerritoryWarsEscortPlayInfoHistory historyPlayInfos = 5;
+}
+
+message TerritoryWarsEscortInfo {
+  map<int32, romsg.TerritoryWarsZoneEscortInfo> zoneEscortInfoMap = 1;
+}
+
+message TerritoryWarsEscortCartInfoChange {
+  int64 uuid = 1;
+  romsg.EscortCartVarInfo cart_varinfo = 2;
+}
+
+message TerritoryWarEscortCartInfo {
+  int64 cartId = 1;
+  int64 followPlayerId = 2;
+  int64 mapId = 3;
+  romsg.Vec3 pos = 4;
+  int32 pointConfigId = 5;
+  int64 ownerPlayerId = 6;
+}
+
+message TerritoryWarsEscortCartNtf {
+  romsg.TerritoryWarEscortCartInfo cartInfo = 1;
+  romsg.TerritoryWarEscortCartChangeReason reason = 2;
+}
+
+message TerritoryWarsEscortAllNtf {
+  repeated romsg.TerritoryWarEscortCartInfo cartInfo = 1;
+}
+
+message EscortCartVarInfo {
+  int32 curNum = 1;
+  int32 damageLevel = 2;
+  int64 followPlayer = 3;
+}
+
+message EscortCartInfo {
+  int32 maxNum = 1;
+  int32 initNum = 2;
+  int64 guildId = 3;
+  int64 ownerId = 4;
+  romsg.EscortCartVarInfo varInfo = 5;
+}
+
+message TerritoryWarsEscortGuildSimpleInfo {
+  int64 guildId = 1;
+  string guildName = 2;
+  int64 leaderId = 3;
+  string leaderName = 4;
+  romsg.GuildHeadIcon headIcon = 5;
+}
+
+message TerritoryWarsEscortSellingGoodsReq {
+  int32 startIdx = 1;
+  int32 num = 2;
+}
+
+message TerritoryWarsEscortSellingGoodsRes {
+  int32 totalNum = 1;
+  int32 startIdx = 2;
+  repeated romsg.TerritoryWarsEscortGuildSellingGoods sellingGoods = 3;
+  map<int64, romsg.TerritoryWarsEscortGuildSimpleInfo> guildSimpleInfos = 4;
+  int32 num = 5;
+}
+
+message TerritoryWarsEscortGuildTradeHistoryReq {
+}
+
+message TerritoryWarsEscortGuildTradeHistoryRes {
+  repeated romsg.TerritoryWarsEscortGuildSellingGoods buyList = 1;
+  repeated romsg.TerritoryWarsEscortGuildSellingGoods sellList = 2;
+  map<int64, romsg.TerritoryWarsEscortGuildSimpleInfo> guildSimpleInfos = 3;
+}
+
+message TerritoryWarsEscortGuildBuyReq {
+  int64 goodsUid = 1;
+  string message = 2;
+}
+
+message TerritoryWarsEscortGuildBuyRes {
+  int64 goodsUid = 1;
+  int32 result = 2;
+}
+
+message TerritoryWarsEscortGuildOrderListReq {
+}
+
+message TerritoryWarsEscortGuildOrderListRes {
+  repeated romsg.TerritoryWarsEscortGuildSellingGoods orders = 1;
+  map<int64, romsg.TerritoryWarsEscortGuildSimpleInfo> guildSimpleInfos = 2;
+}
+
+message TerritoryWarsEscortGuildSellReq {
+  int64 goodsUid = 1;
+  int32 sellingNum = 2;
+  int32 unitPrice = 3;
+  string sellingMessage = 4;
+}
+
+message TerritoryWarsEscortGuildSellRes {
+  int64 goodsUid = 1;
+  int32 result = 2;
+  bool isNew = 3;
+}
+
+message TerritoryWarsEscortGuildTakeDownReq {
+  int64 goodsUid = 1;
+}
+
+message TerritoryWarsEscortGuildTakeDownRes {
+  int64 goodsUid = 1;
+  int32 result = 2;
+}
+
+message TerritoryWarsEscortGuildSellOrderListReq {
+}
+
+message TerritoryWarsEscortGuildSellOrderListRes {
+  repeated romsg.TerritoryWarsEscortGuildSellingGoods orders = 1;
+  map<int64, romsg.TerritoryWarsEscortGuildSimpleInfo> guildSimpleInfos = 2;
+}
+
+message TerritoryWarsEscortOperateApplyReq {
+  int64 goodsUid = 1;
+  int64 targetGuildId = 2;
+  bool isAccept = 3;
+}
+
+message TerritoryWarsEscortOperateApplyRes {
+  int64 goodsUid = 1;
+  int64 targetGuildId = 2;
+  bool isAccept = 3;
+  int32 result = 4;
+}
+
+message TerritoryWarsEscortToOperateApplyNtf {
+  bool hasUnProcessedApply = 1;
+}
+
+message TerritoryWarsEscortStageReq {
+}
+
+message TerritoryWarsEscortStageRes {
+  romsg.TerritoryWarsEscortStage stage = 1;
+  int64 startTime = 2;
+  int64 endTime = 3;
+}
+
+message TerritoryWarsEscortKillRpt {
+  int64 deadId = 1;
+  int64 killId = 2;
+  repeated int64 assists = 3;
+}
+
+message TerritoryWarsEscortRobCart {
+  int64 guildId = 1;
+  int64 robNum = 2;
+  repeated int64 attackers = 3;
+}
+
+message TerritoryWarsEscortSuccessNtf {
+  int32 cartType = 1;
+  int64 cartId = 2;
+  int64 guildId = 3;
+  int64 teamId = 4;
+  int64 originTransportNum = 5;
+  int64 finalTransportNum = 6;
+  int64 playerId = 7;
+}
+
+message TerritoryWarsEscortPlayTimeReq {
+  int32 startDaySeconds = 1;
+}
+
+message TerritoryWarsEscortPlayTimeRes {
+  int32 startDaySeconds = 1;
+  int32 result = 2;
+}
+
+message TerritoryWarsEscortGuildPlayTimelistReq {
+}
+
+message TerritoryWarsEscortGuildPlayTimelistRes {
+  repeated int64 timeList = 1;
+}
+
+message TerritoryWarsEscortGuildPlayInfoReq {
+  int64 playTime = 1;
+}
+
+message TerritoryWarsEscortGuildPlayInfoRes {
+  romsg.TerritoryWarsEscortGuildPlayInfo playInfo = 1;
+}
+
+message TerritoryWarsEscortGuildPlayersPlayInfoReq {
+  int64 playTime = 1;
+}
+
+message TerritoryWarsEscortGuildPlayersPlayInfoRes {
+  repeated romsg.TerritoryWarsEscortPlayerPlayInfo playerInfos = 1;
+}
+
+message TerritoryWarsEscortGuildPlayerScoreReq {
+}
+
+message TerritoryWarsEscortGuildPlayerScoreRes {
+  int64 score = 1;
+  repeated int32 awardStates = 2;
+}
+
+message TerritoryWarsEscortGuildPlayerGetScoreAwardReq {
+  int32 awardIndex = 1;
+}
+
+message TerritoryWarsEscortCartReq {
+  int32 cartType = 1;
+  int32 pointId = 2;
+}
+
+message TerritoryWarsEscortCartRes {
+  int32 cartType = 1;
+  int64 cartId = 2;
+  int64 transportNum = 3;
+  int32 result = 4;
+}
+
+message TerritoryWarsEscortGuildsReq {
+  int32 stateId = 1;
+}
+
+message TerritoryWarsEscortGuildPlayTimeInfo {
+  int64 guildId = 1;
+  string guildName = 2;
+  int64 startPlayTime = 3;
+  int32 pointId = 4;
+  int64 totalGoods = 5;
+  int64 toTransGoods = 6;
+}
+
+message TerritoryWarsEscortZoneGuildPlayTimeInfo {
+  int32 stateId = 1;
+  repeated romsg.TerritoryWarsEscortGuildPlayTimeInfo guilds = 2;
+  repeated romsg.TerritoryWarsEscortGuildPlayInfo guildPlayInfos = 3;
+}
+
+message TerritoryWarsEscortGuildsRes {
+  int32 stateId = 1;
+  repeated romsg.TerritoryWarsEscortZoneGuildPlayTimeInfo zoneGuildPlayTimeInfos = 2;
+}
+
+message TerritoryWarsEscortGuildStartPlayNtf {
+  romsg.TerritoryWarsEscortGuildPlayTimeInfo playTimeInfo = 1;
+  int32 sceneEntryId = 2;
+}
+
+message TerritoryWarsEscortSubmitReq {
+  int64 cartId = 1;
+  int32 pointId = 2;
+}
+
+message TerritoryWarsEscortDropSubmitReq {
+}
+
+message TerritoryWarsEscortMarkPosReq {
+  romsg.DungeonGatherType GatherType = 1;
+  romsg.DungeonMarkPos pos = 2;
+  int32 GatherGuid = 3;
+}
+
+message TerritoryWarsEscortMarkPosRsp {
+  int32 result = 1;
+  romsg.DungeonGatherType GatherType = 2;
+  romsg.DungeonMarkPos pos = 3;
+  int32 GatherGuid = 4;
+}
+
+message TerritoryWarsGuildScenePlayerCountNtf {
+  int64 guildId = 1;
+  int32 playerCount = 2;
+}
+
+message TerritoryWarsFatigueTeleportNtf {
+}
+
+message EscortSetMarkPosReq {
+  bool bDel = 1;
+  romsg.EscortMarkType markType = 2;
+  romsg.EscortMarkPos pos = 3;
+}
+
+message EscortSetMarkPosRsp {
+  int32 result = 1;
+}
+
+message EscortSetMarkPosNtf {
+  romsg.EscortMarkType markType = 1;
+  repeated romsg.EscortMarkPos pos = 2;
+}
+
+message EscortGatherReq {
+  romsg.EscortMarkType markType = 1;
+  int32 markId = 2;
+}
+
+message EscortGatherRsp {
+  int32 result = 1;
+}
+
+message EscortGroupTransferNtf {
+  int64 sceneId = 1;
+  romsg.Vec3 transferPos = 2;
+  int64 inviterPlayerId = 3;
+  int64 inviterUid = 4;
+}
+
+message EscortGroupTransferReq {
+  int64 sceneId = 1;
+  romsg.Vec3 transferPos = 2;
+  int64 inviterUid = 3;
+}
+
+message EscortGroupTransferRsp {
+  int32 result = 1;
+}
+
+message EscortUseNpcSkillReq {
+  int32 pointId = 1;
+  int32 skillId = 2;
+}
+
+message EscortNpcSkillNtf {
+  repeated romsg.EscortNpcSkill npcSkills = 1;
+}
+
+message EscortNpcSkill {
+  int32 pointId = 1;
+  int64 CDEndTime = 2;
+  int64 guildId = 3;
+  int32 skillId = 4;
+  bool success = 5;
+  int64 effectEndTime = 6;
+}
+
+message EscortNpcSkillSuccessfulNtf {
+  int32 skillId = 1;
+  int64 effectEndTime = 2;
+}
+
+message EscortQueryGuildByOwnerReq {
+  int64 playerId = 1;
+  int64 guildId = 2;
+}
+
+message EscortQueryGuildByOwnerRsp {
+  bool isHave = 1;
+}
+
+message TerritoryWarQueueNotify {
+  int32 channel = 1;
+  int32 aheadCount = 2;
+  romsg.TerritoryWarQueueExitReason exitReason = 3;
+  int64 exitPlayerId = 4;
+  int64 sceneEntryId = 5;
+}
+
+message TerritoryWarQueueEnterNotify {
+  int64 enterTime = 1;
+}
+
+message TerritoryWarQueueCancelReq {
+}
+
+message TerritoryWarQueueCancelRes {
+  int32 result = 1;
+}
+
+message TerritoryWarQueueAreaStatusNotify {
+  int32 status = 1;
+  int64 expireTime = 2;
+}
+
+message TerritoryWarsSubmitDropItemsReq {
+}
+
+message TerritoryWarsWarHallDonateRankEntry {
+  int64 playerId = 1;
+  int32 guildPosition = 2;
+  int64 donateCount = 3;
+}
+
+message TerritoryWarsWarHallDonateRankGroup {
+  repeated romsg.TerritoryWarsWarHallDonateRankEntry entries = 1;
+  int32 cannonConsume = 2;
+  int32 vehicleConsume = 3;
+}
+
+message TerritoryWarsWarHallGetInfoReq {
+}
+
+message TerritoryWarsWarHallGetInfoResp {
+  int32 result = 1;
+  romsg.TerritoryWarsWarHallDonateRankGroup weekRank = 2;
+  romsg.TerritoryWarsWarHallDonateRankGroup monthRank = 3;
+  romsg.TerritoryWarsWarHallDonateRankGroup seasonRank = 4;
+}
+

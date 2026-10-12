@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>RO3Emu</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="topbar" id="drag">
+  <span class="logo">RO3Emu</span>
+  <nav class="tabs">
+    <span class="star">✦</span>
+    <button class="tab active" data-tab="home">Home</button>
+    <button class="tab" data-tab="news">News</button>
+    <button class="tab" data-tab="settings">Settings</button>
+    <span class="star">✦</span>
+  </nav>
+  <div class="right">
+    <span class="server" id="server"><i></i><span id="server-text">Connecting…</span></span>
+    <span class="vsep"></span>
+    <button class="wbtn" id="btn-min" title="Minimize"><svg viewBox="0 0 16 16"><path d="M3 8h10"/></svg></button>
+    <button class="wbtn" id="btn-close" title="Close"><svg viewBox="0 0 16 16"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/></svg></button>
+  </div>
+</header>
+
+<section class="card notices" id="notices">
+  <div class="card-head">
+    <h2><span class="star">✦</span>Notices</h2>
+    <span class="pill green">Test server</span>
+  </div>
+  <p class="card-sub">News from the RO3Emu team.</p>
+  <hr class="gem">
+  <ul class="list" id="news-list"></ul>
+  <p class="card-foot">RO3Emu · private test realm</p>
+</section>
+
+<section class="card settings" id="settings" hidden>
+  <div class="card-head"><h2><span class="star">✦</span>Settings</h2></div>
+  <p class="card-sub">Where the game lives on this PC.</p>
+  <hr class="gem">
+  <label class="field-label">Game folder</label>
+  <div class="field" id="set-dir"></div>
+  <div class="row">
+    <button class="cream small" id="set-dir-change">Change folder</button>
+    <button class="cream small" id="set-open">Open folder</button>
+  </div>
+  <p class="hint">Already have the RO3 PC client? Point this at its ROO_PC folder and only the changed files are downloaded.</p>
+  <p class="card-foot" id="set-version"></p>
+</section>
+
+<section class="panel steps-panel">
+  <div class="steps">
+    <div class="step" id="step-1"><span class="hex">1</span><div><b>Install</b><small>Download game files</small></div></div>
+    <span class="chev">›</span>
+    <div class="step" id="step-2"><span class="hex">2</span><div><b>Verify</b><small>Check file integrity</small></div></div>
+    <span class="chev">›</span>
+    <div class="step" id="step-3"><span class="hex">3</span><div><b>Ready</b><small>Launch the game</small></div></div>
+  </div>
+  <div class="progress" id="progress" hidden>
+    <div class="p-top"><b id="p-stage">Downloading</b><span id="p-pct">0%</span></div>
+    <div class="bar"><div id="p-fill"></div></div>
+    <div class="p-bottom"><span id="p-bytes"></span><span id="p-rate"></span></div>
+  </div>
+  <p class="message" id="message"><span id="message-text">Checking for updates…</span></p>
+</section>
+
+<section class="panel actions-panel">
+  <h3>Actions</h3>
+  <button class="blue" id="primary" disabled><img id="primary-icon" alt="" hidden><span id="primary-label">Checking…</span></button>
+  <button class="cream" id="repair"><span>Repair</span></button>
+</section>
+
+<footer class="version" id="ver-line"></footer>
+<script src="app.js"></script>
+</body>
+</html>

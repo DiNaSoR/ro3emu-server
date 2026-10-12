@@ -1,0 +1,59 @@
+syntax = "proto2";
+package phonest.proto;
+import "common.proto";
+import "common_service.proto";
+
+message EncryptToken {
+  required int64 token = 1;
+}
+
+message EncryptKey {
+  required bytes headPadding = 1;
+  required bytes key = 2;
+  required int64 token = 3;
+  required bytes tailPadding = 4;
+}
+
+message EncryptKeyString {
+  required bytes keyString = 1;
+}
+
+message DisconnectClientInfo {
+  required int32 reason = 1;
+  optional bytes customData = 2;
+}
+
+service IClientGateService {
+  rpc requestEncryptToken (phonest.proto.Void) returns (phonest.proto.Void);
+  rpc confirmEncryptKey (phonest.proto.EncryptKeyString) returns (phonest.proto.Void);
+  rpc connectServer (phonest.proto.ConnectServerReq) returns (phonest.proto.Void);
+  rpc entityMessage (phonest.proto.EntityMessage) returns (phonest.proto.Void);
+  rpc channelMessage (phonest.proto.ChannelMessage) returns (phonest.proto.Void);
+  rpc heartbeat (phonest.proto.Heartbeat) returns (phonest.proto.Void);
+  rpc entityMessage2C (phonest.proto.EntityMessage2C) returns (phonest.proto.Void);
+  rpc MicroServiceRequest (phonest.proto.MsRequest) returns (phonest.proto.Void);
+}
+
+service IGateClientService {
+  rpc connectResponse (phonest.proto.ConnectServerResp) returns (phonest.proto.Void);
+  rpc entityMessage (phonest.proto.EntityMessage) returns (phonest.proto.Void);
+  rpc channelMessage (phonest.proto.ChannelMessage) returns (phonest.proto.Void);
+  rpc createChannelEntity (phonest.proto.ChannelEntityInfo) returns (phonest.proto.Void);
+  rpc disconnectClient (phonest.proto.DisconnectClientInfo) returns (phonest.proto.Void);
+  rpc bindAccount (phonest.proto.BindAccountInfo) returns (phonest.proto.Void);
+  rpc bindAvatar (phonest.proto.BindAvatarInfo) returns (phonest.proto.Void);
+  rpc bindSoul (phonest.proto.BindSoulInfo) returns (phonest.proto.Void);
+  rpc unbindSoul (phonest.proto.UnbindSoulInfo) returns (phonest.proto.Void);
+  rpc responseEncryptToken (phonest.proto.EncryptToken) returns (phonest.proto.Void);
+  rpc confirmEncryptKeyAck (phonest.proto.Void) returns (phonest.proto.Void);
+  rpc recvHeartbeat (phonest.proto.Heartbeat) returns (phonest.proto.Void);
+  rpc entityMessage2C (phonest.proto.EntityMessage2C) returns (phonest.proto.Void);
+  rpc propertySync2Client (phonest.proto.PropertySyncClientMessage) returns (phonest.proto.Void);
+  rpc propertyStrategySync2Client (phonest.proto.PropertyStrategySyncClientMessage) returns (phonest.proto.Void);
+  rpc recoverChannelEntity (phonest.proto.RecoverChannelEntityInfo) returns (phonest.proto.Void);
+  rpc createClientEntity (phonest.proto.ClientEntityInfo) returns (phonest.proto.Void);
+  rpc propertyIdSync2Client (phonest.proto.PropertyIdSyncClientMessage) returns (phonest.proto.Void);
+  rpc MicroServiceResponse (phonest.proto.MsResponse) returns (phonest.proto.Void);
+  rpc MicroServicePush (phonest.proto.MsPush) returns (phonest.proto.Void);
+}
+

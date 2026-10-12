@@ -1,0 +1,28 @@
+syntax = "proto3";
+package romsg;
+import "MG_Define.proto";
+import "MG_Common.proto";
+
+message CellMgrMsg {
+  romsg.MSG_Type msgType = 1;
+  bytes data = 2;
+}
+
+message CellMgrRegisterReq {
+  int64 cellID = 1;
+  int64 gameID = 2;
+  string cellName = 3;
+}
+
+message CellMgrRegisterRsp {
+  map<int64, romsg.CellScenes> cells = 1;
+}
+
+message CellMgrPlayerLoginReq {
+  int64 playerID = 1;
+  int64 gameID = 2;
+  int64 sceneHash = 3;
+  string nickName = 4;
+  string userAccount = 5;
+}
+

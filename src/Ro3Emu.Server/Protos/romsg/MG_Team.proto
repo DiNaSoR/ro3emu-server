@@ -1,0 +1,583 @@
+syntax = "proto3";
+package romsg;
+import "MG_Common.proto";
+import "MG_MultiDungeon.proto";
+import "MG_Guild.proto";
+import "MG_GuildLeague.proto";
+import "MG_Chicken.proto";
+import "FieldOption.proto";
+import "MG_Siege.proto";
+import "MG_DB.proto";
+import "MG_TerritoryWars.proto";
+import "MG_HiddenTreasure.proto";
+import "MG_HeroicSpirit.proto";
+import "MG_GuildDraculaWedding_Init.proto";
+import "MG_RainbowKoi_Init.proto";
+import "MG_AdventureGroup.proto";
+import "MG_Training.proto";
+
+enum TeamType {
+  TeamTypeNone = 0;
+  TeamTypeFive = 1;
+  TeamTypeForty = 2;
+}
+
+enum TeamTitleType {
+  TeamTitleTypeNone = 0;
+  TeamTitleTypeViceLeader = 1;
+  TeamTitleTypeLeader = 2;
+}
+
+enum TeamMemberOnlineState {
+  TeamMemberOnlineStateNone = 0;
+  TeamMemberOnlineStateOffline = 1;
+  TeamMemberOnlineStateSavePower = 2;
+  TeamMemberOnlineStateFaraway = 3;
+}
+
+enum TeamMemberChatState {
+  TeamMemberChatStateNone = 0;
+  TeamMemberChatStateListen = 1;
+  TeamMemberChatStateClose = 2;
+}
+
+enum TeamOperationType {
+  TeamOperTypeNone = 0;
+  TeamOperTypeKick = 1;
+  TeamOperTypeChangeLeader = 2;
+  TeamOperTypeAppointViceLeader = 3;
+  TeamOperTypeRemovalViceLeader = 4;
+  TeamOperTypeForbiddenChat = 5;
+}
+
+enum TeamConfirmPosType {
+  TeamConfirmPosTypeDel = 0;
+  TeamConfirmPosTypeNone = 1;
+  TeamConfirmPosTypeYes = 2;
+  TeamConfirmPosTypeNo = 3;
+}
+
+enum RallyTeamType {
+  RallyTeamTypeNone = 0;
+  RallyTeamTypeTeam = 1;
+  RallyTeamTypeGroup = 2;
+  RallyTeamTypePos = 3;
+  RallyTeamTypeBeckon = 4;
+}
+
+enum TeamFlagType {
+  TeamFlagTypeNone = 0;
+  TeamFlagTypePosition = 1;
+  TeamFlagTypeNpc = 2;
+  TeamFlagTypePlayer = 3;
+}
+
+enum ApplyListOperateType {
+  ApplyListOperateTypeNone = 0;
+  ApplyListOperateTypeAgree = 1;
+  ApplyListOperateTypeClear = 2;
+  ApplyListOperateTypeRefuse = 3;
+}
+
+enum ELeaveType {
+  ELeaveTypeNone = 0;
+  ELeaveTypeKick = 1;
+  ELeaveTypeOfflineKick = 2;
+}
+
+enum ETeamFollowType {
+  ETeamFollowTypeNone = 0;
+  ETeamFollowTypeTeam = 1;
+  ETeamFollowTypeGroup = 2;
+}
+
+enum ETeamMemberStateOperEnum {
+  ETeamMemberStateOperNone = 0;
+  ETeamMemberStateOperOnline = 1;
+  ETeamMemberStateOperChat = 2;
+  ETeamMemberStateForbiddenChat = 3;
+}
+
+message TeamCreateReq {
+  romsg.TeamType teamType = 1;
+  int64 targetId = 2;
+  int64 limitScore = 3;
+  string teamDesc = 4;
+  string teamAreaInfo = 5;
+  romsg.TeamMemberDetailInfo info = 6;
+  int64 playBookId = 7;
+}
+
+message PlayerShieldInfo {
+  int64 physicalShieldValue = 1;
+  int64 magicShieldValue = 2;
+  int64 commonShieldValue = 3;
+  int64 extendedPartition1ShieldValue = 4;
+}
+
+message TeamMemberDetailInfo {
+  int64 guid = 1;
+  int32 headImage = 2;
+  int32 job = 3;
+  int32 level = 4;
+  string name = 5;
+  int32 gender = 6;
+  int64 guildId = 7;
+  string guildName = 8;
+  int64 sceneId = 9;
+  int32 mapId = 10;
+  int32 lineId = 11;
+  romsg.TeamTitleType title = 12;
+  int32 teamIndex = 13;
+  int64 joinTeamTime = 14;
+  int64 beckonTime = 15;
+  int64 offlineTime = 16;
+  romsg.TeamMemberOnlineState onlineState = 17;
+  romsg.TeamMemberChatState chatState = 18;
+  bool isForbiddenChat = 19;
+  bool isFollow = 20;
+  romsg.TeamConfirmPosType confirmPos = 21;
+  bytes multiDungeonBytes = 22;
+  romsg.TeamMemberBattleInfo battleInfo = 23;
+  romsg.TeamMemberExtraInfo extra = 24;
+}
+
+message TeamMemberExtraInfo {
+  romsg.TeamOnePieceInfo onePieceInfo = 1;
+}
+
+message TeamMemberBattleInfo {
+  int32 hpPercent = 1;
+  int32 mpPercent = 2;
+  int64 battlePoint = 3;
+  romsg.Vec3 pos = 4;
+  int64 maxHpValue = 5;
+  int64 maxMpValue = 6;
+  romsg.PlayerShieldInfo shieldInfo = 7;
+  romsg.EPlayerLifeStatus playerLifeStatus = 8;
+}
+
+message TeamMemberBattleInfoChangeRes {
+  int64 guid = 1;
+  romsg.TeamMemberBattleInfo battleInfo = 2;
+}
+
+message TeamChickenInfo {
+  int32 chickenTimes = 1;
+  int64 chickenRank = 2;
+  bool chickenOpen = 3;
+}
+
+message TeamOnePieceInfo {
+  bool isFunctionOpen = 1;
+  map<int64, int64> npcPunishTime = 2;
+}
+
+message TeamMultiDungeonBossPlayerBond {
+  int64 bossId = 1;
+  repeated int64 playerBond = 2;
+}
+
+message TeamMultiDungeonInfo {
+  repeated romsg.TeamMultiDungeonBossPlayerBond playerBonds = 1;
+  repeated romsg.DBMultiDungeon dungeonInfo = 2;
+  int64 jobPosition = 3;
+  int64 unlockTs = 4;
+}
+
+message TeamSimpleInfo {
+  romsg.TeamType teamType = 1;
+  int64 targetId = 2;
+  int64 minBattlePoint = 3;
+  string teamDesc = 4;
+  int64 teamId = 5;
+  string teamName = 6;
+  string areaInfo = 7;
+  bool isAutoAgree = 8;
+  int64 creatTime = 9;
+  int64 recruitCd = 10;
+  int64 playBookId = 11;
+}
+
+message TeamDetailInfo {
+  romsg.TeamSimpleInfo info = 1;
+  map<int32, romsg.TeamFlagInfo> flagList = 3;
+  map<int64, int64> applyerList = 5;
+}
+
+message TeamCreateResp {
+  int32 result = 1;
+  int64 teamId = 2;
+  romsg.TeamType teamType = 3;
+}
+
+message TeamMemberChangeResp {
+  int64 teamId = 1;
+  map<int64, romsg.TeamMemberDetailInfo> memberList = 2;
+}
+
+message TeamTotalSimpleInfo {
+  romsg.TeamSimpleInfo info = 1;
+  repeated int64 memberList = 2;
+}
+
+message TeamTotalDetailInfo {
+  romsg.TeamDetailInfo info = 1;
+  map<int64, romsg.TeamMemberDetailInfo> memberList = 2;
+}
+
+message LeaveTeamReq {
+  int64 guid = 1;
+}
+
+message LeaveTeamResp {
+  int32 result = 1;
+}
+
+message ChangeTeamTypeReq {
+  romsg.TeamType teamType = 1;
+  int64 guid = 2;
+}
+
+message ChangeTeamTypeResp {
+  int32 result = 1;
+  romsg.TeamType teamType = 2;
+  int64 newTeamId = 3;
+  int64 guid = 4;
+}
+
+message ChangeTeamInfoReq {
+  int64 targetId = 1;
+  int64 minBattlePoint = 2;
+  string teamDesc = 3;
+  string teamName = 4;
+  bool isAutoAgree = 5;
+  int64 guid = 6;
+}
+
+message ChangeTeamInfoResp {
+  int32 result = 1;
+}
+
+message TeamInvitePlayerInfo {
+  int64 guid = 1;
+  int32 headImage = 2;
+  int32 job = 3;
+  int32 level = 4;
+  int64 battlePoint = 5;
+  string name = 6;
+  bool isRecentlySameTeam = 7;
+}
+
+message TeamInviteListReq {
+  int64 guid = 1;
+}
+
+message TeamInviteListResp {
+  int32 result = 1;
+  repeated romsg.TeamInvitePlayerInfo list = 2;
+}
+
+message InviteIntoTeamReq {
+  int64 guid = 1;
+  int64 operGuid = 2;
+}
+
+message InviteIntoTeamResp {
+  int32 result = 1;
+}
+
+message NotifyInvitee {
+  int64 inviteGuid = 1;
+  romsg.TeamTotalSimpleInfo teamTotalSimpleInfo = 2;
+}
+
+message InviteeResp {
+  int64 teamId = 1;
+  bool isAgree = 2;
+  int64 inviteGuid = 3;
+  romsg.TeamMemberDetailInfo info = 4;
+}
+
+message InviteeRespResp {
+  int32 result = 1;
+  int64 teamId = 2;
+}
+
+message TeamOperateReq {
+  romsg.TeamOperationType oper = 1;
+  int64 targetGuid = 2;
+  int64 operGuid = 3;
+}
+
+message TeamOperateResp {
+  int32 result = 1;
+  romsg.TeamOperationType oper = 2;
+  int64 targetGuid = 3;
+}
+
+message TeamOperateNotify {
+  romsg.TeamOperationType oper = 1;
+  int64 targetGuid = 2;
+}
+
+message RallyTeamReq {
+  romsg.RallyTeamType rallyType = 1;
+  int64 operGuid = 2;
+  romsg.DungeonInitData dungeonInitData = 3;
+  int64 targetGuid = 4;
+  int64 dungeonId = 5;
+}
+
+message RallyTeamResp {
+  int32 result = 1;
+  romsg.RallyTeamType rallyType = 2;
+}
+
+message RallyTeamNotify {
+  romsg.RallyTeamType rallyType = 1;
+  int64 operGuid = 2;
+  romsg.DungeonInitData dungeonInitData = 3;
+  int64 dungeonId = 4;
+}
+
+message RallyTeamMemberResponse {
+  romsg.RallyTeamType rallyType = 1;
+  bool isAgree = 2;
+  int64 operGuid = 3;
+  int64 inviteGuid = 4;
+}
+
+message RallyTeamMemberResponseResp {
+  int32 result = 1;
+  romsg.RallyTeamType rallyType = 2;
+  bool isAgree = 3;
+}
+
+message EditorTeamReq {
+  int32 indexFirst = 1;
+  int32 indexSecond = 2;
+  int64 operGuid = 3;
+}
+
+message EditorTeamResp {
+  int32 result = 1;
+  int32 indexFirst = 2;
+  int32 indexSecond = 3;
+  int64 operGuid = 4;
+}
+
+message TeamMemberIndexChangeRes {
+  map<int64, int32> memberIndex = 1;
+}
+
+message GetTeamListReq {
+  int64 targetId = 1;
+  string areaInfo = 2;
+}
+
+message GetTeamListResp {
+  int32 result = 1;
+  repeated romsg.TeamTotalSimpleInfo list = 2;
+}
+
+message EnterTeamReq {
+  int64 teamId = 1;
+  romsg.TeamMemberDetailInfo applyerInfo = 2;
+}
+
+message EnterTeamResp {
+  int32 result = 1;
+  int64 teamId = 2;
+}
+
+message TeamFlagInfo {
+  romsg.TeamFlagType type = 1;
+  int64 targetGuid = 2;
+  romsg.Vec3 position = 3;
+  int64 sceneId = 4;
+  int64 mapId = 5;
+}
+
+message TeamSetFlagReq {
+  int32 slot = 1;
+  romsg.TeamFlagInfo flagInfo = 2;
+  int64 operGuid = 3;
+}
+
+message TeamSetFlagResp {
+  int32 result = 1;
+  int32 slot = 2;
+  romsg.TeamFlagInfo flagInfo = 3;
+  int64 operGuid = 4;
+}
+
+message ApplyListOperateReq {
+  romsg.ApplyListOperateType operType = 1;
+  int64 targetGuid = 2;
+  int64 operGuid = 3;
+}
+
+message ApplyListOperateResp {
+  int32 result = 1;
+}
+
+message BroadCastNewMemberEnter {
+  romsg.TeamType teamType = 1;
+  romsg.TeamMemberDetailInfo detailInfo = 2;
+}
+
+message BroadCastMemberLeave {
+  int64 teamId = 1;
+  romsg.ELeaveType leaveType = 2;
+  int64 guid = 3;
+  string name = 4;
+  map<int64, int32> memberIndex = 5;
+}
+
+message TeamFollowOperReq {
+  romsg.ETeamFollowType type = 1;
+  bool isFollow = 2;
+  int64 operGuid = 3;
+}
+
+message TeamFollowOperResp {
+  int32 result = 1;
+  romsg.ETeamFollowType type = 2;
+  bool isFollow = 3;
+}
+
+message TeamConfirmEnterReq {
+  int64 teamId = 1;
+  int64 playerUId = 2;
+  int64 dungeonId = 3;
+  romsg.DungeonInitData dungeonInitData = 4;
+  int64 result = 5;
+}
+
+message DungeonInitData {
+  romsg.MultiDungeonInitData multiDungeonInitData = 1;
+  romsg.ClimbTowerInit climbTowerInit = 2;
+  romsg.GuildGveDungeonScoreInfo guildGveDungeonScoreInfo = 3;
+  romsg.GuildLeagueInitStr guildLeagueInitStr = 4;
+  int32 afkDungeonConfigId = 5;
+  romsg.ChickenInitData chickenInitData = 6;
+  romsg.SiegeInitData siegeInitData = 7;
+  romsg.TerritoryWarsInitData territoryWarInitData = 8;
+  romsg.GuildChallengeInitData ChallengeInitData = 9;
+  romsg.GuildHomeInitData guildHomeInitData = 10;
+  int64 playbookId = 11;
+  romsg.HiddenTreasureInitData hiddenTreasureInitData = 12;
+  romsg.HeroicSpiritDungeonInitData heroicSpiritDungeonInitData = 13;
+  romsg.DraculaWeddingInitData draculaWeddingInitData = 14;
+  romsg.AdventureGroupDungeonInitData adventureGroupDungeonInitData = 15;
+  romsg.RainbowKoiInitData rainbowKoiInitData = 16;
+  romsg.CasualBattleInitData casualBattleInitData = 17;
+  romsg.DragonIslandBattleInitData dragonIslandBattleInitData = 18;
+}
+
+message CasualBattlePlayerSlot {
+  int64 playerId = 1;
+  int32 faction = 2;
+  int64 originalTeamId = 3;
+  int32 squadIndex = 4;
+}
+
+message CasualBattleInitData {
+  repeated romsg.CasualBattlePlayerSlot players = 1;
+}
+
+message DragonIslandBattlePlayerSlot {
+  int64 playerId = 1;
+  int32 faction = 2;
+}
+
+message DragonIslandBattleRobotSlot {
+  int64 robotUid = 1;
+  int64 robotConfigId = 2;
+  int32 faction = 3;
+}
+
+message DragonIslandBattleInitData {
+  map<int64, romsg.DragonIslandBattlePlayerSlot> players = 1;
+  int64 matchEntryId = 2;
+  map<int64, romsg.DragonIslandBattleRobotSlot> robots = 3;
+}
+
+message TeamConfirmEnterResp {
+  int32 result = 1;
+}
+
+message TeamConfirmRemindersReq {
+  int64 playerId = 1;
+  int64 remindersGuid = 2;
+}
+
+message TeamConfirmRemindersResp {
+  int32 result = 1;
+}
+
+message TeamEnterReadyQueueNotify {
+  map<int64, bool> readyQueue = 1;
+  int64 dungeonId = 2;
+  romsg.DungeonInitData dungeonInitData = 3;
+  bool cancel = 4;
+  int64 cancelErrorCode = 5;
+  int64 cancelRoleId = 6;
+}
+
+message CreateDungeonResultNotify {
+  int32 result = 1;
+}
+
+message TeamConfirmRemindersNotify {
+  int64 memberGuid = 1;
+}
+
+message ToSceneEnterDungeonResult {
+  int64 sceneId = 1;
+  int64 areaId = 2;
+  int64 dungeonId = 3;
+}
+
+message TeamTargetAndEnemy {
+  int64 leaderTargetId = 1;
+  repeated int64 teamEnemyList = 2;
+}
+
+message TeamRecruitReq {
+  string content = 1;
+  int64 operGuid = 2;
+}
+
+message TeamRecruitResp {
+  int32 result = 1;
+}
+
+message ChangeTeamMemberStateReq {
+  int64 operGuid = 1;
+  int64 memberGuid = 2;
+  romsg.ETeamMemberStateOperEnum eOperType = 3;
+  romsg.TeamMemberOnlineState onlineState = 4;
+  romsg.TeamMemberChatState chatState = 5;
+  bool isForbiddenChat = 6;
+}
+
+message ChangeTeamMemberStateResp {
+  int32 result = 1;
+  romsg.ChangeTeamMemberStateReq info = 2;
+}
+
+message TeamMemberLinkInfo {
+  int32 jobs = 1;
+}
+
+message TeamRecruitLinkInfo {
+  string descriptions = 1;
+  int32 curr_num = 2;
+  int32 max_num = 3;
+  int64 team_id = 4;
+  int64 sender_role_id = 5;
+  repeated romsg.TeamMemberLinkInfo team_member = 6;
+}
+

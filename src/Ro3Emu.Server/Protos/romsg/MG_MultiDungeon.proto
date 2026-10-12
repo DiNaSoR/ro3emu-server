@@ -1,0 +1,160 @@
+syntax = "proto3";
+package romsg;
+import "MG_Common.proto";
+import "MG_DB.proto";
+import "MG_PublicServer.proto";
+import "FieldOption.proto";
+
+message DBMultiDungeonHallOfFame {
+  int32 multiDungeonBossId = 1;
+  int32 passTime = 2;
+  repeated romsg.RoleDetailInfo roleInfo = 3;
+  int64 passTimestamp = 4;
+  string teamLeaderName = 5;
+  int64 teamLeaderId = 6;
+}
+
+message DBMultiDungeonServerInfo {
+  int64 ro3Define_SaveVersion = 9999;
+  int64 ro3Define_DbTerm = 10000;
+  int32 week = 1;
+  repeated int32 fivePeakChallengeBossIds = 2;
+  repeated int32 difficultBuffBossIds = 3;
+  map<int32, romsg.DBMultiDungeonHallOfFame> hallOfFame = 6;
+  map<int32, bool> firstBroadCast = 7;
+  map<int32, romsg.DBMultiDungeonSacredBlessings> sacredBlessings = 8;
+  map<int32, int32> fiveDungeonMaxMark = 9;
+  map<int32, int32> gveDifficultyPassTime = 10;
+}
+
+message DungeonPlayerLeaderBoardInfo {
+  int64 playerId = 1;
+  int64 fightPower = 2;
+  int32 job = 3;
+  string playerName = 4;
+}
+
+message UpLoadDungeonPassLeaderBoardInfoNtf {
+  repeated romsg.DungeonPlayerLeaderBoardInfo infos = 1;
+  string teamLeaderName = 2;
+  int64 passCostTime = 3;
+  int32 bossId = 4;
+}
+
+message QueryHallOfFameInfoReq {
+  int32 multiDungeonBossId = 1;
+}
+
+message QueryHallOfFameInfoResp {
+  int32 result = 1;
+  int32 multiDungeonBossId = 2;
+  romsg.DBMultiDungeonHallOfFame hallOfFameInfo = 3;
+}
+
+message MultiDungeonHallOfFameUpload {
+  romsg.DBMultiDungeonHallOfFame hallOfFameInfo = 1;
+}
+
+message SyncMultiDungeonServerInfoNtf {
+  int32 area = 1;
+  romsg.DBMultiDungeonServerInfo info = 2;
+}
+
+message SyncMultiDungeonAwardNotify {
+  bool isFastRecord = 1;
+  int64 passTime = 2;
+  repeated romsg.ItemBaseInfo normalAward = 3;
+  repeated romsg.ItemBaseInfo autionAward = 4;
+  repeated romsg.ItemBaseInfo firstPassAward = 5;
+  romsg.DBMultiDungeonHonor honor = 6;
+}
+
+message MultiDungeonPraiseReq {
+  repeated int64 targetPlayerIds = 1;
+}
+
+message MultiDungeonPraiseResp {
+  int32 result = 1;
+  map<int64, int32> praiseResult = 2;
+}
+
+message MultiDungeonPraiseNotify {
+  int32 dungeonId = 1;
+  map<int64, int32> praiseInfo = 2;
+  map<int64, bool> likePlayer = 3;
+  int64 praisePlayerId = 4;
+  repeated int64 praisedPlayerIds = 5;
+}
+
+message ClaimFirstPassAwardReq {
+  int32 multiDungeonId = 1;
+  int32 markId = 2;
+}
+
+message ClaimFirstPassAwardResp {
+  int32 result = 1;
+  int32 multiDungeonId = 2;
+  int32 markId = 3;
+}
+
+message MultiDungeonInitData {
+  int32 multiDungeonId = 1;
+  int32 markId = 2;
+  int64 dungeonId = 3;
+  bool isMatch = 4;
+  int64 teamID = 5;
+  bool needCreateTeam = 6;
+  romsg.MultiDungeonInfo origin = 7;
+}
+
+message ClimbTowerInit {
+  int64 layerConfID = 1;
+}
+
+message MultiDungeonMarkSacredBlessingsReq {
+  int32 multiDungeonId = 1;
+  int32 markId = 2;
+}
+
+message MultiDungeonMarkSacredBlessingsResp {
+  int32 result = 1;
+}
+
+message MultiDungeonClaimHonorAwardReq {
+  int32 multiDungeonId = 1;
+  int32 markId = 2;
+  repeated int64 honorIds = 3;
+}
+
+message MultiDungeonClaimHonorAwardResp {
+  int32 result = 1;
+}
+
+message MultiDungeonSetJobPositionReq {
+  int64 jobPosition = 1;
+}
+
+message MultiDungeonSetJobPositionResp {
+  int32 result = 1;
+}
+
+message MultiDungeonSetJobPositionGuideFlagReq {
+  bool guideFlag = 1;
+}
+
+message MultiDungeonSetJobPositionGuideFlagResp {
+  int32 result = 1;
+  bool guideFlag = 2;
+}
+
+message MultiDungeonInfo {
+  int64 multiDungeonId = 1;
+  int32 markId = 2;
+}
+
+message RandomDungeonNotify {
+  romsg.MultiDungeonInfo origin = 1;
+  romsg.MultiDungeonInfo random = 2;
+  int64 enterTime = 3;
+}
+

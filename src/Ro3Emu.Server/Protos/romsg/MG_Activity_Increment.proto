@@ -1,0 +1,813 @@
+syntax = "proto3";
+package romsg;
+import "APIError.proto";
+import "client2service.proto";
+import "FieldOption.proto";
+import "GM_Chat.proto";
+import "MG_Achievement.proto";
+import "MG_Activity.proto";
+import "MG_Adventure.proto";
+import "MG_AdventureGroup.proto";
+import "MG_AFK.proto";
+import "MG_AreaConcur.proto";
+import "MG_Auction.proto";
+import "MG_Barroom.proto";
+import "MG_Base.proto";
+import "MG_BaseMgr.proto";
+import "MG_BlueDbg.proto";
+import "MG_BroadCast.proto";
+import "MG_Card.proto";
+import "MG_CareerSpecial.proto";
+import "MG_Cell.proto";
+import "MG_CellMgr.proto";
+import "MG_Chat.proto";
+import "MG_Chicken.proto";
+import "MG_Common_Increment.proto";
+import "MG_Common.proto";
+import "MG_DB.proto";
+import "MG_Define.proto";
+import "MG_DragonIsland.proto";
+import "MG_Dungeon.proto";
+import "MG_Emblem.proto";
+import "MG_EmojiPlay.proto";
+import "MG_Entity.proto";
+import "MG_Equipment.proto";
+import "MG_FirstHeart.proto";
+import "MG_FlyingDragon_Increment.proto";
+import "MG_FlyingDragon.proto";
+import "MG_Friend.proto";
+import "MG_Function.proto";
+import "MG_Gateway.proto";
+import "MG_Genre.proto";
+import "MG_GlobalCache.proto";
+import "MG_Guide.proto";
+import "MG_Guild.proto";
+import "MG_GuildBlackMarket.proto";
+import "MG_GuildCampFire.proto";
+import "MG_GuildDraculaWedding_Init.proto";
+import "MG_GuildDraculaWedding.proto";
+import "MG_GuildLeague_Increment.proto";
+import "MG_GuildLeague.proto";
+import "MG_GuildVoiceChannel.proto";
+import "MG_HeroicSpirit.proto";
+import "MG_HiddenTreasure.proto";
+import "MG_IDIP.proto";
+import "MG_IDIPSerialNumber.proto";
+import "MG_Interact.proto";
+import "MG_LeaderBoardClient.proto";
+import "MG_Library.proto";
+import "MG_Lifejob.proto";
+import "MG_Login.proto";
+import "MG_Lottery.proto";
+import "MG_Mail.proto";
+import "MG_MapData.proto";
+import "MG_Match.proto";
+import "MG_Mount.proto";
+import "MG_Mover.proto";
+import "MG_MultiDungeon.proto";
+import "MG_MVP.proto";
+import "MG_NewActivity.proto";
+import "MG_Pack.proto";
+import "MG_Paragon.proto";
+import "MG_Pay.proto";
+import "MG_Personal.proto";
+import "MG_Pet.proto";
+import "MG_Player.proto";
+import "MG_PlayerOfflineMessage.proto";
+import "MG_PlayMethod.proto";
+import "MG_PlotActing.proto";
+import "MG_PublicChat.proto";
+import "MG_PublicServer.proto";
+import "MG_RainbowKoi_Init.proto";
+import "MG_Relationship.proto";
+import "MG_Scene.proto";
+import "MG_SceneStream.proto";
+import "MG_Season.proto";
+import "MG_SeasonPage.proto";
+import "MG_SeasonRefine.proto";
+import "MG_SeasonTalent.proto";
+import "MG_ServerClientMsg.proto";
+import "MG_Setting.proto";
+import "MG_Shop.proto";
+import "MG_Siege_Increment.proto";
+import "MG_Siege.proto";
+import "MG_Skill.proto";
+import "MG_SkillGrowth.proto";
+import "MG_SocialOutfit.proto";
+import "MG_SpecialEffect.proto";
+import "MG_StageRewards.proto";
+import "MG_Stalls.proto";
+import "MG_State.proto";
+import "MG_Statistics.proto";
+import "MG_StorageHole.proto";
+import "MG_Task.proto";
+import "MG_Team.proto";
+import "MG_TerritoryAuction.proto";
+import "MG_TerritoryWars_Increment.proto";
+import "MG_TerritoryWars.proto";
+import "MG_ThreeDay.proto";
+import "MG_Title.proto";
+import "MG_Totem.proto";
+import "MG_TradeCenter.proto";
+import "MG_TradeMarket.proto";
+import "MG_Training.proto";
+import "MG_TransAction.proto";
+import "MG_TypeWriter.proto";
+import "MG_WardRobe.proto";
+import "MG_WorldExploration.proto";
+import "MG_Zone.proto";
+
+message ActivityBaseInfoIncrement {
+  message activityParamFieldIncrement {
+    oneof value {
+      romsg.ActivityParam all = 1;
+      romsg.ActivityParamIncrement inc = 2;
+    }
+  }
+
+  optional int32 activityId = 10;
+  romsg.ActivityBaseInfoIncrement.activityParamFieldIncrement activityParam = 20;
+}
+
+message ActivityParamIncrement {
+  message noviceActivityFieldIncrement {
+    oneof value {
+      romsg.NoviceActivity all = 1;
+      romsg.NoviceActivityIncrement inc = 2;
+    }
+  }
+
+  oneof val {
+    romsg.ActivityParamIncrement.noviceActivityFieldIncrement noviceActivity = 10;
+  }
+}
+
+message CasualBattleGroupIncrement {
+  message sideAFieldIncrement {
+    oneof value {
+      romsg.CasualBattleSide all = 1;
+      romsg.CasualBattleSideIncrement inc = 2;
+    }
+  }
+
+  message sideBFieldIncrement {
+    oneof value {
+      romsg.CasualBattleSide all = 1;
+      romsg.CasualBattleSideIncrement inc = 2;
+    }
+  }
+
+  romsg.CasualBattleGroupIncrement.sideAFieldIncrement sideA = 10;
+  romsg.CasualBattleGroupIncrement.sideBFieldIncrement sideB = 20;
+}
+
+message CasualBattleMatchUnitIncrement {
+  message playerIdsRepeatedOrigin {
+    repeated int64 value = 1;
+  }
+
+  message playerIdsRepeatedIncrement {
+    repeated int64 value = 1;
+  }
+
+  message playerIdsFieldIncrement {
+    oneof value {
+      romsg.CasualBattleMatchUnitIncrement.playerIdsRepeatedOrigin all = 1;
+      romsg.CasualBattleMatchUnitIncrement.playerIdsRepeatedIncrement inc = 2;
+    }
+  }
+
+  optional int64 teamId = 10;
+  romsg.CasualBattleMatchUnitIncrement.playerIdsFieldIncrement playerIds = 20;
+  optional int32 totalMmr = 30;
+  optional int32 squadIndex = 40;
+}
+
+message CasualBattlePlayerInfoIncrement {
+  optional int64 playerId = 10;
+  optional int32 mmr = 20;
+  optional int64 joinTimeMs = 30;
+}
+
+message CasualBattlePlayerListIncrement {
+  message valuesRepeatedOrigin {
+    repeated int64 value = 1;
+  }
+
+  message valuesRepeatedIncrement {
+    repeated int64 value = 1;
+  }
+
+  message valuesFieldIncrement {
+    oneof value {
+      romsg.CasualBattlePlayerListIncrement.valuesRepeatedOrigin all = 1;
+      romsg.CasualBattlePlayerListIncrement.valuesRepeatedIncrement inc = 2;
+    }
+  }
+
+  romsg.CasualBattlePlayerListIncrement.valuesFieldIncrement values = 10;
+}
+
+message CasualBattleSideIncrement {
+  message unitsRepeatedOrigin {
+    repeated romsg.CasualBattleMatchUnit value = 1;
+  }
+
+  message unitsRepeatedIncrement {
+    repeated romsg.CasualBattleMatchUnitIncrement value = 1;
+  }
+
+  message unitsFieldIncrement {
+    oneof value {
+      romsg.CasualBattleSideIncrement.unitsRepeatedOrigin all = 1;
+      romsg.CasualBattleSideIncrement.unitsRepeatedIncrement inc = 2;
+    }
+  }
+
+  romsg.CasualBattleSideIncrement.unitsFieldIncrement units = 10;
+  optional int32 playerCount = 20;
+  optional int32 totalMmr = 30;
+}
+
+message DBActivityDataIncrement {
+  message activityParamFieldIncrement {
+    oneof value {
+      romsg.DBActivityParam all = 1;
+      romsg.DBActivityParamIncrement inc = 2;
+    }
+  }
+
+  message StateTimeStampsFieldIncrement {
+    oneof value {
+      int64 all = 1;
+      int64 inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message StateTimeStampListRepeatedOrigin {
+    repeated romsg.TimeSegment value = 1;
+  }
+
+  message StateTimeStampListRepeatedIncrement {
+    repeated romsg.TimeSegmentIncrement value = 1;
+  }
+
+  message StateTimeStampListFieldIncrement {
+    oneof value {
+      romsg.DBActivityDataIncrement.StateTimeStampListRepeatedOrigin all = 1;
+      romsg.DBActivityDataIncrement.StateTimeStampListRepeatedIncrement inc = 2;
+    }
+  }
+
+  romsg.DBActivityDataIncrement.activityParamFieldIncrement activityParam = 10;
+  optional string activityKey = 20;
+  optional int64 activityInstance = 30;
+  optional string businessState = 40;
+  optional bool isOldRound = 50;
+  optional bool IsEnterComplete = 60;
+  optional bool IsExitComplete = 70;
+  map<string, romsg.DBActivityDataIncrement.StateTimeStampsFieldIncrement> StateTimeStamps = 80;
+  optional int64 stateInstance = 90;
+  optional bool IsShielded = 100;
+  romsg.DBActivityDataIncrement.StateTimeStampListFieldIncrement StateTimeStampList = 110;
+  optional int64 CurStartTime = 120;
+  optional int64 CurEndTime = 130;
+  optional int64 CycleStartTime = 140;
+  optional int64 CycleEndTime = 150;
+}
+
+message DBActivityInfoIncrement {
+  message activityInfoFieldIncrement {
+    oneof value {
+      romsg.ActivityBaseInfo all = 1;
+      romsg.ActivityBaseInfoIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  map<int32, romsg.DBActivityInfoIncrement.activityInfoFieldIncrement> activityInfo = 10;
+}
+
+message DBActivityParamIncrement {
+  message noviceActivityFieldIncrement {
+    oneof value {
+      romsg.NoviceActivity all = 1;
+      romsg.NoviceActivityIncrement inc = 2;
+    }
+  }
+
+  message siegeDataFieldIncrement {
+    oneof value {
+      romsg.SiegeEntityTotalInfo all = 1;
+      romsg.SiegeEntityTotalInfoIncrement inc = 2;
+    }
+  }
+
+  message territoryWarsDataFieldIncrement {
+    oneof value {
+      romsg.DBTerritoryWarsData all = 1;
+      romsg.DBTerritoryWarsDataIncrement inc = 2;
+    }
+  }
+
+  message guildLeagueTotalInfoFieldIncrement {
+    oneof value {
+      romsg.GuildLeagueTotalInfo all = 1;
+      romsg.GuildLeagueTotalInfoIncrement inc = 2;
+    }
+  }
+
+  message flyingDragonProduceInfoFieldIncrement {
+    oneof value {
+      romsg.DBFlyingDragonProduceInfo all = 1;
+      romsg.DBFlyingDragonProduceInfoIncrement inc = 2;
+    }
+  }
+
+  message seasonEveInfoFieldIncrement {
+    oneof value {
+      romsg.DBSeasonEveInfo all = 1;
+      romsg.DBSeasonEveInfoIncrement inc = 2;
+    }
+  }
+
+  message journeyFieldIncrement {
+    oneof value {
+      romsg.DBJourneyActivity all = 1;
+      romsg.DBJourneyActivityIncrement inc = 2;
+    }
+  }
+
+  message pronteraDefenseFieldIncrement {
+    oneof value {
+      romsg.DBPronteraDefenseInfo all = 1;
+      romsg.DBPronteraDefenseInfoIncrement inc = 2;
+    }
+  }
+
+  message territoryWarDataFieldIncrement {
+    oneof value {
+      romsg.DBTerritoryWarData all = 1;
+      romsg.DBTerritoryWarDataIncrement inc = 2;
+    }
+  }
+
+  message rainbowKoiDataFieldIncrement {
+    oneof value {
+      romsg.DBRainbowKoiActivityData all = 1;
+      romsg.DBRainbowKoiActivityDataIncrement inc = 2;
+    }
+  }
+
+  message gveHuntingDataFieldIncrement {
+    oneof value {
+      romsg.DBGveHuntingActivityData all = 1;
+      romsg.DBGveHuntingActivityDataIncrement inc = 2;
+    }
+  }
+
+  message casualBattleDataFieldIncrement {
+    oneof value {
+      romsg.DBCasualBattleActivityData all = 1;
+      romsg.DBCasualBattleActivityDataIncrement inc = 2;
+    }
+  }
+
+  message OnePieceInfoFieldIncrement {
+    oneof value {
+      romsg.DBOnePieceActivity all = 1;
+      romsg.DBOnePieceActivityIncrement inc = 2;
+    }
+  }
+
+  oneof val {
+    romsg.DBActivityParamIncrement.noviceActivityFieldIncrement noviceActivity = 10;
+    romsg.DBActivityParamIncrement.siegeDataFieldIncrement siegeData = 20;
+    romsg.DBActivityParamIncrement.territoryWarsDataFieldIncrement territoryWarsData = 30;
+    romsg.DBActivityParamIncrement.guildLeagueTotalInfoFieldIncrement guildLeagueTotalInfo = 40;
+    romsg.DBActivityParamIncrement.flyingDragonProduceInfoFieldIncrement flyingDragonProduceInfo = 50;
+    romsg.DBActivityParamIncrement.seasonEveInfoFieldIncrement seasonEveInfo = 60;
+    romsg.DBActivityParamIncrement.journeyFieldIncrement journey = 70;
+    romsg.DBActivityParamIncrement.pronteraDefenseFieldIncrement pronteraDefense = 80;
+    romsg.DBActivityParamIncrement.territoryWarDataFieldIncrement territoryWarData = 90;
+    romsg.DBActivityParamIncrement.rainbowKoiDataFieldIncrement rainbowKoiData = 100;
+    romsg.DBActivityParamIncrement.gveHuntingDataFieldIncrement gveHuntingData = 110;
+    romsg.DBActivityParamIncrement.casualBattleDataFieldIncrement casualBattleData = 120;
+    romsg.DBActivityParamIncrement.OnePieceInfoFieldIncrement OnePieceInfo = 130;
+  }
+}
+
+message DBCasualBattleActivityDataIncrement {
+  message playerMapFieldIncrement {
+    oneof value {
+      romsg.CasualBattlePlayerInfo all = 1;
+      romsg.CasualBattlePlayerInfoIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message teamPlayerMapFieldIncrement {
+    oneof value {
+      romsg.CasualBattlePlayerList all = 1;
+      romsg.CasualBattlePlayerListIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message battleGroupMapFieldIncrement {
+    oneof value {
+      romsg.CasualBattleGroup all = 1;
+      romsg.CasualBattleGroupIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message battleSceneIdsRepeatedOrigin {
+    repeated int64 value = 1;
+  }
+
+  message battleSceneIdsRepeatedIncrement {
+    repeated int64 value = 1;
+  }
+
+  message battleSceneIdsFieldIncrement {
+    oneof value {
+      romsg.DBCasualBattleActivityDataIncrement.battleSceneIdsRepeatedOrigin all = 1;
+      romsg.DBCasualBattleActivityDataIncrement.battleSceneIdsRepeatedIncrement inc = 2;
+    }
+  }
+
+  map<int64, romsg.DBCasualBattleActivityDataIncrement.playerMapFieldIncrement> playerMap = 10;
+  map<int64, romsg.DBCasualBattleActivityDataIncrement.teamPlayerMapFieldIncrement> teamPlayerMap = 20;
+  map<int32, romsg.DBCasualBattleActivityDataIncrement.battleGroupMapFieldIncrement> battleGroupMap = 30;
+  romsg.DBCasualBattleActivityDataIncrement.battleSceneIdsFieldIncrement battleSceneIds = 40;
+  optional int64 current_match_scene_id = 50;
+  optional int32 current_match_player_count = 60;
+}
+
+message DBGveHuntingActivityDataIncrement {
+  message groupMapFieldIncrement {
+    oneof value {
+      romsg.GveHuntingMatchGroup all = 1;
+      romsg.GveHuntingMatchGroupIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message topResultsRepeatedOrigin {
+    repeated romsg.GveHuntingGuildResult value = 1;
+  }
+
+  message topResultsRepeatedIncrement {
+    repeated romsg.GveHuntingGuildResultIncrement value = 1;
+  }
+
+  message topResultsFieldIncrement {
+    oneof value {
+      romsg.DBGveHuntingActivityDataIncrement.topResultsRepeatedOrigin all = 1;
+      romsg.DBGveHuntingActivityDataIncrement.topResultsRepeatedIncrement inc = 2;
+    }
+  }
+
+  message guildMatchResultsFieldIncrement {
+    oneof value {
+      romsg.GveHuntingGroupMatchResult all = 1;
+      romsg.GveHuntingGroupMatchResultIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  map<int64, romsg.DBGveHuntingActivityDataIncrement.groupMapFieldIncrement> groupMap = 10;
+  romsg.DBGveHuntingActivityDataIncrement.topResultsFieldIncrement topResults = 20;
+  optional bool isSettled = 30;
+  optional int64 candidateEndMs = 40;
+  optional int64 startPhaseEndMs = 50;
+  optional int64 settlementPhaseEndMs = 60;
+  map<int64, romsg.DBGveHuntingActivityDataIncrement.guildMatchResultsFieldIncrement> guildMatchResults = 70;
+}
+
+message DBJourneyActivityIncrement {
+  message playerCompleteInfoFieldIncrement {
+    oneof value {
+      romsg.JourneyPlayerCompleteInfo all = 1;
+      romsg.JourneyPlayerCompleteInfoIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  map<int64, romsg.DBJourneyActivityIncrement.playerCompleteInfoFieldIncrement> playerCompleteInfo = 10;
+}
+
+message DBOnePieceActivityIncrement {
+  message npcInfoFieldIncrement {
+    oneof value {
+      romsg.OnePieceSceneNpcInfo all = 1;
+      romsg.OnePieceSceneNpcInfoIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  map<int64, romsg.DBOnePieceActivityIncrement.npcInfoFieldIncrement> npcInfo = 10;
+  optional int64 endTime = 20;
+}
+
+message DBPronteraDefenseGuildBoardInfoIncrement {
+  optional int64 guildId = 10;
+  optional int64 contribution = 20;
+}
+
+message DBPronteraDefenseGuildInfoIncrement {
+  optional int64 guildId = 10;
+  optional int64 guildPrepLv = 20;
+  optional int64 guildPrepExp = 30;
+  optional int64 guildContribution = 40;
+}
+
+message DBPronteraDefenseInfoIncrement {
+  message mapInfoFieldIncrement {
+    oneof value {
+      romsg.DBPronteraDefenseMapInfo all = 1;
+      romsg.DBPronteraDefenseMapInfoIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message roundInfoFieldIncrement {
+    oneof value {
+      romsg.DBPronteraDefenseRoundInfo all = 1;
+      romsg.DBPronteraDefenseRoundInfoIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message guildInfoFieldIncrement {
+    oneof value {
+      romsg.DBPronteraDefenseGuildInfo all = 1;
+      romsg.DBPronteraDefenseGuildInfoIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  map<int64, romsg.DBPronteraDefenseInfoIncrement.mapInfoFieldIncrement> mapInfo = 10;
+  map<int64, romsg.DBPronteraDefenseInfoIncrement.roundInfoFieldIncrement> roundInfo = 20;
+  map<int64, romsg.DBPronteraDefenseInfoIncrement.guildInfoFieldIncrement> guildInfo = 30;
+  optional int64 curRound = 40;
+  optional int64 curIntensity = 50;
+}
+
+message DBPronteraDefenseMapInfoIncrement {
+  message defenseGuildsFieldIncrement {
+    oneof value {
+      bool all = 1;
+      bool inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message guildContributionBoardFieldIncrement {
+    oneof value {
+      romsg.DBPronteraDefenseGuildBoardInfo all = 1;
+      romsg.DBPronteraDefenseGuildBoardInfoIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  optional int64 mapId = 10;
+  optional int64 curResistLevel = 20;
+  optional int64 defensePoint = 30;
+  optional int64 maxDefensePoint = 40;
+  optional int64 defendRoundCount = 50;
+  optional bool isFall = 60;
+  optional int64 fallRound = 70;
+  map<int64, romsg.DBPronteraDefenseMapInfoIncrement.defenseGuildsFieldIncrement> defenseGuilds = 80;
+  map<int64, romsg.DBPronteraDefenseMapInfoIncrement.guildContributionBoardFieldIncrement> guildContributionBoard = 90;
+}
+
+message DBPronteraDefenseRoundInfoIncrement {
+  message mapIdsFieldIncrement {
+    oneof value {
+      bool all = 1;
+      bool inc = 2;
+      bool del = 3;
+    }
+  }
+
+  optional int64 roundId = 10;
+  optional int64 startTime = 20;
+  optional int64 endTime = 30;
+  map<int64, romsg.DBPronteraDefenseRoundInfoIncrement.mapIdsFieldIncrement> mapIds = 40;
+}
+
+message DBRainbowKoiActivityDataIncrement {
+  message progressFieldIncrement {
+    oneof value {
+      romsg.RainbowKoiProgress all = 1;
+      romsg.RainbowKoiProgressIncrement inc = 2;
+    }
+  }
+
+  message actorBetMapFieldIncrement {
+    oneof value {
+      int64 all = 1;
+      int64 inc = 2;
+      bool del = 3;
+    }
+  }
+
+  romsg.DBRainbowKoiActivityDataIncrement.progressFieldIncrement progress = 10;
+  optional int64 dungeonId = 20;
+  map<int64, romsg.DBRainbowKoiActivityDataIncrement.actorBetMapFieldIncrement> actorBetMap = 30;
+  optional bool isSettled = 40;
+}
+
+message DBSeasonEveChapterInfoIncrement {
+  message notesFieldIncrement {
+    oneof value {
+      int64 all = 1;
+      int64 inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message cluesFieldIncrement {
+    oneof value {
+      int64 all = 1;
+      int64 inc = 2;
+      bool del = 3;
+    }
+  }
+
+  map<int64, romsg.DBSeasonEveChapterInfoIncrement.notesFieldIncrement> notes = 10;
+  map<int64, romsg.DBSeasonEveChapterInfoIncrement.cluesFieldIncrement> clues = 20;
+  optional int64 openTime = 30;
+  optional int64 chapterId = 40;
+}
+
+message DBSeasonEveInfoIncrement {
+  message chapterInfoFieldIncrement {
+    oneof value {
+      romsg.DBSeasonEveChapterInfo all = 1;
+      romsg.DBSeasonEveChapterInfoIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message playerBulletRepeatedOrigin {
+    repeated romsg.SeasonEveBulletInfo value = 1;
+  }
+
+  message playerBulletRepeatedIncrement {
+    repeated romsg.SeasonEveBulletInfoIncrement value = 1;
+  }
+
+  message playerBulletFieldIncrement {
+    oneof value {
+      romsg.DBSeasonEveInfoIncrement.playerBulletRepeatedOrigin all = 1;
+      romsg.DBSeasonEveInfoIncrement.playerBulletRepeatedIncrement inc = 2;
+    }
+  }
+
+  optional int64 progress = 10;
+  map<int64, romsg.DBSeasonEveInfoIncrement.chapterInfoFieldIncrement> chapterInfo = 20;
+  romsg.DBSeasonEveInfoIncrement.playerBulletFieldIncrement playerBullet = 30;
+  optional int64 lastCalcTime = 40;
+}
+
+message GveHuntingGroupMatchResultIncrement {
+  message guildResultsRepeatedOrigin {
+    repeated romsg.GveHuntingGuildResult value = 1;
+  }
+
+  message guildResultsRepeatedIncrement {
+    repeated romsg.GveHuntingGuildResultIncrement value = 1;
+  }
+
+  message guildResultsFieldIncrement {
+    oneof value {
+      romsg.GveHuntingGroupMatchResultIncrement.guildResultsRepeatedOrigin all = 1;
+      romsg.GveHuntingGroupMatchResultIncrement.guildResultsRepeatedIncrement inc = 2;
+    }
+  }
+
+  romsg.GveHuntingGroupMatchResultIncrement.guildResultsFieldIncrement guildResults = 10;
+}
+
+message GveHuntingGuildResultIncrement {
+  optional int64 guildId = 10;
+  optional int64 score = 20;
+  optional int64 reachTs = 30;
+  optional int32 rank = 40;
+  optional int64 commandSkillKill = 50;
+}
+
+message JourneyCompleteInfoIncrement {
+  optional int64 chapterId = 10;
+  optional int64 count = 20;
+}
+
+message JourneyPlayerCompleteInfoIncrement {
+  message completeNodeFieldIncrement {
+    oneof value {
+      romsg.JourneyCompleteInfo all = 1;
+      romsg.JourneyCompleteInfoIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message completeActFieldIncrement {
+    oneof value {
+      romsg.JourneyCompleteInfo all = 1;
+      romsg.JourneyCompleteInfoIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message completeEventFieldIncrement {
+    oneof value {
+      romsg.JourneyCompleteInfo all = 1;
+      romsg.JourneyCompleteInfoIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message completeTravelFieldIncrement {
+    oneof value {
+      romsg.JourneyCompleteInfo all = 1;
+      romsg.JourneyCompleteInfoIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  message attributesFieldIncrement {
+    oneof value {
+      int64 all = 1;
+      int64 inc = 2;
+      bool del = 3;
+    }
+  }
+
+  optional int64 playerId = 10;
+  map<int64, romsg.JourneyPlayerCompleteInfoIncrement.completeNodeFieldIncrement> completeNode = 20;
+  map<int64, romsg.JourneyPlayerCompleteInfoIncrement.completeActFieldIncrement> completeAct = 30;
+  map<int64, romsg.JourneyPlayerCompleteInfoIncrement.completeEventFieldIncrement> completeEvent = 40;
+  map<int64, romsg.JourneyPlayerCompleteInfoIncrement.completeTravelFieldIncrement> completeTravel = 50;
+  optional int64 gainCoinCount = 60;
+  map<int64, romsg.JourneyPlayerCompleteInfoIncrement.attributesFieldIncrement> attributes = 70;
+  optional int64 titleId = 80;
+}
+
+message NoviceActivityIncrement {
+  message taskIdsFieldIncrement {
+    oneof value {
+      int32 all = 1;
+      int32 inc = 2;
+      bool del = 3;
+    }
+  }
+
+  map<int32, romsg.NoviceActivityIncrement.taskIdsFieldIncrement> taskIds = 10;
+}
+
+message OnePieceSceneNpcInfoIncrement {
+  message npcPointInfoFieldIncrement {
+    oneof value {
+      int64 all = 1;
+      int64 inc = 2;
+      bool del = 3;
+    }
+  }
+
+  map<int64, romsg.OnePieceSceneNpcInfoIncrement.npcPointInfoFieldIncrement> npcPointInfo = 10;
+  optional int64 sceneGuid = 20;
+  optional int64 sceneEntry = 30;
+  optional int64 sceneLineId = 40;
+  optional int64 sceneNpcRoundCount = 50;
+}
+
+message RainbowKoiCandidateInfoIncrement {
+  optional bool isEliminated = 10;
+  optional bool isGiveUp = 20;
+  optional int32 rank = 30;
+  optional bool isSettle = 40;
+}
+
+message RainbowKoiProgressIncrement {
+  message candidateMapFieldIncrement {
+    oneof value {
+      romsg.RainbowKoiCandidateInfo all = 1;
+      romsg.RainbowKoiCandidateInfoIncrement inc = 2;
+      bool del = 3;
+    }
+  }
+
+  map<int64, romsg.RainbowKoiProgressIncrement.candidateMapFieldIncrement> candidateMap = 10;
+  optional bool isGameOver = 20;
+}
+
+message SeasonEveBulletInfoIncrement {
+  optional int64 playerId = 10;
+  optional int64 chapterId = 20;
+  optional int64 timeMs = 30;
+}
+

@@ -1,0 +1,17 @@
+syntax = "proto3";
+package romsg;
+import "MG_Define.proto";
+
+message BaseMsg {
+  romsg.MSG_Type msgType = 1;
+  bytes data = 2;
+}
+
+message BaseMsgPlayerLoginReq {
+  int64 playerID = 1;
+}
+
+message BaseMsgPlayerLogoutReq {
+  int32 reason = 1;
+}
+

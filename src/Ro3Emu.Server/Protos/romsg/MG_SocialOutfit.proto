@@ -1,0 +1,19 @@
+syntax = "proto3";
+package romsg;
+
+message EquipSocialOutfitReq {
+  int64 cfgId = 1;
+  int64 type = 2;
+}
+
+message EquipSocialOutfitRes {
+  int32 err = 1;
+}
+
+message RefreshSocialOutfitReq {
+}
+
+message RefreshSocialOutfitRes {
+  int32 err = 1;
+}
+

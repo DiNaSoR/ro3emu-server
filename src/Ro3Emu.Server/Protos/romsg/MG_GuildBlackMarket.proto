@@ -1,0 +1,157 @@
+syntax = "proto3";
+package romsg;
+import "FieldOption.proto";
+
+message BlackMarketStack {
+  string stallUniqueId = 1;
+  int64 unitPrice = 3;
+  int64 totalCount = 4;
+  int64 remainCount = 5;
+  int64 displayAvailableTimeMs = 6;
+  int64 expireTimeMs = 7;
+}
+
+message BlackMarketTradeRecord {
+  string orderId = 1;
+  int32 recordType = 2;
+  int64 unitPrice = 3;
+  int64 count = 4;
+  int64 fee = 5;
+  int64 counterpartGuildId = 6;
+  int64 tradeTimeMs = 7;
+  bool isRead = 8;
+}
+
+message BlackMarketPriceHistory {
+  int64 avgPrice = 1;
+  int32 dateHour = 2;
+}
+
+message BlackMarketGuildData {
+  repeated romsg.BlackMarketStack stacks = 1;
+  repeated romsg.BlackMarketTradeRecord sellRecords = 2;
+  repeated romsg.BlackMarketTradeRecord buyRecords = 3;
+}
+
+message BlackMarketGlobalData {
+  int64 rollingAvgPrice = 1;
+  int64 recentAvgPrice = 2;
+  repeated int64 samplePrices = 3;
+  repeated romsg.BlackMarketPriceHistory priceHistory = 4;
+  repeated int64 sampleCounts = 5;
+}
+
+message GetBlackMarketBoothReq {
+}
+
+message GetBlackMarketBoothRsp {
+  int32 result = 1;
+  repeated romsg.BlackMarketBoothInfo booths = 2;
+  int64 recentAvgPrice = 3;
+  repeated romsg.BlackMarketPriceHistoryInfo priceHistory = 4;
+}
+
+message BlackMarketBoothInfo {
+  string stallUniqueId = 1;
+  int64 unitPrice = 2;
+  int64 totalCount = 3;
+  int64 remainCount = 4;
+  int64 expireTimeMs = 5;
+  int64 displayAvailableTimeMs = 6;
+}
+
+message BlackMarketPriceHistoryInfo {
+  int64 avgPrice = 1;
+  int32 dateHour = 2;
+}
+
+message ListOnBlackMarketReq {
+  int64 unitPrice = 1;
+  int64 count = 2;
+}
+
+message ListOnBlackMarketRsp {
+  int32 result = 1;
+}
+
+message UnlistFromBlackMarketReq {
+  string stallUniqueId = 1;
+  bool confirm = 2;
+}
+
+message UnlistFromBlackMarketRsp {
+  int32 result = 1;
+}
+
+message GetBlackMarketItemsReq {
+}
+
+message GetBlackMarketItemsRsp {
+  int32 result = 1;
+  repeated romsg.BlackMarketBigStack items = 2;
+  int64 recentAvgPrice = 3;
+  repeated romsg.BlackMarketPriceHistoryInfo priceHistory = 4;
+}
+
+message BlackMarketBigStack {
+  int64 unitPrice = 1;
+  int64 totalRemainCount = 2;
+}
+
+message BuyBlackMarketItemReq {
+  int64 unitPrice = 1;
+  int64 buyCount = 2;
+  bool confirm = 3;
+}
+
+message BuyBlackMarketItemRsp {
+  int32 result = 1;
+}
+
+message GetBlackMarketSellRecordsReq {
+}
+
+message GetBlackMarketSellRecordsRsp {
+  int32 result = 1;
+  repeated romsg.BlackMarketSellRecordInfo records = 2;
+}
+
+message BlackMarketSellRecordInfo {
+  string orderId = 1;
+  int64 unitPrice = 2;
+  int64 count = 3;
+  int64 fee = 4;
+  int64 counterpartGuildId = 5;
+  int64 tradeTimeMs = 6;
+  bool isRead = 7;
+}
+
+message GetBlackMarketBuyRecordsReq {
+}
+
+message GetBlackMarketBuyRecordsRsp {
+  int32 result = 1;
+  repeated romsg.BlackMarketBuyRecordInfo records = 2;
+}
+
+message BlackMarketBuyRecordInfo {
+  string orderId = 1;
+  int64 unitPrice = 2;
+  int64 count = 3;
+  int64 tradeTimeMs = 4;
+}
+
+message UpdateBlackMarketBoothReq {
+  string stallUniqueId = 1;
+  int64 unitPrice = 2;
+  int64 count = 3;
+  bool confirm = 4;
+}
+
+message UpdateBlackMarketBoothRsp {
+  int32 result = 1;
+}
+
+message BlackMarketSellRecordNtf {
+}
+

@@ -1,0 +1,161 @@
+货币效率特权	Currency Boost Perk
+I：苍穹追猎	I: Sky Hunt
+使用重炮轰击阿尔玛基亚，趁它虚弱之时再用弩炮定住它，接着通过绳索到达鲲背上去探索…	Bombard Almagia with the Heavy Cannon, pin it with the Ballista while it's Weak, then climb the rope onto its back to explore…
+II：双线攻防	II: Two-Front Battle
+发现了伊尔玛塔的踪迹，继续战斗吧！\n在飞空艇上的伙伴们要关注天上东西…	Ilmata's trail has been found. Keep fighting!\nAllies on the airship, keep an eye on the sky…
+III：巨怪追逐	III: Giant Chase
+快跑！逃离伊尔玛塔的梦境！！\n别被后面的守卫者给追上了…	Run! Escape Ilmata's dream!!\nDon't let the Guardians behind you catch up…
+IV：双线攻防	IV: Two-Front Battle
+成功逃离了梦境，继续战斗吧！	You escaped the dream. Keep fighting!
+V：鲸背滑降	V: Whaleback Slide
+阿尔玛基亚苏醒了！趁现在还有时间赶紧通过背部滑道逃离吧！！	Almagia has awakened! Escape down the slide on its back while there's still time!!
+VI：苍穹追猎	VI: Sky Hunt
+再加把劲，不能让阿尔玛基亚逃脱了，继续用重炮轰击它！	Push harder! Don't let Almagia escape. Keep bombarding it with the Heavy Cannon!
+VII：最后一役	VII: Final Battle
+决战时刻！！！	The decisive battle is here!!!
+自由视角滑梯模式，相机可自由调整	Free-view slide mode: the camera can be adjusted freely
+锁定视角滑梯模式，相机固定不可调整	Locked-view slide mode: the camera is fixed
+配置锁定滑梯模式，完全使用cameraId配置的镜头参数，只跟随角色移动	Config-locked slide mode: uses the cameraId camera settings and only follows the character
+答题阶段	Quiz Phase
+主要阶段	Main Phase
+死斗阶段	Deathmatch Phase
+城门阶段	Gate Phase
+内城阶段	Inner City Phase
+华丽阶段	Emperium Phase
+结束阶段	End Phase
+华丽金属将在	Emperium respawns in
+秒后重生	 sec
+没有检测到宣誓内容	No oath text detected
+该段位奖励暂不可领取	This rank reward can't be claimed yet
+已加入	Joined
+确认将【%s】从黑名单中移除吗？	Remove [%s] from your block list?
+炮台可能炸掉了	The turret may have been destroyed
+胜败乃兵家常事 大侠请重新来过	Win some, lose some. Try again, hero!
+退出群聊也会退出冒险团，是否确认退出？	Leaving the group chat also leaves the Adv. Guild. Leave anyway?
+锵锵 被治疗拉！	Ta-da! You've been healed!
+城堡	Castle
+ 级	 Lv
+通行证奖励	Pass Rewards
+解锁通行证奖励	Unlock Pass Rewards
+攻防计算开始	ATK/DEF Calc Start
+技能修正	Skill Modifier
+种族修正	Race Modifier
+伤害修正	Damage Modifier
+技能增强	Skill Boost
+PVE与PVP修正	PvE/PvP Modifier
+伤害波动	Damage Variance
+暴击修正	Crit Modifier
+最终伤害	Final Damage
+基础治疗	Base Healing
+治疗加成	Healing Bonus
+治疗暴击概率	Heal Crit Chance
+治疗暴击修正	Heal Crit Modifier
+最终治疗	Final Healing
+当前步骤计算值	Current Step Value
+A物理攻击	A PATK
+A物防参数	A PDEF Param
+B物理防御	B PDEF
+A忽视物防	A Ignore PDEF
+A忽视物防%	A Ignore PDEF%
+A魔防参数	A MDEF Param
+B魔法防御	B MDEF
+A忽视魔防	A Ignore MDEF
+A忽视魔防%	A Ignore MDEF%
+A技能倍率	A Skill Multiplier
+A技能额外伤害	A Skill Bonus DMG
+A物理追加	A Additional PATK
+B物理追加减伤	B Additional Phys DMG Reduction
+A魔法追加	A Bonus MATK
+B魔法追加减伤	B Bonus Magic DMG Reduction
+影响技能倍率固定值	Skill Multiplier Flat Modifier
+影响技能倍率万分比	Skill Multiplier Modifier (/10000)
+影响技能固定伤害参数	Skill Flat DMG Modifier
+A对某种族伤害%	A DMG vs Race%
+B受某种族伤害%	B DMG Taken from Race%
+A某元素伤害%	A Element DMG%
+B受某元素伤害%	B Element DMG Taken%
+A对某元素怪物伤害%	A DMG vs Element Monsters%
+B受某元素怪物伤害%	B DMG Taken from Element Monsters%
+最终元素修正	Final Element Modifier
+B元素克制抗性%	B Element Counter RES%
+A元素克制忽视%	A Element Counter Ignore%
+武器类型	Weapon Type
+A对某体型伤害%	A DMG vs Size%
+B受某体型伤害%	B DMG Taken by Size%
+A头衔增伤%	A Title DMG Bonus%
+A造成伤害%	A DMG Dealt%
+B受到伤害%	B DMG Taken%
+A物理增伤(包括头衔)%	A Phys DMG Bonus (incl. Title)%
+B受物理伤害%	B Phys DMG Taken%
+A近战物理增伤%(针对玩家)	A Melee Phys DMG Bonus% (vs Players)
+B近战物理减伤%(针对玩家)	B Melee Phys DMG Reduction% (vs Players)
+A远程物理增伤%(针对玩家)	A Ranged Phys DMG Bonus% (vs Players)
+B远程物理减伤%(针对玩家)	B Ranged Phys DMG Reduction% (vs Players)
+A魔法伤害(包括头衔)%	A Magic DMG (incl. Title)%
+B受魔法伤害%	B Magic DMG Taken%
+A技能增强%	A Skill Boost%
+B技能减伤%	B Skill DMG Reduction%
+APVP增强	A PvP Boost
+BPVP抵抗	B PvP RES
+PVP参数	PvP Param
+APVE增强	A PvE Boost
+BPVE抵抗	B PvE RES
+PVE参数	PvE Param
+波动下限	Variance Min
+波动上限	Variance Max
+波动值	Variance Value
+A暴击	A CRIT
+B抗暴	B Crit RES
+暴击参数	Crit Param
+A暴击修正	A Crit Modifier
+A技能暴击率参数	A Skill Crit Rate Param
+A暴击概率	A Crit Chance
+B暴击抵抗	B CRIT RES
+A技能额外暴击率	A Skill Bonus Crit Rate
+影响技能暴击倍率	Skill Crit Multiplier Modifier
+技能暴击率	Skill Crit Rate
+概率rand	Chance rand
+B受暴击伤害	B Crit DMG Taken
+伤害增加比	DMG Increase Ratio
+实际伤害人数	Actual Targets Hit
+群体伤害参数	AoE DMG Param
+伤害向上取整	DMG Rounded Up
+B闪避	B FLEE
+A命中	A HIT
+A闪避参数	A FLEE Param
+A初始命中	A Base HIT
+A技能额外命中	A Skill Bonus HIT
+影响技能命中	Skill HIT Modifier
+A命中率	A Hit Rate
+命中随机值	HIT Random Value
+技能治疗倍率	Skill Heal Multiplier
+技能额外治疗	Skill Bonus Healing
+A治疗效果%	A Healing Effect%
+B受治疗效果%	B Healing Received%
+A治疗暴击	A Heal Crit
+A治疗暴击概率	A Heal Crit Chance
+治疗暴击投放参数（*10000）	Heal Crit Param (*10000)
+A治疗暴击修正	A Heal Crit Modifier
+A治疗技能暴击率参数	A Heal Skill Crit Rate Param
+A治疗技能额外暴击率	A Heal Skill Bonus Crit Rate
+治疗技能暴击率	Heal Skill Crit Rate
+治疗概率rand	Heal Chance rand
+附加治疗	Bonus Healing
+技能id：%d  	Skill ID: %d  
+第%d步:[%d][%s]计算结果：%.2f。\n[详细参数]==	Step %d: [%d][%s] result: %.2f.\n[Details]==
+[%d][%s]结果：%.2f;	[%d][%s] result: %.2f;
+平均伤害：	Avg Damage: 
+最小伤害：	Min Damage: 
+最大伤害：	Max Damage: 
+暴击最小伤害：	Crit Min Damage: 
+暴击最大伤害：	Crit Max Damage: 
+总体LOG	Overall Log
+退出频道%s失败	Failed to leave channel %s
+退出频道失败	Failed to leave channel
+本地游戏版本号：{0}	Local version: {0}
+最新游戏版本号：{0}	Latest version: {0}
+正在下载文件 {0:00}/{1:00} MB	Downloading {0:00}/{1:00} MB
+下载速度{0:00}{1}	Speed: {0:00}{1}
+下载速度：{0:00}{1}，预计时间：{2}分{3}秒	Speed: {0:00}{1}, ETA: {2}m {3}s
+下载速度：{0:00}{1}，预计时间：{2}秒	Speed: {0:00}{1}, ETA: {2}s
+当前处于非wifi环境下，游戏有 {0:00}MB 内容更新，下载将产生流量费用，是否继续？	You're not on Wi-Fi. The game has a {0:00} MB update and downloading may incur data charges. Continue?

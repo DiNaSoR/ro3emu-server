@@ -1,0 +1,91 @@
+syntax = "proto3";
+package romsg;
+import "MG_DB.proto";
+
+message WildAFKInfoReq {
+}
+
+message WildAFKInfoRsp {
+  int64 curAfkTime = 1;
+}
+
+message WildAFKNtf {
+  bool isAfking = 1;
+  int64 curAfkTime = 2;
+}
+
+message WildAfkSaveChargeReq {
+  bool isSaveCharge = 1;
+}
+
+message SetMonsterCollectionReq {
+  int32 monsterId = 1;
+  bool isAdd = 2;
+}
+
+message SetMonsterCollectionRsp {
+  int32 result = 1;
+  int32 monsterId = 2;
+  bool isAdd = 3;
+}
+
+message ReceiveOfflineRewardReq {
+}
+
+message ReceiveOfflineRewardRsp {
+  int32 result = 1;
+}
+
+message SetHighMagnificationReq {
+  bool status = 1;
+}
+
+message SetHighMagnificationRsp {
+  int32 result = 1;
+  bool status = 2;
+}
+
+message AfkDungeonResultNtf {
+  int32 curDungeonId = 1;
+  bool isPass = 2;
+  bool isFirstPass = 3;
+  int64 passTime = 4;
+}
+
+message AfkDungeonStartReq {
+  int32 dungeonId = 1;
+  bool isInDungeon = 2;
+}
+
+message AfkDungeonStartRsp {
+  int32 result = 1;
+}
+
+message StartHighMultiplierTimeReq {
+}
+
+message StartHighMultiplierTimeRsp {
+  int32 result = 1;
+  int64 remainingTimeSeconds = 2;
+}
+
+message PauseHighMultiplierTimeReq {
+}
+
+message PauseHighMultiplierTimeRsp {
+  int32 result = 1;
+  int64 consumedTimeSeconds = 2;
+  int64 remainingTimeSeconds = 3;
+}
+
+message GenerateAFKDropSnapshotReq {
+}
+
+message GenerateAFKDropSnapshotRsp {
+  int32 result = 1;
+}
+
+message SuspendReasonRes {
+  string reason = 1;
+}
+

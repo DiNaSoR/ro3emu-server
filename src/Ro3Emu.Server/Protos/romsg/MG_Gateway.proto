@@ -1,0 +1,13 @@
+syntax = "proto3";
+package romsg;
+import "MG_Define.proto";
+
+message GatewayMsg {
+  romsg.MSG_Type msgType = 1;
+  bytes data = 2;
+}
+
+message UserOfflineNotify {
+  romsg.EKickOffType reason = 1;
+}
+

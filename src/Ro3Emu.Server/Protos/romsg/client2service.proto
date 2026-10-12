@@ -1,0 +1,375 @@
+syntax = "proto3";
+package ezmsg;
+
+enum ESErrorCode {
+  EsSuccess = 0;
+  EsFailed = 23010101;
+}
+
+enum ESSearchMode {
+  Wildcard = 0;
+  Match = 1;
+}
+
+enum ESProxyClientMsgID {
+  ESProxyClientMsgIDNone = 0;
+  DocSearchClient = 19003034;
+}
+
+enum GlobalCacheError {
+  GlobalCacheOK = 0;
+  GlobalCacheInternalError = 27010101;
+  GlobalCacheNotFound = 27010201;
+}
+
+enum QueryRegionFlag {
+  QueryRegionFlagNone = 0;
+  QueryRegionFlagWith = 1;
+  QueryRegionFlagOnly = 2;
+}
+
+enum GlobalCachePlayerClientMsgID {
+  GlobalCachePlayerClientMsgIdNone = 0;
+  GlobalCachePlayerClientMsgIdQuery = 19005027;
+}
+
+enum LeaderBoardError {
+  LeaderBoardOK = 0;
+  LeaderBoardInternalError = 20010101;
+  LeaderBoardNotFound = 20010201;
+  LeaderBoardDuplicate = 20010301;
+  LeaderBoardUserError = 20010401;
+}
+
+enum LeaderBoardClientMsgID {
+  LeaderBoardClientMsgNone = 0;
+  LeaderBoardClientMsgIdQueryScore = 19005020;
+  LeaderBoardClientMsgIdQueryBoard = 19008020;
+}
+
+enum MailErrorCode {
+  Success = 0;
+  Failed = 11000100;
+  MailNotExist = 11000200;
+  MailIsDeleted = 11000300;
+  MailAlreadySend = 11000400;
+  MailExpired = 11000500;
+  InvalidOperation = 11000600;
+  DeleteBeforeProcessed = 11000700;
+  ConflictMutexID = 11000800;
+  CopySrcEntityNotFound = 11000900;
+  MailBoxFull = 11001000;
+}
+
+enum PlayerMailClientMsgId {
+  PlayerMailClientMsgIdNone = 0;
+  PlayerMailClientMsgIdGetMailList = 10001032;
+  PlayerMailClientMsgIdGetMailCount = 10002032;
+  PlayerMailClientMsgIdGetSeqIdByRank = 10003032;
+  PlayerMailClientMsgIdReadMail = 10004032;
+  PlayerMailClientMsgIdDeleteMail = 10005032;
+  PlayerMailClientMsgIdNotifyUnreadMail = 10006032;
+}
+
+enum NameCheckErrorCode {
+  OK = 0;
+  InternalError = 33010101;
+  Dup = 33010201;
+}
+
+enum NameClientMsgID {
+  NameClientMsgIdNone = 0;
+  NameClientMsgIdCheck = 19001033;
+}
+
+enum PartyError {
+  PartyOK = 0;
+  PartyInternalError = 15010101;
+  PartyAlreadIn = 15010201;
+  PartyNotFound = 15010301;
+  PartyMemberNotFound = 15010401;
+  PartyMemberInOther = 15010501;
+  PartyUpdateNotChange = 15010601;
+}
+
+enum PartyClientMsgID {
+  PartyClientMsgNone = 0;
+  PartyClientMsgIdGet = 19003015;
+  PartyClientMsgIdQuerySummary = 19009015;
+  PartyClientMsgIdGroupCount = 19010015;
+}
+
+message ESDocument {
+  string region = 1;
+  string value = 2;
+  string key = 3;
+}
+
+message DocSearchRequest {
+  string region = 1;
+  string word = 2;
+  ezmsg.ESSearchMode mode = 3;
+  int32 limit = 4;
+}
+
+message DocSearchResponse {
+  ezmsg.ESErrorCode error = 1;
+  repeated ezmsg.ESDocument result = 2;
+}
+
+message PlayerBasicData {
+  uint64 ID = 1;
+  string name = 2;
+  int32 level = 3;
+  bool online = 4;
+  string areaId = 5;
+  string eventLifeId = 6;
+  string user_id = 7;
+  string user_name = 8;
+  int64 server_id = 9;
+  string server_name = 10;
+  string device_id = 11;
+  string user_value_json = 12;
+  string role_value_json = 13;
+  string sdk_value_json = 14;
+  map<string, bytes> extData = 100;
+  string region = 200;
+}
+
+message GlobalCacheQueryPlayerRequest {
+  repeated uint64 IDList = 1;
+  repeated string extDataKeys = 2;
+  ezmsg.QueryRegionFlag regionFlag = 3;
+}
+
+message GlobalCacheQueryPlayerResponse {
+  ezmsg.GlobalCacheError error = 1;
+  repeated ezmsg.PlayerBasicData playerDataList = 2;
+}
+
+message LeaderBoardQueryBoardRequest {
+  int32 startRank = 1;
+  int32 endRank = 2;
+}
+
+message LeaderBoardQueryScoreRequest {
+  int32 startRank = 1;
+  int32 endRank = 2;
+  uint64 userID = 3;
+  uint32 before = 4;
+  uint32 after = 5;
+}
+
+message TopNExtUserInfo {
+  uint64 userID = 1;
+  repeated int64 scoreList = 2;
+  bytes gameData = 7;
+}
+
+message LeaderBoardQueryBoardClientRequest {
+  string boardName = 1;
+  ezmsg.LeaderBoardQueryBoardRequest queryRequest = 2;
+}
+
+message LeaderBoardQueryScoreClientRequest {
+  string boardName = 1;
+  ezmsg.LeaderBoardQueryScoreRequest queryRequest = 2;
+}
+
+message UserRankInfo {
+  int32 rank = 1;
+  ezmsg.TopNExtUserInfo userInfo = 2;
+}
+
+message LeaderBoardQueryBoardResponse {
+  ezmsg.LeaderBoardError error = 1;
+  repeated ezmsg.UserRankInfo rankUsers = 2;
+}
+
+message LeaderBoardQueryScoreResponse {
+  ezmsg.LeaderBoardError error = 1;
+  repeated ezmsg.UserRankInfo rankUsers = 2;
+  repeated ezmsg.UserRankInfo aroundUsers = 3;
+}
+
+message MailGetMailCountRequest {
+  uint32 mail_custom_category = 1;
+}
+
+message MailGetMailListRequest {
+  uint32 mail_custom_category = 2;
+  uint64 start_seq_id = 3;
+  uint32 mail_limit = 4;
+  repeated uint64 mail_uid = 5;
+  bool need_mail_content = 6;
+  bool is_descending = 7;
+}
+
+message MailGetSeqIdByRankRequest {
+  int32 rank = 2;
+  uint32 mail_custom_category = 3;
+  bool is_descending = 4;
+}
+
+message MailHeader {
+  uint32 send_type = 1;
+  uint64 send_time = 2;
+  uint64 expire_time = 3;
+  string mutex_id = 4;
+  uint64 mutex_id_expire_time = 5;
+  uint32 mail_custom_category = 6;
+  bytes custom_header = 7;
+}
+
+message PlayerMailDeleteMailRequest {
+  repeated uint64 mail_uid = 1;
+}
+
+message PlayerMailReadMailRequest {
+  repeated uint64 mail_uid = 1;
+}
+
+message PlayerMailUnreadMailClientNotify {
+}
+
+message MailGetMailCountResponse {
+  ezmsg.MailErrorCode error = 1;
+  uint32 count = 2;
+}
+
+message MailGetSeqIdByRankResponse {
+  ezmsg.MailErrorCode error = 1;
+  uint64 seq_id = 2;
+}
+
+message MailInfo {
+  uint64 mail_uid = 1;
+  uint64 mail_recv_seq_id = 2;
+  ezmsg.MailHeader mail_header = 3;
+  uint32 read_status = 4;
+  uint32 processed_status = 5;
+  bool is_commit_send = 6;
+  bytes mail_content = 7;
+}
+
+message PlayerMailDeleteMailResponse {
+  ezmsg.MailErrorCode error = 1;
+}
+
+message PlayerMailReadMailResponse {
+  ezmsg.MailErrorCode error = 1;
+}
+
+message MailGetMailListResponse {
+  uint32 error = 1;
+  repeated ezmsg.MailInfo mail_info = 2;
+}
+
+message NameCheckRequest {
+  string type = 1;
+  string name = 2;
+}
+
+message GroupNameCheckResponse {
+  ezmsg.NameCheckErrorCode error = 1;
+}
+
+message IntProperty {
+  string key = 1;
+  sint64 value = 2;
+  repeated sint64 valueList = 3;
+}
+
+message PartyGetClientRequest {
+  uint64 partyID = 1;
+}
+
+message PartyGroupCount {
+  int64 targetType = 1;
+  int32 count = 2;
+}
+
+message PartyIntCondition {
+  string key = 1;
+  sint64 minValue = 2;
+  sint64 maxValue = 3;
+  repeated sint64 listHasValue = 4;
+}
+
+message PartyMember {
+  uint64 UID = 1;
+  bytes gameMemberData = 3;
+}
+
+message PartyQueryGroupCountRequest {
+  string region = 1;
+  uint32 partyType = 2;
+}
+
+message PartySortCondition {
+  string key = 1;
+  bool isASC = 2;
+  bool isWild = 3;
+}
+
+message PartyStrCondition {
+  string key = 1;
+  string value = 2;
+  string regexpValue = 3;
+  repeated string listHasValue = 4;
+  bool isWild = 5;
+}
+
+message StringProperty {
+  string key = 1;
+  string value = 2;
+  repeated string valueList = 3;
+}
+
+message Party {
+  uint64 ID = 1;
+  uint32 partyType = 2;
+  string region = 3;
+  repeated ezmsg.PartyMember memberList = 4;
+  bytes gameData = 5;
+  int64 targetType = 6;
+  bool isMemberUnique = 7;
+}
+
+message PartyLobbySetting {
+  bool isInLobby = 1;
+  repeated ezmsg.IntProperty intPropertyList = 2;
+  repeated ezmsg.StringProperty strPropertyList = 3;
+  repeated ezmsg.StringProperty wildcardStrPropertyList = 4;
+}
+
+message PartyQueryGroupCountResponse {
+  ezmsg.PartyError error = 1;
+  repeated ezmsg.PartyGroupCount groupCount = 2;
+}
+
+message PartyQuerySummaryRequest {
+  uint32 partyType = 1;
+  repeated ezmsg.PartyStrCondition strCondition = 2;
+  repeated ezmsg.PartyIntCondition intCondition = 3;
+  repeated ezmsg.PartySortCondition sortList = 4;
+  int32 start = 5;
+  int32 size = 6;
+  bool directQuery = 7;
+}
+
+message PartyGetResponse {
+  ezmsg.PartyError error = 1;
+  ezmsg.Party party = 2;
+}
+
+message PartySummary {
+  ezmsg.PartyLobbySetting lobbySetting = 1;
+  bytes gameSummaryData = 2;
+}
+
+message PartyQuerySummaryResponse {
+  ezmsg.PartyError error = 1;
+  repeated ezmsg.PartySummary summaryList = 2;
+}
+

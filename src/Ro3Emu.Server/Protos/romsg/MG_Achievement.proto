@@ -1,0 +1,62 @@
+syntax = "proto3";
+package romsg;
+import "MG_Common.proto";
+
+message GetAchievementRewardReq {
+  repeated int64 ID = 1;
+}
+
+message GetAchievementRewardResp {
+  int32 result = 1;
+  int64 errorID = 2;
+  repeated int64 ID = 3;
+}
+
+message GetAchievementPointRewardReq {
+  int32 type = 1;
+  int32 level = 2;
+}
+
+message GetAchievementPointRewardResp {
+  int32 type = 1;
+  int32 result = 2;
+  int32 curLevelRewardLevel = 3;
+}
+
+message UpdateAchievementHintLevelReq {
+}
+
+message ShareAchievementHintLevelResp {
+  int32 result = 1;
+  int64 ID = 2;
+  int64 stamp = 3;
+  float completeRate = 4;
+}
+
+message ShareAchievementInfoReq {
+  int64 ID = 1;
+}
+
+message ShareAchievementInfoResp {
+  int32 result = 1;
+  int64 ID = 2;
+  int64 stamp = 3;
+  float completeRate = 4;
+}
+
+message LevelRewardInfo {
+  int32 type = 1;
+  int32 level = 2;
+}
+
+message GetAchievementAllRewardReq {
+  repeated int64 TaskIds = 1;
+  repeated romsg.LevelRewardInfo LevelRewards = 2;
+}
+
+message GetAchievementAllRewardResp {
+  int32 result = 1;
+  repeated int64 SuccessTaskIds = 2;
+  repeated romsg.LevelRewardInfo SuccessLevelRewards = 3;
+}
+

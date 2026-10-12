@@ -1,0 +1,572 @@
+syntax = "proto3";
+package romsg;
+import "MG_Common.proto";
+import "MG_PublicServer.proto";
+import "MG_Team.proto";
+import "MG_Chicken.proto";
+import "FieldOption.proto";
+import "MG_Training.proto";
+
+enum DungeonFirstResultType {
+  DungeonFirstResultType_None = 0;
+  DungeonFirstResultType_TimeOut = 1;
+  DungeonFirstResultType_ActDupCondition = 2;
+  DungeonFirstResultType_DupIdling = 3;
+}
+
+enum DungeonSecondResultType {
+  DungeonSecondResultType_None = 0;
+  DungeonSecondResultType_Stage_TimeOut = 1;
+  DungeonSecondResultType_KillNpc = 2;
+  DungeonSecondResultType_Score_Act = 3;
+  DungeonSecondResultType_DefendTime_Act = 4;
+  DungeonSecondResultType_Kill_Player = 5;
+  DungeonSecondResultType_Player_BeKill = 6;
+  DungeonSecondResultType_Act_Dup_Task = 7;
+  DungeonSecondResultType_Act_Dup_Task_Fail = 8;
+}
+
+enum SceneMapStateType {
+  SceneMapStateType_Initializing = 0;
+  SceneMapStateType_Running = 1;
+  SceneMapStateType_Settling = 2;
+  SceneMapStateType_PreDestroy = 3;
+  SceneMapStateType_Destroying = 4;
+}
+
+enum DungeonRes {
+  DungeonResNone = 0;
+  DungeonResSuccess = 1;
+  DungeonResFail = 2;
+}
+
+enum DungeonEventType {
+  DungeonEventNone = 0;
+  DungeonEventLevelChange = 1;
+  DungeonEventDungeonVarChange = 4;
+  DungeonEventInvokeClientFunc = 6;
+}
+
+enum RoundRoleStatus {
+  RoundRoleStatus_InWar = 0;
+  RoundRoleStatus_Weak = 1;
+  RoundRoleStatus_Death = 2;
+  RoundRoleStatus_Watch = 3;
+  RoundRoleStatus_Leave = 4;
+}
+
+enum EnumGlobalScenePoint {
+  unReady = 0;
+  ready = 1;
+  complete = 2;
+}
+
+enum CommandMarkUpdateType {
+  CommandMarkUpdateType_None = 0;
+  CommandMarkUpdateType_Add = 1;
+  CommandMarkUpdateType_Remove = 2;
+  CommandMarkUpdateType_Clear = 3;
+}
+
+enum DungeonTeamFlagType {
+  DungeonTeamFlagType_None = 0;
+  DungeonTeamFlagType_Position = 1;
+  DungeonTeamFlagType_Player = 2;
+}
+
+enum DungeonTeamFollowType {
+  DungeonTeamFollowType_None = 0;
+  DungeonTeamFollowType_Team = 1;
+  DungeonTeamFollowType_Squad = 2;
+}
+
+enum DungeonTeamType {
+  DungeonTeamType_None = 0;
+  DungeonTeamType_Squad = 1;
+  DungeonTeamType_Team = 2;
+}
+
+message S2SDungeonEventReq {
+  enum eEventType {
+    Type_None = 0;
+    Type_UpdateGuildHomeEffigy = 1;
+    Type_GveoutRecycle = 2;
+  }
+
+  message GuildEffigy {
+    int64 position = 1;
+    romsg.RoleDetailInfo info = 2;
+    float posX = 3;
+    float posY = 4;
+    int64 npcEntityId = 5;
+    float face = 6;
+  }
+
+  message GuildEffigyData {
+    repeated romsg.S2SDungeonEventReq.GuildEffigy data = 1;
+    int64 guildId = 2;
+  }
+
+  romsg.S2SDungeonEventReq.eEventType eventType = 1;
+  int64 sceneId = 2;
+  romsg.S2SDungeonEventReq.GuildEffigyData guildEffigyData = 3;
+}
+
+message EnterDungeonParam {
+  romsg.TerritoryWarParam territory = 1;
+}
+
+message TerritoryWarParam {
+  oneof enterData {
+    int32 pointId = 1;
+    int32 bornId = 2;
+    int64 fortId = 3;
+  }
+  int32 stateId = 4;
+}
+
+message MultiDungeonEnterParam {
+  int64 baseLv = 1;
+}
+
+message EnterDungeonReq {
+  int64 sceneEntry = 1;
+  romsg.DungeonInitData initData = 2;
+  romsg.EnterDungeonParam param = 3;
+}
+
+message EnterDungeonRsp {
+  int32 result = 1;
+}
+
+message DungeonInitDataNotify {
+  romsg.DungeonInitData initData = 1;
+}
+
+message ConfirmTeamDungeonReq {
+  bool isAgree = 1;
+}
+
+message ConfirmTeamDungeonRsp {
+  int32 result = 1;
+}
+
+message DungeonWatchChangeTargetReq {
+  int64 player_id = 1;
+}
+
+message DungeonStageModuleData {
+  int32 mapState = 1;
+  int32 stage = 2;
+  int64 mapStateStartTime = 4;
+  int64 mapStateEndTime = 5;
+  int64 stageStartTime = 6;
+  int64 stageEndTime = 7;
+  int64 nextStageStartTime = 8;
+  int64 nextStageEndTime = 9;
+  reserved 3 to 3;
+}
+
+message NpcRefreshTime {
+  int32 npcPointId = 1;
+  int64 refreshStartTime = 2;
+  int64 refreshEndTime = 3;
+}
+
+message DungeonNpcRefreshModuleData {
+  map<int32, romsg.NpcRefreshTime> npcRefreshTime = 1;
+}
+
+message DungeonBaseInfoNotify {
+  enum eChangeType {
+    eChangeType_None = 0;
+    eChangeType_Change = 1;
+    eChangeType_All = 2;
+  }
+
+  int64 dungeonEntry = 1;
+  int64 dungeonId = 2;
+  int32 stage = 3;
+  romsg.DungeonInitData initData = 4;
+  int32 level = 5;
+  repeated romsg.DungeonVar vars = 11;
+  repeated romsg.DungeonVar playervars = 12;
+  romsg.DungeonStageModuleData stageModuleData = 13;
+  romsg.DungeonNpcRefreshModuleData npcRefreshModuleData = 14;
+  romsg.DungeonBaseInfoNotify.eChangeType changeType = 100;
+}
+
+message LeaveDungeonReq {
+}
+
+message LeaveDungeonRsp {
+  int32 result = 1;
+}
+
+message GuildChallengeResData {
+  int32 passDifficultTime = 1;
+  bool isNew = 2;
+}
+
+message OnePieceDungeonResData {
+  repeated romsg.ItemBaseInfo baseReward = 1;
+  repeated romsg.ItemBaseInfo extraReward = 2;
+  int64 passTime = 3;
+  bool isNewRecord = 4;
+  int32 bossLevel = 5;
+}
+
+message DungeonResData {
+  oneof data {
+    romsg.GuildChallengeResData guildChallengeData = 1;
+    romsg.OnePieceDungeonResData onePieceData = 2;
+    romsg.TrainingGroundResData trainingGroundData = 3;
+  }
+}
+
+message DungeonResNotify {
+  int64 dungeonEntry = 1;
+  romsg.DungeonRes res = 2;
+  romsg.DungeonResData data = 3;
+  map<int32, int64> rewards = 4;
+  repeated int32 auctionRewards = 5;
+}
+
+message DungeonEventNotify {
+  int64 dungeonEntry = 1;
+  romsg.DungeonEventType eventType = 2;
+  int32 stageNum = 3;
+  repeated romsg.EventParams params = 4;
+  repeated romsg.DungeonVar vars = 5;
+  string cliFuncname = 6;
+  int32 levelNum = 7;
+}
+
+message DungeonVar {
+  int32 var_id = 1;
+  repeated int64 vi64 = 2;
+  repeated double vd64 = 3;
+  repeated string vstr = 4;
+  bytes customMessage = 5;
+  repeated romsg.Vec3 listVec3 = 6;
+  int32 groupType = 7;
+  int64 groupId = 8;
+}
+
+message RoleCurPosInfo {
+  int32 result = 1;
+  romsg.Vec3 pos = 2;
+  int64 sceneEntry = 3;
+  int64 sceneID = 4;
+}
+
+message DungeonSetMarkPosReq {
+  bool bDel = 1;
+  romsg.DungeonMarkPos pos = 2;
+}
+
+message DungeonSetMarkPosRsp {
+  int32 result = 1;
+  bool bDel = 2;
+  romsg.DungeonMarkPos pos = 3;
+}
+
+message DungeonSetMarkPosNtf {
+  repeated romsg.DungeonMarkPos pos = 1;
+  romsg.DungeonMarkType markType = 2;
+}
+
+message DungeonGatherMarkPosReq {
+  romsg.DungeonGatherType GatherType = 1;
+  romsg.DungeonMarkPos pos = 2;
+  int32 GatherGuid = 3;
+}
+
+message DungeonGatherMarkPosRsp {
+  int32 result = 1;
+  romsg.DungeonGatherType GatherType = 2;
+  romsg.DungeonMarkPos pos = 3;
+  int32 GatherGuid = 4;
+}
+
+message DungeonGatherMarkPosNtf {
+  romsg.DungeonGatherType GatherType = 1;
+  romsg.DungeonMarkPos pos = 2;
+  int32 GatherGuid = 3;
+}
+
+message ClientDungeonEvent {
+  string strCmd = 1;
+  repeated romsg.CustomParam customParams = 2;
+}
+
+message RoundTeamMemberInfo {
+  int64 memberGuid = 1;
+  int32 career = 2;
+  map<int32, int64> battleAttr = 3;
+  romsg.Vec3 pos = 4;
+  romsg.RoundRoleStatus state = 5;
+  int32 teamIndex = 6;
+  int32 inAreaId = 7;
+}
+
+message RoundDungeonInfo {
+  int64 ro3Define_SyncVersion = 9998;
+  int64 teamId = 1;
+  map<int64, romsg.RoundTeamMemberInfo> teamMemberInfo = 2;
+  int32 careerId = 4;
+  map<int32, int64> itemCdExpireTime = 5;
+  romsg.RoundDungeonExtendInfo extendInfo = 6;
+  int64 packWeight = 7;
+  int32 freeRelifeCountLeft = 8;
+  map<int64, romsg.ItemBaseInfo> packInfos = 9;
+  reserved 3 to 3;
+}
+
+message RoundDungeonExtendInfo {
+  romsg.ChickenDungeonInfo chickenDungeonInfo = 1;
+}
+
+message GlobalObjectDataNotify {
+  map<int64, romsg.GlobalObjectData> globalDatas = 1;
+}
+
+message GlobalObjectData {
+  int64 globalObjId = 1;
+  int64 configId = 2;
+  romsg.Vec3 pos = 3;
+  int64 camp = 4;
+  int64 hp = 5;
+  int64 maxHp = 6;
+  int32 dungeonPointId = 7;
+  int64 interactStateId = 8;
+  int64 belongGuild = 9;
+  oneof Value {
+    romsg.GlobalPointData pointData = 100;
+    romsg.GlobalReviveData reviveData = 101;
+  }
+}
+
+message GlobalPointData {
+  int64 lockTime = 1;
+  int64 getCount = 2;
+  int32 gvgWarzoneId = 3;
+  bool isLock = 4;
+}
+
+message GlobalReviveData {
+  int64 Progress = 1;
+  int64 State = 2;
+}
+
+message GlobalScenePointData {
+  int64 pointId = 1;
+  romsg.EnumGlobalScenePoint status = 2;
+  int64 readyTime = 3;
+  int64 belongGuildId = 4;
+}
+
+message GlobalScenePointDataNotify {
+  map<int64, romsg.GlobalScenePointData> globalPoints = 1;
+}
+
+message UIModeData {
+  int32 dungeonStage = 1;
+  romsg.UIModeDataExtra extra = 20;
+}
+
+message UIModeDataExtra {
+  oneof val {
+    romsg.GVGWar gvgWar = 1;
+  }
+}
+
+message GvgWarFightPoint {
+  int32 fightProgress = 1;
+  int32 ownerCampId = 2;
+}
+
+message GvgWarNpcRefreshTime {
+  int32 npcPointId = 1;
+  int64 refreshStartTime = 2;
+  int64 refreshEndTime = 3;
+}
+
+message GVGWar {
+  map<int32, romsg.GvgWarNpcRefreshTime> npcRefreshTime = 1;
+  romsg.GvgWarFightPoint fightPoint = 2;
+}
+
+message GvgWarUpdateCommandMarkReq {
+  romsg.CommandMarkUpdateType updateType = 1;
+  int64 markId = 2;
+}
+
+message GvgWarUpdateCommandMarkResp {
+  int32 result = 1;
+}
+
+message GvgWarUpdateCommandMarkNotify {
+  repeated int64 markIds = 1;
+}
+
+message DungeonTeleportInviteNotify {
+  int64 inviteGuid = 1;
+}
+
+message DungeonTeleportResponseReq {
+  bool isAgree = 1;
+}
+
+message DungeonTeleportResponseRsp {
+  int32 result = 1;
+}
+
+message DungeonTeleportInviteClearNotify {
+}
+
+message DungeonTeleportAcceptCountNotify {
+  int64 inviterGuid = 1;
+  int32 acceptCount = 2;
+  int32 maxCount = 3;
+}
+
+message DungeonCommandSkillInfo {
+  int32 skillId = 1;
+  int64 skillCdStart = 2;
+  int64 skillCdEnd = 3;
+  int32 useTimes = 4;
+  int32 maxUseTimes = 5;
+  int64 recoverStart = 6;
+  int64 recoverEnd = 7;
+}
+
+message DungeonCommandSkillNotify {
+  map<int32, romsg.DungeonCommandSkillInfo> skillInfos = 1;
+  int64 commonCdStartMs = 2;
+  int64 commonCdEndMs = 3;
+}
+
+message DungeonGveKunHeartBeatResp {
+  int64 timestampMs = 1;
+}
+
+message DungeonModuleEmojiPlayReq {
+  int32 emojiId = 1;
+}
+
+message DungeonModuleEmojiPlayResp {
+  int32 result = 1;
+}
+
+message DungeonResetNtf {
+}
+
+message DungeonModuleButtonReq {
+  int32 buttonId = 1;
+}
+
+message DungeonModuleButtonResp {
+  int32 result = 1;
+}
+
+message DungeonTeamFlagInfo {
+  romsg.DungeonTeamFlagType type = 1;
+  int64 targetGuid = 2;
+  romsg.Vec3 position = 3;
+}
+
+message DungeonTeamMemberInfo {
+  int64 guid = 1;
+  romsg.DungeonTeamFollowType followType = 2;
+  int32 position = 3;
+}
+
+message DungeonTeamSquadInfo {
+  int32 squadIdx = 1;
+  int64 squadLeaderGuid = 2;
+  map<int64, romsg.DungeonTeamMemberInfo> members = 3;
+}
+
+message DungeonTeamInfoNotify {
+  int64 teamId = 1;
+  int64 leaderGuid = 2;
+  map<int32, romsg.DungeonTeamSquadInfo> squads = 3;
+  map<int32, romsg.DungeonTeamFlagInfo> flags = 4;
+  romsg.DungeonTeamType teamType = 5;
+}
+
+message DungeonTeamSetFlagReq {
+  int32 slot = 1;
+  romsg.DungeonTeamFlagInfo flagInfo = 2;
+}
+
+message DungeonTeamSetFlagResp {
+  int32 result = 1;
+  int32 slot = 2;
+}
+
+message DungeonTeamFlagNotify {
+  int32 squadIdx = 1;
+  map<int32, romsg.DungeonTeamFlagInfo> flags = 2;
+}
+
+message DungeonTeamRallyReq {
+}
+
+message DungeonTeamRallyResp {
+  int32 result = 1;
+  int32 squadIdx = 2;
+}
+
+message DungeonTeamRallyNotify {
+  int64 operGuid = 1;
+  int32 squadIdx = 2;
+}
+
+message DungeonTeamRallyReplyReq {
+  bool isAgree = 1;
+}
+
+message DungeonTeamRallyReplyResp {
+  int32 result = 1;
+}
+
+message DungeonTeamRallyReplyNotify {
+  int64 replyGuid = 1;
+  bool isAgree = 2;
+  int32 squadIdx = 3;
+}
+
+message DungeonTeamFollowReq {
+  romsg.DungeonTeamFollowType followType = 1;
+  bool isFollow = 2;
+}
+
+message DungeonTeamFollowResp {
+  int32 result = 1;
+}
+
+message DungeonTeamFollowNotify {
+  int64 followerGuid = 1;
+  romsg.DungeonTeamFollowType followType = 2;
+  bool isFollow = 3;
+}
+
+message DungeonTeamSwapPositionReq {
+  int32 positionFirst = 2;
+  int32 positionSecond = 3;
+}
+
+message DungeonTeamSwapPositionResp {
+  int32 result = 1;
+}
+
+message DungeonTeamTransferReq {
+  int64 targetGuid = 1;
+}
+
+message DungeonTeamTransferResp {
+  int32 result = 1;
+}
+

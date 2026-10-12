@@ -1,0 +1,105 @@
+syntax = "proto3";
+package romsg;
+import "MG_Common.proto";
+import "FieldOption.proto";
+
+message TotemInfoNotify {
+  int64 totemTotalExp = 1;
+  map<int32, romsg.ItemBaseInfo> setUpTotem = 2;
+  map<int32, int64> setUpTimeStamp = 3;
+}
+
+message SetUpTotemReq {
+  int32 totemPos = 1;
+  int64 totemGuid = 2;
+}
+
+message SetUpTotemResp {
+  int32 result = 1;
+  int32 totemPos = 2;
+  int64 totemGuid = 3;
+  int64 oldTotemGuid = 4;
+}
+
+message RefineTotemAttrReq {
+  int32 totemPos = 1;
+  int64 totemGuid = 2;
+  int32 attrId = 3;
+}
+
+message RefineTotemAttrResp {
+  int32 result = 1;
+  int32 totemPos = 2;
+  int64 totemGuid = 3;
+  int32 attrId = 4;
+}
+
+message RefineTotemSkillReq {
+  int32 totemPos = 1;
+  int64 totemGuid = 2;
+  int64 skillBookGuid = 3;
+}
+
+message RefineTotemSkillResp {
+  int32 result = 1;
+  int32 totemPos = 2;
+  int64 totemGuid = 3;
+  int64 skillBookGuid = 4;
+}
+
+message UpgradeTotemSystemReq {
+  repeated int64 totemGuids = 1;
+  map<int32, int32> consumeItems = 2;
+}
+
+message UpgradeTotemSystemResp {
+  int32 result = 1;
+  map<int32, int32> gainItems = 2;
+}
+
+message CombineTotemReq {
+  int64 leftTotemGuid = 1;
+  int64 rightTotemGuid = 2;
+}
+
+message CombineTotemResp {
+  int32 result = 1;
+  int64 newTotemGuid = 2;
+}
+
+message TotemSwapReq {
+  int64 swapFromGuid = 1;
+  int64 swapToGuid = 2;
+}
+
+message TotemSwitchPlanReq {
+  int32 targetIndex = 1;
+}
+
+message TotemSwitchPlanResp {
+  int32 result = 1;
+  int32 currentPlan = 2;
+}
+
+message TotemChangeTotemNameReq {
+  int32 targetIndex = 1;
+  string name = 2;
+}
+
+message TotemChangeTotemNameResp {
+  int32 result = 1;
+}
+
+message TotemSwapResp {
+  int64 result = 1;
+}
+
+message TotemAppraiseReq {
+  repeated int64 ItemGuids = 1;
+}
+
+message TotemAppraiseResp {
+  int32 Result = 1;
+  repeated romsg.ItemBaseInfo AppraiseResult = 2;
+}
+

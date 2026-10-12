@@ -1,0 +1,220 @@
+syntax = "proto3";
+package romsg;
+import "google/protobuf/descriptor.proto";
+import "MG_DB.proto";
+import "MG_Common.proto";
+import "FieldOption.proto";
+
+message GenreSeekerReq {
+}
+
+message GenreSeekerResp {
+  int32 result = 1;
+  string name = 2;
+  int32 zoneId = 3;
+  int64 seekerTime = 4;
+  int32 seekerCode = 5;
+}
+
+message GenreResponserReq {
+  int64 seekUserId = 1;
+  int32 areaId = 2;
+  int32 codeId = 3;
+}
+
+message GenreResponserResp {
+  int32 result = 1;
+  int32 responseId = 2;
+  int64 seekUserId = 3;
+}
+
+message GenreResponserSendPlanReq {
+  int32 responseId = 1;
+  int64 seekUserId = 2;
+}
+
+message GenreResponserSendPlanResp {
+  int32 result = 1;
+}
+
+message GenreResponserSaveReq {
+  int64 seekUserId = 1;
+  int32 responseId = 2;
+  romsg.GenrePlanConcrete plan = 3;
+}
+
+message GenreResponserSaveResp {
+  int32 result = 1;
+}
+
+message GenreResponserNameSaveReq {
+  int64 seekUserId = 1;
+  int32 responseId = 2;
+  string planName = 4;
+  string planExplain = 5;
+}
+
+message GenreResponserNameSaveResp {
+  int32 result = 1;
+}
+
+message GenreResponserDeleteReq {
+  int32 responseId = 1;
+  int64 seekerUserId = 2;
+}
+
+message GenreResponserDeleteResp {
+  int32 result = 1;
+}
+
+message GenreSeekerDeleteReq {
+  int32 responseId = 1;
+  int64 responseUserId = 2;
+}
+
+message GenreSeekerDeleteResp {
+  int32 result = 1;
+}
+
+message SwitchGenrePlanReq {
+  int32 targetPlan = 1;
+  map<int32, int32> childSystem = 2;
+  bool isApply = 3;
+}
+
+message SwitchGenrePlanResp {
+  int32 result = 1;
+  bool isApply = 2;
+  map<int32, int32> childSystem = 3;
+  int32 targetPlan = 4;
+}
+
+message GenreChangePlanNameReq {
+  int32 targetIndex = 1;
+  string name = 2;
+}
+
+message GenreChangePlanNameResp {
+  int32 result = 1;
+}
+
+message GenreSeekerCodeReq {
+}
+
+message GenreSeekerCodeResp {
+  int32 result = 1;
+  string code = 2;
+}
+
+message GenreGetAllMyRecommendReq {
+}
+
+message GenreGetAllMyRecommendResp {
+  romsg.DBGenreMyRecommendPlan myRecommend = 1;
+}
+
+message GenreGetMyRecConcretePlanReq {
+  int64 seekerUserId = 1;
+  int32 responseId = 2;
+}
+
+message GenreGetMyRecConcretePlanResp {
+  romsg.PlanGenreConcreteAndInfo planInfo = 1;
+  romsg.DBUserGenreData seekerInfo = 2;
+  int32 result = 3;
+}
+
+message GenreGetAllOtherRecommendReq {
+  int64 responseUserID = 1;
+  int32 responseId = 2;
+}
+
+message GenreGetAllOtherRecommendResp {
+  int32 result = 1;
+}
+
+message GenreResponseCodeReq {
+  string code = 1;
+}
+
+message GenreResponseCodeResp {
+  int32 result = 1;
+  int32 responseId = 2;
+  int64 seekUserId = 3;
+}
+
+message GenreSeekerApplyPlanReq {
+  int32 planId = 1;
+  map<int32, int32> systemType = 2;
+  map<int32, int32> childType = 3;
+  int64 responseId = 4;
+  int64 responseUserId = 5;
+}
+
+message GenreSeekerApplyPlanResp {
+  int32 result = 1;
+  map<int32, int32> childType = 2;
+}
+
+message GenreUpdateNtf {
+}
+
+message GenreGetPlanPropertyReq {
+  map<int32, int32> genrePlans = 1;
+}
+
+message GenreGetPlanPropertyResp {
+  map<int32, int64> propertys = 1;
+  int32 result = 2;
+}
+
+message GenrePlanPowerReq {
+  map<int32, int32> genrePlans = 1;
+}
+
+message GenrePlanPowerResp {
+  romsg.PowerUnit power = 1;
+  int32 result = 2;
+}
+
+message GenreSeasonReq {
+}
+
+message GenreSeasonResp {
+  int32 result = 1;
+}
+
+message GenreDeleteRelatedInfoReq {
+  int64 seekerId = 1;
+  int64 responseUserId = 2;
+}
+
+message GenreDeleteRelatedInfoResp {
+}
+
+message GenreCheckCanSendPlanReq {
+  int64 seekUserId = 1;
+  int64 responseUserId = 2;
+}
+
+message GenreCheckCanSendPlanResp {
+  int32 result = 1;
+}
+
+message GenreAttrSettingSchoolReq {
+  int32 planId = 1;
+  int32 professionId = 2;
+}
+
+message GenreAttrSettingSchoolResp {
+  int32 result = 1;
+  int32 planId = 2;
+  int32 professionId = 3;
+}
+
+message GenreQueryAllOtherRecommendReq {
+}
+
+message GenreQueryAllOtherRecommendResp {
+}
+

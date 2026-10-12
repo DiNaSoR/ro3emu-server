@@ -1,0 +1,50 @@
+syntax = "proto3";
+package romsg;
+import "MG_Library.proto";
+import "MG_DB.proto";
+import "FieldOption.proto";
+
+message PersonalLibraryInfo {
+  romsg.LibraryInfoNotify notifyInfo = 1;
+  map<int32, int32> pointInfo = 2;
+}
+
+message UpdatePersonalAppearanceReq {
+  int32 planId = 1;
+  romsg.PersonalInfo info = 2;
+}
+
+message UpdatePersonalAppearanceResp {
+  int32 result = 1;
+  romsg.UpdatePersonalAppearanceReq req = 2;
+}
+
+message UpdatePersonalPlanNameReq {
+  int32 planId = 1;
+  string planName = 2;
+}
+
+message UpdatePersonalPlanNameResp {
+  int32 result = 1;
+  romsg.UpdatePersonalPlanNameReq req = 2;
+}
+
+message UpdateCurPersonalPlanReq {
+  int32 planId = 1;
+}
+
+message UpdateCurPersonalPlanResp {
+  int32 result = 1;
+  int32 planId = 2;
+}
+
+message UpvotePersonalReq {
+  int64 roleId = 1;
+}
+
+message UpvotePersonalResp {
+  int32 result = 1;
+  bool isCancle = 2;
+  romsg.UpvotePersonalReq req = 3;
+}
+

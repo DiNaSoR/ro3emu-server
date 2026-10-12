@@ -1,0 +1,33 @@
+syntax = "proto3";
+package romsg;
+import "FieldOption.proto";
+import "MG_DB.proto";
+
+enum ELotteryPoolType {
+  ELotteryPoolTypeNone = 0;
+  ELotteryPoolTypeGachaCountMin = 1;
+  ELotteryPoolTypeGachaCountMid = 2;
+  ELotteryPoolTypeGachaCountMax = 3;
+}
+
+message LotteryReq {
+  int32 poolId = 1;
+  romsg.ELotteryPoolType type = 2;
+}
+
+message LotteryItemData {
+  int32 itemId = 1;
+  int32 itemCount = 2;
+  bool isPet = 3;
+  bool isBroken = 4;
+  int64 poolId = 5;
+}
+
+message LotteryResp {
+  int32 result = 1;
+  romsg.ELotteryPoolType type = 3;
+  repeated romsg.LotteryItemData itemList = 4;
+  romsg.LotteryPoolData poolData = 5;
+  map<int32, romsg.LotteryPityRecord> pityRecords = 6;
+}
+

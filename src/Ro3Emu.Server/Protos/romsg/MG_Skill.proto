@@ -1,0 +1,471 @@
+syntax = "proto3";
+package romsg;
+import "MG_Common.proto";
+import "FieldOption.proto";
+
+enum DamageType {
+  DamageType_Damage = 0;
+  DamageType_Heal = 1;
+  DamageType_DamageShare = 2;
+  DamageType_HealMana = 3;
+}
+
+enum DamageHitResult {
+  DamageHitResult_Normal = 0;
+  DamageHitResult_Critical = 1;
+  DamageHitResult_Miss = 2;
+  DamageHitResult_Double_Critical = 3;
+}
+
+enum DamageValueType {
+  NORMAL = 0;
+  CRITICAL = 1;
+  MISS = 2;
+  CURE = 3;
+}
+
+enum BattleTrainingGroundOpType {
+  BattleTrainingGroundOpType_None = 0;
+  BattleTrainingGroundOpType_Pause = 1;
+  BattleTrainingGroundOpType_CancelPause = 2;
+}
+
+enum SkillAffectValueType {
+  SkillCdFixed = 0;
+  SkillCdRatio = 1;
+  SkillDamageRatioFixed = 2;
+  SkillDamageRatioRatio = 3;
+  SkillDamageFixed = 4;
+  SkillGunshot = 5;
+  SkillCostExemptProb = 6;
+  SkillItemExemptProb = 7;
+  SkillCostReduceRatio = 8;
+  SkillHitProb = 9;
+  SkillCriticalProb = 10;
+  SkillDamageAdd = 11;
+  SkillHighlight = 12;
+  SkillChantTimeRatio = 13;
+  SkillChantTimeFixed = 14;
+  SkillModeParam = 15;
+  SkillModeParamGrowth = 16;
+  SkillHighlight1 = 17;
+  SkillRangeParam1 = 18;
+  SkillRangeParam2 = 19;
+  SkillTargetMaxExtra = 20;
+  SkillActionTimeMsExtra = 21;
+  SkillCriticalInheritRate = 22;
+  SkillChantFix = 23;
+  SkillChantVar = 24;
+  SkillDistanceMin = 25;
+  SkillDistanceMax = 26;
+  SkillTargetMax = 27;
+  SkillMovement = 28;
+  SkillDamageParam1 = 29;
+  SkillDamageParam2 = 30;
+  SkillLogicData = 31;
+  SkillShowDmg = 32;
+  SkillBuff1 = 33;
+  SkillBuff2 = 34;
+  SkillCost = 35;
+  SkillRange = 36;
+  SkillDamageParamExtra = 37;
+  SkillStageStates = 38;
+  SkillCanUse = 39;
+  SkillEnableLevel = 40;
+  SkillActionTimeInfluence = 41;
+  SkillActionUpperLimit = 42;
+  SkillUseInnerCd = 43;
+  SkillQueue = 44;
+  SkillSetCsvLogicParam1 = 201;
+  SkillSetCsvLogicParam2 = 202;
+  SkillSetCsvLogicParam3 = 203;
+  SkillSetCsvLogicParam4 = 204;
+  SkillSetCsvLogicParam5 = 205;
+  SkillSetCsvLogicParam6 = 206;
+  SkillSetCsvLogicParam7 = 207;
+  SkillSetCsvLogicParam8 = 208;
+  SkillSetCsvLogicParam9 = 209;
+  SkillSetCsvLogicParam10 = 210;
+  SkillSetCsvLogicParamMax = 211;
+  SkillComputeCsvLogicParam1 = 301;
+  SkillComputeCsvLogicParam2 = 302;
+  SkillComputeCsvLogicParam3 = 303;
+  SkillComputeCsvLogicParam4 = 304;
+  SkillComputeCsvLogicParam5 = 305;
+  SkillComputeCsvLogicParam6 = 306;
+  SkillComputeCsvLogicParam7 = 307;
+  SkillComputeCsvLogicParam8 = 308;
+  SkillComputeCsvLogicParam9 = 309;
+  SkillComputeCsvLogicParam10 = 310;
+  SkillComputeCsvLogicParamMax = 311;
+}
+
+enum EBuffAffectValueType {
+  BuffAffectNone = 0;
+  BuffMaxPile = 1;
+  BuffAttr = 2;
+  BuffAttrTransform = 3;
+  BuffLogicData = 4;
+}
+
+enum EPlayerEnergyChangeReason {
+  PlayerEnergyChangeReason_None = 0;
+  PlayerEnergyChangeReason_Tick = 1;
+  PlayerEnergyChangeReason_Attack = 2;
+  PlayerEnergyChangeReason_Attacked = 3;
+  PlayerEnergyChangeReason_BuffEffect = 4;
+  PlayerEnergyChangeReason_SkillCost = 5;
+  PlayerEnergyChangeReason_LoginInit = 6;
+  PlayerEnergyChangeReason_Reset = 30;
+}
+
+message CastSkillReq {
+  int32 skillId = 1;
+  int64 targetId = 2;
+  romsg.Vec3 targetPos = 3;
+  float face = 4;
+  repeated int64 targetsId = 5;
+  romsg.Vec3 faceVector3D = 6;
+  int64 opUnitId = 7;
+  bool isExtraSkill = 8;
+  bool isAutoCast = 9;
+  int32 comboIndex = 10;
+}
+
+message CastSkillRsp {
+  int32 result = 1;
+  int64 sessionId = 2;
+  repeated int64 params = 3;
+  bool isAutoCast = 4;
+}
+
+message UseInSkillInfo {
+  int64 srcID = 1;
+  int32 skillID = 2;
+  int64 targetId = 3;
+  romsg.Vec3 targetPos = 4;
+  float face = 5;
+  int64 sessionId = 6;
+  int32 chantMs = 7;
+  int32 skillMs = 8;
+  bool playAct = 9;
+  int64 startTime = 10;
+  int32 petConfigId = 11;
+  int32 recoveryMs = 12;
+  int32 skillInterruptMs = 13;
+}
+
+message DamageInfo {
+  int64 dstID = 1;
+  int64 damage = 2;
+  int32 damageElementalWeaknessExtra = 3;
+  int64 sheildDamage = 4;
+  romsg.DamageType damageType = 5;
+  romsg.DamageHitResult hitResult = 6;
+  int32 dstElement = 7;
+  bool isDead = 8;
+}
+
+message SkillHitInfo {
+  int64 srcID = 1;
+  int32 skillId = 2;
+  int32 showPoint = 3;
+  int32 split = 4;
+  repeated romsg.DamageInfo dsts = 5;
+  int64 sessionId = 7;
+  int32 srcElement = 8;
+  int64 rootCtxGuid = 9;
+  int32 comboIndex = 10;
+}
+
+message DamageStatistics {
+  int64 damageSourceId = 1;
+  int64 damageTargetId = 2;
+  int64 damageValue = 3;
+  int64 damageBeShield = 4;
+  romsg.DamageType damageType = 5;
+  romsg.DamageHitResult hitResult = 6;
+  int64 skillId = 7;
+  int64 buffId = 8;
+  romsg.FormulaInfo damageCalStep = 9;
+}
+
+message BattleTrainingGroundOpReq {
+  romsg.BattleTrainingGroundOpType opType = 1;
+}
+
+message BattleTrainingGroundOpResp {
+  int32 result = 1;
+  romsg.BattleTrainingGroundOpType opType = 2;
+}
+
+message DamageStatisticsNotify {
+  repeated romsg.DamageStatistics damages = 1;
+}
+
+message SkillInterruptedInfo {
+  enum SkillInterruptType {
+    SkillInterruptType_None = 0;
+    SkillInterruptType_State = 1;
+    SkillInterruptType_Skill = 2;
+    SkillInterruptType_Move = 3;
+    SkillInterruptType_LockerInvalid = 4;
+  }
+
+  romsg.SkillInterruptedInfo.SkillInterruptType type = 1;
+  int64 interruptedId = 2;
+}
+
+message SkillEndNotify {
+  enum SkillEndType {
+    Normal = 0;
+    Interrupted = 1;
+  }
+
+  int64 srcID = 1;
+  int64 sessionId = 2;
+  romsg.SkillEndNotify.SkillEndType type = 3;
+  int32 result = 4;
+  repeated int64 params = 5;
+  romsg.SkillInterruptedInfo interruptedInfo = 6;
+  bool clearEffect = 7;
+}
+
+message BuffInfo {
+  int64 buffGuid = 1;
+  int32 configId = 2;
+  int64 expireTime = 3;
+  int32 duration = 4;
+  int32 pileCount = 5;
+  bool isTotalTime = 6;
+  int64 sourceId = 7;
+}
+
+message WidgetInfo {
+  int64 widgetGuid = 1;
+  int64 sourceGuid = 2;
+  int32 configId = 3;
+  int64 expireTime = 4;
+  int32 pileCount = 5;
+}
+
+message BuffUpdateNotify {
+  int64 unitId = 1;
+  repeated romsg.BuffInfo buffs = 2;
+  bool isViewSync = 3;
+}
+
+message BuffRemoveNotify {
+  int64 unitId = 1;
+  repeated int64 buffGuids = 2;
+}
+
+message WidgetUpdateNotify {
+  int64 unitId = 1;
+  repeated romsg.WidgetInfo widgets = 2;
+}
+
+message WidgetRemoveNotify {
+  int64 unitId = 1;
+  repeated int64 widgetGuids = 2;
+}
+
+message SyncForbiddenNotify {
+}
+
+message AddForbiddenNotify {
+}
+
+message RemoveForbiddenNotify {
+}
+
+message SkillStartMoveNotify {
+  uint64 entityID = 1;
+  romsg.Vec3 startPos = 2;
+  romsg.Vec3 endPos = 3;
+  int32 effectId = 4;
+  int32 skillConfigId = 5;
+  int64 startTimestampMs = 6;
+  int32 moveType = 7;
+  float face = 8;
+  int32 moveTimeMs = 9;
+}
+
+message SkillCdInfo {
+  int64 skillId = 1;
+  int64 skillMode = 2;
+  int64 cdStartTimestampMs = 3;
+  int64 cdEndTimestampMs = 4;
+}
+
+message SkillCdNotify {
+  repeated romsg.SkillCdInfo infos = 1;
+  int64 uuid = 2;
+  bool notPlayCdRefreshEffect = 3;
+}
+
+message BeAffectedParamInfo {
+  map<int64, int64> affectParam = 1;
+}
+
+message SkillBeAffectedParamNotiy {
+  map<int64, romsg.BeAffectedParamInfo> affectParamDict = 1;
+}
+
+message BeAffectedValueList {
+  repeated int64 affectValueList = 1;
+}
+
+message BeAffectedValueEx {
+  int64 affectValue = 1;
+  repeated int64 affectValueList = 2;
+  repeated romsg.BeAffectedValueList affectValueListList = 3;
+}
+
+message BeAffectedParamInfoEx {
+  map<int64, romsg.BeAffectedValueEx> affectParam = 1;
+}
+
+message SkillBeAffectedParamExNotify {
+  map<int64, romsg.BeAffectedParamInfoEx> affectParamDict = 1;
+  bool isAll = 2;
+  int64 uuid = 3;
+}
+
+message BuffBeAffectedParamExNotify {
+  map<int64, romsg.BeAffectedParamInfoEx> affectParamDict = 1;
+}
+
+message SkillEffectDisplayNotify {
+  int64 sourceId = 1;
+  int64 targetId = 2;
+  int32 effectId = 3;
+  romsg.Vec3 targetPos = 4;
+  int32 effectType = 5;
+  float angle = 6;
+  int64 masterId = 7;
+  bool is3DPosition = 8;
+  int64 skill_id = 9;
+}
+
+message SkillFixTimeBulletNotify {
+  int64 sourceId = 1;
+  int64 targetId = 2;
+  int32 effectId = 3;
+  int32 fixedTime = 4;
+  int32 split = 5;
+  romsg.Vec3 targetPosition = 6;
+  int32 skillConfigId = 7;
+  int64 masterId = 8;
+  romsg.Vec3 sourcePosition = 9;
+  int64 startTimestampMs = 10;
+}
+
+message SkillSlotModifyNotify {
+  int32 type = 1;
+  int32 sourceSkillId = 2;
+  int32 skillId = 3;
+  int32 slot = 4;
+  bool interaction = 5;
+  bool enable = 6;
+}
+
+message SkillBlackWhiteInfo {
+  enum SkillBlackWhiteInfoType {
+    White = 0;
+    Black = 1;
+  }
+
+  romsg.SkillBlackWhiteInfo.SkillBlackWhiteInfoType type = 1;
+  int32 skillTagId = 2;
+}
+
+message SkillBlackWhiteOpInfo {
+  enum SkillBlackWhiteOpInfoOperation {
+    Add = 0;
+    Delete = 1;
+  }
+
+  int64 objectId = 1;
+  romsg.SkillBlackWhiteOpInfo.SkillBlackWhiteOpInfoOperation operation = 2;
+  romsg.SkillBlackWhiteInfo skillBlackWhiteInfo = 3;
+}
+
+message SkillWhiteListChangeNotify {
+  repeated romsg.SkillBlackWhiteOpInfo dirtyInfo = 1;
+}
+
+message SkillInterruptReq {
+  int32 interruptSkillId = 1;
+  romsg.CastSkillReq nxtSkill = 2;
+}
+
+message SkillInterruptResp {
+  bool is_interrupt_succ = 1;
+}
+
+message BossSkillShowCdNotify {
+  int32 skillId = 1;
+  int64 endSkillCdTime = 2;
+  int64 BossUId = 3;
+}
+
+message BossClearAllSkillShowCdNotify {
+}
+
+message BossAllSkillShowCdReq {
+  int64 BossUId = 1;
+}
+
+message BossAllSkillShowCdRes {
+  int32 result = 1;
+  repeated romsg.BossSkillShowCdNotify BossSkillCds = 2;
+  int64 BossUId = 3;
+}
+
+message TrapDamageNtf {
+  int32 skillConfigId = 1;
+  int64 damageValue = 2;
+  romsg.Vec3 pos = 3;
+}
+
+message ItemWorldTreeReviveNtf {
+  string worldTreePlayerName = 1;
+}
+
+message ClientRemoveBuffReq {
+  int64 buffGuid = 1;
+}
+
+message ClientRemoveBuffRsp {
+  int32 result = 1;
+  int64 buffGuid = 2;
+}
+
+message BuffEffectCdNotify {
+  int64 buffGuid = 1;
+  int64 startTimestampMs = 2;
+  int64 endTimestampMs = 3;
+}
+
+message PlayerEnergyNotify {
+  int64 energyConfigId = 1;
+  int64 energyValue = 2;
+  romsg.EPlayerEnergyChangeReason changeReason = 3;
+  int64 lastRecoverTimeMs = 4;
+  int64 nextRecoverTimeMs = 5;
+}
+
+message PlayerOnEnterImmuneDeadNotify {
+  int64 buffConfigId = 1;
+  int64 expireTimestampMs = 2;
+}
+
+message PlayerConfirmImmuneDeadReq {
+  bool isConfirm = 1;
+}
+
+message PlayerConfirmImmuneDeadRsp {
+  int32 result = 1;
+}
+

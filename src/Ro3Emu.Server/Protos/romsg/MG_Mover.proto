@@ -1,0 +1,88 @@
+syntax = "proto3";
+package romsg;
+import "MG_Common.proto";
+
+enum MoverBlock {
+  MoverBlock_Ignore = 0;
+  MoverBlock_Block = 1;
+  MoverBlock_Stop = 2;
+  MoverBlock_slip = 3;
+}
+
+enum MoverRotate {
+  MoverRotate_None = 0;
+  MoverRotate_Angular = 1;
+  MoverRotate_Line = 2;
+}
+
+enum MoverAngle {
+  MoverAngle_None = 0;
+  MoverAngle_Fix = 1;
+  MoverAngle_FollowFacing = 2;
+}
+
+message MoverCustomStart {
+  uint64 uuid = 1;
+  uint64 trackID = 2;
+  uint64 moverUnitID = 3;
+  uint64 followID = 4;
+  uint64 passed = 5;
+  float angle = 6;
+  romsg.Vec3 startPos = 7;
+}
+
+message MoverLineStart {
+  uint64 uuid = 1;
+  uint64 moverUnitID = 2;
+  romsg.Vec3 startPos = 3;
+  uint64 passed = 4;
+  float angle = 5;
+  float speed = 6;
+  float distance = 7;
+  romsg.MoverBlock moverBlock = 8;
+  float accel = 101;
+  float minSpeed = 102;
+  float maxSpeed = 103;
+  float height = 201;
+}
+
+message MoverTargetStart {
+  uint64 uuid = 1;
+  uint64 moverUnitID = 2;
+  romsg.Vec3 startPos = 3;
+  uint64 passed = 4;
+  uint64 targetUnitID = 5;
+  float speed = 6;
+  float distance = 7;
+  romsg.MoverBlock moverBlock = 8;
+  float accel = 101;
+  float minSpeed = 102;
+  float maxSpeed = 103;
+  float height = 201;
+}
+
+message MoverTargetPulse {
+  uint64 uuid = 1;
+  uint64 moverUnitID = 2;
+  romsg.Vec3 targetPosition = 3;
+}
+
+message MoverFollowStart {
+  uint64 uuid = 1;
+  uint64 moverUnitID = 2;
+  uint64 passed = 3;
+  uint64 targetUnitID = 4;
+  float radius = 5;
+  romsg.MoverAngle moverAngle = 6;
+  float angle = 7;
+  float radiusSpeed = 8;
+  romsg.MoverRotate moverRotate = 9;
+  float rotateSpeed = 10;
+  float height = 11;
+}
+
+message MoverStop {
+  uint64 uuid = 1;
+  uint64 moverUnitID = 2;
+}
+

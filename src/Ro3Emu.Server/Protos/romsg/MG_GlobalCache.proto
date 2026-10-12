@@ -1,0 +1,118 @@
+syntax = "proto3";
+package romsg;
+import "MG_DB.proto";
+import "MG_Common.proto";
+import "FieldOption.proto";
+import "MG_SeasonPage.proto";
+import "MG_Guild.proto";
+
+enum EGlobalCacheExtDataKey {
+  EGlobalCacheExtDataKey_None = 0;
+  base = 1;
+  extra = 2;
+  personal = 3;
+  personal_upvote_list = 4;
+  personal_upvote_count = 5;
+  library = 6;
+  genre = 7;
+  season_page = 8;
+  guild_snap = 9;
+  team = 10;
+  popularity_star = 11;
+  appearance = 12;
+  mountInfo = 13;
+  social_outfit = 14;
+  season = 15;
+  playbook = 16;
+  name = 18;
+  level = 19;
+  clusterId = 20;
+  online = 21;
+  journey = 25;
+  offline_time = 26;
+  battle_pass = 27;
+  dungeon_team = 28;
+  country = 29;
+  create_time = 30;
+  user_type = 100;
+}
+
+message RoleAdditionBaseInfo {
+  int64 headtitle = 1;
+  int64 title = 2;
+  int32 career = 4;
+  int64 offlinetime = 5;
+  int64 guildID = 6;
+  int64 guildOfficial = 8;
+  int64 guildHonorOffcial = 9;
+  int32 jobLevel = 11;
+  bool isShowDetail = 12;
+  int32 AchievementLevel = 13;
+  int32 Gender = 14;
+  int32 dailyActivity = 15;
+  bool bSaveCharge = 16;
+  int32 teamstatus = 17;
+  int32 teamnum = 18;
+  string teamName = 19;
+  int64 teamId = 20;
+  int32 avatarId = 21;
+  int32 avatarFrameId = 22;
+  int32 personalTitleId = 23;
+  map<int32, int32> appearances = 24;
+  map<int32, int32> appearanceAttrs = 25;
+  romsg.PowerUnit power = 26;
+  int32 fashionScore = 27;
+  romsg.PlayerHonor honor = 28;
+  int32 lastWeekActivity = 29;
+  int32 weekActivity = 30;
+  romsg.SocialOutfitData socialOutfitData = 31;
+  int64 seasonId = 32;
+  int64 playbook = 33;
+  int64 seasonArea = 34;
+  int64 bornArea = 35;
+  bool cantBeInvited = 36;
+  reserved 3 to 3;
+}
+
+message RoleExpandInfo {
+  romsg.AllProperty selfproperty = 2;
+}
+
+message SeasonPageExternalData {
+  map<int64, romsg.SeasonPageHonorBadgeData> honorBadgeData = 1;
+  romsg.SeasonPageHistoryFunctionScoreData current = 2;
+  romsg.SeasonPageHistoryFunctionScoreData history = 3;
+}
+
+message GlobalCacheTeam {
+  int64 teamId = 1;
+  int32 teamstatus = 2;
+  int32 teamnum = 3;
+  string teamName = 4;
+  int32 internalTeamSlot = 5;
+  int32 teamFiveIndex = 6;
+}
+
+message AppearanceData {
+  map<int32, int32> appearance = 1;
+}
+
+message GlobalMountData {
+  map<int32, romsg.MountEtChantInfo> mountInfo = 1;
+}
+
+message MountEtChantInfo {
+  map<int32, int32> etChantData = 1;
+}
+
+message BattlePassData {
+  map<int64, bool> premiumBattlePassData = 1;
+}
+
+message GlobalCacheDungeonTeam {
+  int32 dungeonEntry = 1;
+  int32 teamMemberCount = 2;
+  int64 teamId = 3;
+  int32 teamMaxCount = 4;
+}
+

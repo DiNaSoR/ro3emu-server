@@ -1,0 +1,43 @@
+syntax = "proto3";
+package romsg;
+import "MG_Common.proto";
+
+enum ZoneEventType {
+  ZoneEventTypeNone = 0;
+  ZoneEventDungeonVarChange = 4;
+  ZoneEventInvokeClientFunc = 6;
+}
+
+message ScenePublicVar {
+  int32 var_id = 1;
+  repeated int64 vi64 = 2;
+  repeated double vd64 = 3;
+  repeated string vstr = 4;
+  bytes customMessage = 5;
+  repeated romsg.Vec3 listVec3 = 6;
+  int32 groupType = 7;
+  int64 groupId = 8;
+}
+
+message ZoneBaseInfoNotify {
+  enum eChangeType {
+    eChangeType_None = 0;
+    eChangeType_Change = 1;
+    eChangeType_All = 2;
+  }
+
+  int64 zoneCfgId = 1;
+  int64 zoneGuid = 2;
+  map<int32, romsg.CommonPublicVar> vars = 3;
+  map<int32, romsg.CommonPublicVar> playerVars = 4;
+  romsg.ZoneBaseInfoNotify.eChangeType changeType = 100;
+}
+
+message ZoneEventNotify {
+  int64 zoneCfgId = 1;
+  int64 ZoneGuid = 2;
+  repeated romsg.EventParams params = 3;
+  map<int32, romsg.CommonPublicVar> vars = 5;
+  string cliFuncname = 6;
+}
+

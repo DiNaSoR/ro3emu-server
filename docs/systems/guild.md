@@ -1,0 +1,46 @@
+# Guild implementation
+
+Evidence: the referenced client Lua, `MG_Guild*.proto`, `MG_GlobalCache.proto`, and the exported guild configuration. This is a server/bot implementation report, not an original-server parity certificate. Behavior has not been checked against the native game client.
+
+## Implemented surface
+
+- Creation and text checks: 10003 and 32210. Creation uses `GuildCreateCost=[0,0]`; `GuildCreateCostShow` is a display value and is not charged. Function 13 requires base level 21. Names, duplicate names, text lengths, selected emblems and the configured local sensitive-word list are checked.
+- Recommendation/search/detail: 32211, 32290. Applications, cancellation, approval and rejection: 32223-32225. Invitations and acknowledgements: 32237-32239. Acceptance works for an offline applicant as well as an online player.
+- Membership and management: 32230-32234, 32269, 32322-32323. Position capacities and editable/immutable permissions come from the guild tables. Leader transfer preserves a single leader; the last leader's leave dissolves the guild. Notices, announcements, renaming, invitation preferences and recruitment settings persist.
+- Personal dataset **5047** uses `CharacterService.SyncAsync`. Guild data use **32213**, **32214**, **32225**, **32231**, including real building rows, resources, permissions, applications and roster. `UserDataService` supplies the member UI's actual `Base`/`GuildSnap`, level and online/offline fields. Guild identity is derived from the exclusive membership index, so stale personal blobs cannot resurrect membership.
+- **32242** persists building upgrades, spends guild contribution **107**, reads prerequisite buildings and minute durations from `GuildBuildingConfig`, and reconciles completed timers. Personal contribution, member contribution history and shared resources are stored separately. Balances are not generated from invented activity/donation formulas.
+- Existing **77002**/IM chat supports the client's guild channel `2_<guildId>`, with membership checks and removal on departure. Online members receive committed membership, application, permission and building/resource updates.
+- Pre-create guilds use 32213/32215/32220-32222 helper rows, a persisted response deadline and a configured three-helper transition to Normal. Guild recruitment settings publish through Tencent IM channel 8 for both 32230 enable and 32257 explicit recruitment, with configured length/cooldown checks.
+- The 839xx guild black market persists listings and records, debits/material refunds, matches aggregated offers, updates recent/history prices and synchronizes affected 32231 resources. Function 78 opens at its configured condition; only Normal guilds trade. Expiry reconciliation also removes stalls whose guild was dissolved, so an orphaned same-price offer cannot block a live seller. Matching and fee interpretation are inferred (see "Deferred surface" below).
+- SQLite `guild` stores the aggregate; `guild_member` enforces one guild per role and `guild_market` stores the order book. The role's 5047 blob remains in `RoleStore`. Paid mutations use the existing inventory exchange transaction together with the guild save. `data/` and `re/` are read-only inputs.
+
+## Inferred policies and limits
+
+Every item below is **(inferred)**, rather than verified original-server behavior:
+
+1. The create widget initializes `autoCreateHelper=false`; this selects immediate `Normal` creation. A guild starts at level 1, with the creator as position 1, a current-name history entry, and the real level-1 building rows. Guild and short IDs share the SQLite-generated identifier. With the explicit helper flag, three helpers complete a pre-create guild immediately; helper membership and deadline policy are inferred from the supplied setting/proto surface.
+2. Name uniqueness uses SQLite `NOCASE`; search uses case-insensitive substring matching and guild-ID pagination. The server character whitelist and its text-validation/error-code choices are defensive policies where the original service is unavailable. `ServerOptions.GuildBlockedWords` uses case-insensitive substring matching and defaults to an empty list. The original sensitive-word dictionary was not recovered: this is an injectable check, not profanity-filter parity.
+3. The exact ordering of replies, 5047 replacement and guild notifications is not captured from the original server. Joining uses regular member position 20; a transferred leader is demoted to regular member. Additional nonleader rank restrictions compare numeric position IDs; that hierarchy is not established by the client permission table. Personal history is preserved across departure/rejoin (the greater of the previous personal value and the current member history); no contribution earning formula is implied. Invitations use server-generated, recipient-bound, expiring tokens and are lost on restart. Application timeout is interpreted as hours; rename cooldown as days; application and last-rename timestamps use seconds without a verified UI unit conversion. Creation and join timestamps use milliseconds (`LC_GuildHelper.lua:250-268,1215-1232`). No unproven `GuildPunishRule` departure penalty is invented.
+4. Empty recommendation results return a typed missing-guild error. The configured Lua bridge omits empty repeated-message arrays and the success DAL iterates `guilds` without a nil check. No fake guild, application, stock or history row is inserted to conceal an empty-list problem.
+5. Departure sends a 32213 reset with zero identity/status and copies the former guild's real building rows. This is the observed decoder path that clears `GuildBaseInfo.shortUid`, while preserving a nonempty input for its unguarded building decoder. Fresh guildless login sends only the personal 5047 dataset, not a fabricated guild snapshot.
+6. A guild's level follows its Hall building level. Upgrade timers finish during server reconciliation after their persisted deadline; the original timer scheduling, simultaneous-building policy and automatic settlement timing are not captured. Resource/level/building wire values and configured costs are tested separately from resource earning.
+7. Public-profile field versions increase with each full reply. Offline times are milliseconds for the public profile, with `-1` while online; after an unclean stop a missing positive logout timestamp falls back to the last login. The original per-field version allocator and crash-time presence policy are unproven.
+8. Authority checks, exclusive membership, atomic payment/save, stale invitation rejection and canonical chat-channel enforcement are server safeguards. Their client-visible result codes use the supplied error table; exact original-server refusal precedence is unverified.
+
+## Deferred surface
+
+- The black-market fee denominator, same-price seller order, partial-fill convention, exact original expiry settlement and price history are not proven by client code. The server uses deterministic inferred rules for these. Truly empty market/helper lists return typed nonzero results because the current Lua success decoder iterates omitted repeated fields.
+- Guild activity/pray/salary/resource-earning rules, original sensitive-word lexicon, departure/rejoin punishment and full original-server parity remain unqualified. Recruitment message copy and cross-server chat delivery are not original-server qualified.
+- GvG, GvE, league and territory-war messages retain their existing routing and behavior (see [territory-wars.md](territory-wars.md)). No `MultiverseSchedule` is introduced; existing server season settings are unchanged.
+
+## Tests
+
+Bot integration tests use isolated temporary SQLite databases and dynamically selected ports. `GuildTests` exercises three players, mixed application results, an offline applicant, invitation token ownership/replay, leadership transfer, leave/dissolution, chat access, actual client resync/recruit/permission payloads, position limits, officer/offline kick, notice updates, paid rename, persisted building contribution/timers, and the black market, pre-create helper, recruitment and dissolved-seller paths. Its rename-race regression holds `StateLock` and schedules rename then dissolution on `GameLoop`, proving that the resumed operation cannot debit or resurrect the deleted guild. `GuildProfileTests` exercises two players through joining, public-profile lookup, disconnect, reconnect and departure.
+
+Regression coverage includes missing-application cancellation, empty-payload resync, the client-visible permission subset, recruitment edits, refusal of an empty helper list instead of a default success, and paid rename after a lock wait using the current guild aggregate.
+
+Run them with:
+
+```text
+dotnet test tests/Ro3Emu.Tests/Ro3Emu.Tests.csproj --filter "FullyQualifiedName~GuildTests|FullyQualifiedName~GuildProfileTests"
+```

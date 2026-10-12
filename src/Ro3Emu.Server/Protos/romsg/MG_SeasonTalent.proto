@@ -1,0 +1,33 @@
+syntax = "proto3";
+package romsg;
+import "google/protobuf/descriptor.proto";
+import "FieldOption.proto";
+
+message SeasonTalentUpgradeReq {
+  int32 talentId = 1;
+}
+
+message SeasonTalentUpgradeResp {
+  int32 result = 1;
+  int32 talentId = 2;
+}
+
+message SeasonTalentSetCurPlanReq {
+  int32 planId = 1;
+}
+
+message SeasonTalentSetCurPlanResp {
+  int32 result = 1;
+  romsg.SeasonTalentSetCurPlanReq req = 2;
+}
+
+message SeasonTalentSetPlanNameReq {
+  int32 planId = 1;
+  string planName = 2;
+}
+
+message SeasonTalentSetPlanNameResp {
+  int32 result = 1;
+  romsg.SeasonTalentSetPlanNameReq req = 2;
+}
+

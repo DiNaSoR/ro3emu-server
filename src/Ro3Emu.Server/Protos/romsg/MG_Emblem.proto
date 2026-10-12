@@ -1,0 +1,56 @@
+syntax = "proto3";
+package romsg;
+import "FieldOption.proto";
+
+message SetUpEmblemReq {
+  int32 emblemPos = 1;
+  int64 emblemGuid = 2;
+}
+
+message SetUpEmblemResp {
+  int32 result = 1;
+  int32 emblemPos = 2;
+  int64 emblemGuid = 3;
+  int64 oldEmblemGuid = 4;
+}
+
+message SetDownEmblemReq {
+  int32 emblemPos = 1;
+}
+
+message SetDownEmblemResp {
+  int32 result = 1;
+  int32 emblemPos = 2;
+  int64 emblemGuid = 3;
+}
+
+message UpgradeEmblemReq {
+  int64 emblemGuid = 1;
+  repeated int64 consumeEmblemGuids = 2;
+  map<int32, int32> consumeItems = 3;
+}
+
+message UpgradeEmblemResp {
+  int32 result = 1;
+  int64 emblemGuid = 2;
+  map<int32, int32> gainItems = 3;
+}
+
+message EmbleSwitchPlanReq {
+  int32 targetIndex = 1;
+}
+
+message EmbleSwitchPlanResp {
+  int32 result = 1;
+  int32 currentPlan = 2;
+}
+
+message EmblemPlanChangeNameReq {
+  int32 targetIndex = 1;
+  string name = 2;
+}
+
+message EmblemPlanChangeNameResp {
+  int32 result = 1;
+}
+

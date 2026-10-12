@@ -1,0 +1,23 @@
+syntax = "proto3";
+package romsg;
+import "MG_Entity.proto";
+
+message GuildDraculaSelectBrideNtf {
+  int64 bridePlayerId = 1;
+  romsg.EntityBase brideEntity = 2;
+}
+
+message GuildDraculaWeddingStateNtf {
+  int64 bridePlayerId = 1;
+  int64 stage2SceneId = 2;
+  romsg.EntityBase brideEntity = 3;
+}
+
+message GuildDraculaWeddingCompleteNtf {
+  int32 winCamp = 1;
+  int64 bridePlayerId = 2;
+  int64 rescuerPlayerId = 3;
+  romsg.EntityBase brideEntity = 4;
+  romsg.EntityBase rescuerEntity = 5;
+}
+

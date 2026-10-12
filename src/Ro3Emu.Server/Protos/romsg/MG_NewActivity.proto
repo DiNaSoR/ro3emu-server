@@ -1,0 +1,742 @@
+syntax = "proto3";
+package romsg;
+import "FieldOption.proto";
+import "MG_LeaderBoardClient.proto";
+import "MG_Common.proto";
+import "MG_Activity.proto";
+import "MG_ThreeDay.proto";
+import "MG_WorldExploration.proto";
+import "MG_TerritoryWars.proto";
+
+enum ENewActivityFeature {
+  ENewActivityFeature_Normal = 0;
+  ENewActivityFeature_Season = 1;
+}
+
+enum ENewActivityType {
+  ENewActivityType_None = 0;
+  ENewActivityType_Pre = 2;
+  ENewActivityType_LevelAward = 3;
+  ENewActivityType_FunctionPreview = 4;
+  ENewActivityType_FragmentGather = 5;
+  ENewActivityType_Treasure = 6;
+  ENewActivityType_Gacha = 7;
+  ENewActivityType_SevenLogin = 8;
+  ENewActivityType_MiddleSeason = 12;
+  ENewActivityType_Racing = 13;
+  ENewActivityType_WorldExploration = 14;
+  ENewActivityType_Journey = 15;
+  ENewActivityType_CommonEntrance = 16;
+  ENewActivityType_EmblemPraise = 17;
+  ENewActivityType_TopTenGuild = 18;
+  ENewActivityType_SeasonEve = 19;
+  ENewActivityType_PronteraDefense = 20;
+  ENewActivityType_MonthCard = 21;
+  ENewActivityType_TerritoryWar = 22;
+  ENewActivityType_BattlePass = 23;
+  ENewActivityType_TrainingGround = 24;
+}
+
+enum ETreasureEventNum {
+  ETreasureEventNum_None = 0;
+  ETreasureEventNum_box = 1;
+  ETreasureEventNum_Fail = 2;
+  ETreasureEventNum_RewardDungeon = 3;
+  ETreasureEventNum_Monster = 4;
+  ETreasureEventNum_Boss = 5;
+  ETreasureEventNum_ContinueDig = 6;
+  ETreasureEventNum_TooFar = 100;
+  ETreasureEventNum_Leave = 101;
+  ETreasureEventNum_SwitchScene = 102;
+  ETreasureEventNum_InScene = 103;
+}
+
+enum EJourneyCompleteType {
+  EJourneyCompleteType_None = 0;
+  EJourneyCompleteType_Act = 1;
+  EJourneyCompleteType_Travel = 2;
+  EJourneyCompleteType_Node = 3;
+  EJourneyCompleteType_Event = 4;
+  EJourneyCompleteType_TravelDay = 5;
+  EJourneyCompleteType_AwardNode = 6;
+  EJourneyCompleteType_Game = 7;
+  EJourneyCompleteType_Dungeon = 8;
+}
+
+enum EJourneyGameType {
+  EJourneyGameType_None = 0;
+  EJourneyGameType_PlaceGame = 1;
+  EJourneyGameType_Othello = 2;
+}
+
+enum EBattlePassPrivilegeType {
+  EBattlePassPrivilegeType_None = 0;
+  EBattlePassPrivilegeType_StallSlotAdd = 1;
+  EBattlePassPrivilegeType_TradeFavAdd = 2;
+  EBattlePassPrivilegeType_CopperEffAdd = 3;
+}
+
+message NewActivityBaseInfo {
+  int64 id = 1;
+  int64 beginTime = 2;
+  int64 endTime = 3;
+}
+
+message GetActivityListReq {
+}
+
+message GetActivityListResp {
+  int32 result = 1;
+  repeated romsg.NewActivityBaseInfo activityList = 2;
+}
+
+message NewActivityRecycleItem {
+  int64 itemID = 1;
+  int64 itemNum = 2;
+}
+
+message NewActivityRecycle {
+  repeated romsg.NewActivityRecycleItem recycleItems = 1;
+  repeated romsg.NewActivityRecycleItem sendItems = 2;
+}
+
+message SeasonPreHeatReq {
+}
+
+message SeasonPreHeatRes {
+}
+
+message SeasonPreHeatNotify {
+}
+
+message CommonActivityReq {
+  int64 activityId = 1;
+  int64 requestId = 2;
+  oneof activity {
+    romsg.NewActivityGetRewardCommonReq get_reward_common = 3;
+    romsg.SeasonEveSelectWishReq seasonEveSelectWish = 4;
+    romsg.SeasonEvePlayChapterReq seasonEvePlayChapter = 5;
+    romsg.SeasonEveClaimAwardReq seasonEveClaimAward = 6;
+    romsg.SeasonEveGetGlobalInfoReq seasonEveGetInfo = 7;
+    romsg.SeasonEveFindClueReq seasonEveFindClue = 8;
+    romsg.NewActivityFragmentGatherAskReq fragmentGatherAsk = 16;
+    romsg.NewActivityFragmentGatherAskFinishedReq fragmentGatherAskFinished = 17;
+    romsg.NewActivityFragmentGatherSendReq fragmentGatherSend = 18;
+    romsg.NewActivityFragmentGatherCraftReq fragmentGatherCraft = 19;
+    romsg.NewActivityFragmentGatherProgressReq fragmentGatherProgress = 20;
+    romsg.PronteraDefenseDonateReq pronteraDefenseDonate = 30;
+    romsg.PronteraDefenseGuildDefenseReq pronteraDefenseGuildDefense = 31;
+    romsg.GetThreeDayLevelAwardReq levelAwardGetReward = 50;
+    romsg.GetThreeDayFunctionPreviewAwardReq functionPreviewGetReward = 51;
+    romsg.WorldExplorationFillPhaseNodeReq fillPhaseNodeReq = 61;
+    romsg.JourneyCompleteReq JourneyComplete = 71;
+    romsg.JourneyReportEnterTimeReq JourneyReportEnterTime = 72;
+    romsg.JourneyGetPlayerCompleteReq JourneyGetPlayerComplete = 73;
+    romsg.JourneyReportOpenCompletePanelReq JourneyReportOpenCompletePanel = 74;
+    romsg.JourneyDungeonRestartReq JourneyDungeonRestart = 75;
+    romsg.GainMonthCardDailyAwardReq GainMonthCardDailyAward = 90;
+    romsg.BattlePassClaimRewardReq battlePassClaimReward = 100;
+    romsg.BattlePassMarkUnlockViewedReq battlePassMarkUnlockViewed = 101;
+    romsg.BattlePassBuyLevelReq battlePassBuyLevel = 102;
+    romsg.BattlePassGiftReq battlePassGift = 112;
+  }
+}
+
+message CommonActivityRes {
+  int32 result = 1;
+  int64 activity_id = 2;
+  int64 request_id = 3;
+  oneof activity {
+    romsg.NewActivityGetRewardCommonResp get_reward_common = 4;
+    romsg.SeasonEveSelectWishResp seasonEveSelectWish = 5;
+    romsg.SeasonEvePlayChapterResp seasonEvePlayChapter = 6;
+    romsg.SeasonEveClaimAwardResp seasonEveClaimAward = 7;
+    romsg.SeasonEveGetGlobalInfoResp seasonEveGetInfo = 8;
+    romsg.SeasonEveFindClueResp seasonEveFindClue = 9;
+    romsg.NewActivityFragmentGatherAskResp fragmentGatherAsk = 16;
+    romsg.NewActivityFragmentGatherAskFinishedResp fragmentGatherAskFinished = 17;
+    romsg.NewActivityFragmentGatherSendResp fragmentGatherSend = 18;
+    romsg.NewActivityFragmentGatherCraftResp fragmentGatherCraft = 19;
+    romsg.NewActivityFragmentGatherProgressResp fragmentGatherProgress = 20;
+    romsg.PronteraDefenseDonateResp pronteraDefenseDonate = 30;
+    romsg.PronteraDefenseGuildDefenseResp pronteraDefenseGuildDefense = 31;
+    romsg.GetThreeDayLevelAwardRsp levelAwardGetReward = 50;
+    romsg.GetThreeDayFunctionPreviewAwardRsp functionPreviewGetReward = 51;
+    romsg.WorldExplorationFillPhaseNodeRes fillPhaseNodeRes = 60;
+    romsg.JourneyCompleteResp JourneyComplete = 71;
+    romsg.JourneyReportEnterTimeResp JourneyReportEnterTime = 72;
+    romsg.JourneyGetPlayerCompleteResp JourneyGetPlayerComplete = 73;
+    romsg.JourneyReportOpenCompletePanelResp JourneyReportOpenCompletePanel = 74;
+    romsg.JourneyDungeonRestartResp JourneyDungeonRestart = 75;
+    romsg.GainMonthCardDailyAwardResp GainMonthCardDailyAward = 90;
+    romsg.BattlePassClaimRewardRes battlePassClaimReward = 100;
+    romsg.BattlePassMarkUnlockViewedRes battlePassMarkUnlockViewed = 101;
+    romsg.BattlePassBuyLevelRes battlePassBuyLevel = 102;
+    romsg.BattlePassGiftRes battlePassGift = 112;
+  }
+}
+
+message CommonActivityNotify {
+  int64 activity_id = 1;
+  oneof activity {
+    romsg.SeasonPreHeatNotify season_pre_heat = 10;
+    romsg.JourneyAttrChangeNotify JourneyAttrChange = 71;
+  }
+}
+
+message PlayerActivityTypeState {
+  map<int64, romsg.PlayerActivityState> activityState = 1;
+}
+
+message PlayerActivityTypeInfo {
+  map<int64, romsg.PlayerActivityInfo> activityInfo = 1;
+}
+
+message PlayerActivityInfo {
+  romsg.PlayerActivityParam activityParam = 1;
+  string activityKey = 2;
+  int64 activityInstance = 3;
+  string state = 4;
+  bool isOldRound = 5;
+  bool IsEnterComplete = 6;
+  bool IsExitComplete = 7;
+  int64 playbook = 8;
+  map<string, int64> StateTimeStamps = 9;
+  int64 stateInstance = 10;
+  bool IsShielded = 11;
+  repeated romsg.TimeSegment StateTimeStampList = 12;
+  int64 CurStartTime = 13;
+  int64 CurEndTime = 14;
+  int64 CycleStartTime = 15;
+  int64 CycleEndTime = 16;
+}
+
+message PlayerActivityParam {
+  map<int64, int64> taskRenewSegmentTimes = 10;
+  oneof val {
+    romsg.PlayerActivitySevenDay sevenDay = 1;
+    romsg.PlayerActivitySeasonEve seasonEve = 2;
+    romsg.PlayerActivityPronteraDefense pronteraDefense = 3;
+    romsg.PlayerActivityFragmentGather fragmentGather = 4;
+    romsg.PlayerActivityRacing racing = 5;
+    romsg.DBThreeDayData levelAward = 6;
+    romsg.DBThreeDayData functionPreview = 7;
+    romsg.DBWorldExploration worldExploration = 8;
+    romsg.DBJourneyInfo journey = 9;
+    romsg.DBMonthCardInfo monthCard = 11;
+    romsg.PlayerActivityTerritoryWar territoryWar = 12;
+    romsg.PlayerActivityRainbowKoi rainbowKoi = 13;
+    romsg.PlayerActivityRunRingTask runRingTask = 14;
+    romsg.PlayerActivityBattlePass battlePass = 15;
+  }
+}
+
+message PlayerActivityRunRingTask {
+  int32 remainRingCount = 1;
+}
+
+message PlayerActivityRainbowKoi {
+  int64 betTargetId = 1;
+  romsg.RainbowKoiProgress progress = 2;
+}
+
+message DBThreeDayData {
+  map<int64, int64> awardData = 1;
+}
+
+message PlayerActivityState {
+  int64 enterTime = 1;
+  romsg.PlayerActivitySelfData selfData = 2;
+  int64 beginTime = 3;
+  int64 endTime = 4;
+  map<int64, int64> taskRenewSegmentTimes = 5;
+}
+
+message PlayerActivitySelfData {
+  romsg.PlayerActivitySeasonPre seasonPre = 1;
+  romsg.PlayerActivityFragmentGather gather = 5;
+  romsg.PlayerActivityRacing racing = 6;
+  romsg.PlayerActivitySevenDay sevenDay = 7;
+}
+
+message NewActivityHeader {
+  int64 player = 1;
+  int64 activityID = 2;
+  int64 area = 3;
+  int64 seasonArea = 4;
+  int64 season = 5;
+  int64 playbook = 6;
+  int64 guildID = 7;
+}
+
+message PlayerActivitySeasonPre {
+  map<int64, int64> receivedRewardIDs = 1;
+  int64 score = 2;
+}
+
+message DBNewActivityPublicDataPre {
+  int64 progress = 1;
+  map<int64, romsg.DBNewActivityPublicDataPreGuild> guildDatas = 2;
+}
+
+message DBNewActivityPublicDataPreGuild {
+  map<int64, int64> memberContributions = 1;
+  map<int64, int64> dailyLimit = 2;
+  int64 lastResetMs = 3;
+  int64 score = 4;
+}
+
+message NewActivityPreRankItem {
+  int64 rank = 1;
+  int64 score = 2;
+  string guildName = 3;
+}
+
+message NewActivityPreMailParams {
+  int64 selfContribution = 1;
+  int64 guildContribution = 2;
+  int64 guildRank = 3;
+  repeated romsg.NewActivityPreRankItem guildRankList = 4;
+}
+
+message NewActivityPreSubmitItemReq {
+  int64 activityID = 1;
+  int64 num = 2;
+}
+
+message NewActivityPreSubmitItemResp {
+  int32 result = 1;
+  int64 num = 2;
+}
+
+message NewActivityPreGetDataReq {
+  int64 activityID = 1;
+}
+
+message NewActivityGetRewardCommonReq {
+  int64 activityID = 1;
+  int32 index = 2;
+}
+
+message NewActivityGetRewardCommonResp {
+  int32 result = 1;
+}
+
+message NewActivityPreGetDataResp {
+  int32 result = 1;
+  int64 areaProgress = 2;
+  int64 selfTodayProgress = 3;
+  int64 todaySubmitRoleNum = 4;
+  bool isTodaySubmit = 5;
+}
+
+message NewActivityPreReceiveRewardReq {
+  int64 activityID = 1;
+  repeated int64 rewardIDs = 2;
+}
+
+message NewActivityPreReceiveRewardResp {
+  int32 result = 1;
+  repeated int64 receiveSuccessIDs = 2;
+}
+
+message NewActivityPreSubmitItemPublicReq {
+  romsg.NewActivityHeader header = 1;
+  int64 num = 3;
+  romsg.GuildLeaderBoardGveUserData guildData = 4;
+}
+
+message NewActivityPreSubmitItemPublicResp {
+  int32 result = 1;
+  int64 num = 2;
+  int64 addScore = 3;
+}
+
+message NewActivityGetGlobalDataPublicReq {
+  romsg.NewActivityHeader header = 1;
+  int64 guildID = 3;
+}
+
+message NewActivityGetGlobalDataPublicResp {
+  int32 result = 1;
+  int64 areaProgress = 2;
+  int64 selfTodayProgress = 3;
+  int64 todaySubmitRoleNum = 4;
+  bool isTodaySubmit = 5;
+}
+
+message NewActivityRollbackScorePublicReq {
+  romsg.NewActivityHeader header = 1;
+  int64 score = 2;
+  romsg.GuildLeaderBoardGveUserData guildData = 3;
+}
+
+message NewActivityRollbackScorePublicResp {
+  int32 result = 1;
+}
+
+message NewActivityOnLeaveGuildReq {
+  romsg.NewActivityHeader header = 1;
+}
+
+message NewActivityOnLeaveGuildResp {
+  int32 result = 1;
+}
+
+message TreasureEventNotify {
+  romsg.ETreasureEventNum type = 1;
+  repeated int64 param = 2;
+  map<int64, romsg.ItemBaseInfo> items = 3;
+  romsg.Vec3 pointPosition = 4;
+}
+
+message PlayerActivityTerritoryWar {
+  romsg.DBTerritoryWarData territoryWarData = 1;
+  romsg.TerritoryWarStage territoryWarStage = 2;
+}
+
+message TerritoryWarStage {
+  romsg.TerritoryWarStageType stageType = 1;
+  int64 startTime = 2;
+  int64 endTime = 3;
+}
+
+message PlayerActivityFragmentGather {
+  int32 seed = 1;
+  int32 reqID = 2;
+  int32 progressFinish = 3;
+  int32 progressAward = 4;
+  romsg.FragmentGatherDaily dailyData = 5;
+  int64 playbook = 6;
+}
+
+message FragmentGatherDaily {
+  int64 expireTs = 1;
+  int32 askTimes = 2;
+  int32 receiveTimes = 3;
+}
+
+message NewActivityFragmentGatherAskReq {
+  int64 itemConfigID = 1;
+}
+
+message NewActivityFragmentGatherAskResp {
+  int64 askID = 1;
+  int64 itemConfigID = 2;
+}
+
+message NewActivityFragmentGatherAskFinishedReq {
+  int64 userID = 1;
+  int64 askID = 2;
+}
+
+message NewActivityFragmentGatherAskFinishedResp {
+  bool isFinished = 1;
+}
+
+message NewActivityFragmentGatherSendReq {
+  int64 toUserID = 1;
+  int64 askID = 2;
+  int64 itemID = 3;
+}
+
+message NewActivityFragmentGatherSendResp {
+}
+
+message NewActivityFragmentGatherCraftReq {
+}
+
+message NewActivityFragmentGatherCraftResp {
+  int32 level = 1;
+}
+
+message NewActivityFragmentGatherProgressReq {
+  int64 gatherTimes = 1;
+}
+
+message NewActivityFragmentGatherProgressResp {
+}
+
+message PlayerActivitySevenDay {
+  map<int32, bool> rewardStatus = 1;
+  int32 loginDays = 2;
+  int64 lastLoginTime = 3;
+}
+
+message PlayerActivityRacing {
+  map<int64, int64> joinState = 1;
+}
+
+message PlayerActivitySeasonEve {
+  map<int64, romsg.PlayerSeasonEveChapterInfo> chapterInfo = 1;
+  int64 selectWish = 2;
+  map<int64, bool> claimedReward = 3;
+}
+
+message PlayerSeasonEveChapterInfo {
+  bool isFinish = 1;
+  map<int64, int64> notes = 2;
+  map<int64, bool> clues = 3;
+}
+
+message SeasonEveGetGlobalInfoReq {
+}
+
+message SeasonEveGetGlobalInfoResp {
+  int64 progress = 1;
+  map<int64, romsg.SeasonEveGlobalChapterInfo> chapterInfo = 2;
+  repeated romsg.SeasonEveBulletInfo bulletInfo = 3;
+}
+
+message SeasonEveGlobalChapterInfo {
+  int64 chapterId = 1;
+  int64 openTime = 2;
+  map<int64, int64> clues = 3;
+}
+
+message SeasonEveSelectWishReq {
+  int64 wishId = 1;
+}
+
+message SeasonEveSelectWishResp {
+  romsg.SeasonEveSelectWishReq req = 1;
+}
+
+message SeasonEvePlayChapterReq {
+  int64 chapterId = 1;
+  map<int64, int64> noteIds = 2;
+}
+
+message SeasonEvePlayChapterResp {
+  int32 reason = 1;
+  romsg.SeasonEvePlayChapterReq req = 2;
+}
+
+message SeasonEveClaimAwardReq {
+  map<int64, bool> claimId = 1;
+}
+
+message SeasonEveClaimAwardResp {
+  romsg.SeasonEveClaimAwardReq req = 1;
+}
+
+message SeasonEveFindClueReq {
+  int64 clueId = 1;
+}
+
+message SeasonEveFindClueResp {
+  romsg.SeasonEveFindClueReq req = 1;
+  int64 index = 2;
+  int64 noteId = 3;
+  bool isFirst = 4;
+}
+
+message PlayerActivityPronteraDefense {
+  romsg.DBPronteraDefenseInfo globalInfo = 1;
+  int64 contributionPoint = 2;
+}
+
+message PronteraDefenseDonateReq {
+  int64 itemCount = 1;
+}
+
+message PronteraDefenseDonateResp {
+  romsg.PronteraDefenseDonateReq req = 1;
+}
+
+message PronteraDefenseGuildDefenseReq {
+  int64 mapId = 1;
+  bool bStation = 2;
+}
+
+message PronteraDefenseGuildDefenseResp {
+  romsg.PronteraDefenseGuildDefenseReq req = 1;
+}
+
+message DBWorldExplorationPhaseNode {
+  int64 nodeCfgId = 1;
+  map<int64, int64> items = 2;
+  bool isFinished = 3;
+}
+
+message DBWorldExplorationPhase {
+  int64 PhaseCfgId = 1;
+  map<int64, romsg.DBWorldExplorationPhaseNode> nodeInfos = 2;
+  int32 totalRate = 3;
+}
+
+message DBWorldExplorationDropNote {
+  repeated int64 ItemIds = 1;
+}
+
+message DBWorldExplorationDropData {
+  int32 index = 1;
+  int32 count = 2;
+  map<int32, romsg.DBWorldExplorationDropNote> dropNotes = 3;
+}
+
+message DBWorldExplorationNpcCollectCount {
+  map<int64, int64> collectCount = 1;
+  int64 sum = 2;
+}
+
+message DBWorldExploration {
+  int64 ro3Define_SyncVersion = 9998;
+  map<int64, romsg.DBWorldExplorationPhase> phaseInfos = 1;
+  romsg.DBWorldExplorationDropData dropData = 2;
+  map<int64, romsg.DBWorldExplorationNpcCollectCount> mapCollect = 3;
+}
+
+message JourneyCompleteReq {
+  romsg.EJourneyCompleteType type = 1;
+  int64 completeId = 2;
+}
+
+message JourneyCompleteResp {
+  romsg.JourneyCompleteReq req = 1;
+}
+
+message JourneyAttrChangeNotify {
+  romsg.EJourneyCompleteType type = 1;
+  int64 completeId = 2;
+  map<int64, int64> attrChange = 3;
+}
+
+message JourneyReportEnterTimeReq {
+}
+
+message JourneyReportEnterTimeResp {
+  romsg.JourneyReportEnterTimeReq req = 1;
+}
+
+message JourneyGetPlayerCompleteReq {
+  int64 playerId = 1;
+}
+
+message JourneyGetPlayerCompleteResp {
+  int64 playerId = 1;
+  map<int64, romsg.JourneyCompleteInfo> completeNode = 2;
+  map<int64, romsg.JourneyCompleteInfo> completeAct = 3;
+  map<int64, romsg.JourneyCompleteInfo> completeEvent = 4;
+  map<int64, romsg.JourneyCompleteInfo> completeTravel = 5;
+  int64 gainCoinCount = 6;
+  map<int64, int64> attributes = 7;
+  int64 titleId = 8;
+}
+
+message JourneyReportOpenCompletePanelReq {
+}
+
+message JourneyReportOpenCompletePanelResp {
+  romsg.JourneyReportOpenCompletePanelReq req = 1;
+}
+
+message JourneyDungeonRestartReq {
+}
+
+message JourneyDungeonRestartResp {
+}
+
+message DBJourneyInfo {
+  int64 curNodeId = 2;
+  map<int64, bool> curActIds = 3;
+  map<int64, bool> curEvents = 4;
+  map<int64, int64> attributes = 5;
+  romsg.JourneyTravelInfo travelInfo = 9;
+  romsg.JourneyEventInfo eventInfo = 12;
+  map<int64, romsg.JourneyCompleteInfo> completeNode = 6;
+  map<int64, romsg.JourneyCompleteInfo> completeAct = 7;
+  map<int64, romsg.JourneyCompleteInfo> completeEvent = 8;
+  map<int64, bool> completeAwardNode = 10;
+  map<int64, romsg.JourneyCompleteInfo> completeTravel = 14;
+  int64 gainCoinCount = 15;
+  int64 titleId = 16;
+  int64 reportEnterTime = 11;
+  bool isOpenCompletePanel = 17;
+  bool isSendJourneyNoticeMail = 13;
+}
+
+message JourneyTravelInfo {
+  int64 curDay = 1;
+  int64 remainHour = 2;
+}
+
+message JourneyEventInfo {
+  int64 eventId = 1;
+  map<int64, int64> attrChange = 2;
+}
+
+message DBMonthCardInfo {
+  int64 ro3Define_SyncVersion = 9998;
+  map<int64, romsg.MonthCardInfo> infos = 1;
+}
+
+message MonthCardInfo {
+  int64 monthCardId = 1;
+  int64 lastDays = 2;
+  bool dayAward = 3;
+  int64 expireTs = 4;
+}
+
+message GainMonthCardDailyAwardReq {
+  repeated int64 monthCardId = 1;
+}
+
+message GainMonthCardDailyAwardResp {
+  romsg.GainMonthCardDailyAwardReq req = 1;
+}
+
+message PlayerActivityBattlePass {
+  int32 level = 1;
+  int32 exp = 2;
+  bool premium = 3;
+  int64 premium_time = 4;
+  repeated int32 claimed_free_levels = 5;
+  repeated int32 claimed_premium_levels = 6;
+  bool unlock_page_viewed = 7;
+  int32 bought_level_count = 8;
+  repeated int32 activated_privilege_ids = 9;
+}
+
+message BattlePassClaimRewardReq {
+  int32 reward_type = 1;
+  repeated int32 levels = 2;
+}
+
+message BattlePassClaimRewardRes {
+  int32 result = 1;
+  repeated int32 claimed_levels = 2;
+}
+
+message BattlePassMarkUnlockViewedReq {
+}
+
+message BattlePassMarkUnlockViewedRes {
+  int32 result = 1;
+}
+
+message BattlePassBuyLevelReq {
+  int32 count = 1;
+}
+
+message BattlePassBuyLevelRes {
+  int32 result = 1;
+  int32 actual_count = 2;
+}
+
+message BattlePassGiftReq {
+  int64 target_player_id = 1;
+  string gift_message = 2;
+}
+
+message BattlePassGiftRes {
+  int32 result = 1;
+}
+
+message BattlePassGiftMessage {
+  int64 activity_id = 1;
+  int64 sender_player_id = 2;
+  string gift_message = 3;
+  string sender_name = 4;
+}
+
