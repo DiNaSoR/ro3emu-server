@@ -1,0 +1,47 @@
+name: Project website
+
+on:
+  push:
+    branches: [main]
+    paths: ['docs/site/**', 'tools/check-site.mjs', '.github/workflows/pages.yml']
+  pull_request:
+    paths: ['docs/site/**', 'tools/check-site.mjs', '.github/workflows/pages.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - name: Check website assets, metadata and links
+        run: node tools/check-site.mjs
+
+  deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: docs/site
+      - name: Deploy project website
+        id: deployment
+        uses: actions/deploy-pages@v4

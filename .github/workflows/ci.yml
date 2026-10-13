@@ -1,0 +1,32 @@
+name: Client-independent .NET checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Server and export tools build; patcher tests
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Build server
+        run: dotnet build src/Ro3Emu.Server/Ro3Emu.Server.csproj -c Release --nologo -clp:ErrorsOnly
+      - name: Build export tools
+        run: |
+          dotnet build tools/LuaDecode/LuaDecode.csproj -c Release --nologo -clp:ErrorsOnly
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet build tools/ConfigExport/ConfigExport.csproj -c Release --nologo -clp:ErrorsOnly
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        shell: pwsh
+      - name: Test patcher
+        run: dotnet test tests/Ro3Emu.Patcher.Tests/Ro3Emu.Patcher.Tests.csproj -c Release --nologo

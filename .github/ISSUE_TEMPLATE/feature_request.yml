@@ -1,0 +1,26 @@
+name: Feature or behavior request
+description: Propose a focused improvement or ask about an unimplemented behavior
+title: "[Feature] "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What should a player, operator, or contributor be able to do?
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Proposed behavior
+      description: Describe the smallest useful result and any known constraints.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Client evidence or related documentation
+      description: Include paths, symbols, message IDs, or links when available. Say when original-server behavior is unknown; do not upload client files or exported data.
+    validations:
+      required: false

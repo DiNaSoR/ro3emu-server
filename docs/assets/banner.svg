@@ -37,5 +37,5 @@
 
   <text x="320" y="122" font-family="'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="76" font-weight="700" fill="#f3f5fa" letter-spacing="1">RO3<tspan fill="#e1bb6c">Emu</tspan></text>
   <text x="324" y="166" font-family="'Segoe UI', 'Helvetica Neue', Helvetica, Arial, sans-serif" font-size="25" fill="#b9c3d6">A server emulator for the Ragnarok Online 3 client</text>
-  <text x="324" y="206" font-family="'Cascadia Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace" font-size="16" fill="#7f8ba1">C# · .NET 10 · one game loop · SQLite · recovered protocol, 1:1 with the original</text>
+  <text x="324" y="206" font-family="'Cascadia Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace" font-size="16" fill="#a0adc1">C# · .NET 10 · one game loop · SQLite · client-documented protocol</text>
 </svg>
