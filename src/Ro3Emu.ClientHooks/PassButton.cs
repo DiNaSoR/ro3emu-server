@@ -25,7 +25,16 @@ namespace Ro3Emu.ClientHooks
             var widget = GameObject.Find(Widget);
             if (widget == null) return;
             var all = widget.GetComponentsInChildren<Transform>(true);
-            if (all.Any(t => t.name == CloneName)) return;
+            // One widget shows every pass in turn; the novice pass earns from story quests, not from the challenges.
+            bool novice = NovicePass.Shown(widget);
+            NovicePass.ShowSpecialReward(all, !novice);
+            var existing = all.FirstOrDefault(t => t.name == CloneName);
+            if (existing != null)
+            {
+                if (existing.gameObject.activeSelf == novice) existing.gameObject.SetActive(!novice);
+                return;
+            }
+            if (novice) return;
             var benefits = Button(all, "Equities");
             var gift = Button(all, "GiveFriend");
             if (benefits == null || gift == null) return;

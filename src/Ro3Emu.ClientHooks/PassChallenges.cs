@@ -178,6 +178,7 @@ namespace Ro3Emu.ClientHooks
             RawSet(activities, ActivityId, Row(
                 "_iID", ActivityId, "_iName", List(title), "_iActivityType", 0L,
                 "_kTaskRenew", List(List(0L, TaskType, DailySonType, 0L), List(0L, TaskType, WeeklySonType, 0L))));
+            NovicePass.Inject(dbm, texts);
             return Present();
         }
 
@@ -261,18 +262,18 @@ namespace Ro3Emu.ClientHooks
 
         private static long AwardId(long reward) => TextBase / 1000 + reward; // 99_130_300 and 99_131_000
 
-        private static void Text(Obf_R.Obf_ff texts, long id, string value) =>
+        internal static void Text(Obf_R.Obf_ff texts, long id, string value) =>
             RawSet(texts, id, Row("_iID", id, "_kDes", value));
 
         /// <summary>
         /// rawset: the client fills config rows lazily through m_kValues' __index (rows decoded from its payload on first
         /// use), and that loader fails for an id it does not know. A raw entry is found before __index runs.
         /// </summary>
-        private static void RawSet(Obf_R.Obf_ff table, long key, object value) =>
+        internal static void RawSet(Obf_R.Obf_ff table, object key, object value) =>
             _global.Obf_LuA<Obf_R.Obf_Ef>("rawset").Obf_HuA(table, key, value);
 
         /// <summary>A config's raw rows: Lua_DBManager's lazy proxy loads it on first access.</summary>
-        private static Obf_R.Obf_ff Values(Obf_R.Obf_ff manager, string config) =>
+        internal static Obf_R.Obf_ff Values(Obf_R.Obf_ff manager, string config) =>
             manager.Obf_RuA<Obf_R.Obf_ff>(config)?.Obf_RuA<Obf_R.Obf_ff>("m_kConfigData")?.Obf_RuA<Obf_R.Obf_ff>("m_kValues");
 
         /// <summary>A new Lua table: table.pack() without its count field.</summary>
@@ -287,7 +288,7 @@ namespace Ro3Emu.ClientHooks
             return table;
         }
 
-        private static Obf_R.Obf_ff List(params object[] items)
+        internal static Obf_R.Obf_ff List(params object[] items)
         {
             var table = NewTable();
             for (int i = 0; i < items.Length; i++) table.Obf_luA<long, object>(i + 1, items[i]);
@@ -295,7 +296,7 @@ namespace Ro3Emu.ClientHooks
         }
 
         /// <summary>A new Lua table from key, value pairs.</summary>
-        private static Obf_R.Obf_ff Row(params object[] fields)
+        internal static Obf_R.Obf_ff Row(params object[] fields)
         {
             var table = NewTable();
             for (int i = 0; i + 1 < fields.Length; i += 2) table.Obf_luA<string, object>((string)fields[i], fields[i + 1]);

@@ -115,9 +115,9 @@ public sealed partial class NewActivityService
         tasks.ExtraTasks.Add(PassTasks);
     }
 
-    /// <summary>The pass whose EXP currency 132 is earned now: Pass I, else Pass II.</summary>
+    /// <summary>The pass whose EXP currency 132 is earned now: the latest open one (Pass II once Pass I is done).</summary>
     private long? OpenPass(GameSession session) =>
-        PassIds.Where(id => id != 9201).Cast<long?>().FirstOrDefault(id => ActivityError(session, id!.Value, 23) == 0);
+        PassIds.Where(id => id != 9201).Cast<long?>().LastOrDefault(id => ActivityError(session, id!.Value, 23) == 0);
 
     private static (long Day, long Week) PassPeriod(DateTimeOffset localNow)
     {

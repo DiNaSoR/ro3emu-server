@@ -97,11 +97,16 @@ public sealed partial class NewActivityService
             && session.Role is { } role && activityClock.ResolveActivity(row, Now, role.CreateTime, book).Contains(Now);
     }
 
-    /// <summary>The activity's own open condition; OpenContent forces the rows whose condition is an unreachable level.</summary>
-    private bool Gate(GameSession session, JsonElement row) =>
-        seasons.OpenContent.ForcesActivity(GameData.Int(row, "_iID"))
-        || seasons.OpenContent.OpensStageActivities && StageActivities(Playbook(session)).Contains(GameData.Int(row, "_iID"))
-        || functions.ConditionMet(session, GameData.Int(row, "_kOpenCondition"));
+    /// <summary>
+    /// The activity's own open condition; OpenContent forces the rows whose condition is an unreachable level. A pass
+    /// that follows another one (Pass II after Pass I) also waits for its turn (<see cref="PassTurnReached"/>).
+    /// <paramref name="state"/>: the activity state being rebuilt, when it is not yet the session's.
+    /// </summary>
+    private bool Gate(GameSession session, JsonElement row, DBNewActivityInfo? state = null) =>
+        PassTurnReached(session, GameData.Int(row, "_iID"), state)
+        && (seasons.OpenContent.ForcesActivity(GameData.Int(row, "_iID"))
+            || seasons.OpenContent.OpensStageActivities && StageActivities(Playbook(session)).Contains(GameData.Int(row, "_iID"))
+            || functions.ConditionMet(session, GameData.Int(row, "_kOpenCondition")));
 
     private readonly Dictionary<int, HashSet<long>> stageActivities = new();
 
@@ -190,7 +195,7 @@ public sealed partial class NewActivityService
             InitializePass(session, row, info);
             InitializeMonthCard(session, row, info);
             var window = activityClock.ResolveActivity(row, now, session.Role!.CreateTime, book);
-            bool gate = Gate(session, row);
+            bool gate = Gate(session, row, state);
             bool active = window.Contains(now) && gate;
             info.State = active ? window.State : "_close";
             info.IsShielded = !gate;

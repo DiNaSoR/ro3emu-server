@@ -241,6 +241,32 @@ public sealed class PassPlayTests : IAsyncLifetime
     }
 
     [ClientDataFact]
+    public async Task PassTwoOpensOnlyOncePassOneIsDoneAndStartsFromZero()
+    {
+        await using var alice = await InWorld("Alice");
+        await Gm(alice, "!lvl 99"); // Pass II's own condition
+        await Service<NewActivityService>().ReconcileAsync(Session(alice));
+        Task<string> State(long id) => OnLoop(() => Session(alice).NewActivities!.ActivityInfo[id].State);
+        Task<PlayerActivityBattlePass> Second() => OnLoop(() => Session(alice).NewActivities!.ActivityInfo[201].ActivityParam.BattlePass);
+        Assert.NotEqual("_close", await State(200));
+        Assert.Equal("_close", await State(201)); // Pass I is not done: both would fill from the same currency
+
+        await Gm(alice, "!item 132 120000");
+        await Service<NewActivityService>().ReconcileAsync(Session(alice));
+        Assert.Equal(60, (await Pass(alice)).Level);
+        await Service<NewActivityService>().ReconcileAsync(Session(alice));
+        Assert.NotEqual("_close", await State(201));
+        var second = await Second();
+        Assert.Equal(0, second.Level * 2000L + second.Exp); // the 120000 already went into Pass I
+
+        // New pass EXP goes into Pass II, not into Pass I's bonus chests.
+        await Gm(alice, "!item 5 60");
+        await Until(async () => { var p = await Second(); return p.Level * 2000L + p.Exp > 0; }, "Pass II EXP");
+        Assert.Equal(0, (await Play(alice)).Overflow);
+        Assert.Equal(60, (await Pass(alice)).Level);
+    }
+
+    [ClientDataFact]
     public async Task ChallengesReach5027OnlyAfterTheClientAsksAndShowProgress()
     {
         await using var alice = await InWorld("Alice");

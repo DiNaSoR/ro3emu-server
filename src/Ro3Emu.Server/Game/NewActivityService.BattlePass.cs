@@ -11,6 +11,30 @@ public sealed partial class NewActivityService
 {
     private static readonly long[] PassIds = [200, 201, 9201];
 
+    /// <summary>
+    /// The earlier pass with the same EXP currency (Pass I for Pass II), or null. The client data gives Pass I and II
+    /// the same condition and currency 132; on the original servers they were consecutive seasons.
+    /// </summary>
+    private long? PassBefore(long activityId)
+    {
+        if (!PassIds.Contains(activityId) || PassConfig(activityId) is not { } config) return null;
+        long currency = GameData.Int(config, "_iExpCurrencyId");
+        return PassIds.Where(id => id < activityId).Cast<long?>()
+            .LastOrDefault(id => PassConfig(id!.Value) is { } earlier && GameData.Int(earlier, "_iExpCurrencyId") == currency);
+    }
+
+    /// <summary>
+    /// With Pass:Play a pass opens only once the pass before it is at its last level. Both fill
+    /// from the same currency, and the server's open windows never end, so together they would pay every level twice.
+    /// </summary>
+    private bool PassTurnReached(GameSession session, long activityId, DBNewActivityInfo? state)
+    {
+        if (!passPlay || PassBefore(activityId) is not long before || PassConfig(before) is not { } config) return true;
+        var infos = (state ?? session.NewActivities)?.ActivityInfo;
+        return infos != null && infos.TryGetValue(before, out var info)
+            && info.ActivityParam?.BattlePass is { } pass && pass.Level >= GameData.Int(config, "_iMaxLevel");
+    }
+
     private void InitializePass(GameSession session, JsonElement row, PlayerActivityInfo info)
     {
         if (GameData.Int(row, "_iActivityType") != 23) return;
@@ -191,7 +215,9 @@ public sealed partial class NewActivityService
             bool reset = runtime.Initialized && runtime.ActivityInstance != info.ActivityInstance;
             int expItem = checked((int)GameData.Int(config, "_iExpCurrencyId"));
             long balance = Owned(session, expItem);
-            long earned = reset ? 0 : runtime.Initialized ? Math.Max(0, balance - runtime.LastBalance) : balance;
+            // A following pass starts from the balance it opens with: that EXP already went into the pass before it.
+            long earned = reset ? 0 : runtime.Initialized ? Math.Max(0, balance - runtime.LastBalance)
+                : passPlay && PassBefore(activityId) != null ? 0 : balance;
             bool changed = reset || !runtime.Initialized || runtime.LastBalance != balance;
             int max = checked((int)GameData.Int(config, "_iMaxLevel"));
             int level = reset ? 0 : current.Level, exp = reset ? 0 : current.Exp;
