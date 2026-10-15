@@ -34,7 +34,7 @@ Run(lua, Driver, "driver");
 int ok = 0, failed = 0;
 foreach (var dir in dirs)
 {
-    var target = Path.Combine(root, dir);
+    var target = Path.Combine(root, dir.Replace('\\', Path.DirectorySeparatorChar));
     var files = File.Exists(target) ? [target] : Directory.EnumerateFiles(target, "*.luac");
     foreach (var file in files)
     {
