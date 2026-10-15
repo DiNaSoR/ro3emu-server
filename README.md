@@ -1,4 +1,4 @@
-# RO3Emu — Ragnarok Online 3 server emulator
+# RO3Emu: Ragnarok Online 3 server emulator
 
 An open-source C# server emulator for the **Ragnarok Online 3 PC client**. Explore its protocol, run a local server
 with data exported from your own client, or help implement and test game systems. The server uses .NET 10 and SQLite;
@@ -16,6 +16,7 @@ the client integration needs the original PC client, which this repository does 
   <img src="https://img.shields.io/badge/client-RO3%20PC%20(Unity%20%2B%20Lua)-c98a2b" alt="RO3 PC client">
   <img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="GPL-3.0">
   <a href="https://github.com/aethai/ro3emu-server/actions/workflows/ci.yml"><img src="https://github.com/aethai/ro3emu-server/actions/workflows/ci.yml/badge.svg" alt="Client-independent .NET checks"></a>
+  <a href="https://github.com/aethai/ro3emu-server/actions/workflows/tests.yml"><img src="https://github.com/aethai/ro3emu-server/actions/workflows/tests.yml/badge.svg" alt="Tests on Linux"></a>
 </p>
 
 <p align="center">
@@ -80,8 +81,11 @@ server's encounter scripts are not in the client, so story dungeons and bosses a
 
 ## Getting started
 
-These commands use **PowerShell on Windows**. Building the server alone needs no game files, but a playable local
-setup needs your own RO3 PC client, exported game data and client hooks built against that client's DLLs.
+The server runs on **Windows and Linux**. The client is a Windows game, so exporting the game data, patching the
+client and playing happen on Windows; the commands below use PowerShell there. A server for other players can then run
+on a Linux machine with the exported `data/` (see [Running the server on Linux](#running-the-server-on-linux)).
+Building the server alone needs no game files, but a playable setup needs your own RO3 PC client, exported game data
+and client hooks built against that client's DLLs.
 
 ### Prerequisites
 
@@ -90,7 +94,8 @@ setup needs your own RO3 PC client, exported game data and client hooks built ag
 | [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) | server, tools, tests |
 | [Node.js 20+](https://nodejs.org/) | export scripts in `tools/` |
 | Java 17+ and [unluac](https://sourceforge.net/projects/unluac/) (`unluac.jar` in the repository root) | decompiling the client's Lua (data export only) |
-| Windows 10/11 x64 | documented client workflow and client-independent CI checks |
+| Windows 10/11 x64 | the client, data export, client hooks and patching |
+| Linux x64 (optional) | hosting the server; the test suite runs there in CI |
 | The Ragnarok Online 3 PC client (`ROO_PC`) | your own copy; nothing from the game is distributed here |
 
 Clone the repository and work from its root:
@@ -139,6 +144,44 @@ dotnet run --project src/Ro3Emu.Server -c Release
 
 The first start creates the gate key pair (`data/gate_rsa_*.pem`) and the database (`data/ro3emu.db`). Defaults:
 HTTP / SDK `5380`, micro gate `20000`, game gate `33100`, all on loopback.
+
+### Running the server on Linux
+
+Export `data/` on Windows as in step 1, then copy it to the Linux machine. With the
+[.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) installed there:
+
+```bash
+git clone https://github.com/aethai/ro3emu-server.git
+cd ro3emu-server
+dotnet publish src/Ro3Emu.Server -c Release -o /srv/ro3emu/bin
+# copy the exported data/ to /srv/ro3emu/data
+```
+
+A published server looks for `data/` next to its binary, so point it at the copy. A systemd unit such as
+`/etc/systemd/system/ro3emu.service`:
+
+```ini
+[Unit]
+Description=RO3Emu server
+After=network.target
+
+[Service]
+User=ro3emu
+WorkingDirectory=/srv/ro3emu
+ExecStart=/srv/ro3emu/bin/Ro3Emu.Server
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=Ro3Emu__DataDir=/srv/ro3emu/data
+Environment=Ro3Emu__PublicHost=203.0.113.10
+Environment=Ro3Emu__GmAccounts__0=your-admin-login
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Replace `203.0.113.10` with the address players reach and open TCP `5380`, `20000` and `33100`. Then
+`systemctl daemon-reload` and `systemctl enable --now ro3emu`. Players patch their Windows client against that address
+as described in [Playing together](#playing-together); `tools/run-server.ps1` is the Windows equivalent of the unit.
 
 ### 3. Patch and start the client
 
@@ -237,8 +280,8 @@ dotnet test tests/Ro3Emu.Tests/Ro3Emu.Tests.csproj -c Release --filter "Category
 ```
 
 The patcher tests run without client data. The server integration tests start a real server on free loopback ports
-and talk to it through bots, covering wire format, flow and persistence. They need the exported `data/` and are not
-part of the client-independent CI check.
+and talk to it through bots, covering wire format, flow and persistence. Most of them need the exported `data/`;
+without it they are skipped, and the rest still run. CI runs both suites on Linux on every push (`tests.yml`).
 
 ### Load tests
 
