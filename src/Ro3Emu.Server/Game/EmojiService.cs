@@ -83,7 +83,6 @@ public sealed class EmojiService : IGameTicker
         character.ProgressHandlers.Add(RefreshUnlocksAsync);
         combat.PlayerDied.Add(s => EndAsync(s));
         scene.Leaving.Add(LeavingAsync);
-        loop.Add(this);
     }
 
     private long NowMs => clock.GetUtcNow().ToUnixTimeMilliseconds();

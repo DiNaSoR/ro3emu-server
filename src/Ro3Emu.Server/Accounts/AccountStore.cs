@@ -92,6 +92,7 @@ public sealed partial class AccountStore : IDisposable
         cmd.ExecuteNonQuery();
         _writer = new(() => new DbWriter(_connectionString, AccessMetrics, _metrics, _log) { RoleWritesCommitted = Snapshots.Committed });
         _readers = new(() => new DbReadPool(_databasePath, AccessMetrics, _metrics, _log));
+        foreach (var plan in DatabaseSchema.Plans()) WriteSync<int>(plan);
     }
 
     internal string DatabasePath => _databasePath;

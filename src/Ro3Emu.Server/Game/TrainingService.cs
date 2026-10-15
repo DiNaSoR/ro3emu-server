@@ -78,7 +78,6 @@ public sealed class TrainingService : IGameTicker
             m.Hp = m.Template.MaxHp; m.Target = null;
             return Task.CompletedTask;
         });
-        loop.Add(this);
     }
 
     public async Task LoginAsync(GameSession s)

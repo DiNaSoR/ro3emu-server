@@ -46,6 +46,10 @@ public sealed class GameLoopTests : IAsyncLifetime
         // The dropped task outlives the invocation's permit; its continuation used to throw on a timer thread.
         // It resumes only after the invocation has finished (a fixed delay could fire before that under load).
         await _loop.InvokeAsync(() => { _ = Late(); return Task.CompletedTask; });
+        // The result reaches this thread before the loop closes the invocation's permit; release after it closed.
+        var until = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        while (_loop.DrainStatus.Outstanding != 0 && DateTime.UtcNow < until) await Task.Delay(5);
+        Assert.Equal(0, _loop.DrainStatus.Outstanding);
         release.SetResult();
         Assert.True(await resumed.Task.WaitAsync(TimeSpan.FromSeconds(5)));
         Assert.Equal(1, _loop.OrphanContinuations);
@@ -166,6 +170,7 @@ public sealed class GameLoopTests : IAsyncLifetime
     {
         using var loop = new GameLoop(NullLogger<GameLoop>.Instance);
         var deadlines = new Deadlines(loop);
+        loop.Add(deadlines);
         await loop.StartAsync(default);
         await loop.StopAsync(default);
         long rejected = loop.DrainStatus.Rejected;
@@ -181,6 +186,7 @@ public sealed class GameLoopTests : IAsyncLifetime
     {
         using var loop = new GameLoop(NullLogger<GameLoop>.Instance);
         var deadlines = new Deadlines(loop);
+        loop.Add(deadlines);
         await loop.StartAsync(default);
         await loop.InvokeAsync(() =>
         {

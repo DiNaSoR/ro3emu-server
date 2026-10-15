@@ -101,7 +101,6 @@ public sealed partial class AdventureGroupService : IGameTicker
         tasks.QuestDelivered.Add(OnTaskDelivered);
         scene.Loaded.Add(OnSceneLoadedAsync);
         gm.Register("advguild", "create <name> | add <role name> | exp <n> | water | info | disband (Adventure Group test aid)", GmAsync);
-        loop.Add(this);
     }
 
     // ---------------------------------------------------------------- config

@@ -11,7 +11,6 @@ public sealed class GuildStore
     public GuildStore(AccountStore accounts)
     {
         this.accounts = accounts;
-        accounts.WriteSync<int>(new GuildSchemaPlan());
     }
 
     public sealed class State

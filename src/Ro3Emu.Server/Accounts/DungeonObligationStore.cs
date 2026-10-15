@@ -12,7 +12,6 @@ public sealed class DungeonObligationStore
     public DungeonObligationStore(AccountStore accounts)
     {
         this.accounts = accounts;
-        accounts.WriteSync<int>(new DungeonObligationSchemaPlan());
     }
 
     public Task FreezeAsync(IReadOnlyList<DungeonRewardObligation> obligations) =>

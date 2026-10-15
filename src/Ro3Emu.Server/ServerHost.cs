@@ -40,6 +40,8 @@ public static class ServerHost
             builder.Services.AddSingleton<ILoggerProvider>(sp => sp.GetRequiredService<Diagnostics.RecentLogBuffer>());
         builder.Services.AddSingleton<GameLoop>();
         builder.Services.AddSingleton<Deadlines>();
+        // Starts before the loop: by then the host has built every hosted service and, through them, every ticker.
+        builder.Services.AddHostedService<GameLoopTickers>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<GameLoop>());
         builder.Services.AddSingleton<AccountStore>();
         builder.Services.AddSingleton<RoleStore>();
@@ -139,6 +141,7 @@ public static class ServerHost
         builder.Services.AddHostedService<DatabaseBackup>();
         builder.Services.AddSingleton<Game.Persistence.PositionPersistence>();
         builder.Services.AddSingleton<Game.Persistence.SettingsPersistence>();
+        builder.Services.AddSingleton<RoleSystems>();
         builder.Services.AddSingleton<RoleSessionService>();
         // Message modules in this order: it is the order of their interceptors (World before Economy before Character).
         builder.Services.AddSingleton<Game.Messaging.IMessageModule, CoreMessages>();
@@ -372,6 +375,53 @@ public static class ServerHost
         }
         return AppContext.BaseDirectory;
     }
+}
+
+/// <summary>
+/// Adds the loop's fixed tickers, in the order it ticks them, just before the loop starts. Each used to add itself
+/// from its constructor; resolving them any earlier would change the order the services subscribe to each other's
+/// events. Map instances and the visibility rebalancer join later as the world opens maps.
+/// </summary>
+internal sealed class GameLoopTickers(IServiceProvider services) : IHostedService
+{
+    public Task StartAsync(CancellationToken cancellationToken)
+    {
+        var loop = services.GetRequiredService<GameLoop>();
+        void Add<T>() where T : IGameTicker => loop.Add(services.GetRequiredService<T>());
+        Add<Deadlines>();
+        Add<MonsterService>();
+        Add<BuffService>();
+        Add<CombatService>();
+        Add<SeasonService>();
+        Add<MountService>();
+        Add<TeamService>();
+        Add<DailyActivityService>();
+        Add<TimedEventService>();
+        Add<PronteraDefenseService>();
+        Add<TimedBattleService>();
+        Add<FestivalService>();
+        Add<TrainingService>();
+        Add<GuildHomeService>();
+        Add<GuildCampfireService>();
+        Add<GuildChallengeService>();
+        Add<AdventureGroupService>();
+        Add<GuildCaravanService>();
+        Add<WildAfkService>();
+        Add<MvpService>();
+        Add<TerritoryWarsService>();
+        Add<TerritoryEscortService>();
+        Add<WorldCoreService>();
+        Add<EmojiService>();
+        Add<AchievementService>();
+        Add<DungeonMatchService>();
+        Add<GatheringService>();
+        Add<TotemEffects>();
+        Add<Game.Persistence.PositionPersistence>();
+        Add<Game.Persistence.SettingsPersistence>();
+        return Task.CompletedTask;
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }
 
 internal sealed class GameLoopQuiesceService(GameLoop loop) : IHostedService

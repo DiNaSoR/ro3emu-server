@@ -18,6 +18,7 @@ public sealed class DeadlinesTests : IAsyncLifetime
     public Task InitializeAsync()
     {
         _deadlines = new Deadlines(_loop, _clock, perTickLimit: 2);
+        _loop.Add(_deadlines);
         return _loop.StartAsync(default);
     }
 

@@ -179,7 +179,6 @@ public sealed partial class TerritoryWarsService : IGameTicker
         this.activities = activities;
         activities.TerritoryWarState = BuildActivityState;
         this.loop = loop; this.log = log;
-        accounts.WriteLegacySync<int>(new TerritorySchemaPlan(RealmStateKind.TerritoryWars));
         state = accounts.ReadSync<byte[]?>(new TerritoryRealmReadPlan(RealmStateKind.TerritoryWars)) is { } saved
             ? JsonSerializer.Deserialize<WorldState>(saved)! : new();
         scene.Loaded.Add(LoadedAsync);
@@ -204,7 +203,6 @@ public sealed partial class TerritoryWarsService : IGameTicker
         combat.PvpDealtAsync.Add(SiegePvpRecordedAsync);
         combat.HealedAsync.Add(BattleHealRecordedAsync);
         combat.HealedAsync.Add(SiegeHealRecordedAsync);
-        loop.Add(this);
     }
 
     public sealed class RoleState

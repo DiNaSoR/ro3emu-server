@@ -59,10 +59,8 @@ public sealed class PronteraDefenseService : IGameTicker
         this.data = data; this.clock = clock; this.roles = roles; this.accounts = accounts; this.guilds = guilds;
         this.character = character; this.awards = awards; this.functions = functions; this.monsters = monsters; this.worldData = worldData; this.world = world;
         this.sessions = sessions; this.loop = loop; this.log = log;
-        accounts.WriteLegacySync<int>(new PronteraDefenseSchemaPlan());
         LoadWorld();
         combat.Killed.Add(OnKilledAsync);
-        loop.Add(this);
     }
 
     public async Task LoginAsync(GameSession session)

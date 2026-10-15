@@ -155,7 +155,6 @@ public sealed class AchievementService : IGameTicker
         });
         mvps.ParticipantSettled.Add(s => PostEvent(s, t => t[0] == CMvp ? 1 : 0));
         gm.Register("ach", "<id> done|reset | fill <type> <count> (achievements test aid)", GmAsync);
-        loop.Add(this);
     }
 
     // ---------------------------------------------------------------- catalog

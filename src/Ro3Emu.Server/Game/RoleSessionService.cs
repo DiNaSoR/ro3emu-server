@@ -8,7 +8,7 @@ namespace Ro3Emu.Server.Game;
 /// A role's session: create and select, the login -> world sequence, position and
 /// settings persistence, the handover cleanup and role switching. Its messages are mapped by CoreMessages.
 /// </summary>
-public sealed class RoleSessionService(RoleStore roles, Maps.World world, ChatService chat, Data.GameData data, CharacterService character, SkillService skills, FunctionService functions, CombatService combat, BuffService buffs, SceneService scene, TaskService tasks, DailyActivityService daily, GuideService guides, EmojiService emoji, AchievementService achievements, Micro.FriendService friends, MvpService mvps, CardService cards, ShopService shops, EmblemService emblems, SeasonService seasons, SeasonPageService seasonPage, SeasonRefineService seasonRefine, SeasonTalentService talents, PetService pets, TowerService tower, MailService mail, AuctionService auctions, GuildService guilds, AdventureGroupService adventureGroups, GuildCaravanService caravan, GuildChallengeService guildChallenge, DungeonService dungeons, DungeonMatchService dungeonMatches, InstanceService instances, TradeService trade, StallsService stalls, LifeJobService life, GatheringService gathering, WildAfkService afk, WorldCoreService worldCore, WorldInteractionService interaction, NewActivityService activities, TimedEventService timedEvents, PronteraDefenseService defense, TimedBattleService timedBattles, FestivalService festival, TrainingService training, LotteryService lottery, TimeProvider clock, MountService mounts, CareerSpecialService careerSpecial, WardrobeService wardrobe, TotemService totems, GenreService genre, TerritoryWarsService territory, TerritoryEscortService escort, Deadlines deadlines, Ownership.RoleHandover handover, SessionRegistry sessions, Persistence.PositionPersistence positions, Persistence.SettingsPersistence settings, ReconnectService reconnects, ILogger<RoleSessionService> log)
+public sealed class RoleSessionService(RoleStore roles, Data.GameData data, BuffService buffs, SceneService scene, Micro.FriendService friends, SeasonService seasons, GuildService guilds, WildAfkService afk, TimeProvider clock, Deadlines deadlines, Ownership.RoleHandover handover, SessionRegistry sessions, Persistence.PositionPersistence positions, Persistence.SettingsPersistence settings, ReconnectService reconnects, RoleSystems systems, ILogger<RoleSessionService> log)
 {
     /// <summary>Novice; JobConfig[1000] picks the male/female unit.</summary>
     private const int NoviceCareer = 1000;
@@ -45,7 +45,7 @@ public sealed class RoleSessionService(RoleStore roles, Maps.World world, ChatSe
     internal Ownership.ReservationKey[] CleanupReservation(GameSession session) =>
         [.. session.Role is { } role ? new[] { Ownership.ReservationKey.Lifecycle(role.Id) } : [],
             .. session.Account is { } account ? new[] { Ownership.ReservationKey.Account(account) } : [],
-            .. guilds.OwnGuildKeys(session), .. timedBattles.CleanupKeys(session)];
+            .. systems.LeaveKeys(session)];
 
     /// <summary>Essential unlinking runs after admitted role work, under the handover's cleanup capability.</summary>
     internal Func<string, GameSession, Exception?>? CleanupFailureForTest { get; set; }
@@ -62,41 +62,7 @@ public sealed class RoleSessionService(RoleStore roles, Maps.World world, ChatSe
             }
             catch (Exception e) { failures.Add(e); }
         }
-        await Step("scene", () => { scene.DisconnectLine(session); return Task.CompletedTask; });
-        await Step("combat", () => combat.ClearSkillsAsync(session));
-        await Step("interaction", () => interaction.DisconnectAsync(session));
-        await Step("gathering", () => gathering.InterruptAsync(session, notify: false));
-        await Step("life", () => life.CancelAsync(session));
-        if (session.Role is { } leaving)
-        {
-            try { await friends.OnlineChangedAsync(leaving.Id, online: false); }
-            catch (Exception e) { log.LogWarning(e, "Optional offline friend notice failed for role {Role}", leaving.Id); }
-        }
-        if (session.RolePositionReady)
-            await Step("position", () => { SavePosition(session); return Task.CompletedTask; });
-        await Step("settings", () => { settings.Flush(session); return Task.CompletedTask; });
-        await Step("territory", () => territory.DisconnectAsync(session));
-        var afkState = session.WildAfk;
-        await Step("afk", () => afk.LeaveAsync(session));
-        // AFK.Leave detaches its session state. A held old-day award still needs the old
-        // daily/task rows on the next login, so the ordinary daily reset must wait for it.
-        if (!WildAfkService.PendingDailyAward(afkState, session.Daily, session.Tasks, session.DailyRows))
-            await Step("daily boundary", () => daily.ReconcileAsync(session));
-        await Step("dungeon", () => dungeons.AbandonAsync(session));
-        await Step("tower", () => tower.AbandonAsync(session));
-        if (session.GuildOnlinePublished)
-            await Step("guild", () => guilds.OnlineChangedAsync(session, false));
-        session.ActivitiesReady = false;
-        await Step("training", () => training.LeaveRoleAsync(session));
-        await Step("festival", () => festival.LeaveRoleAsync(session));
-        await Step("dungeon match", () => dungeonMatches.LeaveRoleAsync(session));
-        session.DungeonSoloMatch = false;
-        await Step("timed battle", () => timedBattles.LeaveRoleAsync(session));
-        session.EventFaction = 0;
-        await Step("instance", () => instances.AbandonAsync(session));
-        await Step("world", () => world.LeaveAsync(session));
-        await Step("chat", () => { chat.OnRoleLeft(session); return Task.CompletedTask; });
-        await Step("world core", () => { worldCore.Disconnected(session); return Task.CompletedTask; });
+        await systems.LeaveAsync(session, Step, () => SavePosition(session));
         if (snapshotRole is { } released) roles.ReleaseLoginSnapshot(released);
         if (failures.Count != 0) throw new AggregateException("Essential role cleanup failed.", failures);
     }
@@ -195,9 +161,7 @@ public sealed class RoleSessionService(RoleStore roles, Maps.World world, ChatSe
 
     private async Task<Ownership.ReservationKey[]> LoginReservationAsync(long roleId, string account) =>
         [Ownership.ReservationKey.Role(roleId), Ownership.ReservationKey.Account(account), Ownership.ReservationKey.Lifecycle(roleId),
-            .. defense.LoginKeys(roleId), .. activities.LoginKeys(roleId), .. territory.LoginKeys(),
-            .. caravan.LoginKeys(roleId), .. guildChallenge.LoginKeys(roleId),
-            .. await mvps.LoginKeysAsync(roleId), .. await dungeons.LoginKeysAsync(roleId)];
+            .. await systems.LoginKeysAsync(roleId)];
 
     /// <summary>The login keys follow guild membership and pending obligations, which may change while the select
     /// waits: re-admit until the admitted reservation still covers them.</summary>
@@ -311,22 +275,7 @@ public sealed class RoleSessionService(RoleStore roles, Maps.World world, ChatSe
         session.Mounts = null; session.MountState = new(); session.Wardrobe = null; session.Totems = null; session.Genre = null;
         session.TotemSwitchUtc = default;
         session.SceneLoading = true;
-        character.Load(session);
-        await character.FinishLoadAsync(session);
-        careerSpecial.Load(session); // before mounts: a leased mount entitles the battle slot
-        mounts.Load(session);
-        totems.Load(session);
-        await life.LoadAsync(session);
-        seasons.Load(session);
-        session.ActivitiesReady = false;
-        session.NewActivities = null;
-        session.DailyReady = false;
-        afk.Load(session);
-        daily.Load(session);
-        await emblems.LoadAsync(session);
-        talents.Load(session);
-        seasonRefine.Load(session);
-        character.Refresh(session); // first entity/stats use this role's saved active talent plan
+        await systems.LoadAsync(session);
         log.LogInformation("Role {Name} ({Id}) of {Account} enters scene {Scene} at {X},{Z}", role.Name, role.Id, session.Account, role.SceneEntry, role.X, role.Z);
         return arrival;
     }
@@ -363,108 +312,7 @@ public sealed class RoleSessionService(RoleStore roles, Maps.World world, ChatSe
         session.SettingsPart = null;
         await session.SendGameAsync(MsgId.AutoSyncSettings, SettingsSync(session.Settings));
         EnsureSelection(session, lease);
-        await chat.OnRoleEnteredAsync(session);
-        EnsureSelection(session, lease);
-        await seasons.LoginAsync(session); // 5021 early: multiverse lookups read its playBookId
-        EnsureSelection(session, lease);
-        await character.SendLoginSyncAsync(session);
-        EnsureSelection(session, lease);
-        await skills.LoadAsync(session); // after character/cart sync, before login rewards can call skill sync under StateLock
-        EnsureSelection(session, lease);
-        await life.LoginAsync(session); // 5018 vigor then 5010 before To-Do/tasks/functions consume life state.
-        EnsureSelection(session, lease);
-        await seasonPage.LoginAsync(session); // 5022 before the Season/honor panels can open
-        EnsureSelection(session, lease);
-        await seasonRefine.LoginAsync(session); // 5023 after 5007, before function unlocks
-        EnsureSelection(session, lease);
-        await wardrobe.LoginAsync(session);
-        EnsureSelection(session, lease);
-        await mounts.LoginAsync(session);
-        EnsureSelection(session, lease);
-        await careerSpecial.LoginAsync(session); // 5002: the equipment window reads SpecialPropData unguarded
-        EnsureSelection(session, lease);
-        await totems.SyncAsync(session);
-        EnsureSelection(session, lease);
-        // 5035 must precede To-Do/scene loading: LC_OnHookHelper calls Mathf.Max on its remaining seconds.
-        await afk.LoginAsync(session);
-        EnsureSelection(session, lease);
-        await tasks.LoginAsync(session); // 5027 before 5056: quest-gated functions (condition 4004)
-        EnsureSelection(session, lease);
-        await daily.LoginAsync(session); // 5004 and 5059 before 5056 opens To-Do / Dodo
-        EnsureSelection(session, lease);
-        await afk.ReconcileAsync(session); // finish any held old-day award before exposing today's allowance
-        EnsureSelection(session, lease);
-        await talents.SyncAsync(session); // TaskService may return without quest config; 5050 still has safe nonempty maps
-        EnsureSelection(session, lease);
-        await guides.LoginAsync(session);
-        EnsureSelection(session, lease);
-        await emoji.LoginAsync(session); // 5006: the emote panel enables only unlocked emotes
-        EnsureSelection(session, lease);
-        await cards.LoginAsync(session); // after 5009: inserted cards are its storagePack
-        EnsureSelection(session, lease);
-        await tower.LoginAsync(session); // 5065 before tower-dependent functions and shop conditions
-        EnsureSelection(session, lease);
-        await dungeons.LoginAsync(session); // 5062 before opening the Dungeon menu
-        EnsureSelection(session, lease);
-        await emblems.LoginAsync(session); // after 5009: plan GUIDs refer to item instances
-        EnsureSelection(session, lease);
-        await shops.LoginAsync(session); // after 5066: purchase replies read PlayerBasicInfo.id
-        EnsureSelection(session, lease);
-        await trade.LoginAsync(session); // 5033 before 5056 makes the trade UI reachable.
-        EnsureSelection(session, lease);
-        await stalls.LoginAsync(session); // 5058 is metadata; stock remains in 33408/33411.
-        EnsureSelection(session, lease);
-        await guilds.LoginAsync(session); // 5047 and, for members only, 32213 before 5056 opens guild UI
-        EnsureSelection(session, lease);
-        await adventureGroups.LoginAsync(session); // 5068 and, for members, 34011 before 5056 opens the Adv. Guild
-        EnsureSelection(session, lease);
-        await guildChallenge.LoginAsync(session);
-        EnsureSelection(session, lease);
-        await caravan.LoginAsync(session); // role caravan counters in 5047 before the activity card opens
-        EnsureSelection(session, lease);
-        await territory.LoginAsync(session);
-        EnsureSelection(session, lease);
-        await escort.LoginAsync(session);
-        EnsureSelection(session, lease);
-        await defense.LoginAsync(session);
-        EnsureSelection(session, lease);
-        await activities.LoginAsync(session); // 5013/5042/5054 before gated activity panels
-        EnsureSelection(session, lease);
-        await dungeons.DeliverJourneyPendingAsync(session);
-        EnsureSelection(session, lease);
-        await timedEvents.LoginAsync(session);
-        EnsureSelection(session, lease);
-        await timedBattles.LoginAsync(session);
-        EnsureSelection(session, lease);
-        await festival.LoginAsync(session);
-        EnsureSelection(session, lease);
-        await training.LoginAsync(session);
-        EnsureSelection(session, lease);
-        await auctions.LoginAsync(session); // 5063 personal state; 82000/82005 supply actual lists
-        EnsureSelection(session, lease);
-        await pets.LoginAsync(session); // 5017 before 5056: opening a function must not expose an uninitialized pet DAL.
-        EnsureSelection(session, lease);
-        await genre.LoginAsync(session);
-        session.DeferTaskSync = false;
-        EnsureSelection(session, lease);
-        await tasks.RefreshAsync(session); // all owner snapshots are now available for passive objectives; settles with the login's one full 5027
-        EnsureSelection(session, lease);
-        await achievements.LoginAsync(session); // one full 5019 after every owner snapshot its conditions read; function 21 opens at level 1
-        EnsureSelection(session, lease);
-        session.DeferFunctionSync = false;
-        await functions.SyncAsync(session);
-        EnsureSelection(session, lease);
-        await lottery.LoginAsync(session);
-        EnsureSelection(session, lease);
-        await mail.LoginAsync(session); // offline deliveries invalidate the mail categories after role selection
-        await mvps.RecoverAsync(session); // frozen MVP outcomes survive commit-before-delivery and restart
-        EnsureSelection(session, lease);
-        await skills.SyncAsync(session); // after 5066: skill points need PlayerBasicInfo.career
-        EnsureSelection(session, lease);
-        await buffs.InitializeEnergyAsync(session);
-        EnsureSelection(session, lease);
-        await worldCore.LoginAsync(session);
-        EnsureSelection(session, lease);
+        await systems.LoginAsync(session, () => EnsureSelection(session, lease));
 
         await friends.OnlineChangedAsync(role.Id, online: true);
         EnsureSelection(session, lease);
@@ -489,11 +337,7 @@ public sealed class RoleSessionService(RoleStore roles, Maps.World world, ChatSe
         session.Face = walk.Face;
         session.Walking = !walk.BStop && walk.SpeedRate > 0;
         positions.MarkDirty(session, urgent: walk.BStop); // C/D 18: written lazily, never on the loop
-        await world.MoveAsync(session, walk);
-        await gathering.PlayerMovedAsync(session);
-        combat.PlayerMoved(session);
-        await emoji.PlayerMovedAsync(session);
-        await dungeons.PlayerMovedAsync(session); // scripted scene regions and points
+        await systems.MovedAsync(session, walk);
     }
 
     /// <summary>The entity a remote client renders for this player (same shape as ENTITYSELF).</summary>

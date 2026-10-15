@@ -264,7 +264,6 @@ public sealed partial class TerritoryEscortService : IGameTicker
         this.loop = loop;
         this.world = world;
         this.maps = maps;
-        accounts.WriteLegacySync<int>(new TerritorySchemaPlan(RealmStateKind.TerritoryEscort));
         ledger = accounts.ReadSync<byte[]?>(new TerritoryRealmReadPlan(RealmStateKind.TerritoryEscort)) is { } bytes
             ? JsonSerializer.Deserialize<Ledger>(bytes) ?? new Ledger() : new Ledger();
         foreach (var (guild, play) in ledger.Play)
@@ -281,7 +280,6 @@ public sealed partial class TerritoryEscortService : IGameTicker
         combat.MonsterDamageApplied.Add(CartDamagedAsync);
         combat.PvpDealt.Add(PvpRecorded);
         combat.PlayerKilled.Add(PlayerKilledAsync);
-        loop.Add(this);
     }
 
     private static long RoleId(GameSession s) => s.Role?.Id ?? 0;

@@ -44,7 +44,6 @@ public sealed class GuildHomeService : IGameTicker
             ? (long)map : DefaultScene;
         // (inferred, spec §6.5) Exiting the home revives a dead member on return, as ordinary dungeon runs do.
         dungeons.RecoverDeadOnLeave = roomId => GuildOfRoom(roomId) != null;
-        loop.Add(this);
     }
 
     /// <summary>GuildSettingConfig.GuildMap, 4000101 when the export lacks it.</summary>

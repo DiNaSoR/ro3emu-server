@@ -91,8 +91,6 @@ public sealed class GuildCaravanService : IGameTicker
         this.data = data; this.guilds = guilds; this.accounts = accounts; this.roles = roles;
         this.character = character; this.awards = awards; this.mail = mail; this.guildService = guildService;
         this.tasks = tasks; this.seasons = seasons; this.functions = functions; this.sessions = sessions; this.clock = clock; this.loop = loop; this.log = log;
-        accounts.WriteLegacySync<int>(new CaravanSchemaPlan());
-        loop.Add(this);
     }
 
     private SemaphoreSlim Gate(long guildId) => gates.GetOrAdd(guildId, _ => new SemaphoreSlim(1, 1));
@@ -236,7 +234,7 @@ public sealed class GuildCaravanService : IGameTicker
         && progress.Level >= GameData.Int(row, "_iiLv")
         && functions.IsOpen(s, 1320);
 
-    private State? Read(long roleId) => accounts.ReadSync<State?>(new CaravanReadPlan(CaravanReadKind.Member, roleId));
+    private State? Read(long roleId) => accounts.ReadSync<State?>(new CaravanMemberReadPlan<State>(roleId));
 
     private EconomyEnvelope MetadataEnvelope(long roleId, string kind)
     {
@@ -258,7 +256,7 @@ public sealed class GuildCaravanService : IGameTicker
     {
         // (inferred) The protocol has one dayVersion for a guild help list, while skuIndex must stay 1..8.
         // A guild-wide monotonic revision rejects actions against refreshed or replaced slots.
-        long revision = accounts.ReadSync<long>(new CaravanReadPlan(CaravanReadKind.Version, guildId, day));
+        long revision = accounts.ReadSync<long>(new CaravanVersionReadPlan(guildId, day));
         return checked(day * 1_000_000 + revision);
     }
 
@@ -339,14 +337,14 @@ public sealed class GuildCaravanService : IGameTicker
 
     private async Task<State> EnsureAsync(GameSession s, GuildStore.State guild)
     {
-        if (Guild(s)?.Id != guild.Id || !Eligible(s)) throw new MembershipChangedException();
+        if (Guild(s)?.Id != guild.Id || !Eligible(s)) throw new CaravanMembershipChangedException();
         long roleId = s.Role!.Id;
         var state = Read(roleId) ?? new State { Day = Day, GuildId = guild.Id };
         state.PendingAwards ??= new(); state.Skus ??= new();
         if (state.Day != Day)
             state = await RolloverAsync(roleId, state, s.Progress!);
         if (Guild(s)?.Id != guild.Id || !Eligible(s) || state.Day != Day)
-            throw new MembershipChangedException();
+            throw new CaravanMembershipChangedException();
         if (state.GuildId != guild.Id)
         {
             // (inferred) A guild switch keeps paid/done slots and daily limits; only old-guild help requests expire.
@@ -430,7 +428,7 @@ public sealed class GuildCaravanService : IGameTicker
     /// <summary>Settle yesterday's connected and offline orders at 05:00, once per persisted role.</summary>
     public async Task ReconcileAllAsync()
     {
-        var roleIds = accounts.ReadSync<List<long>>(new CaravanReadPlan(CaravanReadKind.RoleIds));
+        var roleIds = accounts.ReadSync<List<long>>(new CaravanRoleIdsReadPlan());
         foreach (long roleId in roleIds)
         {
             var snapshot = Read(roleId);
@@ -545,7 +543,7 @@ public sealed class GuildCaravanService : IGameTicker
             await PublishAsync(s, state);
             await ShowCoreAsync(s, state);
         }
-        catch (MembershipChangedException) { /* Guild membership changed during login. */ }
+        catch (CaravanMembershipChangedException) { /* Guild membership changed during login. */ }
     }
 
     public async Task ShowAsync(GameSession s)
@@ -559,18 +557,18 @@ public sealed class GuildCaravanService : IGameTicker
         using (var order = await EnterWithGuildGateAsync("guild-caravan/show-order", guild.Id, s.Role!.Id))
         {
             try { await EnsureAsync(s, guild); }
-            catch (MembershipChangedException)
+            catch (CaravanMembershipChangedException)
             { await s.SendGameAsync(Show, new GuildCatShopShowResp { Result = ErrorCodes.NotInGuild }); return; }
         }
         using var operation = await EnterWithCharacterGateAsync("guild-caravan/show-delivery", guild.Id, s, s.Role!.Id);
         try
         {
-            if (Guild(s)?.Id != guild.Id) throw new MembershipChangedException();
+            if (Guild(s)?.Id != guild.Id) throw new CaravanMembershipChangedException();
             var state = await EnsureAsync(s, guild);
             await DeliverPendingAsync(s, state, guild.Id, operation.CharacterLocked);
             await ShowCoreAsync(s, state);
         }
-        catch (MembershipChangedException)
+        catch (CaravanMembershipChangedException)
         { await s.SendGameAsync(Show, new GuildCatShopShowResp { Result = ErrorCodes.NotInGuild }); }
     }
 
@@ -578,109 +576,6 @@ public sealed class GuildCaravanService : IGameTicker
     private int Check(State state, long version, Sku? sku) => version != Version(state.GuildId, state.Day) ? ErrorCodes.CaravanOrderExpired
         : state.CurRound >= Setting("GuildTransportRoundNum", 5) ? ErrorCodes.CaravanDeparted
         : sku == null ? ErrorCodes.Parameter : 0;
-
-    private sealed class MembershipChangedException : Exception;
-
-    private sealed class CaravanSchemaPlan : DbPlan
-    {
-        internal override int Bytes => 128;
-        internal override string Label => "guild-caravan/schema";
-        internal override object Execute(SqliteConnection db, SqliteTransaction tx)
-        {
-            using var cmd = DbSql.Command(db, tx, """
-                CREATE TABLE IF NOT EXISTS guild_caravan_member (role_id INTEGER PRIMARY KEY, state BLOB NOT NULL, revision INTEGER NOT NULL);
-                CREATE TABLE IF NOT EXISTS guild_caravan_version (guild_id INTEGER PRIMARY KEY, day INTEGER NOT NULL, revision INTEGER NOT NULL);
-                """);
-            cmd.ExecuteNonQuery();
-            SchemaSql.Execute(db, tx, """
-                INSERT OR IGNORE INTO owner_revision(kind,id,part,revision) SELECT 'guild_caravan_member',role_id,'state',0 FROM guild_caravan_member;
-                INSERT OR IGNORE INTO owner_revision(kind,id,part,revision) SELECT 'guild_caravan_version',guild_id,'state',0 FROM guild_caravan_version;
-                """);
-            return 1;
-        }
-    }
-
-    private enum CaravanReadKind { Member, Version, RoleIds }
-
-    private sealed class CaravanReadPlan(CaravanReadKind kind, long id = 0, long day = 0) : DbReadPlan
-    {
-        internal override int Bytes => 128;
-        internal override string Label => "guild-caravan/read-" + kind;
-        internal override object? Execute(SqliteConnection db, SqliteTransaction tx)
-        {
-            switch (kind)
-            {
-                case CaravanReadKind.Member:
-                    using (var cmd = DbSql.Command(db, tx, "SELECT state FROM guild_caravan_member WHERE role_id=$role"))
-                    {
-                        cmd.Parameters.AddWithValue("$role", id);
-                        return cmd.ExecuteScalar() is byte[] blob ? JsonSerializer.Deserialize<State>(blob) : null;
-                    }
-                case CaravanReadKind.Version:
-                    using (var cmd = DbSql.Command(db, tx,
-                        "SELECT revision FROM guild_caravan_version WHERE guild_id=$guild AND day=$day"))
-                    {
-                        cmd.Parameters.AddWithValue("$guild", id);
-                        cmd.Parameters.AddWithValue("$day", day);
-                        return Convert.ToInt64(cmd.ExecuteScalar() ?? 0L);
-                    }
-                case CaravanReadKind.RoleIds:
-                    using (var cmd = DbSql.Command(db, tx, "SELECT role_id FROM guild_caravan_member"))
-                    using (var reader = cmd.ExecuteReader())
-                    {
-                        var ids = new List<long>();
-                        while (reader.Read()) ids.Add(reader.GetInt64(0));
-                        return ids;
-                    }
-                default: throw new ArgumentOutOfRangeException(nameof(kind));
-            }
-        }
-    }
-
-    private sealed class CaravanMemberWritePlan(long roleId, long guildId, bool requireMembership,
-        long expected, long next, byte[] state) : DbPlan
-    {
-        private readonly byte[] _state = (byte[])state.Clone();
-        internal override int Bytes => 128 + _state.Length;
-        internal override string Label => "guild-caravan/member";
-        internal override IReadOnlyList<long> RolePins => [roleId];
-        internal override IReadOnlyList<OwnerRevisionKey> EntityWrites => [RevisionStore.Entity("guild_caravan_member", roleId)];
-        internal override object Execute(SqliteConnection db, SqliteTransaction tx)
-        {
-            if (requireMembership)
-            {
-                using var member = DbSql.Command(db, tx, "SELECT guild_id FROM guild_member WHERE role_id=$role");
-                member.Parameters.AddWithValue("$role", roleId);
-                if (Convert.ToInt64(member.ExecuteScalar() ?? 0L) != guildId) throw new MembershipChangedException();
-            }
-            using var cmd = DbSql.Command(db, tx, "INSERT INTO guild_caravan_member(role_id,state,revision) VALUES($role,$state,$next) " +
-                "ON CONFLICT(role_id) DO UPDATE SET state=excluded.state,revision=excluded.revision " +
-                "WHERE guild_caravan_member.revision=$expected");
-            cmd.Parameters.AddWithValue("$role", roleId);
-            cmd.Parameters.AddWithValue("$state", _state);
-            cmd.Parameters.AddWithValue("$next", next);
-            cmd.Parameters.AddWithValue("$expected", expected);
-            if (cmd.ExecuteNonQuery() != 1) throw new MembershipChangedException();
-            return next;
-        }
-    }
-
-    private sealed class CaravanVersionPlan(long guildId, long day) : DbPlan
-    {
-        internal override int Bytes => 128;
-        internal override string Label => "guild-caravan/version";
-        internal override IReadOnlyList<OwnerRevisionKey> EntityWrites => [RevisionStore.Entity("guild_caravan_version", guildId)];
-        internal override object Execute(SqliteConnection db, SqliteTransaction tx)
-        {
-            using var cmd = DbSql.Command(db, tx, """
-                INSERT INTO guild_caravan_version(guild_id,day,revision) VALUES($guild,$day,1)
-                ON CONFLICT(guild_id) DO UPDATE SET revision=CASE WHEN day=$day THEN revision+1 ELSE 1 END,day=$day
-                """);
-            cmd.Parameters.AddWithValue("$guild", guildId);
-            cmd.Parameters.AddWithValue("$day", day);
-            return cmd.ExecuteNonQuery();
-        }
-    }
 
     private static void EnlistMemberSave(RoleItemPlanBuilder transaction, long roleId, long guildId,
         State state, bool requireMembership)
@@ -809,7 +704,7 @@ public sealed class GuildCaravanService : IGameTicker
                 additional?.Invoke(tx);
                 tx.WithEconomy(economy);
             }, asyncCommit: true); }
-        catch (MembershipChangedException) { return null; }
+        catch (CaravanMembershipChangedException) { return null; }
         if (committed == null) return null;
         Copy(next, state);
         var notify = new GetRewardNotify { TargetUid = s.Role!.Id };
@@ -894,7 +789,7 @@ public sealed class GuildCaravanService : IGameTicker
                     }
                 }
             }
-            catch (MembershipChangedException) { resp.Result = ErrorCodes.NotInGuild; }
+            catch (CaravanMembershipChangedException) { resp.Result = ErrorCodes.NotInGuild; }
         }
         await s.SendGameAsync(Submit, resp);
     }
@@ -935,7 +830,7 @@ public sealed class GuildCaravanService : IGameTicker
                     await PublishAsync(s, state);
                 }
             }
-            catch (MembershipChangedException) { resp.Result = ErrorCodes.NotInGuild; }
+            catch (CaravanMembershipChangedException) { resp.Result = ErrorCodes.NotInGuild; }
         }
         await s.SendGameAsync(WantHelp, resp);
     }
@@ -959,7 +854,7 @@ public sealed class GuildCaravanService : IGameTicker
                             resp.Skus.Add(new GuildCatShopItemHelpSku
                             { PlayerID = member.RoleId, PlayerName = member.Name, Data = Proto(sku) });
             }
-            catch (MembershipChangedException) { resp.Result = ErrorCodes.NotInGuild; resp.Skus.Clear(); }
+            catch (CaravanMembershipChangedException) { resp.Result = ErrorCodes.NotInGuild; resp.Skus.Clear(); }
         }
         await s.SendGameAsync(HelpList, resp);
     }
@@ -995,7 +890,7 @@ public sealed class GuildCaravanService : IGameTicker
                     {
                         if (!ReferenceEquals(s.Role, helperRole) || !ReferenceEquals(s.Attachment, helperAttachment)
                             || !ReferenceEquals(s.Owner, helperOwner) || s.Owner?.LifecycleEpoch != helperEpoch
-                            || Guild(s)?.Id != guild.Id) throw new MembershipChangedException();
+                            || Guild(s)?.Id != guild.Id) throw new CaravanMembershipChangedException();
                         var own = await EnsureAsync(s, guild);
                         var target = guild.Members.ContainsKey(req.PlayerID) ? Read(req.PlayerID) : null;
                         var sku = target == null ? null : Slot(target, req.SkuIndex);
@@ -1051,7 +946,7 @@ public sealed class GuildCaravanService : IGameTicker
                             }
                         }
                     }
-                    catch (MembershipChangedException) { resp.Result = ErrorCodes.NotInGuild; }
+                    catch (CaravanMembershipChangedException) { resp.Result = ErrorCodes.NotInGuild; }
                 }
             }
             if (committedOwn != null && committedTarget != null)
@@ -1182,7 +1077,7 @@ public sealed class GuildCaravanService : IGameTicker
                     }
                 }
             }
-            catch (MembershipChangedException) { resp.Result = ErrorCodes.NotInGuild; }
+            catch (CaravanMembershipChangedException) { resp.Result = ErrorCodes.NotInGuild; }
             }
             if (departed) await RefreshDepartureTasksAsync(s);
         }
@@ -1224,7 +1119,7 @@ public sealed class GuildCaravanService : IGameTicker
                     await PushOtherShowsAsync(guild, s.Role!.Id);
                 }
             }
-            catch (MembershipChangedException) { resp.Result = ErrorCodes.NotInGuild; }
+            catch (CaravanMembershipChangedException) { resp.Result = ErrorCodes.NotInGuild; }
         }
         await s.SendGameAsync(Refresh, resp);
     }

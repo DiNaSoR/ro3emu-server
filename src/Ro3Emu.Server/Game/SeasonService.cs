@@ -74,7 +74,6 @@ public sealed class SeasonService : IGameTicker
         this.sessions = sessions;
         this.log = log;
         OpenContent = options.Value.OpenContent;
-        accounts.WriteLegacySync<int>(new SeasonStateSchemaPlan());
         playBook = int.TryParse(Get("playbook"), CultureInfo.InvariantCulture, out int saved) ? saved : options.Value.PlayBook;
         seasonId = int.TryParse(Get("season_id"), CultureInfo.InvariantCulture, out int savedId) && savedId > 0 ? savedId : 1;
         history = JsonSerializer.Deserialize<Dictionary<int, Season>>(Get("season_history") ?? "{}") ?? new();
@@ -82,7 +81,6 @@ public sealed class SeasonService : IGameTicker
             DateTimeStyles.AssumeLocal, out var rolled) ? rolled : options.Value.SeasonStart is { Length: > 0 } configured
             ? DateTime.ParseExact(configured, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal)
             : FirstStart();
-        loop.Add(this);
     }
 
     /// <summary>Midnight of the season's first day.</summary>

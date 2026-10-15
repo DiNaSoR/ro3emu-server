@@ -73,7 +73,6 @@ public sealed partial class DailyActivityService : IGameTicker
         tasks.RefreshDailyTracking = s => tasks.EnsureDailyTrackingCoreAsync(s, TrackingTasks(s));
         tasks.PrepareDailyDelivery = PrepareDelivery;
         tasks.SyncDailyDelivery = SyncDeliveryAsync;
-        loop.Add(this);
     }
 
     /// <summary>Restores the new day's AFK allowance into the reset transaction (WildAfkService, same role scope).</summary>

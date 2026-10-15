@@ -201,22 +201,30 @@ public sealed class QuestWalkTests : IAsyncLifetime
                 .OrderBy(u => (u.X - me.Position.X) * (u.X - me.Position.X) + (u.Z - me.Position.Z) * (u.Z - me.Position.Z)).First();
             return Task.FromResult((m, skills.NormalAttack(me.Progress!.Career)));
         });
-        // The client chases a roaming target itself; the bot jumps next to it again every 3 s instead. Under a loaded
-        // machine a fight lasts longer: the bot died with its potions unused (diagnosis of the full-suite failure).
-        for (int i = 0; i < 300 && !target.Dead; i++)
+        // Like the client: attack again only when the auto-attack stopped (a potion, a jump) and chase a target that
+        // roamed out of reach. A new cast cancels the swing in progress, so attacking blindly on a timer starved the
+        // fight under a loaded suite (a Poring left at 65 HP after 30 s). Under load a fight also lasts longer: the
+        // bot died once with its potions unused.
+        for (int i = 0, check = 0; i < 300 && !target.Dead; i++)
         {
-            // At most every 1.2 s (the potion cooldown); drinking stops the auto-attack, so attack again right after.
-            bool sipped = i % 12 == 6 && await SipAsync();
-            if (sipped)
+            // At most every 1.2 s (the potion cooldown).
+            if (i % 12 == 6) await SipAsync();
+            if (i >= check)
             {
-                await bot.SendGameAsync(CombatService.LockEnemy, new LockEnemyReq { EnemyId = target.Uid });
-                await bot.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = attack, TargetId = target.Uid });
-            }
-            if (i % 30 == 0)
-            {
-                await Gm(FormattableString.Invariant($"!jump {target.X:0.0} {target.Z + 1:0.0}"));
-                await bot.SendGameAsync(CombatService.LockEnemy, new LockEnemyReq { EnemyId = target.Uid });
-                await bot.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = attack, TargetId = target.Uid });
+                check = i + 3;
+                var (attacking, near) = await loop.InvokeAsync(() =>
+                {
+                    var me = sessions.All().Single(x => x.Role != null);
+                    return Task.FromResult((ReferenceEquals(me.Attack?.Target, target),
+                        MonsterService.Distance(target.X, target.Z, me.Position.X, me.Position.Z) <= 2f));
+                });
+                if (!attacking || !near)
+                {
+                    if (!near) await Gm(FormattableString.Invariant($"!jump {target.X:0.0} {target.Z + 1:0.0}"));
+                    await bot.SendGameAsync(CombatService.LockEnemy, new LockEnemyReq { EnemyId = target.Uid });
+                    await bot.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = attack, TargetId = target.Uid });
+                    check = i + 10; // give the cast a second to start before judging it again
+                }
             }
             await Task.Delay(100);
         }

@@ -44,7 +44,6 @@ public sealed partial class BuffService : IGameTicker
         this.character = character;
         this.loop = loop;
         this.log = log;
-        loop.Add(this);
         character.GiveBuff = (p, buff, ms) => AddAsync(p, buff, ms, p.Role!.Id);
         character.IsItemUseForbidden = p => HasForbidden(p, 12);
         character.DynamicProperties.Add(SupportShieldProperties);

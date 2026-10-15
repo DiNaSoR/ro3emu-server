@@ -55,7 +55,6 @@ public sealed class TotemEffects : IGameTicker
         this.monsters = monsters; this.sessions = sessions;
         this.loop = loop;
         character.DynamicProperties.Add(ShieldProperties);
-        loop.Add(this);
         combat.CastLanded.Add(OnCastAsync);
         combat.DamageAdjusters.Add(AdjustDamage);
         combat.ExtraHitDamage.Add(ExtraDamage);

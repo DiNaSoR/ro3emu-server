@@ -36,7 +36,6 @@ public sealed class TimedEventService : IGameTicker
         this.sessions = sessions;
         this.loop = loop;
         this.seasons = seasons;
-        loop.Add(this);
     }
 
     /// <summary>The activity's join window holds now (real dates, the OpenContent repeat, or a GM test window).</summary>

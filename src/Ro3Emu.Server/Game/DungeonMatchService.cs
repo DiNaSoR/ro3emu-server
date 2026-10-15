@@ -60,7 +60,6 @@ public sealed class DungeonMatchService : IGameTicker
         this.data = data; this.catalog = catalog; this.dungeons = dungeons; this.teams = teams;
         this.timedBattles = timedBattles; this.sessions = sessions; this.time = time; this.loop = loop; this.log = log;
         timedBattles.OtherMatchBusy = Owns;
-        loop.Add(this);
     }
 
     public bool WantsEntry(int entry) => data.Row("MatchConfig", entry) is { } row

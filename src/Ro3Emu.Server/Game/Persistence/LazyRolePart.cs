@@ -36,7 +36,6 @@ public abstract class LazyRolePart : IGameTicker
         this.loop = loop;
         this.roles = roles;
         this.log = log;
-        loop.Add(this);
     }
 
     /// <summary>The revision part guarded by the CAS chain (RevisionStore part name).</summary>

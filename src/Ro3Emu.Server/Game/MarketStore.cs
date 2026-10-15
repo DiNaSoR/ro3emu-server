@@ -36,7 +36,6 @@ public sealed class MarketStore
         this.mail = mail;
         this.log = log;
         this.clock = clock;
-        accounts.WriteLegacySync<int>(new MarketSchemaPlan());
         MigrateLegacyMail();
     }
 

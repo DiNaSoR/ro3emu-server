@@ -51,7 +51,6 @@ public sealed class MountService : IGameTicker
         wardrobe.MountGrant = PlanShopGrant;
         character.JobChanged.Add(ReconcileAsync);
         scenes.BeforeSelf.Add(ReconcileAsync);
-        loop.Add(this);
     }
 
     public void Load(GameSession s)

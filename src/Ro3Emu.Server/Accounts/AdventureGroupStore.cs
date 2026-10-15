@@ -17,7 +17,6 @@ public sealed class AdventureGroupStore
     public AdventureGroupStore(AccountStore accounts)
     {
         this.accounts = accounts;
-        accounts.WriteSync<int>(new AdventureGroupSchemaPlan());
     }
 
     public sealed class State

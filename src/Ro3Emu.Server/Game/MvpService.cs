@@ -146,7 +146,6 @@ public sealed class MvpService : IGameTicker
         this.world = world;
         this.loop = loop;
         this.combat = combat;
-        accounts.WriteLegacySync<int>(new MvpSchemaPlan());
         combat.EventDamageRecorded.Add((s, m, damage) => { OnDealt(s, m, damage); return Task.CompletedTask; });
         combat.Taken.Add(OnTaken);
         combat.BeforeLethalPublication.Add(PrepareKilledAsync);
@@ -156,7 +155,6 @@ public sealed class MvpService : IGameTicker
         scene.PublicLineOpened.Add(ActivateLine);
         lines.HasPendingWork.Add(HasPendingWork);
         lines.Retiring.Insert(0, RetireLineAsync);
-        loop.Add(this);
     }
 
     // ---- client requests ----

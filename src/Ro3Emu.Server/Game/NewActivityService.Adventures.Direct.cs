@@ -32,7 +32,6 @@ public sealed partial class NewActivityService
     /// <summary>Shared Pre progress is durable across roles and server restart, keyed by cycle and realm area.</summary>
     private void InitializeAdventureServices(AccountStore accountStore, ItemStore itemStore)
     {
-        accountStore.WriteLegacySync<int>(new AdventureSchemaPlan());
     }
 
     private (long Cycle, int Area, long Day) PreKey(GameSession session, long id) =>

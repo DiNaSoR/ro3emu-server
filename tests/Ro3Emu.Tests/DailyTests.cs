@@ -135,15 +135,20 @@ public sealed class DailyTests : IAsyncLifetime
     [Fact]
     public void LegacyDailyBindingMigratesOnceAndKeepsAllNewItemFields()
     {
-        using var accounts = new AccountStore(Microsoft.Extensions.Options.Options.Create(new ServerOptions
-        { DataDir = Path.Combine(dataDir, "legacy-daily") }));
-        long roleId = new RoleStore(accounts).Create("legacy-daily", 1, "LegacyDaily", 1, 1000, 1)!.Id;
-        FixtureSql.Execute(accounts, """
-                CREATE TABLE item (guid INTEGER PRIMARY KEY AUTOINCREMENT, role_id INTEGER NOT NULL,
-                    entry INTEGER NOT NULL, stack INTEGER NOT NULL, pack INTEGER NOT NULL, sort INTEGER NOT NULL,
-                    grid INTEGER NOT NULL DEFAULT 0, attrs TEXT, bind INTEGER NOT NULL DEFAULT 0);
-                INSERT INTO item (role_id, entry, stack, pack, sort, bind) VALUES ($role, 1250001, 1, 1, 1, 1);
-                """, ("$role", roleId));
+        var options = Microsoft.Extensions.Options.Options.Create(new ServerOptions { DataDir = Path.Combine(dataDir, "legacy-daily") });
+        long roleId;
+        using (var old = new AccountStore(options))
+        {
+            roleId = new RoleStore(old).Create("legacy-daily", 1, "LegacyDaily", 1, 1000, 1)!.Id;
+            FixtureSql.Execute(old, """
+                    DROP TABLE item;
+                    CREATE TABLE item (guid INTEGER PRIMARY KEY AUTOINCREMENT, role_id INTEGER NOT NULL,
+                        entry INTEGER NOT NULL, stack INTEGER NOT NULL, pack INTEGER NOT NULL, sort INTEGER NOT NULL,
+                        grid INTEGER NOT NULL DEFAULT 0, attrs TEXT, bind INTEGER NOT NULL DEFAULT 0);
+                    INSERT INTO item (role_id, entry, stack, pack, sort, bind) VALUES ($role, 1250001, 1, 1, 1, 1);
+                    """, ("$role", roleId));
+        }
+        using var accounts = new AccountStore(options); // opening the old database migrates its item table
         var store = new ItemStore(accounts);
         var item = Assert.Single(store.Load(roleId));
         Assert.Equal(1, item.BindType);

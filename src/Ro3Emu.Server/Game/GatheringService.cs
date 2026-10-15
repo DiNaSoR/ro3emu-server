@@ -50,7 +50,6 @@ public sealed class GatheringService : IGameTicker
         scene.Leaving.Add(s => InterruptAsync(s));
         lines.HasPendingWork.Add(HasPendingWork);
         lines.Retiring.Insert(0, RetireRuntimeAsync);
-        loop.Add(this);
     }
 
     private sealed class GatherRuntime

@@ -61,7 +61,6 @@ public sealed class ItemStore
     public ItemStore(AccountStore accounts)
     {
         _accounts = accounts;
-        _accounts.WriteLegacySync<int>(new ItemSchemaPlan());
     }
 
     public List<InvItem> Load(long roleId)

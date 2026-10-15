@@ -28,7 +28,6 @@ public sealed class MonsterService : MonsterBrain, IGameTicker
         this.data = data;
         this.loop = loop;
         this.log = log;
-        loop.Add(this);
         world.UnitRemoved.Add(unit =>
         {
             if (unit is MonsterUnit monster && _spawns.TryGetValue(monster.RuntimeMap, out var owner))

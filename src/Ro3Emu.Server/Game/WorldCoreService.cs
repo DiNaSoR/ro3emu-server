@@ -106,7 +106,6 @@ public sealed partial class WorldCoreService : IGameTicker
         { Id=long.Parse(a[0]), CustomParam=new CustomParam{Tp=(CustomParam.Types.ParamType)3,LongParam=long.Parse(a[1])} }));
         gm.Register("worldleave", "seconds", (s,a) => BeginTemporaryLeaveAsync(s,int.Parse(a[0])));
         gm.Register("scenevar", "id value", (s,a) => SetSceneVariableAsync(s.WorldScene,new CommonPublicVar{VarId=int.Parse(a[0]),Vi64={long.Parse(a[1])}}));
-        loop.Add(this);
     }
 
     private long Now => clock.GetUtcNow().ToUnixTimeMilliseconds();

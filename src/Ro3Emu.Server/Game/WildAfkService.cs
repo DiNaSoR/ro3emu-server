@@ -73,7 +73,6 @@ public sealed class WildAfkService : IGameTicker
         rewards.KillDropsGranted.Add(DropsGrantedAsync);
         daily.BeforeReset = BeforeDailyResetAsync;
         daily.PlanAfkRollover = PlanDailyRollover;
-        loop.Add(this);
     }
 
     private long Param(string key, long fallback) => data.Table("PublicParamConfig").TryGetValue(key, out var value)

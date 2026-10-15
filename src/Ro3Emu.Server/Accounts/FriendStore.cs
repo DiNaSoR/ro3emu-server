@@ -11,7 +11,6 @@ public sealed partial class FriendStore
     public FriendStore(AccountStore accounts)
     {
         _accounts = accounts;
-        _accounts.WriteSync<int>(new FriendSchemaPlan());
     }
 
     private T Read<T>(FriendReadKind kind, long a, long b = 0, int max = 100, long cutoff = 0)

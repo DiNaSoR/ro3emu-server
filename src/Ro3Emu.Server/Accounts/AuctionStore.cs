@@ -12,7 +12,6 @@ public sealed class AuctionStore
     public AuctionStore(AccountStore accounts)
     {
         this.accounts = accounts;
-        accounts.WriteSync<int>(new AuctionSchemaPlan());
     }
 
     public sealed class Item

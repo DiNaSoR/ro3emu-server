@@ -136,11 +136,9 @@ public sealed partial class TimedBattleService : IGameTicker
         this.character = character;
         this.functions = functions; this.awards = awards; this.tasks = tasks; this.instances = instances; this.scene = scene; this.worldData = worldData; this.monsters = monsters;
         this.sessions = sessions; this.loop = loop; this.log = log;
-        accounts.WriteLegacySync<int>(new TimedBattleSchemaPlan());
         scene.Loaded.Add(LoadedAsync);
         scene.Leaving.Add(LeavingAsync);
         combat.Killed.Add(OnePieceKilledAsync);
-        loop.Add(this);
     }
 
     public async Task LoginAsync(GameSession session)

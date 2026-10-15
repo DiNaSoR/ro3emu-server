@@ -30,7 +30,6 @@ public sealed class Deadlines : IGameTicker, IDisposable
         _loop = loop;
         _clock = clock ?? TimeProvider.System;
         _perTickLimit = perTickLimit;
-        loop.Add(this);
     }
 
     /// <summary>Explicitly begin a new attachment, invalidating any work from the previous one.</summary>

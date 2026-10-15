@@ -278,7 +278,6 @@ public sealed partial class CombatService : IGameTicker
         character.ProgressHandlers.Add(buffs.ReconcileEnergyAsync);
         monsters.AttackPet = MonsterAttackPetAsync;
         buffs.UnitChanged.Add(PublishTowerPetStatsAsync);
-        loop.Add(this);
     }
 
     private static long Now => MonsterService.NowMs;

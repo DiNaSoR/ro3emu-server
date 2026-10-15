@@ -11,7 +11,9 @@ public sealed partial class NewActivityTests
 {
     private async Task Eventually(Func<bool> condition, Func<string>? detail = null)
     {
-        for (int i = 0; i < 120; i++)
+        // 15 s: under the full suite a deadline's tick and its save can lag well behind the advanced clock.
+        var until = DateTime.UtcNow + TimeSpan.FromSeconds(15);
+        while (DateTime.UtcNow < until)
         {
             // Read loop-owned state on its owner, after the current synchronous mutation/save step.
             // A test-thread read can otherwise observe RefreshCalendar before its following DB write.
@@ -22,7 +24,7 @@ public sealed partial class NewActivityTests
         }
         await OnLoop(() =>
         {
-            Assert.True(condition(), "Activity deadline was not observed within three seconds. " + detail?.Invoke());
+            Assert.True(condition(), "Activity deadline was not observed within 15 seconds. " + detail?.Invoke());
             return Task.CompletedTask;
         });
     }

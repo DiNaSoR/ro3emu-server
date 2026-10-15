@@ -86,7 +86,6 @@ public sealed class FestivalService : IGameTicker
         this.data = data; this.accounts = accounts; this.roles = roles; this.character = character; this.functions = functions;
         this.awards = awards; this.clock = clock; this.schedule = schedule; this.daily = daily;
         this.instances = instances; this.sessions = sessions; this.loop = loop;
-        accounts.WriteLegacySync<int>(new FestivalSchemaPlan());
         if (accounts.ReadSync<byte[]?>(new FestivalReadPlan(FestivalReadKind.LatestRound)) is { } bytes)
             current = JsonSerializer.Deserialize<Round>(bytes);
         if (data.Row("DungeonConfig", Dungeon) is { } config
@@ -110,7 +109,6 @@ public sealed class FestivalService : IGameTicker
         daily.EventProjections.Add(Project);
         scene.Loaded.Add(LoadedAsync);
         scene.Leaving.Add(LeavingAsync);
-        loop.Add(this);
     }
 
     private ActivityClock.Window? Segment => clock.Segments(1083, Now).FirstOrDefault(w => w.Contains(Now));

@@ -82,7 +82,6 @@ public sealed class RoleStore
     public RoleStore(AccountStore accounts)
     {
         _accounts = accounts;
-        _accounts.WriteLegacySync<int>(new RoleSchemaPlan());
     }
 
     /// <summary>Durable lifecycle epoch and storage-part revisions for a staged role operation.</summary>

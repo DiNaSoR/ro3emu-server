@@ -10,7 +10,6 @@ public sealed class GuildChallengeStore
     public GuildChallengeStore(AccountStore accounts)
     {
         this.accounts = accounts;
-        accounts.WriteSync<int>(new GuildChallengeSchemaPlan());
     }
 
     public GuildChallengeService.GuildState Load(long guild) =>

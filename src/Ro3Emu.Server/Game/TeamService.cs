@@ -85,7 +85,6 @@ public sealed partial class TeamService : IGameTicker
         this.options = options;
         this.log = log;
         this.loop = loop;
-        loop.Add(this);
     }
 
     /// <summary>Party EXP multiplier for a kill (‱ of TeamExpBuffNum by same-map members; the split rule itself is inferred).</summary>

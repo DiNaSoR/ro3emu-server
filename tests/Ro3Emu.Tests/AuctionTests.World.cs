@@ -144,8 +144,11 @@ public sealed partial class AuctionTests
 
         clock.Advance(TimeSpan.FromMinutes(5));
         await service.ProcessPrebuysAsync();
-        Assert.Equal((long)carol.Self!.Uuid, Service<AuctionStore>().Get(queued.Id)!.Owner);
-        var lot = Service<AuctionStore>().Get(moved[0].Id)!;
+        // The pre-buy takes the cheapest open lot of its item (then the lowest id); the guild drop can hold the same
+        // item twice, so that is not always the lot it was placed on.
+        var bought = moved.Where(r => r.Entry == queued.Entry).OrderBy(r => r.Price).ThenBy(r => r.Id).First();
+        Assert.Equal((long)carol.Self!.Uuid, Service<AuctionStore>().Get(bought.Id)!.Owner);
+        var lot = Service<AuctionStore>().Get(moved.First(r => r.Id != bought.Id).Id)!;
         Assert.Equal(AuctionState.Bidding, lot.State);
         Assert.Equal(0, (await Bid(carol, lot.Id, lot.FixedPrice, BiddingType.Fixed)).Result);
         var award = Assert.Single(Mailbox(carol).Letters, m => m.DeliveryKey == $"auction:{lot.Id}:award");

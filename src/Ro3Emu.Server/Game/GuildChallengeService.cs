@@ -81,7 +81,6 @@ public sealed class GuildChallengeService : IGameTicker
         this.auctions = auctions; this.auctionStore = auctionStore; this.sessions = sessions;
         this.clock = clock; this.loop = loop; this.log = log;
         dungeons.GuildChallengeEnter = TryEnterAsync;
-        loop.Add(this);
     }
 
     public sealed class GuildState
