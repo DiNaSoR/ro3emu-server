@@ -12,6 +12,8 @@ public sealed class ActivitiesMessages(DailyActivityService daily, TowerService 
     public void Map(Messaging.MessageRoutes routes)
     {
         routes.AdmitEconomic(id => id is >= 82800 and <= 82828); // genre build plans
+        routes.AdmitRole(id => id is NewActivityService.PassPanelMsg); // marks the session and syncs its own 5027
+        routes.Map(NewActivityService.PassPanelMsg, "pass", (session, _, _) => activities.PassPanelAsync(session));
         routes.AdmitEconomic(id => id is >= 84061 and <= 84067); // training
         routes.AdmitEconomic(id => id is LotteryService.DrawRequest);
         routes.AdmitEconomic((_, id, body) => activities.IsOfflineOwnerRequest(id, body) || activities.IsEventOwnerRequest(id, body));

@@ -6,6 +6,26 @@ The server observes the configured EXP-currency balance when inventory changes a
 
 Premium and MonthCard are **owned item entitlements**, never implicit purchases. ProductConfig product 7 awards item 703; products 4/5 award 701/702. The server atomically consumes an owned entitlement token once and updates pass premium or MonthCard expiry. This conversion is **(inferred)**; the client confirms product award item IDs and reads the resulting activity state, but payment verification and original server conversion are not exposed. A pass gift spends owned 1020001/920704 and atomically delivers the configured premium item as a claimable mail attachment to the recipient. The gift UI opened by `LC_ItemHelper._useBattlePassGiftItem` and 82976 request are proven; ordinary mail delivery and one pending gift per recipient/activity are **(inferred)**. Mail claim activates the recipient's pass when its activity is live. The gift path checks configured tokens, recipient existence and pending mail; it does not assert friendship or a gift-day rule.
 
+## Where pass EXP comes from
+
+The client data grants no currency 132 at all (no AwardConfig, task or drop row), so the original server's sources are unknown. With `Ro3Emu:Pass:Play` on, this server uses its own design (**inferred** as a whole), in `NewActivityService.PassPlay.cs`:
+
+| Source | Pass EXP |
+|---|---|
+| Daily challenges: 3 a day, drawn per role and game day from 5 (defeat 100 monsters, 50 in a party, reach 60 daily activity, clear a dungeon, complete 3 quests) | 300 each |
+| Weekly challenges: all 7 (1000 monsters, 300 in a party, 300 daily activity, 5 dungeons, 3 MVP fights, 20 quests, play on 5 days) | 1000 each |
+| Daily activity points (currency 5), watched after every award | 6 per point |
+| Monsters | 3 each, up to 300 a day |
+| Dungeon clear | 200, up to 5 a day |
+| MVP fight (a settled participant) | 200, up to 3 a day |
+| A story chapter's last main quest (8 chapters) | 500, once |
+
+Multipliers: +20% in a party of two or more; double while the role has earned less than 75% of the season pace (60 levels in about six and a half weeks from the pass instance's start). Past the last level, every 2000 earned pays a bonus chest: the last level's free reward. The game day and week turn at 05:00 local time (Monday for the week). Progress is saved with the role; without a grant, every tenth change.
+
+Pass I (200) can be forced open through `Ro3Emu:OpenContent:Activities` (its own condition is base level 99). Pass II (201) has the same condition and the same currency 132. The novice pass 9201 (currency 920132, from base level 10) gains 300 for each main story quest.
+
+`Ro3Emu:Pass:FreePremium` (off by default) opens the premium track and its privileges without the 703 item. With the client hooks (`Ro3Emu.ClientHooks.PassChallenges`), `/pass` in chat or the "Challenges" button in the pass view (`PassButton`) opens the client's own season task panel with a "Daily" and a "Weekly" tab: the hook adds the 12 challenges as TaskConfig type-13 rows (ids 99130001-99130005 and 99130101-99130107, son types 139/138, under an activity row 99139 of its own), sends game message 77014, and the server then adds the role's challenges to 5027 (running with progress, or delivered once paid). A client without the hook never sends 77014, so it never receives task ids it does not know; it gets the text answer on the marquee instead (`/pass`, `/pass week`). Completions and chapter bonuses are announced on the marquee for everyone.
+
 MonthCard is NewActivity type 21, activity 199. Its 5054 state is the same `DBMonthCardInfo` nested in 5013. `MonthCardConfig` IDs 1001/1002 are 30-day cards with daily award groups 199006/199007 and a 143-day ownership cap. Owned 701/702 starts or extends the corresponding card at the realm-local civil-day boundary. `lastDays` is one higher than display days because `LC_ActivityParser_MonthCard.lua` subtracts one. An 82976 `GainMonthCardDailyAward` request may claim several distinct owned cards together; claim day and reward settlement persist atomically. A second claim on the same local day is refused, including after reconnect. On the next local day, the flag clears; after expiry, no further daily award is granted. Local civil-day rollover and 30-day expiry placement are **(inferred)** from the client's `lastDays`, `dayAward`, `expireTs` fields and configured `_iDay`.
 
 Primary sources: `re/clientB/lua-src/Logic/Activity/LC_ActivityServer.lua`, `LC_ActivityParser_BattlePass.lua`, `LC_ActivityParser_MonthCard.lua`, `Logic/BattlePass/LC_BattlePassHelper.lua`, `Logic/ThreeDays/LC_MonthCardHelper.lua`, `Logic/Knapsack/LC_ItemHelper.lua`, and `data/config/{NewActivity,BattlePass,BattlePassReward,MonthCard,Product,Award,Item}Config.json`.

@@ -90,7 +90,7 @@ public sealed partial class TaskService
         session.Tasks.WaitSelectBranch.Remove(req.BranchId);
         Save(session);
         await session.SendGameAsync(TaskSelectQuestBranch, new SelectTaskQuestBranchResp { Req = req });
-        await CharacterService.SyncAsync(session, TaskInfoSync, session.Tasks.Clone());
+        await SyncTasksAsync(session);
     }
 
     /// <summary>

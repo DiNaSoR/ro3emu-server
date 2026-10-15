@@ -31,6 +31,13 @@ namespace Ro3Emu.ClientHooks
                     case "dumptex":
                         DumpTextures(parts.Length > 1 ? parts[1] : "Txt");
                         break;
+                    case "sprites":
+                        Sprites(parts.Length > 1 ? parts[1] : "icon");
+                        break;
+                    case "spritepng":
+                        foreach (var name in (parts.Length > 1 ? parts[1] : "").Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries))
+                            SpritePng(name);
+                        break;
                     default:
                         Debug.Log("[Ro3Emu.Diag] unknown command " + line);
                         break;
@@ -121,6 +128,72 @@ namespace Ro3Emu.ClientHooks
                       .Append(" size=").Append(((RectTransform)t).rect.size.ToString("F0")).Append(" color=").Append(sprite.color);
             }
             Debug.Log("[Ro3Emu.Diag] dumptex '" + filter + "': " + hits + sb);
+        }
+
+        /// <summary>
+        /// Sprite names containing <paramref name="filter"/>: from every loaded sprite atlas (also sprites no view
+        /// shows yet) and every loaded sprite object.
+        /// </summary>
+        private static void Sprites(string filter)
+        {
+            var sb = new StringBuilder();
+            int hits = 0;
+            foreach (var atlas in Resources.FindObjectsOfTypeAll<UnityEngine.U2D.SpriteAtlas>())
+            {
+                var sprites = new Sprite[atlas.spriteCount];
+                atlas.GetSprites(sprites);
+                foreach (var s in sprites)
+                {
+                    if (s == null || s.name.IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0) continue;
+                    if (++hits > 200) break;
+                    sb.Append("\n  atlas ").Append(atlas.name).Append(": ").Append(s.name.Replace("(Clone)", ""));
+                    UnityEngine.Object.Destroy(s); // GetSprites hands out clones
+                }
+            }
+            foreach (var s in Resources.FindObjectsOfTypeAll<Sprite>())
+            {
+                if (s.name.IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0 || s.name.EndsWith("(Clone)", StringComparison.Ordinal)) continue;
+                if (++hits > 400) break;
+                sb.Append("\n  sprite ").Append(s.name).Append(" tex=").Append(s.texture != null ? s.texture.name : "-");
+            }
+            Debug.Log("[Ro3Emu.Diag] sprites '" + filter + "': " + hits + sb);
+        }
+
+        /// <summary>One sprite (by exact name, from any loaded atlas) cut out of its atlas page into &lt;client&gt;/ro3emu/dump/.</summary>
+        private static void SpritePng(string name)
+        {
+            var sprite = FindSprite(name);
+            if (sprite == null) { Debug.Log("[Ro3Emu.Diag] spritepng " + name + ": not found"); return; }
+            var tex = sprite.texture;
+            var rect = sprite.textureRect;
+            var rt = RenderTexture.GetTemporary(tex.width, tex.height, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+            var prev = RenderTexture.active;
+            Graphics.Blit(tex, rt);
+            RenderTexture.active = rt;
+            var copy = new Texture2D((int)rect.width, (int)rect.height, TextureFormat.RGBA32, false);
+            copy.ReadPixels(rect, 0, 0);
+            copy.Apply();
+            RenderTexture.active = prev;
+            RenderTexture.ReleaseTemporary(rt);
+            string dir = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(Application.dataPath), "ro3emu", "dump");
+            Directory.CreateDirectory(dir);
+            string file = System.IO.Path.Combine(dir, name + ".png");
+            File.WriteAllBytes(file, ImageConversion.EncodeToPNG(copy));
+            UnityEngine.Object.Destroy(copy);
+            Debug.Log("[Ro3Emu.Diag] spritepng " + name + " " + rect.ToString("F0") + " -> " + file);
+        }
+
+        /// <summary>A sprite by exact name: a loaded sprite object first, else from any loaded atlas (a clone).</summary>
+        internal static Sprite FindSprite(string name)
+        {
+            foreach (var s in Resources.FindObjectsOfTypeAll<Sprite>())
+                if (s.name == name) return s;
+            foreach (var atlas in Resources.FindObjectsOfTypeAll<UnityEngine.U2D.SpriteAtlas>())
+            {
+                var s = atlas.GetSprite(name);
+                if (s != null) return s;
+            }
+            return null;
         }
 
         private static readonly string AutoDumpFilter = Environment.GetEnvironmentVariable("RO3EMU_DUMPTEX");

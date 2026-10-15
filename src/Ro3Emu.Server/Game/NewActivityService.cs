@@ -43,6 +43,8 @@ public sealed partial class NewActivityService
     private readonly InstanceService instances;
     private readonly DungeonService dungeons;
     private readonly PronteraDefenseService defense;
+    private readonly TeamService teams;
+    private readonly bool freePremiumPass, passPlay;
     private readonly ILogger<NewActivityService> log;
     private readonly HashSet<(GameSession Session, long Attachment)> queued = new();
     private long Now => clock.GetUtcNow().ToUnixTimeSeconds();
@@ -51,7 +53,8 @@ public sealed partial class NewActivityService
         AccountStore accounts, ItemStore items, MailService mail, SeasonService seasons, TimeProvider clock, ActivityClock activityClock,
         AwardService awards, TaskService tasks, SessionRegistry sessions, GameLoop loop, SceneService scene,
         InstanceService instances, DungeonService dungeons, PronteraDefenseService defense, CombatService combat,
-        Deadlines deadlines, ILogger<NewActivityService> log)
+        Deadlines deadlines, TeamService teams, MvpService mvps, ChatService chat, Microsoft.Extensions.Options.IOptions<ServerOptions> options,
+        ILogger<NewActivityService> log)
     {
         this.data = data; this.character = character; this.functions = functions; this.roles = roles;
         this.accounts = accounts; this.items = items; this.mail = mail; this.seasons = seasons; this.clock = clock;
@@ -59,6 +62,10 @@ public sealed partial class NewActivityService
         this.loop = loop; this.scene = scene; this.instances = instances; this.defense = defense; this.log = log;
         this.deadlines = deadlines;
         this.dungeons = dungeons;
+        this.teams = teams;
+        freePremiumPass = options.Value.Pass.FreePremium;
+        passPlay = options.Value.Pass.Play;
+        if (passPlay) InitializePassPlay(combat, dungeons, mvps, tasks, chat);
         dungeons.JourneyWon = JourneyDungeonWonAsync;
         dungeons.CanStageJourneyVictory = session => ActivityError(session, 112, 15) == 0;
         InitializeAdventureServices(accounts, items);
@@ -149,6 +156,7 @@ public sealed partial class NewActivityService
             if (!deadlines.IsCurrent(session, lease)) return;
             session.ActivitiesReady = true;
             ScheduleDeadline(session);
+            PassEvent(session, []); // the day played, and any daily activity earned while the pass was not watching
         }
         finally { session.ActivityGate.Release(); ownerScope?.Dispose(); }
     }

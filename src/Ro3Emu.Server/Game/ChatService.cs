@@ -19,6 +19,9 @@ public sealed class ChatService(GmCommands gm, FeedbackService feedback, GuildSt
     /// <summary>Bug reports: "/bug" lines here and the client hook's message (GameMessageHandler routes it through this).</summary>
     public FeedbackService Feedback => feedback;
 
+    /// <summary>Player chat commands ("/pass week"): the first word, any case, and the rest of the line. Never shown to others.</summary>
+    public Dictionary<string, Func<GameSession, string, Task>> PlayerCommands { get; } = new(StringComparer.OrdinalIgnoreCase);
+
     public const uint ImUserSig = 77001;
     public const uint JoinChannel = 77002;
     public const uint TunnelUp = 77010;
@@ -269,6 +272,13 @@ public sealed class ChatService(GmCommands gm, FeedbackService feedback, GuildSt
             return;
         }
 
+        if (PlayerCommand(req.Content) is var (command, args))
+        {
+            await DownAsync(sender, Cmd.SendText, new SendTextChatMessageResponse { ChatResult = true, Msg = message });
+            await command(sender, args);
+            return;
+        }
+
         if (gm.IsCommand(req.Content))
         {
             // GM command: acknowledge the send (the client waits for it) but show the line to nobody.
@@ -330,6 +340,15 @@ public sealed class ChatService(GmCommands gm, FeedbackService feedback, GuildSt
     /// LC_ChatMessageHandler.lua:780-803 decodes extra_param.templateId=1 and commonData with teamId/senderRoleId;
     /// LC_DAL_Team.lua:3191-3282 subsequently resolves the link through PartyService.getParty.
     /// </summary>
+    private (Func<GameSession, string, Task> Run, string Args)? PlayerCommand(string? content)
+    {
+        var line = (content ?? "").TrimStart();
+        if (!line.StartsWith('/')) return null;
+        int space = line.IndexOfAny([' ', '	']);
+        string word = space < 0 ? line : line[..space];
+        return PlayerCommands.TryGetValue(word, out var run) ? (run, space < 0 ? "" : line[(space + 1)..].Trim()) : null;
+    }
+
     public async Task PublishTeamRecruitmentAsync(GameSession sender, string content, long teamId, int current,
         int capacity, IReadOnlyList<int> jobs)
     {

@@ -217,6 +217,8 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
     public ActivityRuntimeState ActivityRuntime { get; set; } = new();
     public SemaphoreSlim ActivityGate { get; } = new(1, 1);
     public bool ActivitiesReady { get; set; }
+    /// <summary>The client has the pass challenge rows (Ro3Emu.ClientHooks.PassChallenges sent 77014): 5027 may carry them.</summary>
+    public bool PassChallengeRows { get; set; }
     public PronteraDefenseService.State? Defense { get; set; }
     public TimedBattleService.State? TimedBattle { get; set; }
     public int EventFaction { get; set; }

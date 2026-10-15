@@ -101,6 +101,22 @@ public sealed partial class TaskService
     }
 
     /// <summary>Delivered = completeTaskNum &gt; 0 or status 4 (the client's CheckTaskDeliveryed). Without quest state: true.</summary>
+    /// <summary>
+    /// Tasks the client shows that are not quests of this service (the pass challenges, NewActivityService.PassPlay):
+    /// added to every 5027 so the dataset's diff never drops them. They are not in <see cref="GameSession.Tasks"/>.
+    /// </summary>
+    public List<Func<GameSession, IEnumerable<TaskInfo>>> ExtraTasks { get; } = new();
+
+    /// <summary>5027: the role's quests plus <see cref="ExtraTasks"/>, as the change since the last send.</summary>
+    public Task SyncTasksAsync(GameSession session)
+    {
+        if (session.Tasks == null) return Task.CompletedTask;
+        var view = session.Tasks.Clone();
+        foreach (var extra in ExtraTasks)
+            foreach (var info in extra(session)) view.Infos[info.TaskId] = info;
+        return CharacterService.SyncAsync(session, TaskInfoSync, view);
+    }
+
     public static bool IsDelivered(GameSession session, long taskId) =>
         session.Tasks is not { } t
         || (t.CompleteTaskNum.TryGetValue(taskId, out int n) && n > 0)
@@ -136,7 +152,7 @@ public sealed partial class TaskService
         // The full sync needs non-empty maps (they decode as nil otherwise and AllTaskInfo stays unset).
         if (session.Tasks.CompleteTaskNum.Count == 0) session.Tasks.CompleteTaskNum[FirstTask] = 0;
         Save(session);
-        if (!session.DeferTaskSync) await CharacterService.SyncAsync(session, TaskInfoSync, session.Tasks.Clone());
+        if (!session.DeferTaskSync) await SyncTasksAsync(session);
         // Deliveries found at login (e.g. a level target already met) are handled like any other change.
         await SettleAsync(session);
         if (AfterLoginSettlementForTest is { } afterLogin) await afterLogin(session);
@@ -527,7 +543,7 @@ public sealed partial class TaskService
         if (settled && roles.HasTaskFollowup(session.Role!.Id))
             await roles.SaveSettledTasksAsync(session.Role.Id, session.Tasks!.ToByteArray(), JsonSerializer.SerializeToUtf8Bytes(session.TaskRuntime));
         else Save(session);
-        if (!session.DeferTaskSync) await CharacterService.SyncAsync(session, TaskInfoSync, session.Tasks!.Clone());
+        if (!session.DeferTaskSync) await SyncTasksAsync(session);
         if (session.DailyReady && RefreshDailyTracking is { } refresh) await refresh(session);
         await talents.SyncAsync(session); // 5050 before 5056 when quest 10103160 opens function 1003
         await functions.SyncAsync(session);

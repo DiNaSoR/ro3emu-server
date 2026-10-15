@@ -238,7 +238,7 @@ public static partial class EconomySnapshotReader
 
         private void ClassifyActivityRuntime(JsonElement value, string key)
         {
-            Fields(value, "PassProgress MonthCards AdventureFragmentAsks EveSettledCycleStart AdventureTreasure");
+            Fields(value, "PassProgress MonthCards AdventureFragmentAsks EveSettledCycleStart AdventureTreasure PassPlay");
             if (!Try(value, "AdventureTreasure", out var cursor)) return;
             Fields(cursor, "PointId GroupId ItemId EventId Began PendingMonsterUid PendingMonsterAward PendingMonsterId");
             // Active hunt/monster cursor is a restorable paid opportunity. The award is not earned until its kill.

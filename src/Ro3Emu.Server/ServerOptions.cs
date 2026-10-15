@@ -73,6 +73,9 @@ public sealed class ServerOptions
     /// </summary>
     public OpenContentOptions OpenContent { get; set; } = new();
 
+    /// <summary>Battle pass policy: the premium track is free for now.</summary>
+    public PassOptions Pass { get; set; } = new();
+
     /// <summary>
     /// Accounts allowed to use GM commands in game ("!" lines in chat, the client's GM panel, 1031/1034). Empty:
     /// <see cref="GmOpenWhenEmpty"/> decides. docs/guide/gm-access.md.
@@ -118,6 +121,16 @@ public sealed class FeedbackOptions
     public int CooldownSeconds { get; set; } = 5;
 }
 
+/// <summary>Both off by default so the tests keep the original's pass; a realm turns them on (docs/systems/activities-battlepass-monthcard.md).</summary>
+public sealed class PassOptions
+{
+    /// <summary>Every role gets the premium track and its privileges without the premium item 703.</summary>
+    public bool FreePremium { get; set; }
+
+    /// <summary>Pass EXP from play: challenges, daily activity, monsters, dungeons, MVPs and story (NewActivityService.PassPlay).</summary>
+    public bool Play { get; set; }
+}
+
 /// <summary>
 /// "Everything open" ("Policy: all content open"). The playbook stays 101: it is the only one
 /// with its own content in this client, so seasons need no switch.
@@ -136,8 +149,12 @@ public sealed class OpenContentOptions
     /// </summary>
     public long[] Functions { get; set; } = [7201, 70122, 41, 1000000];
 
-    /// <summary>NewActivityConfig rows whose own open condition is a level the cap never reaches (e.g. 112 Novice Challenge).</summary>
-    public long[] Activities { get; set; } = [];
+    /// <summary>
+    /// NewActivityConfig rows whose own open condition is a level the cap never reaches (e.g. 112 Novice Challenge).
+    /// 200 Pass I asks for base level 99 (condition 21000019). Pass II (201, the same condition and EXP currency) opens
+    /// after Pass I, when the owner adds it here.
+    /// </summary>
+    public long[] Activities { get; set; } = [200];
 
     /// <summary>
     /// The season page's stage activities (MultiverseStage._kStageActivity of the playbook: for 101 that is 105 Fragment

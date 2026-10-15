@@ -27,7 +27,10 @@ public static partial class EconomySnapshotReader
     // goods are granted by its own cd13e/advguild-award receipt, and takenGroupRewardLevel is only that receipt's
     // once-only marker. The adventure_group / adventure_group_member tables hold names, rosters, the tree and group EXP
     // (a progression counter, not a currency); they are classified as social tables.
-    public const string ExpectedFormatManifestHash = "0E228586BF7EC7BD15F30B984006DCD55D3D542ACBC441A6280165B24EABBE74";
+    // Pass play: role.activity_runtime PassPlay (NewActivityService.PassPlay) holds the day's and week's challenge
+    // progress, daily EXP caps, paid chapters and EXP counters. No balance and no asset: pass EXP is currency 132, granted
+    // by the pass/play receipt that also saves these markers.
+    public const string ExpectedFormatManifestHash = "A14FE43F31DC43EB30810DB07B7354DE001C270B361AA8E8E2FB0308F1C27EDF";
     public static string FormatManifestHash => State.FormatManifestHash;
 
     private sealed partial class State
