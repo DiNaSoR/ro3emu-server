@@ -7,7 +7,7 @@ namespace Ro3Emu.Tests;
 
 public sealed partial class DungeonTests
 {
-    [Fact]
+    [ClientDataFact]
     public async Task TerminalFreezeDoesNotCountPrecountedPublishedKillTwice()
     {
         var request = ConfigureTwoActorStory();

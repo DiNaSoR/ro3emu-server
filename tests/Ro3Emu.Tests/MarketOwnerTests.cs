@@ -77,7 +77,7 @@ public sealed class MarketOwnerTests(ITestOutputHelper output) : IAsyncLifetime
         return 0;
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task MultiSellerCommitAndSlowNoticeFenceOnlyParticipantsAndPublishAllTogether()
     {
         var (buyerBot, buyer) = await Login("Ownerbuyer"); await using var b = buyerBot;
@@ -151,7 +151,7 @@ public sealed class MarketOwnerTests(ITestOutputHelper output) : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task MarketDeliveryRestagesMailboxAfterWaitingForEarlierDelivery()
     {
         var (bot, session) = await Login("Restagemail"); await using var client = bot;
@@ -191,7 +191,7 @@ public sealed class MarketOwnerTests(ITestOutputHelper output) : IAsyncLifetime
         Assert.Single(box.Letters, letter => letter.Id == finalMail && letter.Currency[1] == 7);
     }
 
-    [Theory]
+    [ClientDataTheory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task MarketPurchaseWaitsForCommittedParticipantApplyThenUsesNewBalances(bool speculativeRefusal)
@@ -314,7 +314,7 @@ public sealed class MarketOwnerTests(ITestOutputHelper output) : IAsyncLifetime
         });
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SqlConflictRollsBackEveryParticipantAndRetryHasOneOutcome()
     {
         var (bot, buyer) = await Login("Conflictbuyer"); await using var client = bot;
@@ -333,7 +333,7 @@ public sealed class MarketOwnerTests(ITestOutputHelper output) : IAsyncLifetime
         Assert.Single(JsonSerializer.Deserialize<MailService.Mailbox>(Roles.LoadMailbox(seller)!)!.Letters);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task MailClaimKeepsLiveStateUnchangedUntilReceiptAndAllowsUnrelatedProgress()
     {
         var (bot, owner) = await Login("Claimowner"); await using var client = bot;

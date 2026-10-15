@@ -86,7 +86,7 @@ public sealed class TowerPetTests : IAsyncLifetime
         return await Next(bot, TowerService.SetPets, SetClimTowerPetsRes.Parser);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FormationRejectsInvalidRequestsAndPersistsFourSlots()
     {
         await using (var bot = await InWorld())
@@ -127,7 +127,7 @@ public sealed class TowerPetTests : IAsyncLifetime
         Assert.Equal(new[] { 10001, 11001, 13001, 12001 }, info.PetIds);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task TwoAlliesCastConfiguredSkillsAndKillTowerMonsters()
     {
         await using var bot = await InWorld();
@@ -175,7 +175,7 @@ public sealed class TowerPetTests : IAsyncLifetime
         Assert.Equal(1, end.PassedMaxLayerConfID);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task OrdinaryFollowerIsReplacedByTowerLineupAndReturnsOnExit()
     {
         await using var bot = await InWorld();
@@ -222,7 +222,7 @@ public sealed class TowerPetTests : IAsyncLifetime
         Assert.Equal(10001, session.Pets.SetupPlans[0].SetUpPets[1]);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task EnemyDeathsDeployBothSubstitutesWithoutChangingSavedFormation()
     {
         await using var bot = await InWorld();
@@ -289,7 +289,7 @@ public sealed class TowerPetTests : IAsyncLifetime
         Assert.All(next.Pets, p => Assert.True(p.Hp > 0));
     }
 
-    [Theory]
+    [ClientDataTheory]
     [InlineData(10000, 200)]
     [InlineData(9000, 180)]
     public async Task TowerDifficultyScalesEnemyDamageAgainstPets(int ratio, long expectedDamage)

@@ -17,7 +17,7 @@ namespace Ro3Emu.Tests;
 /// </summary>
 public sealed partial class DungeonTests
 {
-    [Theory]
+    [ClientDataTheory]
     [MemberData(nameof(ScriptedScenes))]
     public async Task EveryInteractionAStepWaitsOnIsOfferedByTheClientsOwnRules(long scene)
     {
@@ -101,7 +101,7 @@ public sealed partial class DungeonTests
         Assert.True(TimedBattleService.TreasureNpcUid < limit);
     }
 
-    [Theory]
+    [ClientDataTheory]
     [MemberData(nameof(ScriptedScenes))]
     public async Task TheUseTestAidFinishesAScriptedSceneServerSide(long scene)
     {

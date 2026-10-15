@@ -37,7 +37,7 @@ public sealed class MapLineAdmissionTests
     }
     private static GameSession Session()=>new(null!,null!);
 
-    [Fact]
+    [ClientDataFact]
     public async Task SixHundredConcurrentPronteraAdmissionsRespectAuthoredLimits()
     {
         Assert.Equal((200,300,true),lines.Limits(10100));

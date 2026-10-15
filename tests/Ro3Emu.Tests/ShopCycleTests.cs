@@ -81,7 +81,7 @@ public sealed class ShopCycleTests : IAsyncLifetime
         return (await Next(bot, ShopService.BuyCommodity, BuyCommodityResp.Parser)).Result;
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LegacySeasonLimitSurvivesCycleOneAndResetsOnlyAfterNewLogin()
     {
         var bot = await Enter(legacyCounter: true);
@@ -104,7 +104,7 @@ public sealed class ShopCycleTests : IAsyncLifetime
         Assert.Equal(ErrorCodes.PurchaseLimit, await Buy(again));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task CounterSaveFailureRollsBackPaymentAndGrantedItem()
     {
         await using var bot = await Enter();
@@ -124,7 +124,7 @@ public sealed class ShopCycleTests : IAsyncLifetime
         Assert.Equal(0, await Buy(bot));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FailureAfterCommitCannotReopenThePurchaseLimit()
     {
         await using var bot = await Enter();

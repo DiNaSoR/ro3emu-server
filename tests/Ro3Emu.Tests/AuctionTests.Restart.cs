@@ -8,7 +8,7 @@ namespace Ro3Emu.Tests;
 /// recovery sweep that starts with the server, and a second restart does not settle it again.</summary>
 public sealed partial class AuctionTests
 {
-    [Fact]
+    [ClientDataFact]
     public async Task ALotThatEndsWhileTheServerIsDownSettlesOnceAfterRestart()
     {
         long id, aliceId, bobId, aliceFunds, bobFunds;

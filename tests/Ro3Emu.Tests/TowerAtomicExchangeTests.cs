@@ -67,7 +67,7 @@ public sealed class TowerAtomicExchangeTests : IAsyncLifetime
     private long Count(long role, int entry) =>
         Service<ItemStore>().Load(role).Where(i => i.Entry == entry).Sum(i => (long)i.Stack);
 
-    [Fact]
+    [ClientDataFact]
     public async Task SuccessfulExchangeCommitsRewardsCurrencyAndBothTowerMarkers()
     {
         await using var alice = await InWorld("Alice");
@@ -101,7 +101,7 @@ public sealed class TowerAtomicExchangeTests : IAsyncLifetime
         Assert.Equal(messagesBefore, ExchangesSent(alice)); // Caller owns the postcommit 5009 and 5065 ordering.
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task TowerRewardKeepsExistingInstanceMetadataAndUsesSeparateStack()
     {
         await using var alice = await InWorld("Alice");
@@ -142,7 +142,7 @@ public sealed class TowerAtomicExchangeTests : IAsyncLifetime
         Assert.Equal(10, DBClimTower.Parser.ParseFrom(roles.LoadTower(role)!).LayerConfID);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FailedTowerUpdateRollsBackBothStacksCurrencyAndMarkerThenRetryGrantsOnce()
     {
         await using var alice = await InWorld("Alice");

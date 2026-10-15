@@ -98,7 +98,7 @@ public sealed class AppraiseEnchantTests : IAsyncLifetime
         return await Next(bot, CharacterService.EquipItemOpr, EquipItemOprResp.Parser);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task AppraisalPreservesGuidAndRollsAndSurvivesRelog()
     {
         long guid;
@@ -132,7 +132,7 @@ public sealed class AppraiseEnchantTests : IAsyncLifetime
         Assert.All(attrs.Where(p => p.Key != 3), p => Assert.Equal(p.Value, equipped.Items[guid].All.ItemInfos[p.Key].LongVal));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task AppraisalRejectsWholeInvalidBatchWithoutChanges()
     {
         await using var alice = await InWorld("Alice");
@@ -169,7 +169,7 @@ public sealed class AppraiseEnchantTests : IAsyncLifetime
         Assert.Equal(0, Live(gear.Guid).Attrs![3]);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LootCreatesSeparateUnappraisedInstancesAndBatchAppraisalUpdatesBoth()
     {
         await using var alice = await InWorld("Alice");
@@ -190,7 +190,7 @@ public sealed class AppraiseEnchantTests : IAsyncLifetime
         Assert.Equal(before, Snapshot());
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task CraftCreatesUnappraisedGearWhenItsConfigRequiresIt()
     {
         await using var alice = await InWorld("Alice");
@@ -215,7 +215,7 @@ public sealed class AppraiseEnchantTests : IAsyncLifetime
         Assert.Equal(ErrorCodes.EquipNotAppraised, (await Wear(alice, crafted.Item.ItemGuid)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task EnchantBagGearThenWearAndRelogPreservesAttributesAndStats()
     {
         long guid;
@@ -272,7 +272,7 @@ public sealed class AppraiseEnchantTests : IAsyncLifetime
             m => m.Property.Propertys.Any(p => p.PropertyId == 1 && p.Data == 1));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task WornEnchantAndSameGroupReplacementSyncEquipmentAndDerivedStats()
     {
         await using var alice = await InWorld("Alice");
@@ -308,7 +308,7 @@ public sealed class AppraiseEnchantTests : IAsyncLifetime
         Assert.Equal(snapshot, Snapshot());
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FullSlotsEvictOneAndSameIdRerollKeepsCapacity()
     {
         await using var alice = await InWorld("Alice");
@@ -338,7 +338,7 @@ public sealed class AppraiseEnchantTests : IAsyncLifetime
         Assert.Equal(10000, Session().Progress!.Currency[2]);
     }
 
-    [Theory]
+    [ClientDataTheory]
     [InlineData(1, false)]
     [InlineData(2, false)]
     [InlineData(1, true)]
@@ -364,7 +364,7 @@ public sealed class AppraiseEnchantTests : IAsyncLifetime
         Assert.Single(Service<ItemStore>().Load(Session().Role!.Id).Single(i => i.Guid == gear.Guid).Enchantments);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FailedSecondAppraisalWriteRollsBackWholeBatch()
     {
         await using var alice = await InWorld("Alice");
@@ -384,7 +384,7 @@ public sealed class AppraiseEnchantTests : IAsyncLifetime
         Assert.Equal(0, (await Next(alice, AppraisalService.Appraise, EquipAppraiseResp.Parser)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task EnchantRefusalsPreserveBothPlayersItemsCurrencyAndStats()
     {
         await using var alice = await InWorld("Alice");
@@ -433,7 +433,7 @@ public sealed class AppraiseEnchantTests : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LegacyItemsKeepTheirPreviouslyAdvertisedAppraisalState()
     {
         long guid;
@@ -456,7 +456,7 @@ public sealed class AppraiseEnchantTests : IAsyncLifetime
         Assert.Equal(1, Service<ItemStore>().Load((long)again.Self!.Uuid).Single(i => i.Guid == guid).Attrs![3]);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LegacyWornStackSplitsIntoIndependentlyEnchantableInstances()
     {
         const int LegacyGear = 2030550;

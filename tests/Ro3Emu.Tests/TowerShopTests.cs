@@ -77,7 +77,7 @@ public sealed class TowerShopTests : IAsyncLifetime
         return await Next(bot, ShopService.BuyCommodity, BuyCommodityResp.Parser);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ShopNeedsItsQuestAndAnActuallyClearedFloor()
     {
         await using var alice = await InWorld("Alice");
@@ -89,7 +89,7 @@ public sealed class TowerShopTests : IAsyncLifetime
         Assert.Equal(ErrorCodes.PurchaseRequirements, (await Buy(alice, FirstOffer)).Result);
     }
 
-    [Theory]
+    [ClientDataTheory]
     [InlineData(9, FirstOffer)]
     [InlineData(10, SecondOffer)]
     [InlineData(999999, FirstOffer)]
@@ -101,7 +101,7 @@ public sealed class TowerShopTests : IAsyncLifetime
         Assert.Equal(ErrorCodes.PurchaseRequirements, (await Buy(alice, commodityId)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FloorTenBuysTheFirstOfferOnceAndKeepsItsCounterAfterRelog()
     {
         await using (var alice = await InWorld("Alice", 10))
@@ -133,7 +133,7 @@ public sealed class TowerShopTests : IAsyncLifetime
         Assert.Equal(ErrorCodes.PurchaseLimit, (await Buy(relog, FirstOffer)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FloorTwentyCanBuySecondOfferButNotThird()
     {
         await using var alice = await InWorld("Alice", 20);

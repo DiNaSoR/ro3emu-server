@@ -24,7 +24,7 @@ public sealed class EconomyProbeTests : IDisposable
         var p = roles.LoadProgress(role); p.Currency[1] = 1000; roles.SaveProgress(role, p);
     }
 
-    [Fact]
+    [ClientDataFact]
     public void SnapshotCompareReceiptAndRestoreCommandsStayReadOnlyAndNeverHideIncompleteCoverage()
     {
         string opening = Path.Combine(directory, "opening");
@@ -51,7 +51,7 @@ public sealed class EconomyProbeTests : IDisposable
         Assert.Equal(1, RunReadOnly("verify-receipts", Database, Data, "auto", "0", "1", Path.Combine(directory, "damaged")));
     }
 
-    [Fact]
+    [ClientDataFact]
     public void CliRejectsWrongRealmMalformedEvidenceAndOutputOverwrite()
     {
         string opening = Path.Combine(directory, "opening");

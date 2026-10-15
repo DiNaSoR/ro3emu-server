@@ -204,7 +204,7 @@ public sealed partial class DungeonTests : IAsyncLifetime
         });
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task AuthenticThreePlayerBossRequiresReadyAndPaysEachClearOnce()
     {
         var plan = Service<DungeonCatalog>().Resolve(Request());
@@ -336,7 +336,7 @@ public sealed partial class DungeonTests : IAsyncLifetime
         Assert.DoesNotContain(Service<World>().AllUnits(), m => m.InstanceId == instance);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ReadyTimeoutDeclineAndRosterChangeCancelWithoutTeleport()
     {
         ((Dictionary<string, JsonElement>)Service<GameData>().Table("PublicParamConfig"))
@@ -366,7 +366,7 @@ public sealed partial class DungeonTests : IAsyncLifetime
         Assert.False(HasSwitch(alice));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ReadyConfirmationRevalidatesSeasonBeforeCreatingRoom()
     {
         // The cached team row gets the same season restriction as the exported raid rows, so three bots suffice.
@@ -394,7 +394,7 @@ public sealed partial class DungeonTests : IAsyncLifetime
         Assert.Equal(0, await Enter(alice)); // cancellation released every pending membership
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SyntheticSoloDisconnectDuringTransferRestoresPublicWorld()
     {
         SyntheticSolo(); // exported 50101 requires three; only this host's cached admission is relaxed
@@ -420,7 +420,7 @@ public sealed partial class DungeonTests : IAsyncLifetime
         Assert.DoesNotContain(Service<World>().AllUnits(), m => m.InstanceId == instance);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ExportedPointRespawnRunsSoloAndRegionGroupResolvesConfiguredMonsters()
     {
         const long pointScene = 1022001, regionScene = 4400001;
@@ -491,7 +491,7 @@ public sealed partial class DungeonTests : IAsyncLifetime
         Assert.Equal(0, (await Next(bob, DungeonService.Leave, LeaveDungeonRsp.Parser)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ConfiguredImmediateOnClickReviveAdmitsTheNormalRequest()
     {
         // Thirty-three other ordinary scenes export [[0]]; reuse a source-backed room with that exact option
@@ -529,7 +529,7 @@ public sealed partial class DungeonTests : IAsyncLifetime
         Assert.Equal(0, (await Next(alice, DungeonService.Leave, LeaveDungeonRsp.Parser)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SamePlaybookRolloverCannotPayAnOldDungeonAttempt()
     {
         SyntheticSolo();
@@ -548,7 +548,7 @@ public sealed partial class DungeonTests : IAsyncLifetime
         Assert.Equal(ErrorCodes.FeatureUnavailable, await Enter(alice));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SyntheticStoryEditorRunsTwoPrivateWavesButBareExportHasNoServerEncounter()
     {
         // 1054001 (an Ant Hell story scene) has neither a resolved spawn source nor a reconstruction. (1000201, used
@@ -597,7 +597,7 @@ public sealed partial class DungeonTests : IAsyncLifetime
         Assert.DoesNotContain(Service<World>().AllUnits(), m => m.InstanceId == instance && m is MonsterUnit);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SyntheticSoloCombatChecksDailyAllowanceCarryAndRollback()
     {
         static bool ClearPublished(DBMultiDungeonInfoIncrement update, int used)

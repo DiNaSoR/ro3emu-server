@@ -12,7 +12,7 @@ public sealed class GameDataTests
     private static readonly GameData Data = new(
         Options.Create(new ServerOptions { DataDir = Path.Combine(RepoRoot(), "data") }), NullLogger<GameData>.Instance);
 
-    [Fact]
+    [ClientDataFact]
     public void ConfigRowsRetainAttributePairsAndLocalizedNames()
     {
         var novice = Data.Row("JobConfig", 1000);
@@ -28,7 +28,7 @@ public sealed class GameDataTests
         Assert.Equal("Lv. 1 Ore Vein", Data.TextOf(Data.Row("NPCConfig", 7010001)!.Value, "_kName"));
     }
 
-    [Fact]
+    [ClientDataFact]
     public void SkillRowsRemainValidAfterFileParseAndConcurrentAccess()
     {
         var rows = Enumerable.Range(0, 12).AsParallel().Select(_ => Data.SkillTemplate(10000)).ToArray();

@@ -416,6 +416,13 @@ public sealed class SkillService
             yield break;
         }
         int next = 1;
+        // The PC bar renders whellSkills, not atkSkillId. At level 1 a Novice has no other
+        // active skill, so expose the already learned normal attack in a clickable slot.
+        if (p.Career == 1000 && data.Row("SkillConfig", NormalAttack(p.Career)) is { } attack)
+        {
+            int group = (int)GameData.Int(attack, "_iSkillID");
+            if (group > 0 && Level(p, group) > 0 && IsActive(group)) yield return (next++, group);
+        }
         foreach (var (group, _) in Tree(p.Career))
         {
             if (next > BarSlots) break;
@@ -674,7 +681,8 @@ public sealed class SkillService
         else if (code == 0)
         {
             int learned = Level(p, group);
-            if (group <= 0 || learned <= 0 || !IsActive(group) || IsNormalGroup(p, group)
+            if (group <= 0 || learned <= 0 || !IsActive(group)
+                || (IsNormalGroup(p, group) && p.Career != 1000)
                 || req.Info!.SkillLevel < 1 || req.Info.SkillLevel > learned
                 || op == 1 && target < loadList.Count && loadList[target].SkillId > 0
                     && loadList[target].SkillId != group

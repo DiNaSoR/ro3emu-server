@@ -13,7 +13,7 @@ public sealed class EquipmentRatingTests
     private static readonly GameData Data = new(
         Options.Create(new ServerOptions { DataDir = Path.Combine(RepoRoot(), "data") }), NullLogger<GameData>.Instance);
 
-    [Fact]
+    [ClientDataFact]
     public void AppraisedCutterUsesItsActualRolledValuesAffixAndSpecial()
     {
         // ItemConfig/EquipConfig 2010250: Cutter has two base attributes, PATK=103 and MATK=104.
@@ -29,7 +29,7 @@ public sealed class EquipmentRatingTests
         Assert.Equal(660, EquipmentRating.Calculate(item, Data));
     }
 
-    [Fact]
+    [ClientDataFact]
     public void FractionalConfigWeightRoundsOnceAndStopsAtFirstIncompletePair()
     {
         // AttributeConfig[101]._iPower=0.25; slot 1 is missing its value, so slot 2 is not parsed by the client.
@@ -42,7 +42,7 @@ public sealed class EquipmentRatingTests
         Assert.Equal(51, EquipmentRating.Calculate(item, Data)); // 3*0.25 + 1*50 = 50.75
     }
 
-    [Fact]
+    [ClientDataFact]
     public void UnappraisedAndNonEquipmentInstancesHaveNoCalculatedScore()
     {
         var cutter = new InvItem { Entry = 2010250, Attrs = new() { [3] = 0, [30] = 103, [60] = 50, [2] = 777 } };

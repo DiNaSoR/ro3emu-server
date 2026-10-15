@@ -4,10 +4,34 @@ using Romsg;
 
 namespace Ro3Emu.Server.Game;
 
-public sealed partial class GameMessageHandler
+/// <summary>The world around the role: scenes, combat targets, MVPs, world interaction, revival and the territory war.</summary>
+public sealed class WorldMessages(Maps.World world, CombatService combat, SceneService scene, MvpService mvps, TowerService tower, DungeonService dungeons, WorldCoreService worldCore, WorldCommonService common, WorldInteractionService interaction, TimedBattleService timedBattles, FestivalService festival, GuildHomeService guildHome, TrainingService training, TerritoryWarsService territory, TerritoryEscortService escort) : Messaging.IMessageModule
 {
-    private void MapWorldRoutes(Messaging.MessageRoutes routes)
+    private const uint ChangeViewCfg = 30007, SyncMiniMapStatus = 31043, SceneGetLineInfo = 70009;
+
+    public void Map(Messaging.MessageRoutes routes)
     {
+        routes.AdmitEconomic(id => id is MvpService.BriefInfo or MvpService.AwardNum or MvpService.ReportRank);
+        routes.AdmitEconomic(id => TerritoryWarsService.IsOwnerRequest(id) || TerritoryEscortService.IsOwnerRequest(id));
+        routes.AdmitEconomic(territory.IsSharedOwnerRequest);
+        routes.AdmitEconomic(escort.IsSharedOwnerRequest);
+        // Target lock is a session field and in-scene teleport moves the sender; a portal hop as Realm waited up to 3.4 s.
+        routes.AdmitRole(id => id is MsgId.ChangeFace or CombatService.LockEnemy or SceneService.SceneTeleport);
+        routes.AdmitRole(id => id is WorldInteractionService.Action or WorldInteractionService.SeatChange
+            or WorldInteractionService.VehicleSync);
+        routes.AdmitRole(id => id is WorldCoreService.ReliveItem); // owns the role payment and the exclusive revive claim
+
+        // Siege, territory battle and an ordinary dungeon answer the same statistics requests; escort cargo and
+        // territory pickups are NPCs behind the ordinary interaction.
+        static bool DungeonStatistics(uint id) => id is 30106 or 30110 or 30114 or 30116 or 30117;
+        static bool NpcInteraction(uint id) => id == SceneService.NpcInteraction;
+        routes.Intercept("territory", TerritoryWarsService.IsOwnerRequest, territory.HandleAsync);
+        routes.Intercept("escort", TerritoryEscortService.IsOwnerRequest, escort.HandleAsync);
+        routes.Intercept("territory/siege", DungeonStatistics, territory.SiegeSharedAsync);
+        routes.Intercept("territory/battle", DungeonStatistics, territory.SharedAsync);
+        routes.Intercept("escort/actors", id => id is 32287 || NpcInteraction(id), escort.HandleSharedAsync); // guild goods, cargo NPCs
+        routes.Intercept("territory/world", NpcInteraction, territory.WorldSharedAsync);
+
         routes.Map(1031, "common", async (session, msgId, body) =>
         {
             await common.TransmitAsync(session, GMCommandTransmitReq.Parser.ParseFrom(body.Span));
@@ -99,21 +123,6 @@ public sealed partial class GameMessageHandler
         routes.Map(MsgId.PlayerAsset, "worldCore", async (session, msgId, body) =>
         {
             await worldCore.AssetsAsync(session, PlayerAssetReq.Parser.ParseFrom(body.Span));
-        });
-        routes.Map(MsgId.SceneLoaded, "scene", async (session, msgId, body) =>
-        {
-            var loadedRole = session.Role;
-            var loadedAttachment = session.Attachment;
-            long sceneGeneration = session.SceneGeneration;
-            session.WorldState.NameBoardLimit = Math.Min(SceneLoadedReq.Parser.ParseFrom(body.Span).NameBoardMaxCount, 1000);
-            await scene.SceneLoadedAsync(session, SceneLoadedReq.Parser.ParseFrom(body.Span));
-            using var scope = session.Owners is { } loadedOwners ? await EnterScenePublicationAsync(loadedOwners, session) : null;
-            if (!ReferenceEquals(session.Role, loadedRole) || !ReferenceEquals(session.Attachment, loadedAttachment)
-                || session.SceneGeneration != sceneGeneration) return;
-            await teams.OnEnteredAsync(session);
-            session.GuildOnlinePublished = true; // undo even if the publication throws after saving
-            await guilds.OnlineChangedAsync(session, true);
-            await guilds.SceneGuildIdAsync(session);
         });
         routes.Map(DungeonService.Enter, "territory", async (session, msgId, body) =>
         {

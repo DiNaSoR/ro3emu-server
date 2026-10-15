@@ -233,7 +233,7 @@ public sealed class GuildCaravanTests : IAsyncLifetime
         throw new DirectoryNotFoundException("repository root");
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task EveryCaravanMessageUsesDurableOrdersAndGuildHelp()
     {
         await using var alice = await InWorld("Alice");
@@ -344,7 +344,7 @@ public sealed class GuildCaravanTests : IAsyncLifetime
         Assert.True(app.Services.GetRequiredService<GuildStore>().Get(guild)!.Money > 0);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FiveConfiguredRoundsEndAtCapAndOnlyFirstRoyalCountsForDaily()
     {
         await using var alice = await InWorld("Alice");
@@ -379,7 +379,7 @@ public sealed class GuildCaravanTests : IAsyncLifetime
         Assert.Equal(1, session.DailyRows!.ActivityData[101].TaskCompleteTimes);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ResetAtFiveCompensatesOfflineUnclaimedDepartureExactlyOnce()
     {
         long roleId;
@@ -429,7 +429,7 @@ public sealed class GuildCaravanTests : IAsyncLifetime
             .Single(x => x.Role?.Id == roleId).DailyRows!.ActivityData[101].TaskCompleteTimes);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ResetAtFiveUsesLatestGuildDeltaRevisionAndRecordsExactSource()
     {
         long roleId;
@@ -486,7 +486,7 @@ public sealed class GuildCaravanTests : IAsyncLifetime
             && leg.Asset.Id == EconomyDenominations.GuildMoney && leg.Delta == 1000);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task OfflineRolloverAfterDisbandCreditsDurableGuildRecoveryOnce()
     {
         long role, guild, day;
@@ -518,7 +518,7 @@ public sealed class GuildCaravanTests : IAsyncLifetime
         Assert.Equal(1, SourceLegs(source, role).Receipts);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task OfflineRolloverExpiresUnclaimedMailInItsParentReceipt()
     {
         long role, guild, day;
@@ -571,7 +571,7 @@ public sealed class GuildCaravanTests : IAsyncLifetime
         Assert.Equal(moneyBefore + 1000, app.Services.GetRequiredService<GuildStore>().Get(guild)!.Money);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task HelpCancellationDoesNotRefundDailyRequestsAndRefreshStopsAtFive()
     {
         await using var alice = await InWorld("Alice");
@@ -625,7 +625,7 @@ public sealed class GuildCaravanTests : IAsyncLifetime
             (await Next(alice, GuildCaravanService.Refresh, GuildCatShopRefreshResp.Parser)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FeatureGateRejectsUnderleveledGuildMember()
     {
         await using var alice = await InWorld("Alice");
@@ -641,7 +641,7 @@ public sealed class GuildCaravanTests : IAsyncLifetime
             (await Next(bob, GuildCaravanService.HelpList, GuildCatShopItemHelpListResp.Parser)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task OfflineHelpAwardSurvivesKickAndDeliversOnGuildlessLogin()
     {
         await using var alice = await InWorld("Alice");
@@ -711,7 +711,7 @@ public sealed class GuildCaravanTests : IAsyncLifetime
         Assert.Equal(0, delivery.GuildMoney); // booked treasury value is not created twice
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LeavingWhileSubmitWaitsForCharacterLockCannotSpendOrReward()
     {
         await using var alice = await InWorld("Alice");
@@ -760,7 +760,7 @@ public sealed class GuildCaravanTests : IAsyncLifetime
         Assert.Equal(funds, app.Services.GetRequiredService<GuildStore>().Get(guild)!.Money);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task HeldHelpCannotCreateYesterdayPendingAwardAcrossOfflineRollover()
     {
         await using var alice = await InWorld("Alice");
@@ -836,7 +836,7 @@ public sealed class GuildCaravanTests : IAsyncLifetime
         Assert.Equal(0, SourceLegs(source, bobId).Receipts);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task HeldOfflineRolloverCommitPrecedesLoginPendingDeliveryExactlyOnce()
     {
         await using var alice = await InWorld("Alice");
@@ -923,7 +923,7 @@ public sealed class GuildCaravanTests : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ConcurrentHelpersCanCompleteOneRequestOnlyOnce()
     {
         await using var alice = await InWorld("Alice");
@@ -962,7 +962,7 @@ public sealed class GuildCaravanTests : IAsyncLifetime
         Assert.Equal(1, (int)(await Show(alice)).SkuData.Single(x => x.Index == request.Index).Status);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task CommittedHelpRepliesWhenRecipientDisconnectsBeforePendingDelivery()
     {
         await using var alice = await InWorld("Alice");
@@ -1023,7 +1023,7 @@ public sealed class GuildCaravanTests : IAsyncLifetime
         finally { if (!disposed) await bob.DisposeAsync(); }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task CommittedHelpRepliesWhileRecipientQuiescesBeforeResourceProjection()
     {
         await using var alice = await InWorld("Alice");
@@ -1134,7 +1134,7 @@ public sealed class GuildCaravanTests : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task MigratedYesterdayOrderRollsOverForOriginalGuildBeforeNewOrder()
     {
         await using var alice = await InWorld("Alice");
@@ -1188,7 +1188,7 @@ public sealed class GuildCaravanTests : IAsyncLifetime
         Assert.Equal(1, SourceLegs(source, bobId).Receipts);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task MigratedLegacyUnbookedPendingCreditsOriginalGuildAndRoleOnce()
     {
         await using var alice = await InWorld("Alice");
@@ -1250,7 +1250,7 @@ public sealed class GuildCaravanTests : IAsyncLifetime
         Assert.Equal(1, SourceLegs(source + ":deliver", bobId).Receipts);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task PendingAwardCannotOverwriteOrderMigratedToAnotherGuildDuringAwait()
     {
         await using var alice = await InWorld("Alice");
@@ -1345,7 +1345,7 @@ public sealed class GuildCaravanTests : IAsyncLifetime
         Assert.Equal(1, (int)after.SkuData.Single(x => x.Index == requested.Index).Status);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FailedPersistenceRollsBackCargoAndConfiguredReward()
     {
         await using var alice = await InWorld("Alice");

@@ -182,9 +182,11 @@ public sealed class PhonestChannel : IAsyncDisposable
             Interlocked.Add(ref _queuedBytes, -frame.Length);
             if (Interlocked.Exchange(ref _overflowed, 1) == 0)
             {
-                _log.LogWarning("{Remote}: {Bytes} bytes queued, the client is not reading; closing the connection",
+                _log.LogWarning("{Remote}: {Bytes} bytes queued, the client is not reading; resetting the connection",
                     Remote, Interlocked.Read(ref _queuedBytes));
-                Abort();
+                // A reset, not a FIN: the FIN would wait behind the kernel's send buffer, which a client that stopped
+                // reading drains at a trickle (minutes on Linux with a large buffer and a small receive window).
+                AbortReset();
             }
             return Task.CompletedTask;
         }

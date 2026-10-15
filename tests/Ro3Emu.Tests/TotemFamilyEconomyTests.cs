@@ -69,7 +69,7 @@ public sealed class TotemFamilyEconomyTests : IAsyncLifetime
     private EconomyLedgerWindow Window(EconomySnapshot a, EconomySnapshot b) =>
         S3EconomyReader.ReadLedger(directory, EconomyCatalog.Load(Path.Combine(RepoRoot(), "data")), a, b)!;
 
-    [Fact]
+    [ClientDataFact]
     public async Task SetupAndDownCommitMarkersAndBlobWithVerifiableMetadataReceipts()
     {
         await using var bot = await Enter();
@@ -108,7 +108,7 @@ public sealed class TotemFamilyEconomyTests : IAsyncLifetime
         Assert.Equal(2, Window(opening, down).Legs.Count);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task BoundCombineConsumesTwoInstancesAndPublishesOneMatchingReceipt()
     {
         await using var bot = await Enter();

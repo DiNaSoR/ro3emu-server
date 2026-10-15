@@ -18,7 +18,7 @@ public sealed partial class DungeonTests
     public static TheoryData<long> ScriptedScenes() => new(new ReconstructedDungeons(
         Options.Create(new ServerOptions())).AllScripted.Select(s => s.Scene).Order());
 
-    [Theory]
+    [ClientDataTheory]
     [MemberData(nameof(ScriptedScenes))]
     public void AScriptedSceneResolvesToOneStepPerConfiguredStageAgainstTheClientData(long scene)
     {
@@ -35,7 +35,7 @@ public sealed partial class DungeonTests
         Assert.Equal(plan.Waves.Select(w => w.Quest).Order(), plan.Waves.Select(w => w.Quest));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task TheVortexScenePlaysFromTheCorridorThroughTheJumpToTheEndOfThePassage()
     {
         const long scene = 1000201;
@@ -71,7 +71,7 @@ public sealed partial class DungeonTests
         Assert.DoesNotContain(Service<World>().AllUnits(), u => u.InstanceId == instance);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task TheDeniroSceneOpensOneInteractionPerStepUntilTheRideToTheDepths()
     {
         const long scene = 1000301;
@@ -126,7 +126,7 @@ public sealed partial class DungeonTests
         await StoryMovesOn(alice, 10104300, 10104310);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LouiesGamePlaysItsStoriesAndOnlyKatiesBellWins()
     {
         const long scene = 3120402;
@@ -184,7 +184,7 @@ public sealed partial class DungeonTests
         Assert.NotEmpty(off.AllScripted);
     }
 
-    [Fact]
+    [ClientDataFact]
     public void ServerRegionsUseTheClientsCircleAndRectangleFootprints()
     {
         var map = Service<WorldData>().Map(1000201)!;

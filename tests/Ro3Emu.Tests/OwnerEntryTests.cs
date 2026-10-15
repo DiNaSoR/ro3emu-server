@@ -41,7 +41,7 @@ public sealed class OwnerEntryTests : IAsyncLifetime
         await bot.EnterWorldAsync(role); return (bot, role);
     }
 
-    [Theory]
+    [ClientDataTheory]
     [InlineData("GM")]
     [InlineData("micro/MailService")]
     [InlineData("timer/owner-test")]

@@ -27,12 +27,33 @@ public abstract class GateListener(IPAddress address, int port, ILogger log, Dia
     protected virtual void OnCleanupFailed(PhonestChannel channel, Exception error) { }
     protected GameLoop.CompletionReservation? CurrentServeCompletion => _serveCompletion.Value;
 
+    private Socket? _listener;
+
+    /// <summary>
+    /// Binds before the host reports started. ExecuteAsync runs in the background, so listening there would leave a
+    /// moment after startup where connections are refused.
+    /// </summary>
+    public override Task StartAsync(CancellationToken cancellationToken)
+    {
+        var listener = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+        try
+        {
+            listener.Bind(new IPEndPoint(address, port));
+            listener.Listen(512); // a realm start is a burst of connects (Kestrel's default backlog too)
+        }
+        catch
+        {
+            listener.Dispose();
+            throw;
+        }
+        _listener = listener;
+        Log.LogInformation("{Name} listening on {Address}:{Port}", Name, address, port);
+        return base.StartAsync(cancellationToken);
+    }
+
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
-        using var listener = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
-        listener.Bind(new IPEndPoint(address, port));
-        listener.Listen(512); // a realm start is a burst of connects (Kestrel's default backlog too)
-        Log.LogInformation("{Name} listening on {Address}:{Port}", Name, address, port);
+        using var listener = _listener!;
         try
         {
             while (!ct.IsCancellationRequested)

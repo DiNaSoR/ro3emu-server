@@ -47,7 +47,7 @@ public sealed class CardPackSyncTests : IAsyncLifetime
         try { Directory.Delete(dataDir, true); } catch (IOException) { }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LoginCardPackHoldsOnlyCardsWhenFragmentAndUnupgradedCardShareAQuality()
     {
         var data = app.Services.GetRequiredService<GameData>();
@@ -72,7 +72,7 @@ public sealed class CardPackSyncTests : IAsyncLifetime
         Assert.Equal(249, full.PackInfo[1].All.Items.Values.Where(i => i.ItemEntry == Fragment).Sum(i => i.Stack));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SavedNonCardInCardPackMovesToItemPackBeforeLoginSync()
     {
         var data = app.Services.GetRequiredService<GameData>();

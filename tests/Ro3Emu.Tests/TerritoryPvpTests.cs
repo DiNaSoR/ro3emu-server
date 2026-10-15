@@ -65,7 +65,7 @@ public sealed class TerritoryPvpTests : IAsyncLifetime
         throw new DirectoryNotFoundException("repository root");
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ExplicitTerritoryPilesDoNotChangeOrdinaryBuffStacking()
     {
         await using var player = await InWorld("PvpBuffPiles");
@@ -97,7 +97,7 @@ public sealed class TerritoryPvpTests : IAsyncLifetime
         Assert.Equal(2, session.Buffs.Single(b => b.ConfigId == 1162101).PileCount);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task WireCastDeniesByDefaultAndAlliesButHitsAuthorizedEnemy()
     {
         await using var attacker = await InWorld("PvpAttacker");
@@ -166,7 +166,7 @@ public sealed class TerritoryPvpTests : IAsyncLifetime
         Assert.Equal(3022, (await Next(attacker, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
     }
 
-    [Theory]
+    [ClientDataTheory]
     [InlineData(10000, false)]
     [InlineData(1, true)]
     public async Task SupportShieldPublishesAbsorptionAndOnlyEffectivePvpDamage(long shield, bool lethal)
@@ -230,7 +230,7 @@ public sealed class TerritoryPvpTests : IAsyncLifetime
         }
     }
 
-    [Theory]
+    [ClientDataTheory]
     [InlineData(true)]
     [InlineData(false)]
     public async Task BuffPublicationRevokingHostilityInvalidatesPendingDamage(bool revokeDuringShield)
@@ -300,7 +300,7 @@ public sealed class TerritoryPvpTests : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task AttackerLeavingAfterLethalReservationStillPublishesVictimDeath()
     {
         await using var attacker = await InWorld("PvLeaveA");
@@ -344,7 +344,7 @@ public sealed class TerritoryPvpTests : IAsyncLifetime
         Assert.Equal(0, attributedKills);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task HostilityRevokedWhileVictimLockHeldPreventsPendingPlayerDamage()
     {
         await using var attacker = await InWorld("PvpLockAttacker");
@@ -403,7 +403,7 @@ public sealed class TerritoryPvpTests : IAsyncLifetime
         Assert.Equal(0, deaths);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task OverlappingAoeHitsKeepLethalHpAndNotifyDeathOnce()
     {
         await using var first = await InWorld("PvpAoeFirst");
@@ -487,7 +487,7 @@ public sealed class TerritoryPvpTests : IAsyncLifetime
         Assert.Contains(dealt, d => d.Attacker == secondSession && d.Amount > 0 && d.Lethal);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ThrowingMonsterDamageCallbackStillFinalizesKillAndLeavesCombatUsable()
     {
         await using var attacker = await InWorld("PvpHookThrow");
@@ -538,7 +538,7 @@ public sealed class TerritoryPvpTests : IAsyncLifetime
         Assert.Equal(1, firstKills);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SceneExitDuringMonsterDamageCallbackFinalizesKillWithoutStaleCasterEffects()
     {
         await using var attacker = await InWorld("PvpSceneExit");

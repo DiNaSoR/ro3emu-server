@@ -104,7 +104,7 @@ public sealed class DatabaseBackupTests : IDisposable
             var refused = Assert.Throws<InvalidOperationException>(() => DatabaseRestore.Restore(_dir, copy));
             Assert.Contains("in use", refused.Message);
             Assert.Throws<InvalidOperationException>(() => RealmLock.Acquire(_dir)); // nor may a second server start
-            Assert.Single(new RoleStore(accounts).ForAccount("restore").Where(r => r.Name == "After"));
+            Assert.Single(new RoleStore(accounts).ForAccount("restore"), r => r.Name == "After");
         }
         SqliteConnection.ClearAllPools();
 

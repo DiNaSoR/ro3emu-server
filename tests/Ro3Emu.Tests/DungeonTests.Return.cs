@@ -11,7 +11,7 @@ namespace Ro3Emu.Tests;
 
 public sealed partial class DungeonTests
 {
-    [Fact]
+    [ClientDataFact]
     public async Task FailedPaidReviveCommitPreservesItemAndDeath()
     {
         await using var alice = await InWorld("Alice");
@@ -39,7 +39,7 @@ public sealed partial class DungeonTests
         Assert.Equal(before - 1, Items(alice, 1112001));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task PaidReviveSurvivesPostCommitHookFailureWithoutSecondCharge()
     {
         await using var alice = await InWorld("Alice");
@@ -68,7 +68,7 @@ public sealed partial class DungeonTests
         Assert.Equal(before - 1, Items(alice, 1112001));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task PaidReviveApplyFaultRequiresRestartAndKeepsOneDebit()
     {
         long role, before;
@@ -113,7 +113,7 @@ public sealed partial class DungeonTests
         Assert.True(await Service<CharacterService>().RewardSourceCommittedAsync(source));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task PaidReviveDebitSurvivesSocketAbortAndReconnect()
     {
         var alice = await InWorld("Alice");
@@ -148,7 +148,7 @@ public sealed partial class DungeonTests
         Assert.Equal(before - 1, Items(reconnect, 1112001));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FailedSecondMemberReturnPointAbortsWholeBarrierBeforeRoomEntry()
     {
         await using var alice = await InWorld("Alice");
@@ -183,7 +183,7 @@ public sealed partial class DungeonTests
         Assert.Equal(0, second.InstanceId);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ActorWaveClearDoesNotInvalidatePendingPrivateSceneAcknowledgment()
     {
         SyntheticSolo();
@@ -200,7 +200,7 @@ public sealed partial class DungeonTests
         await Next(alice, MsgId.EntitySelf, EntitySelf.Parser);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task OldRoomReservationCannotEnterAfterPublicSceneGenerationChanges()
     {
         await using var alice = await InWorld("Alice");
@@ -220,7 +220,7 @@ public sealed partial class DungeonTests
             && SwitchSceneLineResp.Parser.ParseFrom(e.Body).SceneEntry == Scene));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ClosingDuringSpawnDrainsStaleActorAndShutdownCompletion()
     {
         SyntheticSolo();
@@ -306,7 +306,7 @@ public sealed partial class DungeonTests
         await Next(bot, MsgId.EntitySelf, EntitySelf.Parser);
     }
 
-    [Theory]
+    [ClientDataTheory]
     [InlineData(false, 1022001L, 5300001, 10101L)]
     [InlineData(true, Scene, Boss, RoleStore.SpawnSceneEntry)]
     public async Task LethalDungeonHitReturnsAliveThrough30402AfterDeathPublication(
@@ -397,7 +397,7 @@ public sealed partial class DungeonTests
         Assert.Equal(ErrorCodes.TargetAlive, (await Next(alice, CombatService.Relive, EntityReliveAck.Parser)).Result);
     }
 
-    [Theory]
+    [ClientDataTheory]
     [InlineData(false, 1022001L)]
     [InlineData(true, Scene)]
     public async Task LivingDungeonExitRetainsWoundedHpSpAndLoadingExitIsRefused(bool multi, long dungeonScene)
@@ -432,7 +432,7 @@ public sealed partial class DungeonTests
         Assert.Null(session.DungeonAttempt);
     }
 
-    [Theory]
+    [ClientDataTheory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task DungeonReturnWaitsForCompetingReviveClaimAndCancelsOnNewHandoff(bool interrupt)
@@ -494,7 +494,7 @@ public sealed partial class DungeonTests
         }
     }
 
-    [Theory]
+    [ClientDataTheory]
     [InlineData(0)] // the original queued return is admitted
     [InlineData(1)] // explicit queue cancellation, followed by an unrelated town transition
     [InlineData(2)] // a same-map generic request replaces the queued return while preserving FIFO
@@ -575,7 +575,7 @@ public sealed partial class DungeonTests
         Assert.Null(Service<InstanceService>().Find(instance));
     }
 
-    [Theory]
+    [ClientDataTheory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task LaterQueueSnapshotCannotRunCanceledOrReplacedDungeonReturn(bool replace)

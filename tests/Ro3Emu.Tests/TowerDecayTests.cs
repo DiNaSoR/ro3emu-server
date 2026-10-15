@@ -6,7 +6,7 @@ namespace Ro3Emu.Tests;
 /// <summary>Captured playbook 101 floor 2: UI decay and the first monster AOI HP (traffic-floor2.jsonl).</summary>
 public sealed class TowerDecayTests
 {
-    [Fact]
+    [ClientDataFact]
     public void FloorTwoRatioMatchesTheCapturedNinetyNinePercentAnd1188Hp()
     {
         // The client floors both timestamps after its UTC+8 offset and the configured 05:00 refresh.

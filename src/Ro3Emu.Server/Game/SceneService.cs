@@ -255,7 +255,7 @@ public sealed partial class SceneService(IOptions<ServerOptions> options, World 
             {
                 if (!CurrentScene() || s.SceneLoading) return;
                 // Must follow the client's 30005: the ShowBattleUI listener lives in the freshly loaded scene logic.
-                await s.SendGameAsync(MsgId.EntitySelf, new EntitySelf { Base = GameMessageHandler.PlayerEntity(s) });
+                await s.SendGameAsync(MsgId.EntitySelf, new EntitySelf { Base = RoleSessionService.PlayerEntity(s) });
                 if (!CurrentScene() || s.SceneLoading) return;
                 await s.SendGameAsync(MsgId.SelfInfoEndFrameNotify, new SelfInfoEndFrameNotify());
                 if (!CurrentScene() || s.SceneLoading) return;
@@ -314,7 +314,7 @@ public sealed partial class SceneService(IOptions<ServerOptions> options, World 
     /// </summary>
     public async Task ResyncAsync(GameSession s, Func<bool> current)
     {
-        await s.SendGameAsync(MsgId.EntitySelf, new EntitySelf { Base = GameMessageHandler.PlayerEntity(s) });
+        await s.SendGameAsync(MsgId.EntitySelf, new EntitySelf { Base = RoleSessionService.PlayerEntity(s) });
         if (!current()) return;
         await s.SendGameAsync(MsgId.SelfInfoEndFrameNotify, new SelfInfoEndFrameNotify());
         if (!current()) return;

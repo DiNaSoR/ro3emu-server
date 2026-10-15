@@ -121,7 +121,7 @@ public sealed partial class StallsTests : IAsyncLifetime
         Assert.Equal(0, (await Next(bot, MailService.ClaimMail, ClaimMailRsp.Parser)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task DelayedOpeningPublishesTheCurrentStockAfterAConcurrentPurchase()
     {
         await using var seller = await InWorld("Seller");
@@ -157,7 +157,7 @@ public sealed partial class StallsTests : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task CommittedOpeningKeepsLineUntilItsActorIsPublished()
     {
         await using var seller = await InWorld("Seller");
@@ -222,7 +222,7 @@ public sealed partial class StallsTests : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task OpenPlayerStallPinsItsPublicLineUntilClosure()
     {
         await using var seller = await InWorld("Seller");
@@ -258,7 +258,7 @@ public sealed partial class StallsTests : IAsyncLifetime
         Assert.DoesNotContain(Service<PublicLineManager>().Snapshot(10100), line => line.Map.LineNumber == 2);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task RestartRestoresOfflinePlayerStallOnItsOpeningLine()
     {
         long sellerId;
@@ -301,7 +301,7 @@ public sealed partial class StallsTests : IAsyncLifetime
         Assert.Equal(0, await Purchase(buyer, sellerId, listing.Info.Itembase[0].StallsItemID));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task PlayerPurchasePreservesMetadataAndSettlesThroughMailWithAoiClosure()
     {
         await using var seller = await InWorld("Seller"); await using var buyer = await InWorld("Buyer");
@@ -345,7 +345,7 @@ public sealed partial class StallsTests : IAsyncLifetime
         Assert.Equal(ErrorCodes.StallMissing, await Purchase(buyer, Id(seller), offer.StallsItemID));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task PlayerRefusalsDoNotMoveOwnershipOrMoney()
     {
         await using var seller = await InWorld("Seller"); await using var buyer = await InWorld("Buyer");
@@ -379,7 +379,7 @@ public sealed partial class StallsTests : IAsyncLifetime
         Assert.Equal(1, Items(seller).Single(i => i.Entry == 1000100).Stack);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SystemStallStockAndLimitsAreSharedByTwoBuyers()
     {
         await using var alice = await InWorld("Alice"); await using var bob = await InWorld("Bob");
@@ -405,7 +405,7 @@ public sealed partial class StallsTests : IAsyncLifetime
         Assert.Equal(1010000, Money(alice, 2)); Assert.Equal(1990000, Money(bob, 2));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SqliteFailureRollsBackStockPaymentAndBothMailsThenRetrySucceeds()
     {
         await using var seller = await InWorld("Seller"); await using var buyer = await InWorld("Buyer");
@@ -424,7 +424,7 @@ public sealed partial class StallsTests : IAsyncLifetime
         Assert.Single(await Mail(seller, Id(seller))); Assert.Single(await Mail(buyer, Id(buyer)));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LiveEditsAndExpiryReturnOnlyUnsoldStockAndSurviveRelog()
     {
         await using var seller = await InWorld("Seller"); await using var buyer = await InWorld("Buyer");
@@ -473,7 +473,7 @@ public sealed partial class StallsTests : IAsyncLifetime
         Assert.Equal(ErrorCodes.StallMissing, await Purchase(buyer, Id(returning), item));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ColdRestartRestoresEscrowOfflineAoiAttachmentsAndSystemPurchaseLimit()
     {
         long sellerId, offerId;

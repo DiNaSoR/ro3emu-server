@@ -397,7 +397,7 @@ public sealed partial class WorldCoreService : IGameTicker
 
     private EntityBase? Entity(GameSession viewer, long id)
     {
-        if (Player(id) is { } p && Ready(p) && p.WorldScene == viewer.WorldScene && (p==viewer || viewer.Visible.Contains(p))) return GameMessageHandler.PlayerEntity(p);
+        if (Player(id) is { } p && Ready(p) && p.WorldScene == viewer.WorldScene && (p==viewer || viewer.Visible.Contains(p))) return RoleSessionService.PlayerEntity(p);
         if (viewer.VisibleUnits.FirstOrDefault(u=>u.Uid==id && u.WorldScene==viewer.WorldScene) is { } unit) return unit.Entity();
         return worldData.Npc(id) is { } npc && npc.SceneEntry==viewer.SceneEntry ? SceneService.NpcEntity(npc) : null;
     }

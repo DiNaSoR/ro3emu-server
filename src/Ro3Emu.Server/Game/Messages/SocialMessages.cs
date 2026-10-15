@@ -4,10 +4,23 @@ using Romsg;
 
 namespace Ro3Emu.Server.Game;
 
-public sealed partial class GameMessageHandler
+/// <summary>Chat, teams, friends, guilds and their caravan, challenge, campfire and home, emblems.</summary>
+public sealed class SocialMessages(ChatService chat, TeamService teams, EmblemService emblems, GuildService guilds, GuildCaravanService caravan, GuildChallengeService guildChallenge, FriendExtraService friendExtra, GuildCampfireService campfire, GuildHomeService guildHome) : Messaging.IMessageModule
 {
-    private void MapSocialRoutes(Messaging.MessageRoutes routes)
+    private const uint SetFriendSystemMetadata = 82208, GetGuildLeagueMgrData = 30410;
+
+    public void Map(Messaging.MessageRoutes routes)
     {
+        // Guild-social owners admit their own guild and member keys; the route owner picks them.
+        routes.AdmitEconomic(id => routes.TryGet(id, out var route) &&
+            route.Owner is "guilds" or "caravan" or "campfire" or "guildChallenge" or "friendExtra" or "teams");
+        routes.AdmitEconomic((_, id, body) => ChatService.IsEventOwnerRequest(id, body));
+        routes.AdmitEconomic(id => id is >= 83900 and <= 83908); // guild black market
+        routes.AdmitRuntime(id => id is GuildCaravanService.HelpOther, "dispatcher/owned continuation");
+        // Chat acts on the sender. As Realm it queued every fighter's next cast behind it (31102 p99 1.4 s).
+        routes.AdmitRole(id => id is ChatService.TunnelUp or ChatService.JoinChannel);
+        routes.AdmitRole(id => id is >= 82422 and <= 82426); // emblems
+
         // Not a guild-social owner: the default Realm reservation serializes the first entries of one guild, as 30400.
         routes.Map(GuildHomeService.EnterHome, "guildHome", async (session, msgId, body) =>
         {

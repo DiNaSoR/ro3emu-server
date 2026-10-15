@@ -37,7 +37,7 @@ public sealed class ReviveRaceTests : IAsyncLifetime
         try { Directory.Delete(_dir, true); } catch (IOException) { }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task HeldClaimRejectsWireRequestAndReplayRevivesOnlyOnce()
     {
         await using var bot = new BotClient(_http, File.ReadAllText(Path.Combine(_dir, "gate_rsa_public.pem")));

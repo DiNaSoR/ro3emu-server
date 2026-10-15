@@ -41,7 +41,7 @@ public sealed class AssetReconnectTests : IAsyncLifetime
         try { Directory.Delete(directory, true); } catch (IOException) { }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task EqualClientVersionsStillReplayEmptyClaimsAndRefineMapsBeforeAcknowledgment()
     {
         await using var bot = new BotClient(http, File.ReadAllText(Path.Combine(directory, "gate_rsa_public.pem")));

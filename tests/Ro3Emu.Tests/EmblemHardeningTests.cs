@@ -9,7 +9,7 @@ namespace Ro3Emu.Tests;
 
 public sealed partial class EmblemTests
 {
-    [Fact]
+    [ClientDataFact]
     public async Task HeldSetupKeepsPlanAndItemUnpublishedWhileAnotherRoleCanProgress()
     {
         await using var alice = await InWorld("Alice");
@@ -67,7 +67,7 @@ public sealed partial class EmblemTests
         Assert.Equal(2, store.Load(owner.Role.Id).Single(i => i.Guid == guid).Attrs![10001]);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FailedSlotBlobWriteRollsBackBothDirectionsAndCanRetry()
     {
         await using var alice = await InWorld("Alice");
@@ -114,7 +114,7 @@ public sealed partial class EmblemTests
         Assert.Equal(0, store.Load(session.Role.Id).Single(i => i.Guid == guid).Attrs![10001]);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task UpgradeLedgerConsumesMaterialAndFeedWithoutCountingPlanReferenceAsAnotherItem()
     {
         await using var alice = await InWorld("Alice");

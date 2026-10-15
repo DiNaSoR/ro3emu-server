@@ -68,7 +68,7 @@ public sealed class CharacterTests : IAsyncLifetime
         resp.EnsureSuccessStatusCode();
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LoginSyncsLevelPointsBagAndStats()
     {
         await using var alice = await InWorld("Alice");
@@ -110,7 +110,7 @@ public sealed class CharacterTests : IAsyncLifetime
         Assert.Equal(new long[7], alice.Self.EquipInfo);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task EquippingTheDaggerShowsItOnTheModelForEveryone()
     {
         await using var alice = await InWorld("Alice");
@@ -147,7 +147,7 @@ public sealed class CharacterTests : IAsyncLifetime
         Assert.Equal(new long[7], bare.EquipInfo);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task EquipmentAndLevelSurviveRelog()
     {
         long dagger;
@@ -171,7 +171,7 @@ public sealed class CharacterTests : IAsyncLifetime
         Assert.DoesNotContain(dagger, bagAgain.PackInfo[2].All.Items.Keys);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task GmLevelGrantsStatPointsAndPointsCanBeSpent()
     {
         await using var alice = await InWorld("Alice");
@@ -200,7 +200,7 @@ public sealed class CharacterTests : IAsyncLifetime
         Assert.NotEqual(0, (await Next(alice, CharacterService.AllocateAttrPoints, AllocateAttrPointRsp.Parser)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ExpLevelsUpThroughTheTable()
     {
         await using var alice = await InWorld("Alice");
@@ -214,7 +214,7 @@ public sealed class CharacterTests : IAsyncLifetime
         Assert.Equal(100, reward.Rewards[0].ItemEntry);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task JobChangeSkipsTheFreeJobLevelsAndChangesTheModel()
     {
         await using var alice = await InWorld("Alice");
@@ -228,7 +228,7 @@ public sealed class CharacterTests : IAsyncLifetime
         Assert.Equal(1100UL, look.EntityTemplateID);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task TransformJobChecksLevelsThenRepliesBeforeTheModelChange()
     {
         await using var alice = await InWorld("Alice");
@@ -284,7 +284,7 @@ public sealed class CharacterTests : IAsyncLifetime
         Assert.Equal(0, (await again.CreateRoleAsync("Carol2")).Result); // the name is free again
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ACardGoesIntoTheWeaponSocketAndBackAndCountsInStats()
     {
         const int Lunatic = 1420100; // Card: Lunatic, part 1 (weapon): CardConfig tier 0 LUK +1, CRI +100, FLEE +1
@@ -330,7 +330,7 @@ public sealed class CharacterTests : IAsyncLifetime
         Assert.True(unlocked.Cards[Lunatic].Inc.Unlock);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task TheNpcShopSellsPotionsForZenyOnceItsTabIsOpen()
     {
         const int Potions = 118, BeginnerPotion = 1000000; // ShopCommodityConfig 118: class 302 (function 701102, Base 10), 100 Zeny each
@@ -357,7 +357,7 @@ public sealed class CharacterTests : IAsyncLifetime
         Assert.Equal(ErrorCodes.CurrencyShort, (await Next(alice, ShopService.BuyCommodity, BuyCommodityResp.Parser)).Result); // 100M Zeny: short
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task CancelledShopExchangeCommitsButSuppressesOuterReplyOnlyForItsSource()
     {
         // E05a: suspend the point-shop envelope at the same writer barrier as the original exchange.
@@ -426,7 +426,7 @@ public sealed class CharacterTests : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task StrengtheningTheWeaponGridRaisesItsLevelAndAttack()
     {
         const int Ore = 1200200; // StrengthenTable grid 1 levels 1-2: 2 ore + 10000 of currency 2 each, ATK/MATK +2 per level
@@ -449,7 +449,7 @@ public sealed class CharacterTests : IAsyncLifetime
         Assert.Equal((0, 2), (done.Result, done.StrengthenLv));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task MaterialsCombineAndDismantleByTheirItemConfig()
     {
         const int Shard = 1200000, Crystal = 1200001; // ItemConfig[1200001]: _kCombine and _kDecompose [[1200000,5]]
@@ -471,7 +471,7 @@ public sealed class CharacterTests : IAsyncLifetime
         Assert.Equal(0, (await Next(alice, EquipmentService.ItemCombine, ItemCombineResp.Parser)).Result); // the 5 shards came back
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task CraftingARankTwoWeaponNeedsTheCraftFunction()
     {
         // EquipCraftConfig 2001: rank 2 subtype 1, 1254001 + 2x 1200704; rank-2 weights make quality 4 (2010240) certain.
@@ -504,7 +504,7 @@ public sealed class CharacterTests : IAsyncLifetime
         Assert.Equal((3, 42L), (rank.Rankid, (long)rank.Itemuid));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SkillDataCarriesTheNormalAttackAndBashCanBeLearned()
     {
         await using var alice = await InWorld("Alice");
@@ -547,7 +547,7 @@ public sealed class CharacterTests : IAsyncLifetime
         Assert.Equal(0, (await Next(alice, SkillService.PlanUpdate, SkillGrowthSkillPlanUpdateResp.Parser)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task GmItemStacksOntoExistingAndZenyGoesToCurrency()
     {
         await using var alice = await InWorld("Alice");

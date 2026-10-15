@@ -109,7 +109,7 @@ public sealed class MailAdventureEconomyTests : IAsyncLifetime
         Assert.All(check.Locations, x => Assert.Equal("0", x.Residual));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task MailDeliveryClaimAndExpiryHaveExactReceiptsAndRefusedReplayIsSilent()
     {
         await using var alice = await InWorld("Alice");
@@ -153,7 +153,7 @@ public sealed class MailAdventureEconomyTests : IAsyncLifetime
         Exact(held, purged, sink);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FragmentGiftConservesTwoOwnersAndConsumedAskRefusesReplay()
     {
         var segment = Service<ActivityClock>().Segments(1014, clock.GetUtcNow().ToUnixTimeSeconds()).Single();
@@ -199,7 +199,7 @@ public sealed class MailAdventureEconomyTests : IAsyncLifetime
         Assert.Equal(after.Cut.CommitSequence, Cut().Cut.CommitSequence);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SharedDeliveryKeyIsScopedPerOfflineRecipient()
     {
         long firstRole = Service<RoleStore>().Create("mail-one", 1, "MailOne", 1, 1000, 1)!.Id;
@@ -223,7 +223,7 @@ public sealed class MailAdventureEconomyTests : IAsyncLifetime
         Assert.Equal(after.Cut.CommitSequence, Cut().Cut.CommitSequence);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ClaimedDeletedDeliveryReplaysOriginalIdAndRejectsChangedReward()
     {
         await using var alice = await InWorld("Alice");
@@ -248,7 +248,7 @@ public sealed class MailAdventureEconomyTests : IAsyncLifetime
         Assert.Equal(afterDelete.Cut.CommitSequence, Cut().Cut.CommitSequence);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ExpiredDeliveryReplaysOriginalIdWithoutRepeatingSourceCallback()
     {
         long role = Service<RoleStore>().Create("expired-source", 1, "ExpiredSource", 1, 1000, 1)!.Id;
@@ -268,7 +268,7 @@ public sealed class MailAdventureEconomyTests : IAsyncLifetime
         Assert.Equal(afterPurge.Cut.CommitSequence, Cut().Cut.CommitSequence);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task OfflinePassGiftSourcesEntitlementAndSinksTokenInOneReceipt()
     {
         await using var alice = await InWorld("Alice");
@@ -307,7 +307,7 @@ public sealed class MailAdventureEconomyTests : IAsyncLifetime
         Assert.Equal(after.Cut.CommitSequence, Cut().Cut.CommitSequence);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SuspendedMailClaimSerializesWithGmItemGrant()
     {
         await using var alice = await InWorld("Alice");

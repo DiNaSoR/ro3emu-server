@@ -47,7 +47,7 @@ public sealed class TotemTests : IAsyncLifetime
     private async Task<SetUpTotemResp> Equip(BotClient b, int slot, long guid)
     { await b.SendGameAsync(82362, new SetUpTotemReq { TotemPos = slot, TotemGuid = guid }); return await Next(b, 82362, SetUpTotemResp.Parser); }
 
-    [Fact]
+    [ClientDataFact]
     public async Task PlansHaveSafeSlotsAndEquipSwapRemoveAndRelogPersistRealInstances()
     {
         long a, b;
@@ -84,7 +84,7 @@ public sealed class TotemTests : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task AReturningLoginWithNothingToNormalizeWritesNoTotemState()
     {
         // Stage G: the totem normalization at login committed a transaction every time, a third of a role's
@@ -114,7 +114,7 @@ public sealed class TotemTests : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task InvalidOwnershipLockedSlotsDuplicateInputsAndSavedPlanConsumptionAreRefused()
     {
         await using var bot = await InWorld();
@@ -139,7 +139,7 @@ public sealed class TotemTests : IAsyncLifetime
         Assert.NotEqual(0, (await Next(bot, 82368, TotemChangeTotemNameResp.Parser)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task AppraisalSkillLearningRefiningAndExperienceConsumeOnlyValidatedMaterials()
     {
         await using var bot = await InWorld(); await Gm("!lvl 60");
@@ -186,7 +186,7 @@ public sealed class TotemTests : IAsyncLifetime
         Assert.Equal(1, capped.GainItems[1256002]); Assert.Equal(2, capped.GainItems[1256001]);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task CombinationReplacesTwoEligibleGuidsAndRejectsSelfOrLowQuality()
     {
         await using var bot = await InWorld(); await Gm("!lvl 60");
@@ -203,7 +203,7 @@ public sealed class TotemTests : IAsyncLifetime
         Assert.InRange(Item(merged.NewTotemGuid).Attrs![230], Item(merged.NewTotemGuid).Attrs![250], Item(merged.NewTotemGuid).Attrs![260]);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task InactiveTotemPlanPreventsMarketAndStallEscrow()
     {
         await using var bot = await InWorld();
@@ -247,7 +247,7 @@ public sealed class TotemTests : IAsyncLifetime
         Assert.Contains(Session.Items, item => item.Guid == guid);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task CartPreservesTotemStorageAndRejectsSavedPlanTransfers()
     {
         long guid;

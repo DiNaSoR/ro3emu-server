@@ -101,7 +101,7 @@ public sealed class EmojiTests : IAsyncLifetime
         return await State(bot, Id(bot), ObjectState.EObjectStateSmemojiPlay);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LoginSendsTheUnlockedEmotesAndLevelsUnlockMore()
     {
         await using var alice = await InWorld("Alice");
@@ -114,7 +114,7 @@ public sealed class EmojiTests : IAsyncLifetime
         Assert.Contains(50006, more.EmojiUnlocks.All.Value);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SittingPlaysInTwoPhasesForTheOwnerAndViewersAndStopEndsIt()
     {
         await using var alice = await InWorld("Alice");
@@ -134,7 +134,7 @@ public sealed class EmojiTests : IAsyncLifetime
         await State(bob, Id(alice), ObjectState.EObjectStateSmidle);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task WalkingEndsAPlayingEmoteButNotAPreparedOne()
     {
         await using var alice = await InWorld("Alice");
@@ -150,7 +150,7 @@ public sealed class EmojiTests : IAsyncLifetime
         Assert.Equal(Sit, end.BehaviorStateMachine.LastParam.EmojiPlay.EmojiId);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LockedUnknownAndTooFrequentEmotesAreRefused()
     {
         await using var alice = await InWorld("Alice");
@@ -166,7 +166,7 @@ public sealed class EmojiTests : IAsyncLifetime
         Assert.Equal(1211, (await Next(alice, EmojiService.StartPlay, EmojiStartPlayRsp.Parser)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FavouritesAndTheIdleEmoteAreSavedSyncedAndShownToViewers()
     {
         await using var alice = await InWorld("Alice");
@@ -188,7 +188,7 @@ public sealed class EmojiTests : IAsyncLifetime
         Assert.Empty(DBEmojiPlayInfo.Parser.ParseFrom(saved).EmojiCollections);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ADuoEmoteNeedsBothPartnersReadyAndEndsForBoth()
     {
         await using var alice = await InWorld("Alice");
@@ -246,7 +246,7 @@ public sealed class EmojiTests : IAsyncLifetime
         await State(alice, Id(bob), ObjectState.EObjectStateSmidle);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task RefusingAnInviteTellsTheInviter()
     {
         await using var alice = await InWorld("Alice");
@@ -273,7 +273,7 @@ public sealed class EmojiTests : IAsyncLifetime
         Assert.Equal(3608, (await Next(bob, EmojiService.Accept, EmojiInviteAcceptRsp.Parser)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task MeditatingInThePlazaRegionCompletesTheAreaActionQuest()
     {
         await using var alice = await InWorld("Alice");

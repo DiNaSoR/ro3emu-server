@@ -88,7 +88,7 @@ public sealed partial class GuildTests : IAsyncLifetime
         return full.Guid;
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ThreePlayersApplyInviteTransferLeaveAndDissolveOverWire()
     {
         await using var alice = await InWorld("Alice");
@@ -185,7 +185,7 @@ public sealed partial class GuildTests : IAsyncLifetime
         Assert.Null(app.Services.GetRequiredService<GuildStore>().Get(guildId));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task BuildingUpgradeUsesPersistedContributionAndConfiguredMinutes()
     {
         await using var alice = await InWorld("Alice");
@@ -240,7 +240,7 @@ public sealed partial class GuildTests : IAsyncLifetime
             x => x.Build?.BuildingID == 1 && x.Build.Level == 2)).Build.Level);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ManagementRejectsUnprivilegedEditsAndOfficerKickThenPersistsOfflineKick()
     {
         await using var alice = await InWorld("Alice");
@@ -292,7 +292,7 @@ public sealed partial class GuildTests : IAsyncLifetime
             x => x.Base?.Notice == "Meet tonight")).Base.Notice);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task PrecreateHelpersTransitionAndRecruitmentPushOverWire()
     {
         await using var founder = await InWorld("Founder");
@@ -351,7 +351,7 @@ public sealed partial class GuildTests : IAsyncLifetime
         Assert.Equal(ErrorCodes.Cooldown, (await Next(founder, GuildService.Recruit, GuildRecruitResp.Parser)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task BlackMarketListsTradesRecordsAndEnforcesBalancesOverWire()
     {
         await using var seller = await InWorld("Seller");
@@ -405,7 +405,7 @@ public sealed partial class GuildTests : IAsyncLifetime
         Assert.Empty(store.LoadMarket().Stalls);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task DissolvedSellerStallDoesNotBlockOtherSamePriceSeller()
     {
         await using var orphan = await InWorld("Orphan");
@@ -459,7 +459,7 @@ public sealed partial class GuildTests : IAsyncLifetime
         Assert.Equal(10, store.Get(buyerId)!.Materials);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task BatchKickRollsBackEveryMemberWhenSecondPersonalWriteFailsThenRevokesChatOnRetry()
     {
         await using var alice = await InWorld("Alice");
@@ -525,7 +525,7 @@ public sealed partial class GuildTests : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task RenamePaymentIsAtomicAndAQueuedRenameCannotResurrectDissolvedGuild()
     {
         await using var alice = await InWorld("Alice");

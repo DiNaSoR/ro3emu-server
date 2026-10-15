@@ -113,7 +113,7 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
     public float Face { get; set; }
 
     /// <summary>Speed attribute (idx 113) of the role; the client moves at Speed/100 units per second.</summary>
-    public long Speed { get; set; } = GameMessageHandler.DefaultSpeed;
+    public long Speed { get; set; } = RoleSessionService.DefaultSpeed;
 
     public DateTime PositionSavedUtc { get; set; }
     /// <summary>C/D 18 lazy public-position state (PositionPersistence).</summary>

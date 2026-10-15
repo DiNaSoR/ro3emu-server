@@ -74,7 +74,7 @@ public sealed partial class LotteryActivityTests : IAsyncLifetime
         response.EnsureSuccessStatusCode();
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task RoleSwitchKeepsEachLotteryCounterWithItsOwnRole()
     {
         await using var bot = await InWorld(create: true);
@@ -112,7 +112,7 @@ public sealed partial class LotteryActivityTests : IAsyncLifetime
         Assert.Equal(1, firstAgain.LotteryPool[201].All.DailyCount);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task EventBannerDrawUsesOwnedTicketsAndResetsDailyCountOnReconnect()
     {
         await using var bot = await InWorld(create: true);
@@ -154,7 +154,7 @@ public sealed partial class LotteryActivityTests : IAsyncLifetime
         Assert.Equal(0, reset.LotteryPool[201].All.DailyCount);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task TwentyDrawBannerGuaranteesPetAndLifetimeCapSurvivesReconnect()
     {
         await using var bot = await InWorld(create: true);

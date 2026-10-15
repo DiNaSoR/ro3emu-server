@@ -10,7 +10,7 @@ namespace Ro3Emu.Tests;
 
 public sealed partial class DungeonTests
 {
-    [Fact]
+    [ClientDataFact]
     public async Task DungeonRoleChoiceIsClassBoundPersistsAndReachesTeamCards()
     {
         await using var alice = await InWorld("Alice");
@@ -40,7 +40,7 @@ public sealed partial class DungeonTests
         Assert.Equal(101, Session(alice).Dungeons!.JobPosition);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task DungeonFinderUsesTargetFilteredMicroDirectoryAndRealPartyApplication()
     {
         await using var alice = await InWorld("Alice");
@@ -65,7 +65,7 @@ public sealed partial class DungeonTests
         Assert.Equal(2, (await Next(bob, TeamService.TeamAll, TeamTotalDetailInfo.Parser)).MemberList.Count);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LightOfBondsProjectsEligibilityAppliesBossBonusesAndClearsOnExit()
     {
         await using var alice = await InWorld("Alice");

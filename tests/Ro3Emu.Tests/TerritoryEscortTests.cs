@@ -133,7 +133,7 @@ public sealed class TerritoryEscortTests : IAsyncLifetime
         await Next(bot, MsgId.EntitySelf, EntitySelf.Parser);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task TwoGuildsTradeThenEscortWithConservedGoodsAndReplayRefusals()
     {
         await using var seller = await InWorld("EscortSeller");
@@ -212,7 +212,7 @@ public sealed class TerritoryEscortTests : IAsyncLifetime
         Assert.Equal(0, escort.GetGuildGoods(buyId));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task HeldProducerCommitPublishesNoGoodsOrReceiptAndOtherRoleContinues()
     {
         await using var leader = await InWorld("HeldLeader");
@@ -250,7 +250,7 @@ public sealed class TerritoryEscortTests : IAsyncLifetime
         Assert.Equal(1, SqlCount("SELECT count(*) FROM operation_source WHERE source_key=$source", "test:escort:held-source"));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ProducerHasOneReceiptAndNaturalSourceAfterUnrelatedCreditAndRestart()
     {
         await using (var leader = await InWorld("SourceLeader"))
@@ -291,7 +291,7 @@ public sealed class TerritoryEscortTests : IAsyncLifetime
         Assert.Equal(1, SqlCount("SELECT count(*) FROM operation_source WHERE source_key=$source", "test:escort:once"));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task EscrowAndListsSurviveServerRestart()
     {
         await using (var seller = await InWorld("RestartSeller"))
@@ -322,7 +322,7 @@ public sealed class TerritoryEscortTests : IAsyncLifetime
         Assert.Equal(30, service.GetGuildGoods(offer.GuildId));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task QualifiedGuildGetsOneFiniteCartLoadPerRoundAcrossReconcileAndRestart()
     {
         await using var leader = await InWorld("SupplyLeader");
@@ -362,7 +362,7 @@ public sealed class TerritoryEscortTests : IAsyncLifetime
         Assert.Equal(12_005, escort.GetGuildGoods(id));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task EnemyDestroysCartAndCollectsFiniteCargoOnce()
     {
         var errors = new EscortErrors();
@@ -437,7 +437,7 @@ public sealed class TerritoryEscortTests : IAsyncLifetime
         Assert.Equal(0, escort.GetGuildGoods(ownerGuild));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task HeldClaimKeepsRewardAndClaimMarkerInvisibleUntilCommit()
     {
         await using var player = await InWorld("ClaimPlayer");
@@ -482,7 +482,7 @@ public sealed class TerritoryEscortTests : IAsyncLifetime
         Assert.Equal(1, SqlCount("SELECT count(*) FROM economy_entry WHERE asset_kind=2 AND asset_id=1 AND delta=5000 AND operation_id IN (SELECT operation_id FROM operation_receipt WHERE command_kind=$source)", "event/escort-claim"));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task CommittedCargoApplyFaultCannotResurrectClaimAcrossRestartAndOtherSave()
     {
         await using var owner = await InWorld("FaultOwner");

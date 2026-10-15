@@ -184,7 +184,7 @@ public sealed class AdventureGroupTests : IAsyncLifetime
 
     // ------------------------------------------------------------------------------------------------ tests
 
-    [Fact]
+    [ClientDataFact]
     public async Task ThreeMembersRecruitPartyAndFoundTheGroupThroughTheRitual()
     {
         await using var alice = await InWorld("Alice");
@@ -422,7 +422,7 @@ public sealed class AdventureGroupTests : IAsyncLifetime
         Assert.Null(Store.Get(group));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task DailyWateringGrowsTheTreeAndItsQuestRaisesTheGroupLevel()
     {
         await using var alice = await InWorld("Alice");
@@ -484,7 +484,7 @@ public sealed class AdventureGroupTests : IAsyncLifetime
         Assert.Equal(5, Store.Get(group)!.Level);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ALevelRewardIsClaimedOncePerRole()
     {
         await using var alice = await InWorld("Alice");
@@ -512,7 +512,7 @@ public sealed class AdventureGroupTests : IAsyncLifetime
         Assert.Equal(AdventureGroupService.ErrClaimed, (await Ope(alice, OpeType.OpeTakenLevelUpReward, new NormalOpeData { LevelReward = 1 })).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task TheGroupAndTheRolesClaimsSurviveARestart()
     {
         long group, a;
@@ -540,7 +540,7 @@ public sealed class AdventureGroupTests : IAsyncLifetime
         Assert.Equal(AdventureGroupService.ErrClaimed, (await Ope(again, OpeType.OpeTakenLevelUpReward, new NormalOpeData { LevelReward = 1 })).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ARallyCallsMembersToTheCaller()
     {
         await using var alice = await InWorld("Alice");

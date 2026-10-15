@@ -89,7 +89,7 @@ public sealed partial class TradeTests : IAsyncLifetime
         }).ToArray();
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task OrdinaryListingPurchaseAndMailClaimPreserveInstanceState()
     {
         await using var seller = await InWorld("Seller");
@@ -185,7 +185,7 @@ public sealed partial class TradeTests : IAsyncLifetime
         Assert.Equal(1, Assert.Single(Items(seller), i => i.Entry == 1254013).Stack);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SpecificTopBuyRefusalsAndListingSurviveRelog()
     {
         var seller = await InWorld("Seller");
@@ -240,7 +240,7 @@ public sealed partial class TradeTests : IAsyncLifetime
         Assert.Contains(Items(buyer), i => i.Entry == 1450100);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task PublicityPreordersSettleOnceInReservationOrderAndRefundLoser()
     {
         await using var seller = await InWorld("Seller");
@@ -324,7 +324,7 @@ public sealed partial class TradeTests : IAsyncLifetime
         Assert.Single(await Mail(second, (long)second.Self!.Uuid), m => m.Template == 1065);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task TwoBuyersCannotConsumeTheSameEscrow()
     {
         await using var seller = await InWorld("Seller");

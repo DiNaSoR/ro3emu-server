@@ -52,7 +52,7 @@ public sealed partial class LotteryActivityTests
         await loop.InvokeAsync(() => Task.CompletedTask);
     }
 
-    [Theory]
+    [ClientDataTheory]
     [InlineData(0)]
     [InlineData(350)]
     [InlineData(172800125)]
@@ -92,7 +92,7 @@ public sealed partial class LotteryActivityTests
         Assert.Equal(bytes, app.Services.GetRequiredService<RoleStore>().LoadLottery(session.Role.Id));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LotteryBannerClosesAtConfiguredEndWithoutTickerAndRejectsDraw()
     {
         await using var bot = await InWorld(create: true);

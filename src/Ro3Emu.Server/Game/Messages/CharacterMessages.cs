@@ -4,10 +4,40 @@ using Romsg;
 
 namespace Ro3Emu.Server.Game;
 
-public sealed partial class GameMessageHandler
+/// <summary>The role itself: stats, skills, equipment, cards, pets, mounts, wardrobe, life jobs, emotes and achievements.</summary>
+public sealed class CharacterMessages(CharacterService character, SkillService skills, CombatService combat, SceneService scene, TaskService tasks, GuideService guides, EmojiService emoji, AchievementService achievements, CardService cards, EquipmentService equipment, AppraisalService appraisal, EnchantService enchants, SeasonPageService seasonPage, SeasonRefineService seasonRefine, SeasonTalentService talents, PetService pets, DungeonService dungeons, LifeJobService life, GatheringService gathering, TimedBattleService timedBattles, GuildCampfireService campfire, MountService mounts, CareerSpecialService careerSpecial, WardrobeService wardrobe, TotemService totems) : Messaging.IMessageModule
 {
-    private void MapCharacterRoutes(Messaging.MessageRoutes routes)
+    public void Map(Messaging.MessageRoutes routes)
     {
+        routes.AdmitEconomic(id => id is GatheringService.MiniGame);
+        // Messages that change only the sender's role.
+        routes.AdmitRole(id => id is CharacterService.PlayerTransformJob or CharacterService.ChangeStatPlan
+            or CharacterService.RenameStatPlan
+            or >= 31301 and <= 31501); // character, equipment, card and stat plans
+        routes.AdmitRole(id => id is CardService.LibraryCardUnlock);
+        // As Realm a cast waited behind every other player's work (31102 p99 1.4 s); NPC talk behind the market up to 3.4 s.
+        routes.AdmitRole(id => id is CombatService.UseSkill or CombatService.SkillInterrupt
+            or >= 31151 and <= 31160); // skill plans
+        routes.AdmitRole(id => id is SceneService.NpcInteraction);
+        routes.AdmitRole(id => id is >= 33501 and <= 33515); // life jobs
+        routes.AdmitRole(id => id is >= 82901 and <= 82903); // season page
+        routes.AdmitRole(id => id is >= 83220 and <= 83222 or >= 83550 and <= 83553); // refinement and talent
+        routes.AdmitRole(id => id is >= 31183 and <= 31189); // wardrobe
+        routes.AdmitRole(id => id is >= 33302 and <= 33325); // pets and incubation
+        routes.AdmitRole(id => id is >= 32743 and <= 32750); // mounts
+        routes.AdmitRole(id => id is CareerSpecialService.Lease or CareerSpecialService.CancelLease); // own battle slot only
+        routes.AdmitRole(id => id is >= 82362 and <= 82370); // totems
+        routes.AdmitRole(id => id is EmojiService.SetIdle or EmojiService.AddCollection or EmojiService.DelCollection);
+        routes.AdmitRole(id => id is AchievementService.GetReward or AchievementService.GetPointReward
+            or AchievementService.UpdateHintLevel or AchievementService.GetAllReward);
+        routes.Intercept("life", id => id is >= LifeJobService.SwitchLife and <= GatheringService.MiniGame, async (session, msgId, _) =>
+        {
+            // Life job requests before the role's life state is loaded are refused, not routed.
+            if (session.Role != null && session.Progress != null && session.LifeJob != null && session.Restrictions != null) return false;
+            await life.RejectUnloadedAsync(session, msgId);
+            return true;
+        });
+
         routes.Map(31183, "wardrobe", async (session, msgId, body) =>
         {
             await wardrobe.UseAsync(session, WardRobeUseAppearanceReq.Parser.ParseFrom(body.Span));

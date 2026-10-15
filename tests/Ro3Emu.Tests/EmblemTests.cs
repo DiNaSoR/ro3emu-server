@@ -72,7 +72,7 @@ public sealed partial class EmblemTests : IAsyncLifetime
             .Single(i => i.ItemEntry == entry);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task GenerationGateWearUpgradeUnwearAndRelogStayCoherent()
     {
         long guid;
@@ -205,7 +205,7 @@ public sealed partial class EmblemTests : IAsyncLifetime
         Assert.True(savedPower.MaxHistoryPower.SeasonPower >= wornPower);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task RefusedFeedsKeepSelectedItemsAndCapRejectsFurtherPayment()
     {
         long target, protectedWithReturns;
@@ -287,7 +287,7 @@ public sealed partial class EmblemTests : IAsyncLifetime
         Assert.Equal(power.CurPower.SeasonPower, (await Next(again, CharacterService.RoleBaseInfoSync, RoleBaseInfoIncrement.Parser)).CurPower.All.SeasonPower);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task EmptySubattributePoolStaysEmptyAndMarksUnlockAtLevelThresholds()
     {
         await using var alice = await InWorld("Alice");
@@ -326,7 +326,7 @@ public sealed partial class EmblemTests : IAsyncLifetime
         Assert.Equal(1200, (await Next(alice, 31502, PlayerChangePowerNtf.Parser, m => m.CurPower.SeasonPower == 1200)).CurPower.SeasonPower);
     }
 
-    [Theory]
+    [ClientDataTheory]
     [InlineData(5, 4700, 5700)]
     [InlineData(6, 6700, 7030)]
     [InlineData(11, 25200, 21160)]
@@ -352,7 +352,7 @@ public sealed partial class EmblemTests : IAsyncLifetime
         Assert.Equal(expected, consumed.PackInfo[5].Inc.Items[target].Inc.ItemInfos[1003].Inc.LongVal);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FailedUpgradeWriteRollsBackMaterialsInstancesAndLiveState()
     {
         await using var alice = await InWorld("Alice");
@@ -384,7 +384,7 @@ public sealed partial class EmblemTests : IAsyncLifetime
         Assert.Equal(1100, saved.Single(i => i.Guid == target).Attrs![1003]);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task MissingUnlockStateDoesNotBypassTheQuestGate()
     {
         await using var alice = await InWorld("Alice");
@@ -406,7 +406,7 @@ public sealed partial class EmblemTests : IAsyncLifetime
         Assert.Equal(ErrorCodes.FunctionLocked, (await Next(alice, EmblemService.Upgrade, UpgradeEmblemResp.Parser)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task OtherSeasonEmblemsCannotBeWornUpgradedOrConsumed()
     {
         await using var alice = await InWorld("Alice");

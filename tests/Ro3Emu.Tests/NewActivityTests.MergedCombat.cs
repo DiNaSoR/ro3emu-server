@@ -7,7 +7,7 @@ namespace Ro3Emu.Tests;
 
 public sealed partial class NewActivityTests
 {
-    [Fact]
+    [ClientDataFact]
     public async Task LethalTrainingHitRestoresDummyWithoutDeathOrOrdinaryReward()
     {
         await using var bot = await InWorld("TrainingLethal");

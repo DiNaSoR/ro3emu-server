@@ -139,6 +139,15 @@ public static class ServerHost
         builder.Services.AddHostedService<DatabaseBackup>();
         builder.Services.AddSingleton<Game.Persistence.PositionPersistence>();
         builder.Services.AddSingleton<Game.Persistence.SettingsPersistence>();
+        builder.Services.AddSingleton<RoleSessionService>();
+        // Message modules in this order: it is the order of their interceptors (World before Economy before Character).
+        builder.Services.AddSingleton<Game.Messaging.IMessageModule, CoreMessages>();
+        builder.Services.AddSingleton<Game.Messaging.IMessageModule, WorldMessages>();
+        builder.Services.AddSingleton<Game.Messaging.IMessageModule, EconomyMessages>();
+        builder.Services.AddSingleton<Game.Messaging.IMessageModule, CharacterMessages>();
+        builder.Services.AddSingleton<Game.Messaging.IMessageModule, SocialMessages>();
+        builder.Services.AddSingleton<Game.Messaging.IMessageModule, ActivitiesMessages>();
+        builder.Services.AddSingleton<Game.Messaging.IMessageModule, AdventureGroupMessages>();
         builder.Services.AddSingleton<GameMessageHandler>();
         builder.Services.AddSingleton(sp => GateCrypto.LoadOrCreate(options.DataDir, sp.GetRequiredService<ILogger<GateCrypto>>()));
         builder.Services.AddSingleton<IMicroService, LoginService>();
@@ -165,8 +174,8 @@ public static class ServerHost
         var app = builder.Build();
         app.Services.GetRequiredService<RealmLock>();
         app.Services.GetRequiredService<Game.Ownership.RoleHandover>()
-            .Configure(session => app.Services.GetRequiredService<GameMessageHandler>().CleanupRoleAsync(session),
-                session => app.Services.GetRequiredService<GameMessageHandler>().CleanupReservation(session));
+            .Configure(session => app.Services.GetRequiredService<RoleSessionService>().CleanupRoleAsync(session),
+                session => app.Services.GetRequiredService<RoleSessionService>().CleanupReservation(session));
         app.Services.GetRequiredService<Diagnostics.ServerMetrics>().Owners = app.Services.GetRequiredService<Game.Ownership.OwnerRegistry>();
         app.Use(async (context, next) =>
         {

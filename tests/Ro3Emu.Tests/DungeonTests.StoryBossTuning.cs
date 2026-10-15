@@ -50,7 +50,7 @@ public sealed partial class DungeonTests
         return new Matchup(npc, template.Level, template.MaxHp / playerDps, playerHp / monsterDps, playerDps, monsterDps, playerHp, template.MaxHp);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task EveryStoryBossIsASoloFightAtItsLevel()
     {
         var results = new List<Matchup>();
@@ -60,7 +60,7 @@ public sealed partial class DungeonTests
         Assert.True(results.All(r => r.SecondsToKill is >= 60 and <= 120 && r.SecondsToDie / r.SecondsToKill is >= 1.1 and <= 1.8), table);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task AGroupOfThreeAirshipBoardersIsASoloFight()
     {
         // The nine boarders come in groups of three (two warriors and an archer, or one and two): all three attack at

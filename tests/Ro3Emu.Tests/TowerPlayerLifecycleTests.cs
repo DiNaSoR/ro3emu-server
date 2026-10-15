@@ -117,7 +117,7 @@ public sealed class TowerPlayerLifecycleTests : IAsyncLifetime
         await Next(bot, CombatService.SkillHit, SkillHitInfo.Parser, hit => hit.Dsts.Any(d => d.DstID == (long)uid && d.IsDead));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FatalTowerFailureWaitsForPublicationThenReturnsAliveAtFullHp()
     {
         await using var bot = await InWorld();
@@ -195,7 +195,7 @@ public sealed class TowerPlayerLifecycleTests : IAsyncLifetime
         Assert.Equal(maxHp, Service<CharacterService>().Stats(Session)[2000]);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ManualExitKeepsLivingPlayersWoundedHp()
     {
         await using var bot = await InWorld();
@@ -217,7 +217,7 @@ public sealed class TowerPlayerLifecycleTests : IAsyncLifetime
         Assert.Null(Session.TowerAttempt);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ReturnWaitsForCompetingReviveClaimBeforeComposingSelf()
     {
         await using var bot = await InWorld();
@@ -249,7 +249,7 @@ public sealed class TowerPlayerLifecycleTests : IAsyncLifetime
         Assert.False(Session.Dead);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task InterruptedReturnCannotPublishSelfOrReviveInTheNewSceneHandshake()
     {
         await using var bot = await InWorld();
@@ -293,7 +293,7 @@ public sealed class TowerPlayerLifecycleTests : IAsyncLifetime
         Assert.True(Session.Dead); // canceled tower recovery is not inherited by the later scene load
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task DelayedTowerMonsterHitCannotDamagePlayerAfterReturn()
     {
         await using var bot = await InWorld();
@@ -332,7 +332,7 @@ public sealed class TowerPlayerLifecycleTests : IAsyncLifetime
             && SkillHitInfo.Parser.ParseFrom(e.Body).Dsts.Any(d => d.DstID == (long)bot.Self!.Uuid));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SuccessAndTimeoutReturnThroughTheSameTowerExitWithoutHealingLivingHp()
     {
         await using var bot = await InWorld();

@@ -117,7 +117,7 @@ public sealed class DbWriteGuardTests : IDisposable
     }
 #endif
 
-    [Fact]
+    [ClientDataFact]
     public async Task HttpMicroGameLoopTimerAndBackupHaveZeroNonWriterWritesAfterStartup()
     {
         var (http, micro, game) = TestPorts.FreePorts();

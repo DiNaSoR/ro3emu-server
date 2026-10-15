@@ -96,7 +96,7 @@ public sealed partial class NewActivityTests : IAsyncLifetime
         return await Next(bot, NewActivityService.Common, CommonActivityRes.Parser, r => r.RequestId == req.RequestId);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SevenDayCountsDistinctLoginsAndClaimsPersist()
     {
         var bot = await InWorld("LoginDays");
@@ -122,7 +122,7 @@ public sealed partial class NewActivityTests : IAsyncLifetime
         Assert.Equal(ErrorCodes.TaskRequirements, (await Next(again, NewActivityService.GetReward, NewActivityGetRewardCommonResp.Parser)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LevelClaimsValidateTypeThresholdAndSourceTransaction()
     {
         await using var bot = await InWorld("LevelClaims");
@@ -179,7 +179,7 @@ public sealed partial class NewActivityTests : IAsyncLifetime
         Assert.Equal(0, (await Common(bot, premature)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FunctionPreviewRequiresItsUnlockAndPersistsSingleClaim()
     {
         await using var bot = await InWorld("Preview");
@@ -195,7 +195,7 @@ public sealed partial class NewActivityTests : IAsyncLifetime
         Assert.True(DBNewActivityInfo.Parser.ParseFrom(saved).ActivityInfo[104].ActivityParam.FunctionPreview.AwardData.ContainsKey(4));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LoggedOutConnectionCannotClaimBeforeReenteringWorld()
     {
         await using var bot = await InWorld("LogoutClaim");
@@ -218,7 +218,7 @@ public sealed partial class NewActivityTests : IAsyncLifetime
         Assert.Equal(0, (await Common(bot, request)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task CalendarUsesSeasonAnchorAndAllApplicableRows()
     {
         await using var bot = await InWorld("Calendar");
@@ -246,7 +246,7 @@ public sealed partial class NewActivityTests : IAsyncLifetime
         public override TimeZoneInfo LocalTimeZone => zone;
     }
 
-    [Theory]
+    [ClientDataTheory]
     [InlineData(2026, 10, 23)]
     [InlineData(2026, 10, 30)]
     [InlineData(2027, 4, 2)]

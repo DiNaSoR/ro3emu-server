@@ -138,7 +138,7 @@ public sealed class EquipmentAffixTests : IAsyncLifetime
         Assert.All(item.ItemInfos.Where(p => p.Key is >= 80 and <= 89 or >= 100 and <= 119 or >= 140 and <= 159), p => Assert.True(p.Value.HasLongVal));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task CutterAppraisalRollsConfiguredAffixesAndStatsAndPersistsTheSameWireState()
     {
         ItemBaseInfo chosen;
@@ -199,7 +199,7 @@ public sealed class EquipmentAffixTests : IAsyncLifetime
         Assert.Equal(chosen.ItemInfos, equipped.Items[chosen.ItemGuid].All.ItemInfos);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task GmLootCraftShopAndCombineAllCreateAppraisedInstanceAffixes()
     {
         await using var bot = await InWorld();
@@ -237,7 +237,7 @@ public sealed class EquipmentAffixTests : IAsyncLifetime
         Assert.Equal(6, Session.Items.Count(i => i.Entry == Purple));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task RedAppraisalCarriesOnlyConfiguredStuntsAndDistinctValidEntries()
     {
         await using var bot = await InWorld();
@@ -261,7 +261,7 @@ public sealed class EquipmentAffixTests : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FixedEntriesStuntRefineAndPlansPreserveTheInstanceUntilConfiguredDismantling()
     {
         await using var bot = await InWorld();
@@ -303,7 +303,7 @@ public sealed class EquipmentAffixTests : IAsyncLifetime
         Assert.DoesNotContain(plans.EquipPlans.Values.SelectMany(p => p.ItemsEquipGrid.Values), g => g == item.ItemGuid);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task DuplicateAffixesSpecialFamiliesAndZeroSentinelsAreExcludedBeforeWireProjection()
     {
         const int entry = 2010160;
@@ -327,7 +327,7 @@ public sealed class EquipmentAffixTests : IAsyncLifetime
         Assert.True(item.ItemInfos[2].LongVal > 0);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ConversionStuntsAndPotionBonusApplyOnlyWhileEquipped()
     {
         // Raise MATK above the conversion step so the test exercises a nonzero type-8 bonus.
@@ -381,7 +381,7 @@ public sealed class EquipmentAffixTests : IAsyncLifetime
         Assert.Equal(101, EquipmentStunts.PotionRecovery(Session, 101, 1, Data));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LegacyAppraisedGearGainsMissingEntriesOnceWithoutReplacingItsSavedStunt()
     {
         long guid;

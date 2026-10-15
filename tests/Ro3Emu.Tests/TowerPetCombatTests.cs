@@ -78,7 +78,7 @@ public sealed class TowerPetCombatTests : IAsyncLifetime
         return parser.ParseFrom(e.Body);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task BoboFloorTwoSpawnsBattleStatsCastsShieldAndBasicAttack()
     {
         await using var bot = await InTower();
@@ -102,7 +102,7 @@ public sealed class TowerPetCombatTests : IAsyncLifetime
             .Select(e => SkillHitInfo.Parser.ParseFrom(e.Body)), h => h.SrcID == pet.Uid && h.SkillId == 2354301);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ShieldHasFiniteBudgetAllyLimitRangeCooldownAndNoEnemyDamage()
     {
         await using var bot = await InTower();
@@ -171,7 +171,7 @@ public sealed class TowerPetCombatTests : IAsyncLifetime
             .Select(e => UseInSkillInfo.Parser.ParseFrom(e.Body)), c => c.SrcID == caster.Uid && c.SkillID == 2354301);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ChocoSupportChangesAllyAttackOnTheWireAndExpiresWithItsBuff()
     {
         await using var bot = await InTower();
@@ -209,7 +209,7 @@ public sealed class TowerPetCombatTests : IAsyncLifetime
         });
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task HealingUsesRecipientHpAndPendingSupportCannotLandAfterSettlement()
     {
         await using var bot = await InTower();

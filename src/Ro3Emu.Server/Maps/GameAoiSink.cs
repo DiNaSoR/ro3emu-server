@@ -25,7 +25,7 @@ public sealed class GameAoiSink : IAoiSink
     public Task EnterAsync(GameSession viewer, GameSession subject)
     {
         var view = new AoIViewChangeData();
-        view.Bases.Add(GameMessageHandler.PlayerEntity(subject));
+        view.Bases.Add(RoleSessionService.PlayerEntity(subject));
         return viewer.SendGameAsync(SyncAoiView, view);
     }
 

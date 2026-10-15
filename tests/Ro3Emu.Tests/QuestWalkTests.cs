@@ -81,7 +81,7 @@ public sealed class QuestWalkTests : IAsyncLifetime
         await bot.Inbox.WaitAsync(e => e.IsGame(MsgId.EntitySelf), Wait);
     }
 
-    [Fact, Trait("Category", "Slow")]
+    [ClientDataFact, Trait("Category", "Slow")]
     public async Task ChapterOneCanBeWalkedToTheEnd()
     {
         await using var bot = new BotClient(_http, File.ReadAllText(Path.Combine(_dataDir, "gate_rsa_public.pem")));

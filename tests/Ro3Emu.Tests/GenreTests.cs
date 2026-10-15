@@ -63,7 +63,7 @@ public sealed partial class GenreTests : IAsyncLifetime
         (await client.PostAsync($"{http}/ro3emu/gm?account={account}", new StringContent($"!lvl {level} 5"))).EnsureSuccessStatusCode();
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FivePresetsRenameAndSelectedChildrenSurviveRelog()
     {
         await using (var player = await Enter("Builder"))
@@ -101,7 +101,7 @@ public sealed partial class GenreTests : IAsyncLifetime
         Assert.Equal(1, skillSync.CurrentPlanIndex);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task InvalidChildSelectionDoesNotChangeCurrentPreset()
     {
         await using (var player = await Enter("Invalid"))
@@ -142,7 +142,7 @@ public sealed partial class GenreTests : IAsyncLifetime
         Assert.Equal(0, (await Next(again, SkillService.SkillDataSync, DBSkillDataIncrement.Parser)).CurrentPlanIndex);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task RecommendationImportsOnlyRecipientOwnedItemAndRejectsMissingItem()
     {
         await using var donor = await Enter("Donor");
@@ -199,7 +199,7 @@ public sealed partial class GenreTests : IAsyncLifetime
         Assert.Equal(0, missing.Self!.EquipInfo[0]);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FormerSkillPlanAndInvalidSavedPlanKeepLearnedSkills()
     {
         long roleId;
@@ -256,7 +256,7 @@ public sealed partial class GenreTests : IAsyncLifetime
         Assert.DoesNotContain(12100, session.SkillPlans!.SkillAssignPlans[0].SkillAssigns.Keys);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task StandaloneStatPlansAndGenreShareOneAtomicPersistedState()
     {
         await using (var player = await Enter("Scholar"))
@@ -334,7 +334,7 @@ public sealed partial class GenreTests : IAsyncLifetime
         Assert.Equal(1, genre.GenreMap.All.SystemMap[1].GenrePlans[2]);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task StatsOnlyGenreApplyLeavesTalentSwitchAvailable()
     {
         await using var player = await Enter("TalentBuild");
@@ -356,7 +356,7 @@ public sealed partial class GenreTests : IAsyncLifetime
         Assert.Equal(0, (await Next(player, SeasonTalentService.SetPlan, SeasonTalentSetCurPlanResp.Parser)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task GenreEchoSwitchCommitsMatchingPlanAndItemMarkers()
     {
         long first, second;

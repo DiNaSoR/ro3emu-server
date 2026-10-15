@@ -84,7 +84,7 @@ public sealed partial class MailService
         long role = session.Role?.Id ?? throw new InvalidOperationException("Activity mail needs a selected role.");
         if (loop?.Owners is { } owners)
             await loop.InvokeAsync(() => owners.RunSessionAsync("activity mail",
-                Ownership.LegacyMutationManifest.Session(session), session,
+                [Ownership.ReservationKey.Role(role)], session,
                 () => DeliverActivityBatchCoreAsync(session, deliveries, persist, committed)));
         else await DeliverActivityBatchCoreAsync(session, deliveries, persist, committed);
         // Delivery and source Apply are complete. A failed notice must not permit another settlement.

@@ -52,7 +52,7 @@ public sealed class WorldCoreTests : IAsyncLifetime
         await Next(bot,MsgId.EntitySelf,EntitySelf.Parser);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task VisitedMapIsPublishedOnlyAfterItsOwnedCommit()
     {
         await using var bot = await InWorld("Alice");
@@ -97,7 +97,7 @@ public sealed class WorldCoreTests : IAsyncLifetime
         Assert.Contains(10100L, System.Text.Json.JsonSerializer.Deserialize<WorldRoleState>(roles.LoadWorldState(role)!)!.VisitedMaps);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SupersededVisitCommitKeepsTheVisitWithoutPublishingTheOldSceneHook()
     {
         await using var bot = await InWorld("Alice");
@@ -141,7 +141,7 @@ public sealed class WorldCoreTests : IAsyncLifetime
         Assert.True(session.SceneLoading);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SnapshotsAreInstanceScopedAndAssetReplayAdvancesVersion()
     {
         await using var alice=await InWorld("Alice");await using var bob=await InWorld("Bob");
@@ -179,7 +179,7 @@ public sealed class WorldCoreTests : IAsyncLifetime
         Assert.Equal(scene,a.SceneEntry);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FullPublicMapQueuesCancelsAndAdmitsWithoutPrematureSceneChange()
     {
         await using var alice=await InWorld("Alice");await using var bob=await InWorld("Bob");
@@ -211,7 +211,7 @@ public sealed class WorldCoreTests : IAsyncLifetime
         Assert.Equal(10100,b.SceneEntry);Assert.Equal(0,b.WorldState.QueueScene);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task CapacityReservationSurvivesAwaitingOldSceneLeave()
     {
         await using var alice=await InWorld("Alice");await using var bob=await InWorld("Bob");
@@ -240,7 +240,7 @@ public sealed class WorldCoreTests : IAsyncLifetime
         Assert.Equal(10100,a.SceneEntry);Assert.Equal(10111,b.SceneEntry);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task InterruptedResurrectionChantCannotCreateAnInvitation()
     {
         await using var alice=await InWorld("Alice");await using var bob=await InWorld("Bob");
@@ -269,7 +269,7 @@ public sealed class WorldCoreTests : IAsyncLifetime
         Assert.Equal(0,offers);Assert.True(b.Dead);Assert.Equal(0,a.WorldState.ResurrectionCastId);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FlightRequiresBuffAndRejectsRepeatedTakeoffNonfiniteAndTeleport()
     {
         await using var alice=await InWorld("Alice");await using var bob=await InWorld("Bob");
@@ -299,7 +299,7 @@ public sealed class WorldCoreTests : IAsyncLifetime
         Assert.False(s.WorldState.Flying);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ResurrectionRequiresRealSkillAndMatchingSingleUseInvitation()
     {
         await using var alice=await InWorld("Alice");await using var bob=await InWorld("Bob");
@@ -335,7 +335,7 @@ public sealed class WorldCoreTests : IAsyncLifetime
         Assert.Equal(ErrorCodes.TargetAlive,(await Next(bob,WorldCoreService.ReliveAccept,EntityReliveInviteAcceptResp.Parser)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task CustomMonitoringAndTemporaryLeaveHaveActualStateAndVisitsSurviveRelog()
     {
         await using(var alice=await InWorld("Alice"))

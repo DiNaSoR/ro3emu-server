@@ -69,7 +69,7 @@ public sealed class SkillBuffTests : IAsyncLifetime
     private Task Run(Func<Task> work) => _app.Services.GetRequiredService<GameLoop>().InvokeAsync(work);
     private Task<T> Run<T>(Func<Task<T>> work) => _app.Services.GetRequiredService<GameLoop>().InvokeAsync(work);
 
-    [Fact]
+    [ClientDataFact]
     public async Task CastGrantsNonemptyBuffAndHandRemovalRejectsProtectedAndForeignGuids()
     {
         await using var alice = await InWorld("Alice");
@@ -97,7 +97,7 @@ public sealed class SkillBuffTests : IAsyncLifetime
         Assert.Contains(Session("alice").Buffs, b => b.Guid == added.Buffs[0].BuffGuid);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task HandRemovableBuffRequestRemovesTheOwnedInstance()
     {
         await using var alice = await InWorld("Alice");
@@ -111,7 +111,7 @@ public sealed class SkillBuffTests : IAsyncLifetime
         Assert.DoesNotContain(session.Buffs, b => b.Guid == guid);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task OverlappingControlsRecompute2702AndKeepTheRemainingSource()
     {
         await using var alice = await InWorld("Alice");
@@ -136,7 +136,7 @@ public sealed class SkillBuffTests : IAsyncLifetime
         Assert.Single(clear.ForbidInfo.Data.Values); // Lua reads values[1] unconditionally.
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task StunForbidsItemUseWithoutConsumingThePotion()
     {
         await using var alice = await InWorld("Alice");
@@ -157,7 +157,7 @@ public sealed class SkillBuffTests : IAsyncLifetime
         Assert.Equal(before - 1, session.Items.Single(i => i.Guid == potion.Guid).Stack);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task OsirisLethalOfferRequiresConfirmationAndSendsEffectCooldown()
     {
         await using var alice = await InWorld("Alice");
@@ -176,7 +176,7 @@ public sealed class SkillBuffTests : IAsyncLifetime
         Assert.False(session.Dead);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SceneTravelPreservesPendingLethalDecisionUntilDeclined()
     {
         await using var alice = await InWorld("Alice");
@@ -203,7 +203,7 @@ public sealed class SkillBuffTests : IAsyncLifetime
         Assert.Null(session.ImmuneDeathOffer);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ConfiguredEnergyInitializesAndChargesTheExactMeter()
     {
         await using var alice = await InWorld("Alice");

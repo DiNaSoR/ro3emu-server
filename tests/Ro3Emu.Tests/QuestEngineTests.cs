@@ -89,7 +89,7 @@ public sealed class QuestEngineTests : IAsyncLifetime
         await Next(bot, TaskService.TaskFollow, TaskFollowResp.Parser);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task NoviceTrialGrantsExactlySevenExpAndReplaySurvivesRelog()
     {
         long role;
@@ -124,7 +124,7 @@ public sealed class QuestEngineTests : IAsyncLifetime
         Assert.Equal(1, OwnedQuestSourceCount(role, 10101040));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SpecificRefusalCodesAndClientCompletionReports()
     {
         await using var bot = await InWorld();
@@ -160,7 +160,7 @@ public sealed class QuestEngineTests : IAsyncLifetime
         Assert.Equal(1, await Read(s => s.Tasks!.CompleteTaskNum[10101150]));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ZeroFiltersCannotCompleteAndJobRankUsesBooleanWireValue()
     {
         await using var bot = await InWorld();
@@ -179,7 +179,7 @@ public sealed class QuestEngineTests : IAsyncLifetime
         Assert.NotEqual(TaskState.Running, (await State(10104104)).Status);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task BothNpcAlternativesAndDamageParticipantsCountExactlyOncePerDeath()
     {
         await using var bot = await InWorld();
@@ -210,7 +210,7 @@ public sealed class QuestEngineTests : IAsyncLifetime
         Assert.Equal(15, await Read(_ => Service<SessionRegistry>().All().Single(s => s.Role?.Name == "QuestBob").Tasks!.Infos[10104080].CompleteNum[0]));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task NpcSubmitRechecksInventoryAndDuplicateBatchConsumesAndGrantsOnce()
     {
         await using var bot = await InWorld();
@@ -241,7 +241,47 @@ public sealed class QuestEngineTests : IAsyncLifetime
         Assert.Equal(TaskState.Running, (await State(10102060)).Status);
     }
 
-    [Fact]
+    [ClientDataFact]
+    public async Task NextObjectiveUsesThePreviousQuestsNpcPointAndJumpsToPayonForest()
+    {
+        // Live incident: the dialog id changes, but Boya keeps point 1010211001.
+        // Reproduce the level and position saved for the stalled character; do not complete the task by GM.
+        await using var bot = await InWorld();
+        await Gm("!lvl 17");
+        await Accept(10102120);
+        await Gm("!warp 10213 210.18365 120.14987");
+        var arrival = await Next(bot, MsgId.SwitchSceneLine, SwitchSceneLineResp.Parser);
+        await bot.SendGameAsync(MsgId.SceneLoaded, new SceneLoadedReq { SceneId = arrival.SceneEntry });
+        await Next(bot, MsgId.EntitySelf, EntitySelf.Parser);
+
+        var report = new ClientNpcInteractReq { DialogID = 1010212001, Areapointid = 1010212001 };
+        await bot.SendGameAsync(SceneService.ClientNpcInteract, report);
+        await Barrier(bot);
+        Assert.Equal(TaskState.Running, (await State(10102120)).Status);
+
+        report.Areapointid = 1010211001;
+        await bot.SendGameAsync(SceneService.ClientNpcInteract, report);
+        await Barrier(bot);
+        Assert.Equal(TaskState.Delivery, (await State(10102120)).Status);
+        Assert.Equal(TaskState.Running, (await State(10102130)).Status);
+        await bot.SendGameAsync(SceneService.ClientNpcInteract, report);
+        await Barrier(bot);
+        Assert.Equal(1, await Read(s => s.Tasks!.CompleteTaskNum[10102120]));
+
+        // TaskConfig's completion action 141 asks the client to send this jump.
+        await bot.SendGameAsync(SceneService.CustomJumpMap, new ClientCustomJumpMapReq
+        {
+            SceneId = 10220, PointId = 1010212001, CustomType = (EClientCustomJumpMapType)2, TypeParam1 = 10102120,
+        });
+        Assert.Equal(0, (await Next(bot, SceneService.CustomJumpMap, ClientCustomJumpMapResp.Parser)).Result);
+        var next = await Next(bot, MsgId.SwitchSceneLine, SwitchSceneLineResp.Parser);
+        Assert.Equal(10220, next.SceneEntry);
+        await bot.SendGameAsync(MsgId.SceneLoaded, new SceneLoadedReq { SceneId = next.SceneEntry });
+        await Next(bot, MsgId.EntitySelf, EntitySelf.Parser);
+        Assert.Equal(10220, await Read(s => s.SceneEntry));
+    }
+
+    [ClientDataFact]
     public async Task GuideRecordsAreNotCompletionAndCargoRequiresActiveMappedTask()
     {
         await using var bot = await InWorld();
@@ -268,7 +308,7 @@ public sealed class QuestEngineTests : IAsyncLifetime
         Assert.Equal(ErrorCodes.TaskRequirements, (await Next(bot, TaskService.GoodsStack, TaskGoodsStackResp.Parser)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ConsumeActionBlocksWithoutItemAndCutsceneExitIsNotPlotCompletion()
     {
         await using var bot = await InWorld();
@@ -295,7 +335,7 @@ public sealed class QuestEngineTests : IAsyncLifetime
         Assert.Equal(0, (await State(10101020)).CompleteNum[0]);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task CommittedItemUseEquipmentAndCraftDriveTheirOwnObjectives()
     {
         await using var bot = await InWorld();
@@ -335,7 +375,7 @@ public sealed class QuestEngineTests : IAsyncLifetime
         Assert.Equal(1, (await State(703070)).CompleteNum[0]);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task EquipmentPlanSwitchRefreshesEquippedObjectivesWithoutAnotherProgressEvent()
     {
         await using var bot = await InWorld();
@@ -362,7 +402,7 @@ public sealed class QuestEngineTests : IAsyncLifetime
         Assert.Equal(TaskState.Running, (await State(1700101)).Status);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task BoundCardStackKeepsItsBindingThroughSocketSplitAndReturn()
     {
         await using var bot = await InWorld();
@@ -396,7 +436,7 @@ public sealed class QuestEngineTests : IAsyncLifetime
         Assert.Equal(2, saved.Where(i => i.BindType == 1 && i.ExpireTimeStamp == expiry && i.Grid == 0).Sum(i => i.Stack));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task CardUnlockKeepsMandatoryQuestDebtAfterAwardSqlFailureAndRecoversExactlyOnce()
     {
         const long task = 1700212;
@@ -430,7 +470,7 @@ public sealed class QuestEngineTests : IAsyncLifetime
             Assert.Equal(1, await Read(s => s.Tasks!.CompleteTaskNum.GetValueOrDefault(task)));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task OnlyPaidUpgradesAdvanceRefinementAndStrengthObjectives()
     {
         await using var bot = await InWorld();
@@ -465,7 +505,7 @@ public sealed class QuestEngineTests : IAsyncLifetime
         Assert.Equal(5, (await State(100007)).CompleteNum[0]);
     }
 
-    [Theory]
+    [ClientDataTheory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task BoardingDialogueTakesAPassOnlyWhenThePlayerHasOne(bool hasPass)
@@ -487,7 +527,7 @@ public sealed class QuestEngineTests : IAsyncLifetime
         Assert.Equal(1, await Read(s => s.Tasks!.CompleteTaskNum[10103200]));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ChapterOneFinalDialoguesGrantTheCareerPoolOnce()
     {
         await using var bot = await InWorld();

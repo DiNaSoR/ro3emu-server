@@ -49,7 +49,7 @@ public sealed class MountTests : IAsyncLifetime
         Assert.Equal(0, (await Next(b, 31323, ItemUseResp.Parser)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task OwnedSelectedAndRiddenAreSeparateAndReplicatedToViewersAndRelog()
     {
         await using (var a = await InWorld("Alice"))
@@ -83,7 +83,7 @@ public sealed class MountTests : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task RefusalsDoNotConsumeOrGrantAndInvalidRideEnumsFail()
     {
         await using var a = await InWorld("Alice");
@@ -103,7 +103,7 @@ public sealed class MountTests : IAsyncLifetime
         Assert.Contains(Session("alice").Items, i => i.Guid == guid);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ExpiryDismountsAndPublishesDeletionAndBaseSpeed()
     {
         await using var a = await InWorld("Alice");
@@ -116,7 +116,7 @@ public sealed class MountTests : IAsyncLifetime
         await Next(a, 5012, DBMountsInfoIncrement.Parser, p => p.Mounts.TryGetValue(60040010, out var m) && m.Del);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FractionalDeadlineDismountsAtBoundaryAndPersistsTheSameReconcileResult()
     {
         await using var a = await InWorld("Alice");
@@ -172,7 +172,7 @@ public sealed class MountTests : IAsyncLifetime
         Assert.Equal(saved.Info, JsonSerializer.Deserialize<MountService.SavedState>(roles.LoadMounts(sessionAfter.Role.Id)!)!.Info);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FailedExpiryPersistenceRetriesOnlyTheCurrentDeadline()
     {
         await using var a = await InWorld("Alice");
@@ -222,7 +222,7 @@ public sealed class MountTests : IAsyncLifetime
         Assert.False(Session("alice").Mounts!.Mounts.ContainsKey(60040010));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task EtchantRequiresPaymentAndOnlyServerPreviewCanBeSaved()
     {
         await using var a = await InWorld("Alice");
@@ -243,7 +243,7 @@ public sealed class MountTests : IAsyncLifetime
         Assert.Equal(rolled.CfgId, Session("alice").Mounts!.Mounts[req.MountId].EtChantInfo[1].EtChantData[1]);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task QuestRideDeliveryPersistsAcrossRelogAndRecycleRemovesOnlyTemporaryRide()
     {
         var roles = app.Services.GetRequiredService<RoleStore>();
@@ -273,7 +273,7 @@ public sealed class MountTests : IAsyncLifetime
         }
     }
 
-    [Theory]
+    [ClientDataTheory]
     [InlineData(1501013, 60030010, true)]
     [InlineData(3025701, 70050010, false)]
     public async Task CollectionShortcutUsesCanonicalReplyCooldownAndSingleConsumption(int entry, int unlockedId, bool mount)
@@ -314,7 +314,7 @@ public sealed class MountTests : IAsyncLifetime
         Assert.Single(player.Inbox.Snapshot().Skip(start), e => e.IsGame(CharacterService.ItemsCdNotify));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FailedCollectionCommitRollsBackConsumableAndOwnership()
     {
         await using var a = await InWorld("Alice");
@@ -342,7 +342,7 @@ public sealed class MountTests : IAsyncLifetime
     private static DBMountsInfo StoredMounts(RoleStore roles, long role) =>
         DBMountsInfo.Parser.ParseFrom(JsonSerializer.Deserialize<MountService.SavedState>(roles.LoadMounts(role)!)!.Info);
 
-    [Fact]
+    [ClientDataFact]
     public async Task ItemUnlockLightsTheWardrobeMountEntryWithoutASecondUnlockTip()
     {
         await using var a = await InWorld("Alice");
@@ -362,7 +362,7 @@ public sealed class MountTests : IAsyncLifetime
         Assert.True(StoredMounts(roles, session.Role.Id).Mounts.ContainsKey(BigPoring));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FailedWardrobeWriteRollsBackTheWholeMountUnlock()
     {
         await using var a = await InWorld("Alice");
@@ -381,7 +381,7 @@ public sealed class MountTests : IAsyncLifetime
         Assert.Equal(wardrobe, roles.LoadWardrobe(session.Role.Id));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task TimedMountAndItsAppearanceShareOneExpiryExtendAndDropTogether()
     {
         await using var a = await InWorld("Alice");
@@ -422,7 +422,7 @@ public sealed class MountTests : IAsyncLifetime
         Assert.False(StoredWardrobe(roles, session.Role.Id).AllLightUpAppearances.ContainsKey(TimedMount));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LoginRepairsMountsOwnedBeforeTheWardrobeLink()
     {
         var roles = app.Services.GetRequiredService<RoleStore>();
@@ -461,7 +461,7 @@ public sealed class MountTests : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LoginOwnsTheMountOfAShopLookBoughtBeforeThePurchaseGrantedIt()
     {
         const int DisabledLook = 60040031; // WardRobeConfig type 6 with _iDisable 1, though MountsConfig lists it.
@@ -498,7 +498,7 @@ public sealed class MountTests : IAsyncLifetime
         Assert.False(StoredMounts(roles, role).Mounts.ContainsKey(DisabledLook));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task WardrobeSelectionOfAnUnlockedMountWearsSelectsAndRidesIt()
     {
         await using var a = await InWorld("Alice");

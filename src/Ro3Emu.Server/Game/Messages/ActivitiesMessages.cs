@@ -4,10 +4,28 @@ using Romsg;
 
 namespace Ro3Emu.Server.Game;
 
-public sealed partial class GameMessageHandler
+/// <summary>Dungeons, the tower, daily and timed activities, festivals, training, lottery, AFK and build plans.</summary>
+public sealed class ActivitiesMessages(DailyActivityService daily, TowerService tower, DungeonService dungeons, DungeonMatchService dungeonMatches, WildAfkService afk, NewActivityService activities, TimedEventService timedEvents, TimedBattleService timedBattles, FestivalService festival, TrainingService training, LotteryService lottery, GenreService genre) : Messaging.IMessageModule
 {
-    private void MapActivitiesRoutes(Messaging.MessageRoutes routes)
+    private const uint SetAutoBattle = 31054;
+
+    public void Map(Messaging.MessageRoutes routes)
     {
+        routes.AdmitEconomic(id => id is >= 82800 and <= 82828); // genre build plans
+        routes.AdmitEconomic(id => id is >= 84061 and <= 84067); // training
+        routes.AdmitEconomic(id => id is LotteryService.DrawRequest);
+        routes.AdmitEconomic((_, id, body) => activities.IsOfflineOwnerRequest(id, body) || activities.IsEventOwnerRequest(id, body));
+        routes.AdmitEconomic((_, id, body) => festival.IsOwnerRequest(id, body));
+        routes.AdmitEconomic(timedEvents.IsOwnerRequest);
+        routes.AdmitEconomic(IsTimedBattleOwnerRequest);
+        routes.AdmitEconomic(training.IsOwnerRequest);
+        // A solo private floor (its return position, room and handoff); as Realm p99 1.2 s at 500 players.
+        routes.AdmitRole(id => id is TowerService.Info or TowerService.SetPets or TowerService.FirstPassRange
+            or TowerService.ClaimFirstPass or TowerService.Sweep or TowerService.End or TowerService.Start);
+        routes.AdmitRole(id => id is DungeonService.SetJobPosition or DungeonService.SetGuide or DungeonService.ClaimFirstPass
+            or DungeonService.Statistics or DungeonService.StatisticsHistory or DungeonService.StatisticsCurrent
+            or DungeonService.StatisticsModule or DungeonService.QueryResult);
+
         routes.Map(82800, "genre", async (session, msgId, body) =>
         {
             await genre.RunOwnedAsync(session, () => genre.SeekAsync(session), 0, codes: true);
@@ -236,19 +254,6 @@ public sealed partial class GameMessageHandler
         {
             await dungeons.RemindAsync(session, TeamConfirmRemindersReq.Parser.ParseFrom(body.Span));
         });
-        routes.Map(MsgId.Heartbeat, "daily", async (session, msgId, body) =>
-        {
-            // C/D 16: every player's heartbeat used to be one Realm scope (S3: 10k per 5 min, the top Realm waiter,
-            // other replies queued behind it up to 2.5 s). The role's own reconciliation runs under its reservation;
-            // realm guild maintenance (at most once a second) admits its own guild keys.
-            async Task OwnAsync() { await daily.ReconcileAsync(session); await dungeons.ReconcileAsync(session); }
-            if (session.Owners is { } owners && session.Role is { } role)
-                await owners.RunSessionAsync("heartbeat",
-                    [Ownership.ReservationKey.Role(role.Id), Ownership.ReservationKey.Lifecycle(role.Id)], session, OwnAsync);
-            else await OwnAsync();
-            await guilds.ReconcileOnHeartbeatAsync();
-            await session.SendGameAsync(MsgId.Heartbeat, new Pong { ServerTimeMs = NowMs() });
-        });
         routes.Map(DailyActivityService.RingAccept, "festival", async (session, msgId, body) =>
         {
             var dailyRequest = CommonDailyActivityReq.Parser.ParseFrom(body.Span);
@@ -348,5 +353,22 @@ public sealed partial class GameMessageHandler
         {
             await afk.SnapshotAsync(session);
         });
+    }
+
+    // Shared match packets retain legacy admission if either end belongs to an unconverted dungeon family.
+    private bool IsTimedBattleOwnerRequest(GameSession session, uint message, ReadOnlyMemory<byte> body)
+    {
+        if (!timedBattles.IsOwnerRequest(message, body)) return false;
+        if (message == TimedBattleService.StartMatch)
+            return !dungeonMatches.WantsEntry(StartMatchReq.Parser.ParseFrom(body.Span).MatchEntryId);
+        if (message == TimedBattleService.CancelMatch)
+        {
+            var request = CancelMatchReq.Parser.ParseFrom(body.Span);
+            return !dungeonMatches.Owns(session) && !dungeonMatches.WantsEntry(request.MatchEntryId)
+                && !dungeonMatches.WantsEntry(request.NextMatchEntry) && request.NextMatchData?.MultiDungeon == null;
+        }
+        if (message == TimedBattleService.Ready)
+            return !dungeonMatches.Owns(session) && !dungeonMatches.WantsEntry(MatchReadyReq.Parser.ParseFrom(body.Span).MatchEntryId);
+        return true;
     }
 }

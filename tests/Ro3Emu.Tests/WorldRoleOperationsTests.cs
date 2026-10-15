@@ -63,7 +63,7 @@ public sealed class WorldRoleOperationsTests : IAsyncLifetime
         response.EnsureSuccessStatusCode();
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ShortcutUsesOwnedPotionAndPreferencesSurviveRelog()
     {
         long potion;
@@ -97,7 +97,7 @@ public sealed class WorldRoleOperationsTests : IAsyncLifetime
         Assert.Equal(1000000, Assert.Single(persisted.QuickUseInfos.All.Value).ItemEntry);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ItemUseRejectsUnsupportedBatchAndPersistsSingleUseCooldown()
     {
         await using var alice = await InWorld("Alice");
@@ -120,7 +120,7 @@ public sealed class WorldRoleOperationsTests : IAsyncLifetime
         Assert.Equal(19, current.Items.Single(i => i.Guid == potion).Stack);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SeasonLapseDecompositionRefusesWithoutConsumingAnItem()
     {
         await using var alice = await InWorld("Alice");
@@ -135,7 +135,7 @@ public sealed class WorldRoleOperationsTests : IAsyncLifetime
         Assert.Equal(20, session.Items.Single(i => i.Guid == potion).Stack);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task StatPlanSwitchAndRenamePersistWithoutLosingOtherAllocation()
     {
         await using (var alice = await InWorld("Alice"))
@@ -168,7 +168,7 @@ public sealed class WorldRoleOperationsTests : IAsyncLifetime
         Assert.Equal("Tank", plans.AllPlanBaseProperty[1].All.PlanName);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task MerchantCartSplitAndReturnPersistAndRefuseOverdraw()
     {
         await using (var alice = await InWorld("Alice"))
@@ -214,7 +214,7 @@ public sealed class WorldRoleOperationsTests : IAsyncLifetime
             NotifyCareerSpecialPackSizeChange.Parser)).Size);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task AutoMedicineAndArrowBindingsPersistAndRejectUnownedArrow()
     {
         await using (var alice = await InWorld("Alice"))
@@ -246,7 +246,7 @@ public sealed class WorldRoleOperationsTests : IAsyncLifetime
         Assert.Equal(50, items.MedicinesAutoUse.All.HpConfig.Condition);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task QuestResetAndBranchChoiceRequireOwnedPendingState()
     {
         await using var alice = await InWorld("Alice");
@@ -289,7 +289,7 @@ public sealed class WorldRoleOperationsTests : IAsyncLifetime
             m => m.OriginMsgId == TaskService.TaskTrackTeleport)).ErrorCode);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task PydReportFinishesOnlyActiveDownloadQuestAndUiDeliveryPaysOnceAfterRelog()
     {
         await using (var alice = await InWorld("Alice"))
@@ -347,7 +347,7 @@ public sealed class WorldRoleOperationsTests : IAsyncLifetime
         Assert.Equal(beforeReward + 1000, saved.Progress.Currency.GetValueOrDefault(1));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LuckyTurnSpendsTicketsAndGrantsConfiguredWeightedAwardsExactlyOncePerPaidRequest()
     {
         await using (var alice = await InWorld("Alice"))

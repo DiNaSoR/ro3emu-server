@@ -67,7 +67,7 @@ public sealed class LoginScopeAuditTests(ITestOutputHelper output) : IAsyncLifet
         AssertEmpty(audit);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task GuildMembersLoginAndPublishInsideTheirOwnGuildKeys()
     {
         var audit = Audit();

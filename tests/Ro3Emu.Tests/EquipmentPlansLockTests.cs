@@ -114,7 +114,7 @@ public sealed class EquipmentPlansLockTests : IAsyncLifetime
 
     private Task Loot(params (int Entry, int Count)[] items) => OnLoop(s => _app.Services.GetRequiredService<CharacterService>().GrantAsync(s, items));
 
-    [Fact]
+    [ClientDataFact]
     public async Task PlansMoveSharedInstancesAndPersistNamesGridsAndCurrentIndex()
     {
         await using var alice = await InWorld("Alice");
@@ -183,7 +183,7 @@ public sealed class EquipmentPlansLockTests : IAsyncLifetime
         await Next(again, CharacterService.OnePropertyChange, OnePropertyChange.Parser);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task BadPlansAndNamesLeaveTheSelectedPlanUnchanged()
     {
         await using var alice = await InWorld("Alice");
@@ -200,7 +200,7 @@ public sealed class EquipmentPlansLockTests : IAsyncLifetime
         Assert.Equal("", StoredPlans(alice).EquipPlans[0].PlanName);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task InvalidTargetReferencesAndFullBagRefuseBeforeAnyMove()
     {
         await using var alice = await InWorld("Alice");
@@ -224,7 +224,7 @@ public sealed class EquipmentPlansLockTests : IAsyncLifetime
         Assert.Equal(1, Stored(alice).Single(i => i.Guid == dagger).Grid);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LocksSyncThroughBagEquipmentAndReconnectAndProtectWholeDismantleBatch()
     {
         await using var alice = await InWorld("Alice");
@@ -260,7 +260,7 @@ public sealed class EquipmentPlansLockTests : IAsyncLifetime
         await Switch(again, 0);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task OwnershipCountsEquippedItemsAndFeatureGateAreEnforced()
     {
         await using var alice = await InWorld("Alice");
@@ -286,7 +286,7 @@ public sealed class EquipmentPlansLockTests : IAsyncLifetime
         Assert.Equal(5, Stored(alice).Single(i => i.Entry == Shard).Stack);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task AutoSettingsSyncPersistAndRejectInvalidTabsGroupsAndOptions()
     {
         await using var alice = await InWorld("Alice");
@@ -318,7 +318,7 @@ public sealed class EquipmentPlansLockTests : IAsyncLifetime
         Assert.False(disabled.AutoDecomposeSetting.Inc.TabOptionSetting[2].Inc.IsOpen);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task MatchingLootIsConvertedOnceWithCompleteNoticeAndLockedExistingGearSurvives()
     {
         const int PurpleArmor = 2550240;
@@ -352,7 +352,7 @@ public sealed class EquipmentPlansLockTests : IAsyncLifetime
         Assert.Equal(before + gain, _app.Services.GetRequiredService<RoleStore>().LoadProgress((long)alice.Self!.Uuid).Currency[2]);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task EmptyDisabledAndNonmatchingFiltersKeepLootAndGmNeverTriggersAutoDismantle()
     {
         await using var alice = await InWorld("Alice");
@@ -374,7 +374,7 @@ public sealed class EquipmentPlansLockTests : IAsyncLifetime
         Assert.Equal(4, Stored(alice).Count(i => i.Entry == PurpleWeapon));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LockedCardSplitAndSocketRemovalPreserveProtection()
     {
         const int Lunatic = 1420100;

@@ -125,7 +125,7 @@ public sealed class DungeonMatchTests : IAsyncLifetime
         Assert.Equal(new[] { 0, 1 }, DungeonMatchService.PickGroupIndices([2, 3, 1], 5));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SelectionCancellationSoloVoteDeclineAndDeadline()
     {
         await using var alice = await InWorld("Alice");
@@ -185,7 +185,7 @@ public sealed class DungeonMatchTests : IAsyncLifetime
         Assert.False(Service<DungeonMatchService>().Owns(Session(alice)));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task TwoAndThreePersonPartiesMatchReadyAndEnterOneInstance()
     {
         await using var alice = await InWorld("Alice");
@@ -231,7 +231,7 @@ public sealed class DungeonMatchTests : IAsyncLifetime
         Assert.NotEqual(0, teamIds.Single());
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ChickenRoutingCrossOwnerExclusionSwitchAndRoleCleanup()
     {
         // TimedEventTests establish the exported Kafra window at this date/time; select it before role login.

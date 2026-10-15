@@ -75,7 +75,7 @@ public sealed class OpenContentTests : IAsyncLifetime
         return await response.Content.ReadAsStringAsync();
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task WorkingNeverOpenedFunctionsAndServerDayGatesAreOpenOnTheFirstDay()
     {
         await using var alice = await InWorld("Alice");
@@ -102,7 +102,7 @@ public sealed class OpenContentTests : IAsyncLifetime
         Assert.False(open.FunctionOpenInfos.ContainsKey(45));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task TheExpiredNoviceWindowRepeatsSoTheEventAuctionTabsOpen()
     {
         // ActivityConfig 10000001 ran 2024-06-01..2025-08-01; it gates Event Auction tabs 3001-3003 in the client.
@@ -116,7 +116,7 @@ public sealed class OpenContentTests : IAsyncLifetime
             "open-content", 3002, [(1200000, 1, 0)], [(long)alice.Self!.Uuid]));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task AForcedActivitySkipsItsOwnUnreachableCondition()
     {
         await using var alice = await InWorld("Alice");
@@ -135,7 +135,7 @@ public sealed class OpenContentTests : IAsyncLifetime
         Assert.False(info.IsShielded);
     }
 
-    [Fact]
+    [ClientDataFact]
     public void ServerOpenAndSeasonStageWindowsAreOpenFromTheFirstDayAndNeverClose()
     {
         var clock = _app.Services.GetRequiredService<ActivityClock>();
@@ -157,7 +157,7 @@ public sealed class OpenContentTests : IAsyncLifetime
             invasion.End, now, 101).Start == invasion.End);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task TheActivityListShowsTheReopenedEventsButNotTheTestPools()
     {
         await using var alice = await InWorld("Alice");
@@ -170,7 +170,7 @@ public sealed class OpenContentTests : IAsyncLifetime
         Assert.DoesNotContain(1014L, ids);
     }
 
-    [Fact]
+    [ClientDataFact]
     public void TerritoryWarsRepeatTheExportedBlockEveryCycleAsASeasonOfItsOwn()
     {
         var clock = _app.Services.GetRequiredService<TerritoryWarsClock>();
@@ -185,7 +185,7 @@ public sealed class OpenContentTests : IAsyncLifetime
         Assert.Equal($"{clock.SeasonStart}:{clock.PlayBook}:{clock.Cycle}", clock.Epoch);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task TheEscortSeasonFollowsTheWarCycle()
     {
         // Escort scores and claimed rounds are keyed by the escort season; with a repeating war block every cycle is a

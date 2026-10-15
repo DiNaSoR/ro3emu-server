@@ -86,7 +86,7 @@ public sealed class BattlePassActivityTests : IAsyncLifetime
         return await Next(bot, NewActivityService.Common, CommonActivityRes.Parser, r => r.RequestId == req.RequestId);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task PassRequiresEarnedLevelAndPremiumEntitlementAndPersistsClaims()
     {
         var alice = await InWorld("Alice");
@@ -138,7 +138,7 @@ public sealed class BattlePassActivityTests : IAsyncLifetime
         Assert.Equal(new[] { 1 }, saved.ClaimedPremiumLevels);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ConfiguredLevelCostAndGiftTokenSettleOnceWithRecipientMail()
     {
         await using var bob = await InWorld("Bob");
@@ -178,7 +178,7 @@ public sealed class BattlePassActivityTests : IAsyncLifetime
         Assert.Equal(0, Session(bob).Progress!.Currency.GetValueOrDefault(703));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task MonthCardClaimsEachOwnedCardOncePerLocalDayAndExpires()
     {
         var alice = await InWorld("Alice");

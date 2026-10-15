@@ -108,7 +108,7 @@ public sealed class SeasonRefineTests : IAsyncLifetime
         Assert.Equal(0, (await alice.CreateRoleAsync("Alice")).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task RecastSelectAndGiveUpUseTheExactUnlockedSlotAndPersistTheActiveGroup()
     {
         int selected;
@@ -249,7 +249,7 @@ public sealed class SeasonRefineTests : IAsyncLifetime
         Assert.True(relogEmpty.EquipParts[2].Inc.RefineSlots[2].Inc.CanSelectedAttr[0].Del);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SelectingAnOfferedGroupUpdatesConfiguredStats()
     {
         await using var alice = await InWorld("Alice");
@@ -305,7 +305,7 @@ public sealed class SeasonRefineTests : IAsyncLifetime
         Assert.Equal(0, (await Next(alice, SeasonRefineService.Recast, SeasonRefineRecastResp.Parser)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LoginOnPlaybook102StaysUnavailableAfterGlobalSwitchBackTo101()
     {
         Service<SeasonService>().SetPlayBook(102);
@@ -341,7 +341,7 @@ public sealed class SeasonRefineTests : IAsyncLifetime
         Assert.Equal(ErrorCodes.SeasonRefineConfig, (await Next(bob, SeasonRefineService.GiveUp, SeasonRefineGiveUpResp.Parser)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task PendingOfferSurvivesRelogAndCannotBeUsedOnAnotherPart()
     {
         int[] offered;

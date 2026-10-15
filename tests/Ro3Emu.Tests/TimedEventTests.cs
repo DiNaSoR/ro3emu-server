@@ -171,7 +171,7 @@ public sealed class TimedEventTests : IAsyncLifetime
     private static ActivityReq NoviceReq(int task) => new()
     { ActivityId = Novice, ReqParam = new ActivityReqParam { NoviceReq = new NoviceActivityReq { TaskId = task } } };
 
-    [Fact]
+    [ClientDataFact]
     public async Task LegacyAbsoluteWindowAndNoviceQuestAreServerAuthoritative()
     {
         await using var bot = await InWorld("Alice");
@@ -199,7 +199,7 @@ public sealed class TimedEventTests : IAsyncLifetime
         Assert.Equal(1, open.ActivityParam.NoviceActivity.TaskIds[100001]);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LegacyUploadCannotForgeAnotherPlayerOrQuestProgress()
     {
         clock.Set(new DateTimeOffset(2025, 7, 1, 12, 0, 0, TimeSpan.Zero).ToUnixTimeSeconds());
@@ -218,7 +218,7 @@ public sealed class TimedEventTests : IAsyncLifetime
         Assert.Empty(accepted.DownloadParam.NoviceActivity.TaskIds);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task PronteraDonateRejectsClosedLevelAndReplayAndPersistsContribution()
     {
         await using var bot = await InWorld("Alice");
@@ -297,7 +297,7 @@ public sealed class TimedEventTests : IAsyncLifetime
         Assert.Contains("ContributionPoint", System.Text.Encoding.UTF8.GetString(saved));
     }
 
-    [Theory]
+    [ClientDataTheory]
     [InlineData(2, 2240101, 114, 10)]
     [InlineData(6, 3010303, 126, 11)]
     public async Task TimedMatchRequiresWindowAndSettlesOnlyActualOpposingPlayerCombat(int entry, int sceneEntry, int todo, int day)
@@ -422,7 +422,7 @@ public sealed class TimedEventTests : IAsyncLifetime
         Assert.NotNull(Service<RoleStore>().LoadTimedBattle((long)alice.Self.Uuid));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task KafraTwoMemberTeamsFightOnlyOpponentsAndSettleAfterLastEnemyFalls()
     {
         await using var alice = await InWorld("Alice");
@@ -507,7 +507,7 @@ public sealed class TimedEventTests : IAsyncLifetime
         Assert.Equal(0, Service<CharacterService>().CountOf(Session(dan), 7));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SimultaneousOpponentHandoversDoNotStrandTheSettledMatch()
     {
         await using var alice = await InWorld("Alice");
@@ -561,7 +561,7 @@ public sealed class TimedEventTests : IAsyncLifetime
         finally { releaseA.TrySetResult(); releaseB.TrySetResult(); }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task DeadlineSettlementSkipsQuiescingRoleAndKeepsDepartedParticipantStatistics()
     {
         await using var alice = await InWorld("Alice");
@@ -628,7 +628,7 @@ public sealed class TimedEventTests : IAsyncLifetime
         finally { releaseB.TrySetResult(); }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task RuntimeSettlementAdmittedBeforeHandoverFinishesBothAwards()
     {
         await using var alice = await InWorld("Alice");
@@ -708,7 +708,7 @@ public sealed class TimedEventTests : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task OnePiecePrivateBossPaysOnlyAfterKillAndPersistsConfiguredDailyCap()
     {
         await using (var bot = await InWorld("Alice"))

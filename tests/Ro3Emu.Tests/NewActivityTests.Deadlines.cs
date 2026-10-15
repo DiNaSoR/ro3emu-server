@@ -40,7 +40,7 @@ public sealed partial class NewActivityTests
         });
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LocalMidnightAdvancesSevenDayOnceAndPersistsWithoutARequest()
     {
         await using var bot = await InWorld("ActMidnight");
@@ -76,7 +76,7 @@ public sealed partial class NewActivityTests
             .ActivityInfo[113].ActivityParam.SevenDay.LoginDays);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task MonthCardAndTreasureExpireAtDeadlinesWithoutARequest()
     {
         await using var bot = await InWorld("ActExpiry");
@@ -123,7 +123,7 @@ public sealed partial class NewActivityTests
         Assert.True(saved.ActivityInfo[199].ActivityParam.MonthCard.Infos[id].DayAward);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task CalendarEndProjectsAndPersistsAtExactBoundary()
     {
         await using var bot = await InWorld("ActCalEnd");
@@ -140,7 +140,7 @@ public sealed partial class NewActivityTests
             .ActivityInfo[200].State);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task CalendarStartProjectsAndPersistsWithoutARequest()
     {
         await using var bot = await InWorld("ActCalStart");
@@ -157,7 +157,7 @@ public sealed partial class NewActivityTests
             .ActivityInfo[118].State);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LockedExpiredMonthCardDoesNotRepeatImmediateDeadline()
     {
         await using var bot = await InWorld("ActCardLock"); // level one does not satisfy activity 199's level-20 gate
@@ -193,7 +193,7 @@ public sealed partial class NewActivityTests
         Assert.Equal(4, session.NewActivities!.ActivityInfo[199].ActivityParam.MonthCard.Infos[id].LastDays);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task EveDeadlineWaitingOnSocialGateCannotSettleIntoNewRole()
     {
         var eveWindow = Assert.Single(Service<ActivityClock>().Segments(1011, clock.GetUtcNow().ToUnixTimeSeconds()));
@@ -249,7 +249,7 @@ public sealed partial class NewActivityTests
             Service<RoleStore>().LoadActivityRuntime(oldRole)!)!.EveSettledCycleStart);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FailedMonthCardAfterPassCommitRetriesTheCurrentAttachment()
     {
         await using var bot = await InWorld("ActRetry");
@@ -354,7 +354,7 @@ public sealed partial class NewActivityTests
         Assert.False(saved.ActivityInfo[199].ActivityParam.MonthCard.Infos[cardId].DayAward);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task EveKeyIsSharedUntilTheSettlementLeadWindowOnEveryActivityPath()
     {
         // Every activity path (local, social, login) settles an ended Eve cycle before refreshing the calendar, so

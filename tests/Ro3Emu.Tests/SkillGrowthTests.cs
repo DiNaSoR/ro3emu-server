@@ -1,3 +1,4 @@
+using Google.Protobuf;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Romsg;
@@ -69,7 +70,69 @@ public sealed class SkillGrowthTests : IAsyncLifetime
         return dir?.FullName ?? throw new DirectoryNotFoundException("Ro3Emu.slnx");
     }
 
-    [Fact]
+    [ClientDataFact]
+    public async Task FreshNoviceWheelShowsNormalAttackAndRepairsAnOlderEmptySavedWheel()
+    {
+        long roleId;
+        await using (var novice = await InWorld("Novice"))
+        {
+            roleId = (long)novice.Self!.Uuid;
+            var fresh = await Next(novice, SkillService.SkillDataSync, DBSkillDataIncrement.Parser);
+            Assert.True(fresh.SyncAllMark);
+            Assert.Equal(1000001, fresh.SkillWheel.All.WhellSkills[1].SkillConfigId);
+            Assert.Equal(1000001, fresh.OriginSkillWheel.All.WhellSkills[1].SkillConfigId);
+            Assert.Equal(1000001, fresh.SkillWheel.All.AtkSkillId);
+        }
+
+        // Simulate an existing role saved before Novices had a visible normal-attack slot.
+        var roles = app.Services.GetRequiredService<RoleStore>();
+        var old = DBSkillData.Parser.ParseFrom(roles.LoadSkillPlans(roleId)!);
+        old.SkillWheel.WhellSkills.Clear();
+        old.OriginSkillWheel.WhellSkills.Clear();
+        Assert.Equal(1, FixtureSql.Execute(app.Services.GetRequiredService<AccountStore>(),
+            "UPDATE role SET skill_plans = $plans WHERE id = $id",
+            ("$plans", old.ToByteArray()), ("$id", roleId)));
+
+        await using var again = await InWorld("Novice", create: false);
+        var repaired = await Next(again, SkillService.SkillDataSync, DBSkillDataIncrement.Parser);
+        Assert.Equal(1000001, repaired.SkillWheel.All.WhellSkills[1].SkillConfigId);
+        Assert.Equal(1000001, repaired.OriginSkillWheel.All.WhellSkills[1].SkillConfigId);
+
+        await Gm("novice", "!job 1100");
+        await again.SendGameAsync(1023, new PlayerAssetReq { AssetType = { 5 } });
+        var swordman = await Next(again, SkillService.SkillDataSync, DBSkillDataIncrement.Parser,
+            m => m.SyncAllMark && m.CurrentAtkSkillId == 1100001);
+        Assert.DoesNotContain(swordman.SkillWheel.All.WhellSkills.Values,
+            slot => slot.SkillConfigId == 1100001);
+    }
+
+    [ClientDataFact]
+    public async Task NoviceCanRebindNormalAttackAndSavedManualSlotSurvivesLogin()
+    {
+        await using (var novice = await InWorld("Novice"))
+        {
+            await Next(novice, SkillService.SkillDataSync, DBSkillDataIncrement.Parser);
+            await novice.SendGameAsync(SkillService.SkillLoad, new SkillLoadReq
+                { OpType = SkillLoadOperation.SkillLoadOpLoad, IsManual = true, SocketNum = 2,
+                    Info = new SkillData { SkillId = 10000, SkillLevel = 2 } });
+            Assert.Equal(ErrorCodes.SkillNotLearned,
+                (await Next(novice, SkillService.SkillLoad, SkillLoadResp.Parser)).Result);
+
+            await novice.SendGameAsync(SkillService.SkillLoad, new SkillLoadReq
+                { OpType = SkillLoadOperation.SkillLoadOpLoad, IsManual = true, SocketNum = 2,
+                    Info = new SkillData { SkillId = 10000, SkillLevel = 1 } });
+            Assert.Equal(0, (await Next(novice, SkillService.SkillLoad, SkillLoadResp.Parser)).Result);
+        }
+
+        await using var again = await InWorld("Novice", create: false);
+        var saved = await Next(again, SkillService.SkillDataSync, DBSkillDataIncrement.Parser);
+        Assert.False(saved.SkillWheel.All.WhellSkills.ContainsKey(1));
+        Assert.Equal(1000001, saved.SkillWheel.All.WhellSkills[3].SkillConfigId);
+        Assert.Equal(1000001, saved.OriginSkillWheel.All.WhellSkills[3].SkillConfigId);
+        Assert.Equal(10000, saved.SkillAssignPlans.All.Value[0].ManualLoadSkill[2].SkillId);
+    }
+
+    [ClientDataFact]
     public async Task AllocationAndDependentRefundAreAtomic()
     {
         await using var alice = await InWorld("Alice");
@@ -114,7 +177,7 @@ public sealed class SkillGrowthTests : IAsyncLifetime
         Assert.Equal(0, (await Next(alice, SkillService.PlanUpdate, SkillGrowthSkillPlanUpdateResp.Parser)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task PlansNameGenreAndSelectedLevelsSurviveRelog()
     {
         await using (var alice = await InWorld("Alice"))
@@ -159,7 +222,7 @@ public sealed class SkillGrowthTests : IAsyncLifetime
         Assert.Equal(0, (await Next(again, SkillService.SwitchPlan, SwitchPlanResp.Parser)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LoadQueueAndResetValidateInputsAndPersist()
     {
         await using (var alice = await InWorld("Alice"))
@@ -208,7 +271,7 @@ public sealed class SkillGrowthTests : IAsyncLifetime
         Assert.DoesNotContain(reloaded.SkillWheel.All.WhellSkills.Values, slot => slot.SkillConfigId == 1300601);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LegacyJsonPlansMigrateOnceAndKeepSelectedLoads()
     {
         long roleId;

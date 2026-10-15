@@ -14,7 +14,7 @@ public sealed partial class DungeonTests
     public static TheoryData<long> ReconstructedScenes() => new(new ReconstructedDungeons(
         Options.Create(new ServerOptions())).All.Select(d => d.Scene).Order());
 
-    [Theory]
+    [ClientDataTheory]
     [MemberData(nameof(ReconstructedScenes))]
     public void AReconstructedStoryDungeonResolvesToItsWavesOfClientKnownMonsters(long scene)
     {
@@ -38,7 +38,7 @@ public sealed partial class DungeonTests
         }
     }
 
-    [Theory]
+    [ClientDataTheory]
     [MemberData(nameof(ReconstructedScenes))]
     public async Task AReconstructedStoryDungeonCanBeClearedWaveByWave(long scene)
     {
@@ -75,7 +75,7 @@ public sealed partial class DungeonTests
         Assert.DoesNotContain(Service<World>().AllUnits(), m => m.InstanceId == instance && m is MonsterUnit);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task AReconstructedClearCountsTowardItsStoryQuestDungeonPassTarget()
     {
         // Quest 10103120 targets [101018, 1051001, 1]: pass the Desert Crossroad Peco Peco nest once.
@@ -94,7 +94,7 @@ public sealed partial class DungeonTests
         Assert.True(State() is TaskState.Finish || TaskService.IsDelivered(Session(alice), 10103120), $"quest state {State()}");
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ADeathInADungeonRunGetsOnlyTheRunsReviveNotice()
     {
         // Seen live: the generic 30-second 30112 and the run's own 5-second one both reached the client.

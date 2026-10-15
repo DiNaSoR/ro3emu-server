@@ -75,7 +75,7 @@ public sealed class OfflineMailOwnerTests : IAsyncLifetime
     private static Task<Dictionary<object, object?>> List(BotClient bot, long role) => bot.MicroAsync("MailService", "getUserMailList",
         new() { ["Uid"] = role.ToString(), ["MailType"] = 1, ["Start"] = 0, ["Limit"] = 150 });
 
-    [Theory]
+    [ClientDataTheory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task TwoOfflineDeliveriesShareOwnerAndRestageAfterCommitOrApply(bool afterCommit)
@@ -126,7 +126,7 @@ public sealed class OfflineMailOwnerTests : IAsyncLifetime
         });
     }
 
-    [Theory]
+    [ClientDataTheory]
     [InlineData(false, false)]
     [InlineData(true, false)]
     [InlineData(false, true)]

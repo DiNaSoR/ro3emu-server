@@ -12,7 +12,7 @@ namespace Ro3Emu.Tests;
 
 public sealed partial class GuildTests
 {
-    [Fact]
+    [ClientDataFact]
     public async Task HeldOrdinaryJoinDefersTimerAndGmPublishesMembershipTogether()
     {
         await using var founder = await InWorld("HoldFounder");
@@ -70,7 +70,7 @@ public sealed partial class GuildTests
         Assert.Equal(2, store.Get(guildId)!.Members.Count);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task OrdinaryJoinLastProjectionFailureRollsBackRosterAndIndex()
     {
         await using var founder = await InWorld("FailFounder");
@@ -105,7 +105,7 @@ public sealed partial class GuildTests
         Assert.Equal(guildId, session.Guild!.GuildId);
     }
 
-    [Theory]
+    [ClientDataTheory]
     [InlineData(0L)]
     [InlineData(10L)]
     public async Task DisbandMovesEveryTreasuryDenominationToDurableRecoveryOnce(long escrow)

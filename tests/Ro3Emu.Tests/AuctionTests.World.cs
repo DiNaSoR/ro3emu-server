@@ -37,7 +37,7 @@ public sealed partial class AuctionTests
     // 2026-10-08 12:00 +02:00 is CEST; WorldAuctionEnd 18 closes World lots at 18:00 local the same day.
     private long SixPm(int days = 0) => new DateTimeOffset(2026, 10, 8 + days, 18, 0, 0, TimeSpan.FromHours(2)).ToUnixTimeSeconds();
 
-    [Fact]
+    [ClientDataFact]
     public async Task WorldGmLotsListPerItemTypeAndBuyOutSettlesWithoutDividend()
     {
         await using var alice = await InWorld("Alice");
@@ -86,7 +86,7 @@ public sealed partial class AuctionTests
         Assert.Empty((await Count(bob, AuctionType.World)).AuctionSrcTypeCount[(long)AuctionType.World].ItemTypeCount);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task UnbidGuildLotMovesToWorldOnceAndPaysItsGuildParticipantsTheWholePrice()
     {
         await using var alice = await InWorld("Alice");
@@ -170,7 +170,7 @@ public sealed partial class AuctionTests
         Assert.All(check.Locations, value => Assert.Equal("0", value.Residual));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task WorldTransferStopsAtTheItemsWorldAuctionCeiling()
     {
         const int capped = 1251008; // AuctionConfig._iWorldAuctionCeiling 1
@@ -191,7 +191,7 @@ public sealed partial class AuctionTests
             (await Service<AuctionService>().PublishWorldSystemAsync("capped", [capped], startNow: true)).Code);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task EventLotsNeedTheirActivityWindowAndShareTheGameModeDividend()
     {
         await using var alice = await InWorld("Alice");
@@ -245,7 +245,7 @@ public sealed partial class AuctionTests
         Assert.False(Service<TimedEventService>().IsActive(NoviceActivity));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task WorldEventAndMovedLotsSettleOnceAcrossRestarts()
     {
         long aliceId, bobId, bobFunds, eventLot, worldLot;

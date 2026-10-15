@@ -156,7 +156,7 @@ public sealed class GuildHomeTests : IAsyncLifetime
         return await Next(bot, MsgId.SwitchSceneLine, SwitchSceneLineResp.Parser, r => r.SceneEntry == outside);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task NoGuildAndClosedGuildFunctionAreRefusedWithoutSceneChange()
     {
         await using var alice = await InWorld("Alice");
@@ -174,7 +174,7 @@ public sealed class GuildHomeTests : IAsyncLifetime
         Assert.Equal(0, Session(alice).InstanceId);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task GuildmatesShareOneRoomOtherGuildsGetTheirOwnAndLeavingClosesIt()
     {
         await using var alice = await InWorld("Alice");
@@ -251,7 +251,7 @@ public sealed class GuildHomeTests : IAsyncLifetime
         Assert.NotEqual(room, next);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task BusySwitchingDeadAndFightingMembersAreRefused()
     {
         await using var alice = await InWorld("Alice", level: 99);
@@ -293,7 +293,7 @@ public sealed class GuildHomeTests : IAsyncLifetime
         Assert.Equal(0, HomeSwitches(alice));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ConcurrentFirstEntriesOfOneGuildCreateExactlyOneRoom()
     {
         await using var alice = await InWorld("Alice");
@@ -314,7 +314,7 @@ public sealed class GuildHomeTests : IAsyncLifetime
         await Load(bob, Home);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task KickedAndLeavingMembersAreEjectedWhileTheRestStay()
     {
         await using var alice = await InWorld("Alice");
@@ -348,7 +348,7 @@ public sealed class GuildHomeTests : IAsyncLifetime
         Assert.Equal(ErrorCodes.NotInGuild, (await Request(bob)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task DisconnectInsideLogsBackInOutsideAndClosesTheRoom()
     {
         long guild, room, outside;
@@ -370,7 +370,7 @@ public sealed class GuildHomeTests : IAsyncLifetime
         Assert.Equal(before.Z, session.Position.Z, 1f);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ExitWhileDeadRevivesOnReturn()
     {
         await using var alice = await InWorld("Alice");
@@ -390,7 +390,7 @@ public sealed class GuildHomeTests : IAsyncLifetime
         Assert.Equal(0, session.InstanceId);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task CampfireRunsInTheLongLivedRoomOnEachEventDay()
     {
         await using var alice = await InWorld("Alice");
@@ -426,7 +426,7 @@ public sealed class GuildHomeTests : IAsyncLifetime
         Assert.Empty(Service<GameLoop>().DrainStatus.FailedObligations);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task EnteringAfterTheEventSendsNoFinish()
     {
         await using var alice = await InWorld("Alice");

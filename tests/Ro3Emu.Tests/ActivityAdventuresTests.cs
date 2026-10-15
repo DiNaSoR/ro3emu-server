@@ -88,7 +88,7 @@ public sealed class ActivityAdventuresTests : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SeasonEveCluesAndCompletedChaptersContributeToOneDurableGlobalCycle()
     {
         var window = app.Services.GetRequiredService<ActivityClock>()
@@ -253,7 +253,7 @@ public sealed class ActivityAdventuresTests : IAsyncLifetime
         Assert.Equal(2, Box(bobId).Letters.Count);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ExplorationFillConsumesTheConfiguredNoteOnceAndPersistsAcrossReconnect()
     {
         var season = app.Services.GetRequiredService<SeasonService>();
@@ -322,7 +322,7 @@ public sealed class ActivityAdventuresTests : IAsyncLifetime
         Assert.NotEqual(0, (await Next(relog, NewActivityService.Common, CommonActivityRes.Parser, r => r.RequestId == 6)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ClosedPreAndInvalidExplorationCoordinatesAreRefused()
     {
         await using var alice = await InWorld("Alice");
@@ -338,7 +338,7 @@ public sealed class ActivityAdventuresTests : IAsyncLifetime
         Assert.NotEqual(0, (await Next(alice, NewActivityService.Common, CommonActivityRes.Parser, r => r.RequestId == 5)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task JourneyDialogueBranchesUseOwnedAttributesAndCompleteFirstNode()
     {
         var window = app.Services.GetRequiredService<ActivityClock>()
@@ -388,7 +388,7 @@ public sealed class ActivityAdventuresTests : IAsyncLifetime
         Assert.NotEqual(0, (await Complete(101, EJourneyCompleteType.Node, 106)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task JourneyTravelConsumesHoursAndResolvesAuthoredEventBranchesBeforeNextDay()
     {
         var window = app.Services.GetRequiredService<ActivityClock>()
@@ -475,7 +475,7 @@ public sealed class ActivityAdventuresTests : IAsyncLifetime
         Assert.NotEqual(0, await Complete(1, EJourneyCompleteType.Travel));
     }
 
-    [Theory]
+    [ClientDataTheory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task DungeonJourneyContinuationRecoversItsExactActAndAcknowledgesWithTheAward(bool expiresBeforeRecovery)
@@ -546,7 +546,7 @@ public sealed class ActivityAdventuresTests : IAsyncLifetime
         Assert.Equal(1L, command.ExecuteScalar());
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task JourneyBossUsesAuthoredSpawnAndRejectsEntryBeforeItsAct()
     {
         var catalog = app.Services.GetRequiredService<DungeonCatalog>();
@@ -561,7 +561,7 @@ public sealed class ActivityAdventuresTests : IAsyncLifetime
         Assert.NotEqual(0, (await Next(alice, DungeonService.Enter, EnterDungeonRsp.Parser)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task TreasureMonsterAwardAndMapUseDoNotInvertActivityAndOwnerGates()
     {
         var window = app.Services.GetRequiredService<ActivityClock>()
@@ -619,7 +619,7 @@ public sealed class ActivityAdventuresTests : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task TreasureMapCreatesAnInteractableHuntAndConsumesOnlyOnce()
     {
         var window = app.Services.GetRequiredService<ActivityClock>()
@@ -659,7 +659,7 @@ public sealed class ActivityAdventuresTests : IAsyncLifetime
             i => i.Result != 0)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task TreasureShortcutUsesCommonValidationCooldownAndReplyContract()
     {
         var window = app.Services.GetRequiredService<ActivityClock>()
@@ -747,7 +747,7 @@ public sealed class ActivityAdventuresTests : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task TreasureCooldownWriteFailureRollsBackSelectedMapAndHunt()
     {
         var window = app.Services.GetRequiredService<ActivityClock>()
@@ -787,7 +787,7 @@ public sealed class ActivityAdventuresTests : IAsyncLifetime
         Assert.True(session.ActivityRuntime.AdventureTreasure.PointId > 0);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FragmentCraftWithoutCrystalSetReportsFailureWithoutProgress()
     {
         var window = app.Services.GetRequiredService<ActivityClock>()
@@ -812,7 +812,7 @@ public sealed class ActivityAdventuresTests : IAsyncLifetime
         Assert.Equal(0, session.NewActivities!.ActivityInfo[105].ActivityParam.FragmentGather.ProgressFinish);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FragmentGiftTransfersOneCrystalAndCannotBeReplayed()
     {
         var window = app.Services.GetRequiredService<ActivityClock>()
@@ -846,7 +846,7 @@ public sealed class ActivityAdventuresTests : IAsyncLifetime
         Assert.Equal(1, persisted.Items.Where(i => i.Entry == 1111001).Sum(i => i.Stack));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ReciprocalFragmentGiftsCommitWithoutCrossGateWait()
     {
         var window = app.Services.GetRequiredService<ActivityClock>()
@@ -893,7 +893,7 @@ public sealed class ActivityAdventuresTests : IAsyncLifetime
         Assert.Equal(1, registry.All().Single(s => s.Role?.Id == bobId).Items.Sum(i => i.Entry == 1111001 ? i.Stack : 0));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task TwoDonorsCannotConsumeTheSameFragmentAskTwice()
     {
         var window = app.Services.GetRequiredService<ActivityClock>()
@@ -923,7 +923,7 @@ public sealed class ActivityAdventuresTests : IAsyncLifetime
             .SelectMany(s => s.Items).Sum(i => i.Entry == 1111001 ? i.Stack : 0));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FragmentGiftRefusesBusyReceiverWithoutChangingEitherOwner()
     {
         var window = app.Services.GetRequiredService<ActivityClock>()
@@ -961,7 +961,7 @@ public sealed class ActivityAdventuresTests : IAsyncLifetime
         Assert.Equal(0, receiver.NewActivities!.ActivityInfo[105].ActivityParam.FragmentGather.DailyData.ReceiveTimes);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task DeletedOfflineAskOwnerCannotConsumeDonorFragment()
     {
         var window = app.Services.GetRequiredService<ActivityClock>()
@@ -1013,7 +1013,7 @@ public sealed class ActivityAdventuresTests : IAsyncLifetime
             .Sum(i => i.Entry == 1111001 ? i.Stack : 0));
     }
 
-    [Theory]
+    [ClientDataTheory]
     [InlineData(false, false)]
     [InlineData(false, true)]
     [InlineData(true, false)]

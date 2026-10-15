@@ -46,6 +46,9 @@ public sealed class MsgCatalog
 
     public Entry? Get(uint id) => _entries.GetValueOrDefault(id);
 
+    /// <summary>Every message id of the client's table.</summary>
+    public IEnumerable<uint> Ids => _entries.Keys;
+
     /// <summary>True only when the table is loaded and the client defines no message with this id.</summary>
     public bool UnknownToClient(uint id) => _entries.Count != 0 && !_entries.ContainsKey(id);
 

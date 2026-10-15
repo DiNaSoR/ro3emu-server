@@ -112,7 +112,7 @@ public sealed class AppearanceShopTests : IAsyncLifetime
         Assert.All(result.Locations, x => Assert.Equal("0", x.Residual));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SuitPurchaseUnlocksTheSuitAndItsPiecesGrantsTheBonusAndChargesOnce()
     {
         await using var bot = await Enter();
@@ -150,7 +150,7 @@ public sealed class AppearanceShopTests : IAsyncLifetime
         Exact(opening, closing, ledger);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task OwnedAppearanceIsRefusedWithoutCharge()
     {
         await using var bot = await Enter();
@@ -177,7 +177,7 @@ public sealed class AppearanceShopTests : IAsyncLifetime
         Assert.False(Alice.Wardrobe!.AllLightUpAppearances.ContainsKey(StrollSuit));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task BatchWithAnAppearanceAndAnItemBuysBoth()
     {
         await using var bot = await Enter();
@@ -201,7 +201,7 @@ public sealed class AppearanceShopTests : IAsyncLifetime
         Exact(opening, closing, ledger);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task MountLookPurchaseOwnsTheMountSoTheWardrobeRidesIt()
     {
         await using var bot = await Enter();
@@ -269,7 +269,7 @@ public sealed class AppearanceShopTests : IAsyncLifetime
             || JsonSerializer.Deserialize<ShopService.ShopState>(shop)!.Bought.Count == 0);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task MalformedCommoditiesAreRefusedWithoutChargeAndTheConnectionSurvives()
     {
         await using var bot = await Enter();

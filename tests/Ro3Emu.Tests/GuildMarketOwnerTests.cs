@@ -24,7 +24,7 @@ public sealed partial class GuildTests
         public void Advance(TimeSpan by) => Interlocked.Add(ref frozenTicks, by.Ticks);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task MarketListUsesExpiryRefundBeforeCheckingOwnMaterials()
     {
         await using var seller = await InWorld("Refundseller");
@@ -53,7 +53,7 @@ public sealed partial class GuildTests
         Assert.NotEqual(oldId, Assert.Single(store.LoadMarket().Stalls).Id);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task MarketMultiSellerSqlFailureRollsBackAllBalancesAndBookThenRetrySucceeds()
     {
         await using var first = await InWorld("Firstseller");
@@ -127,7 +127,7 @@ public sealed partial class GuildTests
         Assert.DoesNotContain(ledger.Legs, x => x.Kind == Ro3Emu.Server.Economy.EconomyLegKind.Source);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task HeldBuyDefersSellerExpiryRefundWhileUnrelatedRoleSavesSettings()
     {
         await using var seller = await InWorld("Timerseller");
@@ -218,7 +218,7 @@ public sealed partial class GuildTests
         Assert.Single(store.LoadMarket().Trades);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SlowMarketNoticeCompletionDoesNotReorderLaterGuildResources()
     {
         await using var seller = await InWorld("Slowseller");

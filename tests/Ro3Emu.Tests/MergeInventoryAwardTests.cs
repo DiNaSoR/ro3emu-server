@@ -43,7 +43,7 @@ public sealed class MergeInventoryAwardTests : IAsyncLifetime
         try { Directory.Delete(_dataDir, true); } catch (IOException) { }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task AwardKeepsExistingMetadataAndCommitsDailyOrRollsBackTogether()
     {
         await using var bot = new BotClient(_http, File.ReadAllText(Path.Combine(_dataDir, "gate_rsa_public.pem")));
@@ -128,7 +128,7 @@ public sealed class MergeInventoryAwardTests : IAsyncLifetime
         Assert.Equal(currencyBefore + 10, roles.LoadProgress(role).Currency.GetValueOrDefault(1));
     }
 
-    [Theory]
+    [ClientDataTheory]
     [InlineData(0, false)]
     [InlineData(1, true)]
     [InlineData(2, false)]

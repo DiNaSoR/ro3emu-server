@@ -12,7 +12,7 @@ public sealed class StatCalculatorTests
     private static readonly GameData Data = new(
         Options.Create(new ServerOptions { DataDir = Path.Combine(RepoRoot(), "data") }), NullLogger<GameData>.Instance);
 
-    [Fact]
+    [ClientDataFact]
     public void PercentMembersScaleTheirRootAndTheResultRoundsUp()
     {
         // STR 5 at PATK base 17: PATK raw 17 + 5 (STR -> ATK +1) = 22, per_atk 1031 = 5 * 20 = 100 (= 1 %).
@@ -22,7 +22,7 @@ public sealed class StatCalculatorTests
         Assert.Equal(100, sheet[1031]);       // members travel as their own properties
     }
 
-    [Fact]
+    [ClientDataFact]
     public void AspdUsesItsDataTypeAndBuffTypes()
     {
         // baseaspd 115 = 100 (1.00, dt 2), AGI 10 -> aspd 114 = 20 (+20 %, calc 2), buff_aspd 1142 = 10 (+0.10, calc 3).

@@ -152,7 +152,7 @@ public sealed class TowerTests : IAsyncLifetime
             : "DROP TRIGGER fail_tower");
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task NextFloorDifficultyUsesFiveAmBoundaryAndScalesOnlyPrivateActors()
     {
         var floor = Service<GameData>().Row("PetFloorConfig", 1)!.Value;
@@ -212,7 +212,7 @@ public sealed class TowerTests : IAsyncLifetime
         Assert.Null(Session(alice).TowerAttempt);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LoginAndInfoHaveFourSlotsAndStoryAndLevelGatesAreIndependent()
     {
         await using var alice = await InWorld("Alice");
@@ -241,7 +241,7 @@ public sealed class TowerTests : IAsyncLifetime
         Assert.Equal(ErrorCodes.FeatureUnavailable, (await Next(alice, TowerService.Sweep, ClimTowerSweepRes.Parser)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FloorOneHandsOffSpawnsTwoMonstersSettlesAndPaysOnlyOnceAcrossRelog()
     {
         long role;
@@ -297,7 +297,7 @@ public sealed class TowerTests : IAsyncLifetime
         Assert.Equal(9, Count(relog, 1250701));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FirstPassRangesAreInclusiveBoundedAndNeverFabricateWinners()
     {
         await using var alice = await InWorld("Alice");
@@ -319,7 +319,7 @@ public sealed class TowerTests : IAsyncLifetime
         Assert.Equal(0, Count(alice, 1250709));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task BossFirstPassBelongsToFirstWinnerAndOtherPlayersClaimItsMilestoneOnce()
     {
         await using var winner = await InWorld("Winner", cleared: 9);
@@ -359,7 +359,7 @@ public sealed class TowerTests : IAsyncLifetime
         Assert.Equal(10, DBClimTower.Parser.ParseFrom(Service<RoleStore>().LoadTower((long)other.Self!.Uuid)!).ServerFirstPassClaimedLayer);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task PrivateFloorsRejectForeignTargetsAndForgedResultPackets()
     {
         await using var alice = await InWorld("Alice");
@@ -388,7 +388,7 @@ public sealed class TowerTests : IAsyncLifetime
         Assert.Equal(0, Count(bob, 1250709));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task WrongOrRepeatedLoadedPacketsCannotStartOrRespawnTheFloor()
     {
         await using var alice = await InWorld("Alice");
@@ -409,7 +409,7 @@ public sealed class TowerTests : IAsyncLifetime
         Assert.Equal(2, Session(alice).TowerAttempt!.Monsters.Count);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task DeadlineBeatsTheLastKillAndDoesNotAdvanceOrPay()
     {
         await using var alice = await InWorld("Alice");
@@ -427,7 +427,7 @@ public sealed class TowerTests : IAsyncLifetime
         Assert.Equal(0, DBClimTower.Parser.ParseFrom(Service<RoleStore>().LoadTower((long)alice.Self!.Uuid)!).LayerConfID);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FailedClearWriteRollsBackEveryRewardAndAllowsOneSuccessfulRetry()
     {
         await using var alice = await InWorld("Alice");
@@ -481,7 +481,7 @@ public sealed class TowerTests : IAsyncLifetime
         Assert.Equal(5, success.RewardNotify.Rewards.Single(i => i.ItemEntry == 1250709).Stack);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task CommittedClearWithApplyFaultRequiresRestartAndReloadsOneAward()
     {
         long role, room;
@@ -564,7 +564,7 @@ public sealed class TowerTests : IAsyncLifetime
         Assert.Equal(9, Count(recovered, 1250701));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FinalTwoFloorMonstersInOneAreaHitCommitOneClear()
     {
         await using var alice = await InWorld("Alice");
@@ -604,7 +604,7 @@ public sealed class TowerTests : IAsyncLifetime
         Assert.Equal(9, Count(alice, 1250701));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task AuthoritativePlayerDeathLosesOnceWithoutProgressOrReward()
     {
         await using var alice = await InWorld("Alice");
@@ -632,7 +632,7 @@ public sealed class TowerTests : IAsyncLifetime
         Assert.Null(Session(alice).TowerAttempt);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task EveryWaveOccurrenceSurvivesExpansionAndExitCancelsTheRest()
     {
         var data = Service<GameData>();
@@ -661,7 +661,7 @@ public sealed class TowerTests : IAsyncLifetime
         Assert.Equal(0, Count(alice, 1250709));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task DisconnectDuringTransferReturnsToWorldWithoutAReward()
     {
         long role, instance;

@@ -102,7 +102,7 @@ public sealed class GuildCampfireTests : IAsyncLifetime
         throw new DirectoryNotFoundException("repository root");
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task GuildRoomSeedAndOwnedFuelAreScopedPersistedAndTimeGated()
     {
         var alice = await InWorld("Alice");
@@ -246,7 +246,7 @@ public sealed class GuildCampfireTests : IAsyncLifetime
         Assert.DoesNotContain(again.Inbox.Snapshot(), e => e.IsGame(GuildCampfireService.Finish));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task HeldFuelCommitDefersSameRoleGmItemWhileUnrelatedRoleMailProgresses()
     {
         await using var alice = await InWorld("Alice");

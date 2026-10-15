@@ -179,7 +179,7 @@ public sealed class SocialExtraTests : IAsyncLifetime
         Assert.Equal(5, await loop.InvokeAsync(() => Task.FromResult(teams.MembersOf(leader).Count)));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FriendMetadataGroupGiftAndRelog()
     {
         var (alice, a) = await InWorld("Alice");

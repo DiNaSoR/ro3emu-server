@@ -81,7 +81,7 @@ public sealed class LifeJobTests : IAsyncLifetime
         return await Next(b, LifeJobService.StartForge, StartForgeResp.Parser);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LifeRequestsAtRoleScreenCannotMutatePreviousCharacter()
     {
         await using var b = new BotClient(http, File.ReadAllText(Path.Combine(dir, "gate_rsa_public.pem")));
@@ -116,7 +116,7 @@ public sealed class LifeJobTests : IAsyncLifetime
         Assert.Single(await OnLoop("alice", s => s.LifeJob!.ActiveLifejob));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LoginHasRealVigorAndSafeEmptyUnchosenProfessionState()
     {
         await using var b = await InWorld("Alice");
@@ -140,7 +140,7 @@ public sealed class LifeJobTests : IAsyncLifetime
         Assert.Equal(ErrorCodes.Parameter, (await Next(b, LifeJobService.CheckCollect, CheckCanCollectNtf.Parser)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LearningCraftingAndReconnectPreserveExactPaidState()
     {
         long role;
@@ -168,7 +168,7 @@ public sealed class LifeJobTests : IAsyncLifetime
         Assert.Equal(480, persisted.RestrictCount[1004].Count);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task RefusalsDoNotConsumeIngredientsVigorOrUnlockCosts()
     {
         await using var b = await InWorld("Alice");
@@ -191,7 +191,7 @@ public sealed class LifeJobTests : IAsyncLifetime
         Assert.Equal(8, await OnLoop("alice", s => s.Items.Where(i => i.Entry == 1293022).Sum(i => i.Stack)));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SpendingOneHundredVigorCompletesTheLifeSkillsTodoOnce()
     {
         await using var b = await InWorld("Alice"); await Cooker(b, "alice", 6);
@@ -208,7 +208,7 @@ public sealed class LifeJobTests : IAsyncLifetime
         Assert.Equal(20, await OnLoop("alice", s => s.Progress!.Currency.GetValueOrDefault(5)));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task VigorCanBeExhaustedAndNeverRefillsOnReconnect()
     {
         await using (var b = await InWorld("Alice"))
@@ -222,7 +222,7 @@ public sealed class LifeJobTests : IAsyncLifetime
         Assert.Equal(0, energy.RestrictCount[1004].All.Count); Assert.Equal(500, energy.RestrictCount[1004].All.HistoryUseCount);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task VigorPotionUsesRestrictionAndExtraCapAndPersistsConsumption()
     {
         await using (var b = await InWorld("Alice"))
@@ -249,7 +249,7 @@ public sealed class LifeJobTests : IAsyncLifetime
         Assert.Equal(2, await OnLoop("alice", s => s.Items.Single(i => i.Entry == 1291002).Stack));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task MagicFoodIncreasesStatsPersistsAndRejectsOverLimitWithoutEating()
     {
         long attack;
@@ -272,7 +272,7 @@ public sealed class LifeJobTests : IAsyncLifetime
         Assert.Equal(50, (await Next(again, LifeJobService.LifeSync, DBLifeJobInfoIncrement.Parser)).MagicFoodTimes[1001801].All);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ProfessionSwitchKeepsProgressAndChecksActiveLifeCondition()
     {
         await using var b = await InWorld("Alice"); Assert.Equal(0, await Learn(b, "alice", 1, 1));
@@ -287,7 +287,7 @@ public sealed class LifeJobTests : IAsyncLifetime
         Assert.Equal(1, await OnLoop("alice", s => s.LifeJob!.LifeJobInfoMap[1].JobLevel));
     }
 
-    [Theory]
+    [ClientDataTheory]
     [InlineData(1001801)]
     [InlineData(1291002)]
     public async Task SpecializedShortcutConsumesLastItemOnceAndKeepsReplyAndCooldownContract(int entry)
@@ -336,7 +336,7 @@ public sealed class LifeJobTests : IAsyncLifetime
         else Assert.Equal(1500, await OnLoop("alice", s => s.Restrictions!.RestrictCount[1004].Count));
     }
 
-    [Theory]
+    [ClientDataTheory]
     [InlineData(1001801)]
     [InlineData(1291002)]
     public async Task SpecializedItemCooldownSaveFailureRollsBackConsumptionAndLifeState(int entry)
@@ -368,7 +368,7 @@ public sealed class LifeJobTests : IAsyncLifetime
         Assert.DoesNotContain(app.Services.GetRequiredService<ItemStore>().Load(role), i => i.Guid == guid);
     }
 
-    [Theory]
+    [ClientDataTheory]
     [InlineData(1)]
     [InlineData(2)]
     public async Task SpecializedCooldownIsPublishedBeforePostCommitHookCanFail(int failOnCall)
@@ -405,7 +405,7 @@ public sealed class LifeJobTests : IAsyncLifetime
         Assert.Equal(state.Stack, app.Services.GetRequiredService<ItemStore>().Load(role).Single(i => i.Guid == guid).Stack);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FailedLifeCommitRollsBackItemsVigorExperienceAndPointCounter()
     {
         await using var b = await InWorld("Alice"); Assert.Equal(0, await Learn(b, "alice", 1, 1));

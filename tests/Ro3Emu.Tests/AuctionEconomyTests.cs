@@ -16,7 +16,7 @@ public sealed partial class AuctionTests
             EconomyCatalog.Load(Path.Combine(RepoRoot(), "data")), "auto",
             opening.Cut.CommitSequence!.Value, closing.Cut.CommitSequence!.Value);
 
-    [Fact]
+    [ClientDataFact]
     public async Task AuctionEconomyGuildPublicationSourcesEachResolvedLotOnce()
     {
         await using var alice = await InWorld("Alice");
@@ -58,7 +58,7 @@ public sealed partial class AuctionTests
         Assert.All(wholeCheck.Locations, value => Assert.Equal("0", value.Residual));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task AuctionEconomyBidOutbidAndCancelConserveReserveAndRefundMail()
     {
         await using var alice = await InWorld("Alice");
@@ -105,7 +105,7 @@ public sealed partial class AuctionTests
         Assert.Single(Mailbox(bob).Letters, m => m.DeliveryKey.StartsWith($"auction:{lot.Id}:cancel:"));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task AuctionEconomyFixedBuyRecordsExactFeeAndOneLotDelivery()
     {
         await using var alice = await InWorld("Alice");
@@ -131,7 +131,7 @@ public sealed partial class AuctionTests
         Assert.All(check.Locations, value => Assert.Equal("0", value.Residual));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task AuctionEconomyLegacyBonusClaimTransfersHeldBonusToMailOnce()
     {
         await using var alice = await InWorld("Alice");
@@ -163,7 +163,7 @@ public sealed partial class AuctionTests
         Assert.Equal(closing.Cut.CommitSequence, AuctionCut().Cut.CommitSequence);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task AuctionEconomyRefusalAndFailedCommitLeaveNoReceiptThenLostAckResolvesOnce()
     {
         await using var alice = await InWorld("Alice");
@@ -194,7 +194,7 @@ public sealed partial class AuctionTests
         Assert.Single(AuctionWindow(opening, closing).Receipts);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task AuctionEconomyDeletedRecipientRetainsLotAndReserveWithOneRecoveryReceipt()
     {
         var roles = Service<RoleStore>();

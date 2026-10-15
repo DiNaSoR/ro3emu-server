@@ -59,7 +59,7 @@ public sealed class FamilyExpiryOwnerTests : IAsyncLifetime
         parser.ParseFrom((await bot.Inbox.WaitAsync(e => e.IsGame(id) && (match == null || match(parser.ParseFrom(e.Body))),
             TimeSpan.FromSeconds(10))).Body);
 
-    [Fact]
+    [ClientDataFact]
     public async Task MountExpiryRunsAfterSuspendedSelectionAndDoesNotRestoreAnExpiredRider()
     {
         await using var bot = await Enter();
@@ -101,7 +101,7 @@ public sealed class FamilyExpiryOwnerTests : IAsyncLifetime
         Assert.False(DBMountsInfo.Parser.ParseFrom(saved.Info).Mounts.ContainsKey(60040010));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task WardrobeExpiryRemovesAHeadWornBySuspendedCommand()
     {
         await using var bot = await Enter();

@@ -95,7 +95,7 @@ public sealed class MarketCaptureTests : IAsyncLifetime
         Assert.Single(accounts.ReadSync<List<(string Id, string Data)>>(new MarketRecordReadPlan("capture")));
     }
 
-    [Theory]
+    [ClientDataTheory]
     [InlineData(false)]
     [InlineData(true)]
     public void ChangedRecordOrPhantomRejectsEntirePaymentItemAndMailCommit(bool phantom)

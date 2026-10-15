@@ -12,7 +12,7 @@ namespace Ro3Emu.Tests;
 
 public sealed partial class LotteryActivityTests
 {
-    [Fact]
+    [ClientDataFact]
     public async Task GuaranteedDuplicatePetDrawHasExactTicketSinkAndConfiguredRefundSources()
     {
         await using var bot = await InWorld(create: true);

@@ -68,7 +68,7 @@ public sealed class CardCrashRecoveryTests
         await Task.Delay(Timeout.InfiniteTimeSpan); // The parent kills this process tree; disposal is intentionally bypassed.
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ProcessCrashAfterLibraryCommitRecoversQuestOnceOnReconnect()
     {
         string scratchRoot = Path.GetFullPath(Path.Combine(RepoRoot(), ".loadtest-temp"));

@@ -39,7 +39,7 @@ public sealed class MapLineSpawnTests : IAsyncLifetime
         try { Directory.Delete(dataDir, true); } catch (IOException) { }
     }
 
-    [Fact]
+    [ClientDataFact]
     public Task FieldMonstersHaveIndependentActorsAndRetirementCancelsCorpseWork() => OnLoop(async () =>
     {
         var monsters = app.Services.GetRequiredService<MonsterService>();
@@ -64,7 +64,7 @@ public sealed class MapLineSpawnTests : IAsyncLifetime
         Assert.Contains(world.AllUnits(), u => u.RuntimeMap == first && u.Uid == one[0].Uid);
     });
 
-    [Fact]
+    [ClientDataFact]
     public Task GatheringNodesHaveIndependentOccupancyAndRetireWithTheirLine() => OnLoop(async () =>
     {
         var gathering = app.Services.GetRequiredService<GatheringService>();
@@ -83,7 +83,7 @@ public sealed class MapLineSpawnTests : IAsyncLifetime
         Assert.Contains(world.AllUnits(), u => u.RuntimeMap == first && u.Uid == one[0].Uid);
     });
 
-    [Fact]
+    [ClientDataFact]
     public Task PrivateSingleSpawnsStayOwnedByTheirRoom() => OnLoop(async () =>
     {
         var monsters = app.Services.GetRequiredService<MonsterService>();
@@ -101,7 +101,7 @@ public sealed class MapLineSpawnTests : IAsyncLifetime
         Assert.DoesNotContain(world.AllUnits(), u => u.RuntimeMap.Kind == RuntimeMapKind.PrivateInstance);
     });
 
-    [Fact]
+    [ClientDataFact]
     public async Task MvpLineOwnsDistinctBossesAndNewLineInheritsLatestDeathCooldown()
     {
         var mvp = app.Services.GetRequiredService<MvpService>();

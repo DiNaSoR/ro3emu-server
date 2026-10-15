@@ -12,7 +12,7 @@ namespace Ro3Emu.Server.Game;
 /// and IGateClientService (gate -> client).
 /// </summary>
 public sealed class GameGateServer(
-    IOptions<ServerOptions> options, GateCrypto crypto, AccountStore accounts, GameMessageHandler messages, TrafficLog traffic,
+    IOptions<ServerOptions> options, GateCrypto crypto, AccountStore accounts, GameMessageHandler messages, RoleSessionService roleSessions, TrafficLog traffic,
     SessionRegistry sessions, GameLoop loop, ReconnectService reconnects, ILogger<GameGateServer> log, Diagnostics.ServerMetrics metrics)
     : GateListener(options.Value.ListenAddress(), options.Value.GameGatePort, log, metrics)
 {
@@ -159,7 +159,7 @@ public sealed class GameGateServer(
         string described = MicroServiceRouter.Describe(args);
         traffic.Rpc(session.Account, "c2s-rpc", method, () => described);
         Log.LogInformation("GameGate: {Account} rpc {Method} {Args}", session.Account, method, described);
-        if (method == "SwitchToAccount") await messages.SwitchToAccountAsync(session);
+        if (method == "SwitchToAccount") await roleSessions.SwitchToAccountAsync(session);
         else if (method == "OnClientReadyInternal") await ClientReadyAsync(session, message.Parameters.Memory);
     }
 
@@ -186,7 +186,7 @@ public sealed class GameGateServer(
                 // Swapped out by a reconnect (the half-open old socket): the session lives on the newer one.
                 if (!ReferenceEquals(session.Channel, channel)) return;
                 if (reconnects.TryEnterGrace(session)) return;
-                try { await messages.OnDisconnectedAsync(session); }
+                try { await roleSessions.OnDisconnectedAsync(session); }
                 finally { sessions.Unregister(session); }
             });
         }

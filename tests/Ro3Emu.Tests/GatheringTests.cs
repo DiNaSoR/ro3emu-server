@@ -130,7 +130,7 @@ public sealed class GatheringTests : IAsyncLifetime
             n => n.DataInfo.EType == InteractInfo.Types.EState.Idle && !n.Interrupt);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SuspendedGatherRetainsQuotaAndNodeUntilCommitAndDoesNotReserveAnotherRole()
     {
         await using var alice = await InWorld("Alice");
@@ -183,7 +183,7 @@ public sealed class GatheringTests : IAsyncLifetime
         Assert.True(items.Where(i => i.Entry is 1291010 or 1291020 or 1291021).Sum(i => i.Stack) > 0);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LostAcknowledgementDoesNotRemintButRefreshedGenerationHasNewSource()
     {
         await using var alice = await InWorld("Alice");
@@ -217,7 +217,7 @@ public sealed class GatheringTests : IAsyncLifetime
         Assert.Equal(2, after.Count);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task PrecommitFailureRetriesFrozenInteractionOnce()
     {
         await using var alice = await InWorld("Alice");
@@ -239,7 +239,7 @@ public sealed class GatheringTests : IAsyncLifetime
             s.LifeJob!.GeneralCollectionTimesByMap[Scene].Times[node.CollectionInfo.PointConfigId]));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task PostcommitNoticeFailureDoesNotRepeatQuotaOrSource()
     {
         await using var alice = await InWorld("Alice");
@@ -260,7 +260,7 @@ public sealed class GatheringTests : IAsyncLifetime
         Assert.Single(GatherSources());
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task CommittedApplyFailureReconcilesResourceAndReloadsOnceAfterRestart()
     {
         await using var alice = await InWorld("Alice");
@@ -310,7 +310,7 @@ public sealed class GatheringTests : IAsyncLifetime
         Assert.Equal(2, GatherSources().Distinct().Count());
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ResolvedGatherVirtualExpUsesProgressAndOneSourceReceipt()
     {
         await using var alice = await InWorld("Alice");
@@ -353,7 +353,7 @@ public sealed class GatheringTests : IAsyncLifetime
         Assert.Single(GatherSources());
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task RefreshNodeRequiresActiveMinerAndPaysOnlyAfterCastThenRespawns()
     {
         await using var alice = await InWorld("Alice");
@@ -403,7 +403,7 @@ public sealed class GatheringTests : IAsyncLifetime
             v => v.Bases.Any(b => b.EntityTemplateID == 7010001 && b.CollectionInfo?.PointConfigId == node.CollectionInfo.PointConfigId));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task MovementWrongRangeAndUnselectedMiniGameCannotPay()
     {
         await using var alice = await InWorld("Alice");
@@ -448,7 +448,7 @@ public sealed class GatheringTests : IAsyncLifetime
         Assert.NotEqual(0, (await Next(alice, GatheringService.Interaction, NpcInteractionRsp.Parser)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task TwoMinersContestingOneUseNodeReceiveOnlyOneReward()
     {
         await using var alice = await InWorld("Alice");
@@ -484,7 +484,7 @@ public sealed class GatheringTests : IAsyncLifetime
         await Next(bob, GameAoiSink.SyncAoiView, AoIViewChangeData.Parser, v => v.LeaveAoi.Contains(node.Uuid));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LeavingSceneDuringCastCannotGrantReward()
     {
         await using var alice = await InWorld("Alice");
@@ -507,7 +507,7 @@ public sealed class GatheringTests : IAsyncLifetime
         Assert.Equal(items, Count(alice, CharacterService.ItemsSync));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task DisconnectDuringCastCannotPersistReward()
     {
         var alice = await InWorld("Alice");
@@ -531,7 +531,7 @@ public sealed class GatheringTests : IAsyncLifetime
         Assert.False(counted);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task RefusedSkillStillInterruptsGatherCastWithoutChargingVigor()
     {
         await using var alice = await InWorld("Alice");

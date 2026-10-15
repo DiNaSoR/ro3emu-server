@@ -14,7 +14,7 @@ public sealed partial class CharacterService
     // ---- entity data ----
 
     /// <summary>
-    /// Recomputes what ENTITYSELF and AOI bases show of this player (GameMessageHandler.PlayerEntity reads it from the
+    /// Recomputes what ENTITYSELF and AOI bases show of this player (RoleSessionService.PlayerEntity reads it from the
     /// session): the property list (base stats, derived stats, HP/SP, level) and the equipment look.
     /// </summary>
     public void Refresh(GameSession session)
@@ -134,7 +134,7 @@ public sealed partial class CharacterService
             if (data.Row("AttributeConversionConfig", stat) is not { } conversion) continue;
             foreach (var (id, perPoint) in GameData.Pairs(conversion, ranged ? "_kAttribute2" : "_kAttribute1")) Add(id, perPoint * baseStats[stat - 1]);
         }
-        if (!raw.ContainsKey(Speed)) raw[Speed] = GameMessageHandler.DefaultSpeed;
+        if (!raw.ContainsKey(Speed)) raw[Speed] = RoleSessionService.DefaultSpeed;
         raw[Speed] += session.SpeedBonus;
         if (!raw.ContainsKey(BaseAspd)) raw[BaseAspd] = 100;
 

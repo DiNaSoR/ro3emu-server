@@ -99,7 +99,7 @@ public sealed class SiegeTests : IAsyncLifetime
                 && (currentCity == null || r.SiegeBaseInfo.CurrentCityId == currentCity));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task PanelUsesRealWednesdayWindowAndNoHistoryRefusesWithoutFabrication()
     {
         await using var bot = await Bot("SiegePlain");
@@ -135,7 +135,7 @@ public sealed class SiegeTests : IAsyncLifetime
             r => r.Result != 0)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task GmSeedQualifiesTwoGuildsForALoadTestSiege()
     {
         await using var gm = await Bot("SiegeGm");
@@ -152,7 +152,7 @@ public sealed class SiegeTests : IAsyncLifetime
         Assert.True(Service<TerritoryWarsService>().Hostile(Session(gm), Session(defense)));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task GmOverrideIsAuthorizedIdempotentAndCloseDeniesEntry()
     {
         await using var gm = await Bot("SiegeGm");
@@ -186,7 +186,7 @@ public sealed class SiegeTests : IAsyncLifetime
             starts: At(2026, 10, 21, 20, 30))).SiegeBaseInfo.BattleInfos[1001].ActivityState);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SeniorCitySettlementTransfersConnectingLandsButNotIndependentPoint()
     {
         await using var attack = await Bot("SiegeSeniorAtk");
@@ -220,7 +220,7 @@ public sealed class SiegeTests : IAsyncLifetime
             SiegeCityHistoryInfoResp.Parser)).Infos).GuildInfo.Guid);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task QualifiedAttackCrystalSettlesOnceAndHistorySurvivesRestart()
     {
         long defenseRole;

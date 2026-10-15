@@ -36,7 +36,7 @@ public sealed class LifeItemPublicationTests : IAsyncLifetime
         try { Directory.Delete(dir, true); } catch (IOException) { }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FirstSpecializedExchangeHookSeesCommittedLifeAndCooldown()
     {
         await using var bot = new BotClient(http, File.ReadAllText(Path.Combine(dir, "gate_rsa_public.pem")));

@@ -42,7 +42,7 @@ public sealed class GuildProfileTests : IAsyncLifetime
         try { Directory.Delete(dataDir, true); } catch (IOException) { }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task TwoBotsSeePersistedMembershipAndOfflineStateAndClearDepartedGuild()
     {
         await using var alice = await InWorld("Alice");

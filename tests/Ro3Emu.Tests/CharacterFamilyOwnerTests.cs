@@ -77,7 +77,7 @@ public sealed class CharacterFamilyOwnerTests : IAsyncLifetime
         Assert.All(result.Locations, x => Assert.Equal("0", x.Residual));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task HeldEquipDefersTimerUseAndGmWhileOtherRoleFinishes()
     {
         await using var alice = await Enter(); await using var bob = await Enter("Bob");
@@ -146,7 +146,7 @@ public sealed class CharacterFamilyOwnerTests : IAsyncLifetime
         Assert.Contains(ledger.Legs, x => x.Reason == EconomyReason.ItemUse && x.Asset.Id == 1000000 && x.Delta == -1);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ItemUseReceiptFailureRollsBackCooldownAndGuidThenLostAckResolvesOnce()
     {
         await using var bot = await Enter();
@@ -195,7 +195,7 @@ public sealed class CharacterFamilyOwnerTests : IAsyncLifetime
         Assert.Equal(-1, Assert.Single(ledger.Legs).Delta); Exact(opening, closing, ledger);
     }
 
-    [Theory]
+    [ClientDataTheory]
     [InlineData(118, "npc-shop-buy", 1000000, 100)]
     [InlineData(12105, "cd13a/shop-buy", 1003100, 1000)]
     public async Task EveryShopCommitsPaymentGoodsAndCounterBeforeApply(int offer, string kind, int goods, int price)

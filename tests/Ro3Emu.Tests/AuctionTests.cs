@@ -123,7 +123,7 @@ public sealed partial class AuctionTests : IAsyncLifetime
         return await Next(bot, AuctionService.Bid, BiddingAuctionRes.Parser);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ProxyTiesAndSameSecondOutbidsRefundEveryEscrowOnce()
     {
         await using var alice = await InWorld("Alice");
@@ -165,7 +165,7 @@ public sealed partial class AuctionTests : IAsyncLifetime
         Assert.Equal((long)bob.Self!.Uuid, Service<AuctionStore>().Get(row.Id)!.Owner);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task IncreasingOwnAutoLimitOnlyDebitsDeltaAndKeepsPublicPrice()
     {
         await using var alice = await InWorld("Alice");
@@ -187,7 +187,7 @@ public sealed partial class AuctionTests : IAsyncLifetime
         Assert.Contains(award.Attachments, a => a.Entry == 1 && a.Count == 1000);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task DungeonAllPassStillRandomlyAwardsAndPaidSaleMailsEightyPercentDividend()
     {
         await using var alice = await InWorld("Alice");
@@ -215,7 +215,7 @@ public sealed partial class AuctionTests : IAsyncLifetime
         Assert.Single(Mailbox(alice).Letters, m => m.DeliveryKey == $"auction:{paid.Id}:award");
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ThreeWirePassesAccelerateDungeonUnsoldAward()
     {
         await using var alice = await InWorld("Alice");
@@ -236,7 +236,7 @@ public sealed partial class AuctionTests : IAsyncLifetime
             m => m.DeliveryKey == $"auction:{row.Id}:unsold");
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task AuthoritativeThreePlayerBossCreatesDungeonRowsVisibleBeforeAnyBid()
     {
         await using var alice = await InWorld("Alice");
@@ -283,7 +283,7 @@ public sealed partial class AuctionTests : IAsyncLifetime
         Assert.Empty((await Next(outsider, AuctionService.Query, QueryAuctionRes.Parser)).Auctions);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task AuctionInsertFailureCannotHideCommittedDungeonResultAndJournalRetries()
     {
         await using var alice = await InWorld("Alice");
@@ -324,7 +324,7 @@ public sealed partial class AuctionTests : IAsyncLifetime
         Assert.NotEmpty((await Next(alice, AuctionService.Self, QuerySelfAuctionRes.Parser)).SelfAuctions);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FailedReadyMarkerRetriesOnlyAfterCompletedProducerHandoff()
     {
         await using var alice = await InWorld("Alice");
@@ -344,7 +344,7 @@ public sealed partial class AuctionTests : IAsyncLifetime
         Assert.True(Service<AuctionStore>().GetRun(runId)!.Ready);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task PublicEscrowWaitsForOwnStartThenSelectsLowestPrice()
     {
         await using var alice = await InWorld("Alice");
@@ -374,7 +374,7 @@ public sealed partial class AuctionTests : IAsyncLifetime
         Assert.Equal(startingFunds - 900, Currency(alice)); // one reservation, no second debit at activation
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task PassedCheapLotCannotBeReacquiredBySecondPublicReservation()
     {
         await using var alice = await InWorld("Alice");
@@ -399,7 +399,7 @@ public sealed partial class AuctionTests : IAsyncLifetime
             && m.DeliveryKey.EndsWith(":cancel"));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task QueuedOnlyRestartPausesUntilResumeWithoutSecondDebit()
     {
         long id, role, fundsAfterReserve;
@@ -434,7 +434,7 @@ public sealed partial class AuctionTests : IAsyncLifetime
         Assert.Equal(fundsAfterReserve, Currency(again));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FailedSqlSettlementRestoresWalletRowAndMail()
     {
         await using var alice = await InWorld("Alice");
@@ -456,7 +456,7 @@ public sealed partial class AuctionTests : IAsyncLifetime
         Assert.Single(Mailbox(alice).Letters, m => m.DeliveryKey.StartsWith($"auction:{row.Id}:outbid:"));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task IncrementalBatchPreorderCountsOnlyCommittedEscrow()
     {
         await using var alice = await InWorld("Alice");
@@ -490,7 +490,7 @@ public sealed partial class AuctionTests : IAsyncLifetime
         Assert.Equal(3, Session(alice).Auction!.PreBuyNum["4:5001:1200000"]);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task PartialBatchFailureStillSyncsItsOneFundedReservation()
     {
         await using var alice = await InWorld("Alice");
@@ -518,7 +518,7 @@ public sealed partial class AuctionTests : IAsyncLifetime
         Assert.Equal(starting - 800, Currency(alice));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task QueuedMaximumMustClearExistingManualPriceAndRaise()
     {
         await using var alice = await InWorld("Alice");

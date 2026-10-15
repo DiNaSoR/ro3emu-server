@@ -191,7 +191,7 @@ public sealed class GuildChallengeTests : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task MessagesHaveLuaVisibleShapeAndEnforceMembershipScheduleDifficultyAndPermission()
     {
         await using var alice = await InWorld("Alice");
@@ -231,7 +231,7 @@ public sealed class GuildChallengeTests : IAsyncLifetime
         Assert.Equal(1, (await Info(alice)).Data.DataInfo.CurTimeMaxDiffiulty);
     }
 
-    [Theory]
+    [ClientDataTheory]
     [InlineData(3011130, 6000041)]
     [InlineData(3011120, 6000042)]
     [InlineData(3011121, 6100024)]
@@ -247,7 +247,7 @@ public sealed class GuildChallengeTests : IAsyncLifetime
         Assert.Null(Service<DungeonCatalog>().Resolve(new EnterDungeonReq { SceneEntry = scene }));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SharedRoomManagerStartAuthoritativeKillPaysMembersAndPublishesAuctionOnce()
     {
         await using var alice = await InWorld("Alice");
@@ -327,7 +327,7 @@ public sealed class GuildChallengeTests : IAsyncLifetime
         Assert.True(Service<GuildChallengeStore>().Load(guild).Cycle > 0);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ClosingTestWindowSettlesFailureAndCreatesNoEntitlementOrAuction()
     {
         await using var alice = await InWorld("Alice"); await Guild(alice);
@@ -341,7 +341,7 @@ public sealed class GuildChallengeTests : IAsyncLifetime
         Assert.Empty(Session(alice).DungeonAttempt!.Room.Monsters);
     }
 
-    [Fact]
+    [ClientDataFact]
     public void RealScheduleUsesSundayCivilWindowAfterCustomPrefix()
     {
         var schedule = Service<TimedTodoSchedule>();
@@ -352,7 +352,7 @@ public sealed class GuildChallengeTests : IAsyncLifetime
         Assert.False(window.Contains(window.End));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FailedPersonalWriteRollsBackAndCommittedClearRecoversAfterRestartExactlyOnce()
     {
         var alice = await InWorld("Alice"); long guild = await Guild(alice);
@@ -403,7 +403,7 @@ public sealed class GuildChallengeTests : IAsyncLifetime
         Assert.Equal(zeny + 5000, Session(returned).Progress!.Currency[1]);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task HeldRealClearDefersSameRoleLoginAndDeliversPendingOnceToNewAttachment()
     {
         var alice = await InWorld("Alice");
@@ -505,7 +505,7 @@ public sealed class GuildChallengeTests : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task OpenWaitingAtChallengeGateCannotPersistForNewGuildAfterTransfer()
     {
         await using var alice = await InWorld("Alice");
@@ -553,7 +553,7 @@ public sealed class GuildChallengeTests : IAsyncLifetime
         Assert.NotEqual(oldGuild, Service<GuildStore>().ForRole((long)bob.Self!.Uuid)!.Id);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task HardStageReplayPaysAbsentMemberOnceAndBothContinueToFinalAuction()
     {
         await using var alice = await InWorld("Alice");

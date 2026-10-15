@@ -120,7 +120,7 @@ public sealed class PetTests : IAsyncLifetime
         return (await Next(bot, MsgId.EntitySelf, EntitySelf.Parser)).Base;
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task EmptyRosterInitializesBeforeFunctionSyncAndGatesAllMutations()
     {
         await using var bot = await InWorld();
@@ -149,7 +149,7 @@ public sealed class PetTests : IAsyncLifetime
         Assert.All(new[] { 33, 3301, 3302 }, f => Assert.True(functions.IsOpen(Session, f)));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task CombineDebitsExactlyOnceUsesAllWrapperAndSurvivesRelog()
     {
         await using (var bot = await InWorld())
@@ -180,7 +180,7 @@ public sealed class PetTests : IAsyncLifetime
         Assert.Empty(sync.SetupPlans[0].All.SetUpPets);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LineupEchoesRequestSwapsAndDrivesOwnerBoundTypeSevenOverWire()
     {
         await using var bot = await InWorld();
@@ -225,7 +225,7 @@ public sealed class PetTests : IAsyncLifetime
         Assert.Equal(ErrorCodes.PetNotOwned, (await Next(bot, PetService.StateUpdate, PetStateUpdateResp.Parser)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task BoboFollowsOverWireAndSurvivesVisibilityMapAndPlanChanges()
     {
         await using var bot = await InWorld();
@@ -327,7 +327,7 @@ public sealed class PetTests : IAsyncLifetime
         Assert.Null(Session.PetActor);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LevelsCarryBookSurplusAndStarTransitionsChargeTargetRows()
     {
         await using var bot = await InWorld();
@@ -372,7 +372,7 @@ public sealed class PetTests : IAsyncLifetime
         Assert.Equal(new long[] { 2353001, 2353101 }, skills.Active);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task RebirthRefundsExactSpentBooksAfterRelogAndRollsBackOnLedgerFailure()
     {
         await using (var bot = await InWorld())
@@ -414,7 +414,7 @@ public sealed class PetTests : IAsyncLifetime
         Assert.Equal(2, Count(again, 1250701));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task HatchingAcceleratesAtomicallyAndCollectsOnlyOnce()
     {
         await using var bot = await InWorld();
@@ -473,7 +473,7 @@ public sealed class PetTests : IAsyncLifetime
         Assert.Equal(saved, Saved(bot));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task NaturalTimerAndPersistedOutcomeSurviveRelogAndInvalidBatchIsAllOrNothing()
     {
         DBIncubateInfo egg;
@@ -502,7 +502,7 @@ public sealed class PetTests : IAsyncLifetime
         Assert.Equal(0, Count(again, 1250709));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task DuplicatePetEggConvertsToConfiguredFragmentsAndUnprovenPathsRefuse()
     {
         await using var bot = await InWorld();
@@ -531,7 +531,7 @@ public sealed class PetTests : IAsyncLifetime
         Assert.Empty(Saved(bot).ListPet[10001].BreakLv);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FastHatchRequiresRoomTwoAndAtomicallyConsumesMaterialsAndAccelerators()
     {
         await using var bot = await InWorld();
@@ -566,7 +566,7 @@ public sealed class PetTests : IAsyncLifetime
         Assert.Equal(before, Saved(bot).ToByteArray());
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SupportPlansCollectionAndFragmentBreakdownPersistWithoutAnActor()
     {
         await using var bot = await InWorld();
@@ -600,7 +600,7 @@ public sealed class PetTests : IAsyncLifetime
         Assert.Equal(1, Count(bot, 1610001));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task PersistedSetupCannotSpawnWithTheQuestGateClosed()
     {
         await using (var bot = await InWorld())
@@ -620,7 +620,7 @@ public sealed class PetTests : IAsyncLifetime
         Assert.DoesNotContain(again.Inbox.Snapshot(), e => e.IsGame(31037) && AoIViewChangeData.Parser.ParseFrom(e.Body).Bases.Any(b => b.EntityType == 7));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SqliteFailureRollsBackBagCurrencyAndPetStateTogether()
     {
         await using var bot = await InWorld();

@@ -127,7 +127,7 @@ public sealed class TerritoryWarsTests : IAsyncLifetime
         Assert.True(info.InitData.TerritoryWarInitData.GuildInfos.Count >= 2);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ThreeGuildWireAuctionRefundsThenSharedBattleCapturesSettlesAndReplaysSafely()
     {
         await using var a = await Bot("TerrAlpha"); await using var b = await Bot("TerrBravo"); await using var c = await Bot("TerrCharlie");
@@ -233,7 +233,7 @@ public sealed class TerritoryWarsTests : IAsyncLifetime
         Assert.Equal(1, br.CommonResultInfo.FirstResultType); Assert.Equal(1, br.CommonResultInfo.SecondResultType);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task AutoBidRechecksOfficerRightsAndSeasonRefundsEscrowOnce()
     {
         await using var bot = await Bot("TerrEpoch");
@@ -301,7 +301,7 @@ public sealed class TerritoryWarsTests : IAsyncLifetime
         Assert.Equal(5000, store.Get(guild)!.AuctionMaterials);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task CommittedSeasonRoleApplyFaultLeavesOnlyThatRolePending()
     {
         await using var first = await Bot("TerrApplyOne");
@@ -387,7 +387,7 @@ public sealed class TerritoryWarsTests : IAsyncLifetime
         finally { accounts.ReadSyncObserved = null; }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task RestartRetainsEscrowAndAutomaticBidScheduleWithoutChargingTwice()
     {
         long guild;
@@ -411,7 +411,7 @@ public sealed class TerritoryWarsTests : IAsyncLifetime
         Assert.Equal(4000, Service<GuildStore>().Get(guild)!.AuctionMaterials); // cancelling automation does not withdraw a seated bid.
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task TerritoryOwnerPublishesActivityStageWithoutActivityPolling()
     {
         await using var bot = await Bot("WarNotify");
@@ -431,7 +431,7 @@ public sealed class TerritoryWarsTests : IAsyncLifetime
         });
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ActivityCatalogueAndRefreshKeepMasterActivitiesAndTerritoryStateTogether()
     {
         await using var bot = await Bot("TerrActivities");
@@ -480,7 +480,7 @@ public sealed class TerritoryWarsTests : IAsyncLifetime
             closed.ActivityList.Select(a => a.Id).Order());
     }
 
-    [Fact]
+    [ClientDataFact]
     public void CalendarUsesExportedAbsoluteWindowsAndSeasonOffsets()
     {
         var schedule = Service<TerritoryWarsClock>();

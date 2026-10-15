@@ -61,7 +61,7 @@ public sealed class WorldInteractionTests : IAsyncLifetime
     private long Npc(int template) => app.Services.GetRequiredService<WorldData>().Map(10111)!.Npcs.Single(n => n.NpcId == template).Uid;
     private static NpcInteractionReq Request(long uid, int id) => new() { NpcUid = uid, InteractionId = id, SceneConfigId = 10111 };
 
-    [Fact]
+    [ClientDataFact]
     public async Task SitStatusEntersAndQuitsAndRefusesDuplicateOrForeignAction()
     {
         await using var bot = await InWorld("Alice");
@@ -83,7 +83,7 @@ public sealed class WorldInteractionTests : IAsyncLifetime
         Assert.Equal(0, (await Next(bot, WorldInteractionService.Action, UseInteractActionRes.Parser)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task VehicleHasExclusiveSeatAndDriverOnlyFacing()
     {
         await using var alice = await InWorld("Alice");

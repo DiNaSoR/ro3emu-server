@@ -8,7 +8,7 @@ namespace Ro3Emu.Tests;
 
 public sealed partial class EmblemTests
 {
-    [Fact]
+    [ClientDataFact]
     public async Task SavedPlansSwitchItemsStatsAndNamesOverWireAndSurviveRelog()
     {
         long guid;
@@ -62,7 +62,7 @@ public sealed partial class EmblemTests
         Assert.Equal(2, bag.PackInfo[5].All.Items[guid].ItemInfos[10001].LongVal);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task PlanSwitchDatabaseFailureLeavesSelectionAndItemProjectionUntouched()
     {
         await using var bot = await InWorld("Alice");

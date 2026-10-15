@@ -97,7 +97,7 @@ public sealed class MailTests : IAsyncLifetime
         return await Next(bot, MailService.ClaimMail, ClaimMailRsp.Parser);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task RawMailMicroReadDeleteGmPushAndClaimSync()
     {
         var (alice, role) = await InWorld("Alice");
@@ -139,7 +139,7 @@ public sealed class MailTests : IAsyncLifetime
         Assert.Equal("News", Row(Assert.Single(await Letters(alice, role)))["Title"]);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task TemplateBulkReplayAndReconnectKeepSingleGrants()
     {
         var (alice, role) = await InWorld("Alice");
@@ -168,7 +168,7 @@ public sealed class MailTests : IAsyncLifetime
             .Progress!.Currency[2]);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task OfflineDeliveryIsDurableAndInvalidatesMailboxOnLogin()
     {
         var (alice, role) = await InWorld("Alice");
@@ -183,7 +183,7 @@ public sealed class MailTests : IAsyncLifetime
         Assert.Equal(1020L, Convert.ToInt64(Params(row)["cfg_id"]));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task MicroReconnectGroupSyncReinvalidatesReadUnclaimedMailWithoutGameLogin()
     {
         var (alice, role) = await InWorld("Alice");
@@ -206,7 +206,7 @@ public sealed class MailTests : IAsyncLifetime
         Assert.False((bool)Params(row)["giftReceived"]!);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task OwnershipExpiryAndGroupNotice()
     {
         var (alice, aliceId) = await InWorld("Alice");
@@ -230,7 +230,7 @@ public sealed class MailTests : IAsyncLifetime
         Assert.False(Ok(await alice.MicroPositionalAsync("MailService", "setMailHaveRead", [aliceId.ToString(), shortId])));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task MalformedMicroInputsAndCapacityRefusalLeaveMailClaimable()
     {
         var (alice, role) = await InWorld("Alice");
@@ -258,7 +258,7 @@ public sealed class MailTests : IAsyncLifetime
         Assert.False((bool)Params((await Letters(alice, role)).Single(r => Row(r)["MailId"]!.Equals(money)))["giftReceived"]!);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ConfiguredTemplateAwardResolvesGroupAndClaimsExactFixedGrant()
     {
         var (alice, role) = await InWorld("Alice");
@@ -274,7 +274,7 @@ public sealed class MailTests : IAsyncLifetime
         await Assert.ThrowsAsync<AwardResolutionException>(() => Mail.SendTemplateAsync(role, 1025)); // conditional group
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task VirtualExpClaimLevelsUpOnceAndMailboxWriteRollbackRestoresProgress()
     {
         var (alice, role) = await InWorld("Alice");
@@ -310,7 +310,7 @@ public sealed class MailTests : IAsyncLifetime
         Assert.True((bool)Params(Assert.Single(await Letters(alice, role)))["giftReceived"]!);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SourceOwnedTemplateDeliveryRollsBackAndReadsLegacySourceKeyOnce()
     {
         var (alice, role) = await InWorld("Alice");
@@ -339,7 +339,7 @@ public sealed class MailTests : IAsyncLifetime
         Assert.False(migrated.ContainsKey("SourceKey"));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FailedMailboxWriteRollsBackGrantAndConcurrentDeliverySurvivesClaim()
     {
         var (alice, role) = await InWorld("Alice");
@@ -365,7 +365,7 @@ public sealed class MailTests : IAsyncLifetime
             .Progress!.Currency[2]);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ActivityBatchSharesMailboxAndRollsBackOnSourceFailure()
     {
         var (alice, role) = await InWorld("Alice");

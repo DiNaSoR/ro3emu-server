@@ -53,7 +53,7 @@ public sealed class LogoutScopeAuditTests(ITestOutputHelper output) : IAsyncLife
         AssertEmpty(audit);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task GuildMemberLogoutStaysInsideItsReservation()
     {
         var audit = Audit();

@@ -81,7 +81,7 @@ public sealed class PetSupportBuffTests : IAsyncLifetime
         return unit;
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task UnitBuffRefreshesByGroupAndSourceAndKeepsOtherUnitsIndependent()
     {
         await using var alice = await InWorld("Alice");
@@ -114,7 +114,7 @@ public sealed class PetSupportBuffTests : IAsyncLifetime
         Assert.Equal(0, Buffs.ShieldAmount(first));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task UnitShieldAbsorbsBeforeHpAndRemovesSpentAndExpiredBuffs()
     {
         await using var alice = await InWorld("Alice");
@@ -147,7 +147,7 @@ public sealed class PetSupportBuffTests : IAsyncLifetime
         Assert.Equal(0, Buffs.ShieldAmount(unit));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task PlayerShieldAddsToExistingDynamicShieldAndClearsOnConsumption()
     {
         await using var alice = await InWorld("Alice");

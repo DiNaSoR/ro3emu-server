@@ -71,7 +71,7 @@ public sealed class KillEconomyTests : IAsyncLifetime
     private long ReceiptCount() { using var db = Service<AccountStore>().Open(); using var c = db.CreateCommand();
         c.CommandText = "SELECT count(*) FROM operation_receipt WHERE command_kind='monster-kill'"; return (long)c.ExecuteScalar()!; }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LethalHitAndCorpseWaitForDurableRewardBarrier()
     {
         await using var bot = await Enter();
@@ -115,7 +115,7 @@ public sealed class KillEconomyTests : IAsyncLifetime
         finally { release.TrySetResult(); }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task PostcommitEffectFaultStillFinalizesAndObservesTheKillOnce()
     {
         await using var bot = await Enter();
@@ -153,7 +153,7 @@ public sealed class KillEconomyTests : IAsyncLifetime
         Assert.Equal(1, ReceiptCount());
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task RepeatedLethalCallbackCommitsWholeConvertedOutcomeOnceAndNewSpawnIsDistinct()
     {
         await using var bot = await Enter(); var player = Session; var monster = Monster();
@@ -176,7 +176,7 @@ public sealed class KillEconomyTests : IAsyncLifetime
         Assert.NotEqual(monster.RewardSource, newSpawn.RewardSource); Assert.Equal(2, ReceiptCount());
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task HeldCommitThenDetachPaysOriginalRoleOnceWithoutEarlyPresentation()
     {
         var bot = await Enter(); var player = Session; long role = player.Role!.Id; var monster = Monster();
@@ -206,7 +206,7 @@ public sealed class KillEconomyTests : IAsyncLifetime
         Assert.Equal(1, ReceiptCount()); Assert.Equal(currency + 18, Session.Progress!.Currency[1]);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LostAcknowledgementAndPostcommitNoticeFaultNeverPayAgain()
     {
         await using var bot = await Enter(); var player = Session; var monster = Monster();
@@ -219,7 +219,7 @@ public sealed class KillEconomyTests : IAsyncLifetime
         Assert.Equal(1, ReceiptCount()); Assert.Equal(committed.Currency[1], player.Progress!.Currency[1]);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LastLedgerFailureRollsBackItemsCurrencyExpAndSource()
     {
         await using var bot = await Enter(); var player = Session; var monster = Monster();

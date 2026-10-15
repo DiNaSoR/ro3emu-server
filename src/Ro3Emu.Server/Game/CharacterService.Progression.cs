@@ -292,7 +292,7 @@ public sealed partial class CharacterService
         await CommitCharacterAsync(session, "job", progress: progress, apply: () =>
         {
             session.Role = session.Role! with { Career = career };
-            session.Speed = data.JobAttributes(career).GetValueOrDefault(Speed, GameMessageHandler.DefaultSpeed);
+            session.Speed = data.JobAttributes(career).GetValueOrDefault(Speed, RoleSessionService.DefaultSpeed);
         });
     }
 
@@ -300,7 +300,7 @@ public sealed partial class CharacterService
     {
         Refresh(session);
         await SyncAsync(session, RoleBaseInfoSync, BuildBaseInfo(session));
-        var entity = GameMessageHandler.PlayerEntity(session);
+        var entity = RoleSessionService.PlayerEntity(session);
         entity.NotifyType = EntityBase.Types.NotifyType.Base;
         await ToSelfAndViewersAsync(session, EntityBaseChange, entity);
         await SendStatsAsync(session);

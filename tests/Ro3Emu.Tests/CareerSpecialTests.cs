@@ -91,7 +91,7 @@ public sealed class CareerSpecialTests : IAsyncLifetime
         return (await Next(b, CareerSpecialService.CancelLease, CancelLeaseCareerSpecialItemRsp.Parser)).ErrCode;
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LoginSendsBothEmptySlotsAndRefusalsFollowCanWearProfessionItem()
     {
         await using var a = await InWorld("Alice");
@@ -114,7 +114,7 @@ public sealed class CareerSpecialTests : IAsyncLifetime
         Assert.True(stored == null || DBCareerSpecial.Parser.ParseFrom(stored).PendantSlot?.CartRemouldCfg is null or 0);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task CartLeaseShowsThePendantToViewersPersistsAndCannotBeCancelledWhileTheCartHoldsItems()
     {
         await using (var a = await InWorld("Alice"))
@@ -165,7 +165,7 @@ public sealed class CareerSpecialTests : IAsyncLifetime
         Assert.Equal(51001, again.Self!.PendantInfo[51001].PendantId);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task CrusaderPecoLeaseSelectsTheBattleSlotRidesAndCancelDismounts()
     {
         await using var a = await InWorld("Alice");
@@ -196,7 +196,7 @@ public sealed class CareerSpecialTests : IAsyncLifetime
         Assert.NotEqual(0, (await Next(a, MountService.Ride, PlayerRiderMountResp.Parser)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task JobChangeRepairsALeaseTheNewCareerCannotHoldAndReleasesTheBattleSlot()
     {
         await using (var a = await InWorld("Alice"))

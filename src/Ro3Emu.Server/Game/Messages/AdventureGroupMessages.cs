@@ -3,13 +3,13 @@ using Romsg;
 
 namespace Ro3Emu.Server.Game;
 
-public sealed partial class GameMessageHandler
+/// <summary>
+/// Adventure Group 34000-34023 (AdventureGroupService). They keep the dispatcher's default Realm reservation
+/// (MessageRoutes.Admit): an operation changes several roles' groups, quests and instance at once.
+/// </summary>
+public sealed class AdventureGroupMessages(AdventureGroupService adventureGroups) : Messaging.IMessageModule
 {
-    /// <summary>
-    /// Adventure Group 34000-34023 (AdventureGroupService). They keep the dispatcher's default Realm reservation
-    /// (LegacyMutationManifest): an operation changes several roles' groups, quests and instance at once.
-    /// </summary>
-    private void MapAdventureGroupRoutes(Messaging.MessageRoutes routes)
+    public void Map(Messaging.MessageRoutes routes)
     {
         const string owner = "advguild";
         routes.Map(AdventureGroupService.Create, owner, async (session, msgId, body) =>

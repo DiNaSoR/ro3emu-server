@@ -107,7 +107,7 @@ public sealed class MarketMaintenanceTests : IAsyncLifetime
     private static MailService.Mailbox Mailbox(RoleStore roles, long role) =>
         JsonSerializer.Deserialize<MailService.Mailbox>(roles.LoadMailbox(role)!)!;
 
-    [Fact]
+    [ClientDataFact]
     public async Task StallsAndTradeSettleWhileUnrelatedOnlineRoleHoldsStateAndWholeRole()
     {
         var (bot, unrelated) = await Login("MaintOther"); await using var client = bot;
@@ -210,7 +210,7 @@ public sealed class MarketMaintenanceTests : IAsyncLifetime
         Assert.Single(Mailbox(Roles, tradeSeller).Letters);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task MaintenanceCompletesWhileStateLockHolderWaitsForRealmAndMailGateIsHeld()
     {
         var (bot, unrelated) = await Login("MaintRealm"); await using var client = bot;
@@ -270,7 +270,7 @@ public sealed class MarketMaintenanceTests : IAsyncLifetime
         if (holder != null) await holder.WaitAsync(TimeSpan.FromSeconds(10));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task TradeExpiryIsDurableWhenTheIncidentalRequesterAttachmentWasCancelled()
     {
         var (bot, incidental) = await Login("MaintStale"); await using var client = bot;

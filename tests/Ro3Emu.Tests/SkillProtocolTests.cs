@@ -62,7 +62,7 @@ public sealed class SkillProtocolTests : IAsyncLifetime
         .Single(s => s.Account == account);
     private Task Run(Func<Task> work) => _app.Services.GetRequiredService<GameLoop>().InvokeAsync(work);
 
-    [Fact]
+    [ClientDataFact]
     public async Task ActiveBuffChangesEffectiveDamageParameterAndWireThenRemovalClearsIt()
     {
         await using var alice = await InWorld("Alice");
@@ -115,7 +115,7 @@ public sealed class SkillProtocolTests : IAsyncLifetime
         Assert.Null(combat.EffectiveSkillRow(session, 1001121));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task TrainingPauseGatesRealStatisticsAndInvalidBossRequestIsRefused()
     {
         await using var alice = await InWorld("Alice");

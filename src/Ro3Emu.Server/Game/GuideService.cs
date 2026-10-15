@@ -50,8 +50,9 @@ public sealed class GuideService(RoleStore roles, ILogger<GuideService> log)
 
     private async Task SaveAndSyncAsync(GameSession session)
     {
-        roles.SaveGuides(session.Role!.Id, session.Guides!.ToByteArray());
-        log.LogInformation("{Name} guides done: {Guides}", session.Role.Name, string.Join(",", session.Guides.FinishedGuideIds));
+        var guides = session.Guides!;
+        roles.SaveGuides(session.Role!.Id, guides.ToByteArray());
+        log.LogInformation("{Name} guides done: {Guides}", session.Role.Name, string.Join(",", guides.FinishedGuideIds));
         await SyncAsync(session);
     }
 

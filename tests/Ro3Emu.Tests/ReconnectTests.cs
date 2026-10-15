@@ -43,7 +43,7 @@ public sealed class ReconnectTests : IAsyncLifetime
         http = $"http://127.0.0.1:{hp}";
         // Probes: every handover phase and every role cleanup step (none may run while a role waits for its client).
         Service<Ro3Emu.Server.Game.Ownership.RoleHandover>().PhaseForTest = (phase, session) => phases.Enqueue((phase, session));
-        Service<GameMessageHandler>().CleanupFailureForTest = (step, session) => { cleanupSteps.Enqueue((step, session)); return null; };
+        Service<RoleSessionService>().CleanupFailureForTest = (step, session) => { cleanupSteps.Enqueue((step, session)); return null; };
     }
 
     public async Task DisposeAsync()
@@ -98,7 +98,7 @@ public sealed class ReconnectTests : IAsyncLifetime
 
     private static AoIViewChangeData View(BotEvent e) => AoIViewChangeData.Parser.ParseFrom(e.Body);
 
-    [Fact]
+    [ClientDataFact]
     public async Task GracefulDropReconnectsTheSameSessionWithoutLogout()
     {
         await StartAsync(gameData: true);

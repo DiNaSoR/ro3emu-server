@@ -36,7 +36,7 @@ public sealed class TotemEffectsTests : IAsyncLifetime
         try { Directory.Delete(dataDir, true); } catch (IOException) { }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task EffectiveAttributesStacksPassiveOwnershipAndHpConditionFollowCurrentPlan()
     {
         await using var bot = new BotClient(http, File.ReadAllText(Path.Combine(dataDir, "gate_rsa_public.pem")));
@@ -104,7 +104,7 @@ public sealed class TotemEffectsTests : IAsyncLifetime
         Assert.Equal(1d, effects.HealingMultiplier(session));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task RoleSwitchRemovesOldTotemStacksWithoutPreWorldPropertyPackets()
     {
         await using var bot = new BotClient(http, File.ReadAllText(Path.Combine(dataDir, "gate_rsa_public.pem")));

@@ -146,7 +146,7 @@ public sealed class SeasonTalentTests
         return (await Next(bot, SeasonTalentService.Upgrade, SeasonTalentUpgradeResp.Parser)).Result;
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task QuestRewardUnlocksFivePlansAndPaidLevelsPersistAcrossSwitchAndRelog()
     {
         await using var fixture = new ServerFixture();
@@ -250,7 +250,7 @@ public sealed class SeasonTalentTests
         Assert.Equal(hp3, fixture.Character.Stats(fixture.Session)[101]);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task InvalidPathPlanNameAndMissingEffectNeverCharge()
     {
         await using var fixture = new ServerFixture();
@@ -276,7 +276,7 @@ public sealed class SeasonTalentTests
         Assert.Equal(40, fixture.Character.CountOf(fixture.Session, Remnant));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task WrongPlaybookRefusesAndJobRankLossClearsTalentOnlyProperty()
     {
         await using (var wrong = new ServerFixture())
@@ -312,7 +312,7 @@ public sealed class SeasonTalentTests
         Assert.Equal(10, fixture.Character.Stats(fixture.Session)[1330]);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ExactJobEffectWinsAndOtherEligibleJobUsesGenericEffect()
     {
         await using var fixture = new ServerFixture();
@@ -332,7 +332,7 @@ public sealed class SeasonTalentTests
         Assert.InRange(generic - empty, 100, 103);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task OathUsesConfiguredCostAndGlobalLevelSurvivesPlanSwitchAndRelog()
     {
         await using var fixture = new ServerFixture();
@@ -365,7 +365,7 @@ public sealed class SeasonTalentTests
         Assert.Equal(1, full.CurPlanId);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task MissingTalentGraphNeverAdvertisesFunctionOrEmpty5050()
     {
         await using var fixture = new ServerFixture();
@@ -380,7 +380,7 @@ public sealed class SeasonTalentTests
         Assert.Equal(50, fixture.Character.CountOf(fixture.Session, Remnant));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task AbortedTalentWriteRollsBackItemCurrencyAndLevel()
     {
         await using var fixture = new ServerFixture();
@@ -429,7 +429,7 @@ public sealed class SeasonTalentTests
         Assert.Equal("Saved", fixture.Session.SeasonTalent.Plan[1].PlanName);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task TalentPurchaseReceiptExplainsBothMaterialAndCurrencyCost()
     {
         await using var fixture = new ServerFixture();

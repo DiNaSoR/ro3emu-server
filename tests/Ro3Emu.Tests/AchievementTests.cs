@@ -162,7 +162,7 @@ public sealed class AchievementTests : IAsyncLifetime
 
     // ---------------------------------------------------------------- 1 catalog
 
-    [Fact]
+    [ClientDataFact]
     public void TheCatalogLoadsEveryRowAndLevelsFollowTheClientWalk()
     {
         var service = Service<AchievementService>();
@@ -189,7 +189,7 @@ public sealed class AchievementTests : IAsyncLifetime
 
     // ---------------------------------------------------------------- 2, 3, 12 login
 
-    [Fact]
+    [ClientDataFact]
     public async Task AFreshRoleGetsOneFullSyncWithLevelInfosAndNothingReached()
     {
         await using var alice = await InWorld("Alice");
@@ -208,7 +208,7 @@ public sealed class AchievementTests : IAsyncLifetime
             && DBRoleAchievementInfoIncrement.Parser.ParseFrom(e.Body).SyncAllMark);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SnapshotsAndLoginDaysAreEvaluatedAtLoginWithoutAnIncrement()
     {
         long role;
@@ -242,7 +242,7 @@ public sealed class AchievementTests : IAsyncLifetime
         Assert.Equal(AchievementStatusType.Complete, Saved(role).Infos[JobRank2].Status);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task StateSurvivesReconnectAndRelogAndALoginDayCountsOnce()
     {
         long role;
@@ -277,7 +277,7 @@ public sealed class AchievementTests : IAsyncLifetime
 
     // ---------------------------------------------------------------- 4, 5 event counters and the increment shape
 
-    [Fact]
+    [ClientDataFact]
     public async Task CraftsCountUpToRAndTheReachIncrementCarriesTheWholeEntry()
     {
         await using var alice = await InWorld("Alice");
@@ -316,7 +316,7 @@ public sealed class AchievementTests : IAsyncLifetime
 
     // ---------------------------------------------------------------- 6, 11 76002
 
-    [Fact]
+    [ClientDataFact]
     public async Task ClaimingOneRowGrantsItsAwardOnceInOneReceipt()
     {
         await using var alice = await InWorld("Alice");
@@ -359,7 +359,7 @@ public sealed class AchievementTests : IAsyncLifetime
         Assert.Equal(AchievementStatusType.GetReward, Saved(role).Infos[JobRank2].Status);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task AFailedClaimCommitChangesNeitherItemsNorAchievements()
     {
         await using var alice = await InWorld("Alice");
@@ -388,7 +388,7 @@ public sealed class AchievementTests : IAsyncLifetime
 
     // ---------------------------------------------------------------- 7, 9 76010
 
-    [Fact]
+    [ClientDataFact]
     public async Task ClaimAllSettlesReachedRowsAndTheLevelInOneTransactionAndSkipsTheRest()
     {
         await using var alice = await InWorld("Alice");
@@ -448,7 +448,7 @@ public sealed class AchievementTests : IAsyncLifetime
 
     // ---------------------------------------------------------------- 8 76003
 
-    [Fact]
+    [ClientDataFact]
     public async Task LevelClaimsValidateAndAClaimAtLevelTwoGrantsBothTiers()
     {
         await using var alice = await InWorld("Alice");
@@ -477,7 +477,7 @@ public sealed class AchievementTests : IAsyncLifetime
 
     // ---------------------------------------------------------------- 10 76009
 
-    [Fact]
+    [ClientDataFact]
     public async Task HintLevelUpdateSendsNoReplyAndPersists()
     {
         long role;
@@ -513,7 +513,7 @@ public sealed class AchievementTests : IAsyncLifetime
 
     // ---------------------------------------------------------------- 14 hook families
 
-    [Fact]
+    [ClientDataFact]
     public async Task AppraisalsAndCardGainsCount()
     {
         await using var alice = await InWorld("Alice");
@@ -537,7 +537,7 @@ public sealed class AchievementTests : IAsyncLifetime
             "a quality-4 card");
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task CreatingAGuildReachesMembershipAndPosition()
     {
         await using var alice = await InWorld("Alice");
@@ -552,7 +552,7 @@ public sealed class AchievementTests : IAsyncLifetime
             "guild position");
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task MvpTowerDungeonBossesAndAppearancesComeFromTheirHooksAndTheTick()
     {
         await using var alice = await InWorld("Alice");
@@ -595,7 +595,7 @@ public sealed class AchievementTests : IAsyncLifetime
         Assert.Equal([40060010], (await Info("Alice", Phoenix))!.Scores);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FriendsAndAffectionAreReadFromTheRelation()
     {
         await using var alice = await InWorld("Alice");
@@ -615,7 +615,7 @@ public sealed class AchievementTests : IAsyncLifetime
         Assert.Equal([2], (await Info("Alice", 102100401))!.Scores);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task BlockedRowsNeverProgress()
     {
         await using var alice = await InWorld("Alice");

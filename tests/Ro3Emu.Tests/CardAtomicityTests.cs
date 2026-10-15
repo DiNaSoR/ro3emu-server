@@ -42,7 +42,7 @@ public sealed class CardAtomicityTests : IAsyncLifetime
         try { Directory.Delete(dataDir, true); } catch (IOException) { }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task HeldInsertKeepsBagAndPlanOldUntilOneCommitAndRemoveResolvesLostAck()
     {
         await using var bot = new BotClient(httpUrl, File.ReadAllText(Path.Combine(dataDir, "gate_rsa_public.pem")));

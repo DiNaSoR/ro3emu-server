@@ -74,7 +74,7 @@ public sealed partial class SkillCombatTests
         Assert.Equal(1, CountReceipts("cd13c/skill-switch"));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task HeldPaidCastHasOneResolvedDebitSourceAndNoEarlyAction()
     {
         await using var alice = await InWorld("Alice");
@@ -130,7 +130,7 @@ public sealed partial class SkillCombatTests
         Assert.All(exact.Locations, location => Assert.Equal("0", location.Residual));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task CancelledAttachmentAfterPaidCommitCannotCastOrRecoverAFreeRetry()
     {
         await using var alice = await InWorld("Alice");

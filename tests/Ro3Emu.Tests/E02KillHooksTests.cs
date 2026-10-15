@@ -97,7 +97,7 @@ public sealed class E02KillHooksTests : IAsyncLifetime
         return (long)command.ExecuteScalar()!;
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SuspendedKillOwnsBothTaskParticipantsAndCommitsCardAfkAndSourceTogether()
     {
         await using var aliceBot = await Enter("Alice"); await Prepare(aliceBot);
@@ -165,7 +165,7 @@ public sealed class E02KillHooksTests : IAsyncLifetime
         Assert.Equal(1, Receipts()); Assert.Equal(beforeKills + 1, SavedAfk(aliceRole).Info.TodayKillCount);
     }
 
-    [Theory]
+    [ClientDataTheory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task KillHooksSurviveLostAcknowledgementOrApplyFailureAndFreshHostRecovery(bool failApply)
@@ -198,7 +198,7 @@ public sealed class E02KillHooksTests : IAsyncLifetime
         Assert.Equal(1, SavedCount(role)); Assert.Equal(1, recovered.Items.Single(i => i.Entry == Card).Stack);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FailedKillRetryUsesNewTaskAndAfkSnapshotWithoutCreditingFutureTasks()
     {
         await using var aliceBot = await Enter("Alice"); await Prepare(aliceBot);

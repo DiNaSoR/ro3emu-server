@@ -28,7 +28,7 @@ public sealed partial class NewActivityTests
 
     private Task OnLoop(Func<Task> work) => Service<GameLoop>().InvokeAsync(work);
 
-    [Fact]
+    [ClientDataFact]
     public async Task SharedEventRejoinKeepsOneParticipantAndCurrentReturnPoint()
     {
         await using var alice = await InWorld("RoomAlice");
@@ -65,7 +65,7 @@ public sealed partial class NewActivityTests
         return sw.SceneID;
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task TrainingMeasuresRealHitsAndRewardClaimsAreAtomicAndDurable()
     {
         var bot = await InWorld("Training");
@@ -167,7 +167,7 @@ public sealed partial class NewActivityTests
         Assert.Equal(0, Session(again).InstanceId);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FestivalUsesAuthoredAnswerZonesAndPaysEachEntitlementOnce()
     {
         var bot = await InWorld("Festival");

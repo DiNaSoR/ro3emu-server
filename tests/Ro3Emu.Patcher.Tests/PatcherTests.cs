@@ -263,6 +263,8 @@ public sealed class PatcherTests : IDisposable
         byte[] damaged = File.ReadAllBytes(grf);
         damaged[123_456] ^= 0xFF;
         File.WriteAllBytes(grf, damaged);
+        // Damage comes later than the install; a coarse file clock (Linux containers) could otherwise keep the old mtime.
+        File.SetLastWriteTimeUtc(grf, File.GetLastWriteTimeUtc(grf).AddSeconds(1));
         File.Delete(Path.Combine(Game, "Game.exe"));
 
         using (var client = new RepositoryClient(new Uri("http://repo.test/"), handler))
@@ -277,7 +279,7 @@ public sealed class PatcherTests : IDisposable
         Assert.True(handler.ChunkBytesServed < 60_000, "repair should fetch only the damaged chunk and the missing exe");
     }
 
-    [Fact]
+    [WindowsFact]
     public async Task LockedFile_FailsCommit_AndJournalFinishesItLater()
     {
         WriteBuild("Game.exe", Random(10_000, 40));
@@ -407,5 +409,14 @@ public sealed class PatcherTests : IDisposable
     {
         Assert.Throws<ArgumentException>(() => new InstallLayout(Game, Path.Combine(Game, "sub")));
         Assert.Null(new InstallLayout(Game, Path.Combine(Game, "ROData")).DataDirectory);
+    }
+}
+
+/// <summary>Needs Windows file locking (an open FileShare.None handle blocks replacing the file).</summary>
+public sealed class WindowsFactAttribute : FactAttribute
+{
+    public WindowsFactAttribute()
+    {
+        if (!OperatingSystem.IsWindows()) Skip = "Windows only: relies on Windows file locking.";
     }
 }

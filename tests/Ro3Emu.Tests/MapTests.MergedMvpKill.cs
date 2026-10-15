@@ -42,7 +42,7 @@ public sealed partial class MapTests
         }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task MergedMvpDeathCommitsEventAndOrdinaryRewardOnce()
     {
         var (alice, uid) = await ReadySoloMvpAsync();
@@ -96,7 +96,7 @@ public sealed partial class MapTests
         }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task MergedMvpOrdinaryRewardRefusalWithholdsLethalPublication()
     {
         var (alice, uid) = await ReadySoloMvpAsync();
@@ -141,7 +141,7 @@ public sealed partial class MapTests
         }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task MergedMvpLostOrdinaryRewardAcknowledgementKeepsSinglePayment()
     {
         var (alice, uid) = await ReadySoloMvpAsync();
@@ -174,7 +174,7 @@ public sealed partial class MapTests
         }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task MergedMvpUnknownEventThenOrdinaryRefusalRetriesWithoutHpOrSourceDrift()
     {
         var (alice, uid) = await ReadySoloMvpAsync();

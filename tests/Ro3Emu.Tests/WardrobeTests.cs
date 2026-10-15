@@ -66,7 +66,7 @@ public sealed class WardrobeTests : IAsyncLifetime
         response.EnsureSuccessStatusCode();
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task DefaultsPlansLikesAndAttributeSourceSurviveRelog()
     {
         await using (var alice = await InWorld("Alice"))
@@ -115,7 +115,7 @@ public sealed class WardrobeTests : IAsyncLifetime
         Assert.Equal(OtherMaleHair, restored.CurUseAppearances[7].All);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task RedeemCostsAreAtomicAndWearAndPlanChangesReachViewers()
     {
         await using var alice = await InWorld("Alice");
@@ -165,7 +165,7 @@ public sealed class WardrobeTests : IAsyncLifetime
         Assert.Equal(OtherMaleHair, bare.CurUseAppearances[7]);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task InvalidOrUnownedLooksAndPlansAreRefusedWithoutChangingTheHair()
     {
         await using var alice = await InWorld("Alice");
@@ -192,7 +192,7 @@ public sealed class WardrobeTests : IAsyncLifetime
         Assert.Equal(MaleHair, alice.Self!.CurUseAppearances[7]);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ActivatedAppearanceItemConsumesOneCopyAndUnlocksItsConfiguredLook()
     {
         const int HairVoucher = 3025701, NewHair = 70050010; // ItemConfig action 200 ActivatedAppearance.
@@ -215,7 +215,7 @@ public sealed class WardrobeTests : IAsyncLifetime
         Assert.NotEqual(0, (await Next(alice, CharacterService.ItemUse, ItemUseResp.Parser)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LateDeadlineRemovesWornTimedAppearanceAndPersistsTheReconciledState()
     {
         await using var alice = await InWorld("Alice");

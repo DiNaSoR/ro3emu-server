@@ -9,7 +9,7 @@ namespace Ro3Emu.Tests;
 
 public sealed partial class AuctionTests
 {
-    [Fact]
+    [ClientDataFact]
     public async Task CommittedChallengeRetryRetainsOriginalPlayBookAndOpenDay()
     {
         await using var alice = await InWorld("Alice");
@@ -45,7 +45,7 @@ public sealed partial class AuctionTests
         return guild;
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task GuildStagePublishesOnceAndMemberBuysWithParticipantDividendAndMailClaim()
     {
         await using var alice = await InWorld("Alice");
@@ -94,7 +94,7 @@ public sealed partial class AuctionTests
         Assert.Equal(before + 1, Session(bob).Items.Where(i => i.Entry == bought.Entry).Sum(i => i.Stack));
     }
 
-    [Theory]
+    [ClientDataTheory]
     [InlineData(1001, 1)]
     [InlineData(1002, 2)]
     [InlineData(1003, 3)]
@@ -122,7 +122,7 @@ public sealed partial class AuctionTests
             .Where(r => r.GuildId == guild).Select(r => r.Id).Order());
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task GuildCommittedClearKeepsCapturedParticipantAfterGuildLeave()
     {
         await using var alice = await InWorld("Alice");
@@ -145,7 +145,7 @@ public sealed partial class AuctionTests
         Assert.All(lots, lot => Assert.Equal(participant, Assert.Single(lot.Eligible)));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task GuildThresholdDeduplicatesParticipantsAndChallengeUsesSeasonGate()
     {
         await using var alice = await InWorld("Alice");
@@ -165,7 +165,7 @@ public sealed partial class AuctionTests
         Assert.Empty(Service<AuctionStore>().Items());
     }
 
-    [Fact]
+    [ClientDataFact]
     public void AuctionFixedAwardAndDayVariantsDoNotChangeDailyPoolOnlyContract()
     {
         var rewards = Service<RewardService>();

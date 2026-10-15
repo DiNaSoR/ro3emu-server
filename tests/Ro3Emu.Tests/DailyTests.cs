@@ -157,7 +157,7 @@ public sealed class DailyTests : IAsyncLifetime
         Assert.Equal(JsonSerializer.Serialize(item), JsonSerializer.Serialize(Assert.Single(new ItemStore(accounts).Load(roleId))));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task StageClaimKeepsItemMetadataAndRestacksOnlyCompatibleRewards()
     {
         var bot = await InWorld("Alice");
@@ -208,7 +208,7 @@ public sealed class DailyTests : IAsyncLifetime
         finally { await bot.DisposeAsync(); }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FreshLoginSendsRowsAndRealEmptyClaimsWithoutFakeStage()
     {
         await using var bot = await InWorld("Alice");
@@ -231,7 +231,7 @@ public sealed class DailyTests : IAsyncLifetime
         Assert.Equal(0, await State(s => s.Progress!.Currency.GetValueOrDefault(5)));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LockedAndInvalidRequestsAreRefusedWithoutMutation()
     {
         await using var bot = await InWorld("Alice");
@@ -268,7 +268,7 @@ public sealed class DailyTests : IAsyncLifetime
             (await Next(bot, DailyActivityService.StageGain, StageRewardGainResp.Parser)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task RingTerminalPaysOnceAndStageClaimPersistsAcrossReconnect()
     {
         var bot = await InWorld("Alice");
@@ -348,7 +348,7 @@ public sealed class DailyTests : IAsyncLifetime
         Assert.Equal(1, OwnedSourceCount(stageSource, "cd13e/daily-stage"));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task RingTerminalSqlAbortKeepsQuestRewardAndRowRetryableAfterReconnect()
     {
         var bot = await InWorld("Alice");
@@ -382,7 +382,7 @@ public sealed class DailyTests : IAsyncLifetime
         Assert.Equal(1, await State(s => s.Items.Single(i => i.Entry == 1250001).BindType));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ResetClearsDailyQuestCurrencyAndTypeSevenClaimsButKeepsOtherClaims()
     {
         await using var bot = await InWorld("Alice");
@@ -430,7 +430,7 @@ public sealed class DailyTests : IAsyncLifetime
         Assert.Equal(0, await State(s => s.Tasks!.CompleteTaskNum.GetValueOrDefault(500080)));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task DailyResetLedgerFailureRollsBackWholePeriodAndHeldRetryOwnsOneSource()
     {
         await using var bot = await InWorld("Alice");
@@ -542,7 +542,7 @@ public sealed class DailyTests : IAsyncLifetime
         Assert.Equal(stagedLiveness, Assert.Single(ledger.Legs, l => l.OperationId == reset.OperationId).Delta * -1);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task WeeklyOnlyResetWithZeroLivenessRetainsAnItemlessReceipt()
     {
         await using var bot = await InWorld("Alice");
@@ -582,7 +582,7 @@ public sealed class DailyTests : IAsyncLifetime
         Assert.Equal(1, (long)command.ExecuteScalar()!);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LoginAfterDayResetSendsOneFullQuestSyncBeforeTheScene()
     {
         // A 5027 increment before the first scene made the client refresh NPC sprites without a current map
@@ -609,7 +609,7 @@ public sealed class DailyTests : IAsyncLifetime
         Assert.Equal(TaskState.Running, full.Infos[500080].All.Status);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task OfflineLoginReconcilesEpochBeforeQuestAndCurrencySync()
     {
         var bot = await InWorld("Alice");
@@ -633,7 +633,7 @@ public sealed class DailyTests : IAsyncLifetime
         Assert.Equal(0, await State(s => s.Tasks!.CompleteTaskNum.GetValueOrDefault(500080)));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task MvpSettlementAdapterKeepsPartialFiveStepProgressWithoutExtraPoints()
     {
         await using var bot = await InWorld("Alice");
@@ -660,7 +660,7 @@ public sealed class DailyTests : IAsyncLifetime
         Assert.Equal(5, await State(s => s.DailyRows!.ActivityData[105].TaskCompleteTimes));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task HeldStoryAwardDoesNotBlockDailySettlement()
     {
         await using var bot = await InWorld("Alice");
@@ -684,7 +684,7 @@ public sealed class DailyTests : IAsyncLifetime
         Assert.Equal(4, await State(s => s.Progress!.Currency.GetValueOrDefault(5)));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task DailyClonePreservesAnotherCompletedManualQuestInTheSameSettle()
     {
         await using var bot = await InWorld("Alice");
@@ -719,7 +719,7 @@ public sealed class DailyTests : IAsyncLifetime
         Assert.Equal(0, await State(s => app.Services.GetRequiredService<CharacterService>().CountOf(s, 1009013)));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SqlAbortDuringClaimItemWriteRollsBackClaimCurrencyAndExp()
     {
         await using var bot = await InWorld("Alice");
@@ -753,7 +753,7 @@ public sealed class DailyTests : IAsyncLifetime
         Assert.Equal(0, (await Next(bot, DailyActivityService.StageGain, StageRewardGainResp.Parser, r => r.Result == 0)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ThreeEligibleDaysRotateThroughEveryConfiguredRingNode()
     {
         await using var bot = await InWorld("Alice");
@@ -785,7 +785,7 @@ public sealed class DailyTests : IAsyncLifetime
         Assert.Equal(new[] { 3001, 3011, 3021 }, roots.Order());
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task RingDialogueAndMapKillAdvanceOnlyFromTheirAuthoritativeSources()
     {
         await using var bot = await InWorld("Alice");

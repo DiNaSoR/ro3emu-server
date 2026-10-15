@@ -84,7 +84,7 @@ public sealed class FreshRealmTests : IAsyncLifetime
         (await http.PostAsync($"{_http}/ro3emu/gm?account={account}", new StringContent(line))).EnsureSuccessStatusCode();
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task TheFashionTabIsAnsweredOnAFreshRealm()
     {
         Assert.False(File.Exists(Path.Combine(_dataDir, "msgtable.tsv")));
@@ -113,7 +113,7 @@ public sealed class FreshRealmTests : IAsyncLifetime
                     $"commodity {GameData.Int(row, "_iID")} has {field}");
     }
 
-    [Fact]
+    [ClientDataFact]
     public void TheMessageTableComesFromGameDataWhenTheRealmDirHasNone()
     {
         Assert.NotNull(Service<MsgCatalog>().EmptyResponse(ShopService.CommodityGetInfo));
@@ -123,7 +123,7 @@ public sealed class FreshRealmTests : IAsyncLifetime
         Assert.False(catalog.UnknownToClient(ShopService.CommodityGetInfo));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task OnDayOneTheSeasonIsInItsHiddenFirstStageAndTheServerSignalsOpenContent()
     {
         await using var alice = await InWorld("Alice");
@@ -159,7 +159,7 @@ public sealed class FreshRealmTests : IAsyncLifetime
 
     private GameSession Session(string account) => Service<SessionRegistry>().All().Single(s => s.Account == account && s.Role != null);
 
-    [Fact]
+    [ClientDataFact]
     public async Task OnDayOneTheSeasonPageActivitiesAreOpenBelowTheirLevel99Gate()
     {
         // The season page lists MultiverseStage._kStageActivity per chapter; each activity's own condition is [1002,99]
@@ -190,7 +190,7 @@ public sealed class FreshRealmTests : IAsyncLifetime
         Assert.True(infos[102].IsShielded);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task OnDayOneEveryExplorationChapterAcceptsNotesAndTheStageClockIsUntouched()
     {
         await using var alice = await InWorld("Alice");

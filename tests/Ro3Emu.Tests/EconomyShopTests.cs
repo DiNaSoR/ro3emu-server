@@ -86,7 +86,7 @@ public sealed class EconomyShopTests : IAsyncLifetime
         Assert.NotEmpty(check.UncoveredMutationFamilies);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task WirePurchaseRestacksPotionAndKeepsPacketsD1AndExactLedger()
     {
         await using var bot = await Enter();
@@ -117,7 +117,7 @@ public sealed class EconomyShopTests : IAsyncLifetime
         Assert.Equal(0, access.GetProperty("writeGuardErrors").GetInt64());
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task EqualWirePurchasesAreDistinctAndRefusalsNeverCreateReceipts()
     {
         await using var bot = await Enter(level: false);
@@ -139,7 +139,7 @@ public sealed class EconomyShopTests : IAsyncLifetime
         ExactButUncovered(opening, closing, ledger);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task BatchPreservesPartialSuccessAndOneReceiptPerSuccessfulChild()
     {
         await using var bot = await Enter();
@@ -163,7 +163,7 @@ public sealed class EconomyShopTests : IAsyncLifetime
         ExactButUncovered(opening, closing, ledger);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LastLedgerInsertFailureRollsBackQuotaCurrencyItemsAndRevisions()
     {
         await using var bot = await Enter();
@@ -199,7 +199,7 @@ public sealed class EconomyShopTests : IAsyncLifetime
         ExactButUncovered(opening, closing, Window(opening, closing));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LostWriterAcknowledgementResolvesBeforeLiveApplyAndWireReply()
     {
         await using var bot = await Enter();
@@ -220,7 +220,7 @@ public sealed class EconomyShopTests : IAsyncLifetime
         ExactButUncovered(opening, closing, Window(opening, closing));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task UnresolvableWriterOutcomeQuarantinesOwnerAndClosesTheChannel()
     {
         await using var bot = await Enter();
@@ -248,7 +248,7 @@ public sealed class EconomyShopTests : IAsyncLifetime
         ExactButUncovered(opening, closing, Window(opening, closing));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task PostCommitNotificationFailureKeepsPurchaseAndQuotaDurable()
     {
         await using var bot = await Enter();

@@ -70,7 +70,7 @@ public sealed class PetFamilyOwnerEconomyTests : IAsyncLifetime
             TimeSpan.FromSeconds(8))).Body);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task StagedCommitKeepsPetAndFragmentsUnpublishedUntilCoveredCommit()
     {
         await using var bot = await Enter();
@@ -101,7 +101,7 @@ public sealed class PetFamilyOwnerEconomyTests : IAsyncLifetime
         Assert.Equal(0, s.Items.Where(i => i.Entry == 1610001).Sum(i => i.Stack));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task GmItemWaitsForSuspendedPetCommitAndSeesItsPublishedInventory()
     {
         await using var bot = await Enter();
@@ -132,7 +132,7 @@ public sealed class PetFamilyOwnerEconomyTests : IAsyncLifetime
         Assert.Equal(1, session.Items.Where(i => i.Entry == 1250701).Sum(i => i.Stack));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LedgerFailureRollsBackPetBlobAndMaterialDebit()
     {
         await using var bot = await Enter();
@@ -158,7 +158,7 @@ public sealed class PetFamilyOwnerEconomyTests : IAsyncLifetime
         Assert.Single(Window(opening, Cut()).Receipts);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task RebirthRefundHasOneExpectedBookSourceAndCannotRepeat()
     {
         await using var bot = await Enter();

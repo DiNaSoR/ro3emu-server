@@ -92,7 +92,7 @@ public sealed class LifeJobOwnerEconomyTests : IAsyncLifetime
         return rows.ToArray();
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task HeldCertificateCommitKeepsLifeAndBagPrivateWhileOtherRoleProceeds()
     {
         await using var alice = await Enter("alice");
@@ -156,7 +156,7 @@ public sealed class LifeJobOwnerEconomyTests : IAsyncLifetime
         Assert.Equal(1, DBLifeJobInfo.Parser.ParseFrom(Service<RoleStore>().LoadLifeJob(role)!).ActiveLifejob[1]);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LedgerFailureRollsBackCertificateAndProfessionThenAllowsFreshRequest()
     {
         await using var alice = await Enter("alice");
@@ -187,7 +187,7 @@ public sealed class LifeJobOwnerEconomyTests : IAsyncLifetime
         Assert.Equal(1, ReceiptCount("cd13c/life-switch"));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task VigorItemConsumptionAndQuotaShareOneCoveredReceipt()
     {
         await using var alice = await Enter("alice");
@@ -208,7 +208,7 @@ public sealed class LifeJobOwnerEconomyTests : IAsyncLifetime
         Assert.Equal(1, ReceiptCount("cd13c/life-vigor-item"));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ForgeDebitsMaterialsGrantsResolvedOutputAndSpendsVigorInOneReceipt()
     {
         await using var alice = await Enter("alice");
@@ -242,7 +242,7 @@ public sealed class LifeJobOwnerEconomyTests : IAsyncLifetime
         Assert.Equal(1, ReceiptCount("cd13c/life-forge"));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LostCertificateCommitAcknowledgementResolvesWithoutSecondDebit()
     {
         await using var alice = await Enter("alice");
@@ -262,7 +262,7 @@ public sealed class LifeJobOwnerEconomyTests : IAsyncLifetime
         Assert.Equal(1, ReceiptCount("cd13c/life-switch"));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task HeldForgeCrossesFiveAmAndQueuedVigorUseReconcilesAfterCommit()
     {
         var localBefore = DateTime.Today.AddHours(4).AddMinutes(59);

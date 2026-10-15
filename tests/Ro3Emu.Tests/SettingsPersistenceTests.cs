@@ -11,7 +11,7 @@ using Xunit.Abstractions;
 namespace Ro3Emu.Tests;
 
 /// <summary>C/D 17: lazy client settings - merged in memory, no loop write, AFK settings durable, flushed on leave.</summary>
-public sealed class SettingsPersistenceTests(ITestOutputHelper output) : IAsyncLifetime
+public sealed class SettingsPersistenceTests : IAsyncLifetime
 {
     private readonly string dataDir = Path.Combine(Path.GetTempPath(), "ro3emu-set-" + Guid.NewGuid().ToString("N"));
     private static readonly TimeSpan Wait = TimeSpan.FromSeconds(10);
@@ -165,7 +165,7 @@ public sealed class SettingsPersistenceTests(ITestOutputHelper output) : IAsyncL
         Assert.Equal(x, Stored(role).ClientSetting[14].ToByteArray());
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task AFirstLoginCommitsItsDefaultBlobsWithoutBlockingTheLoop()
     {
         // Stage G: a new role's first login wrote 10 default blobs synchronously on the loop (15 ms per new role).
@@ -176,7 +176,7 @@ public sealed class SettingsPersistenceTests(ITestOutputHelper output) : IAsyncL
         var (bot, s) = await InWorld("Firstie");
         await using var _ = bot;
         accounts.WriteSyncPlanObserved = null;
-        Assert.Empty(onLoop.Where(AccountStore.StagedColumns.Contains));
+        Assert.DoesNotContain(onLoop, AccountStore.StagedColumns.Contains);
         Assert.NotNull(Service<RoleStore>().LoadTasks(s.Role!.Id));
         Assert.NotNull(accounts.ReadSync<byte[]?>(new Ro3Emu.Server.Accounts.Persistence.RoleBlobReadPlan(s.Role.Id, "tasks")));
         Assert.Equal(-1, accounts.StagedCount(s.Role.Id));

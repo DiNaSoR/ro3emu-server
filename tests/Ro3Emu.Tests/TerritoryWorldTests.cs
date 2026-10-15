@@ -127,7 +127,7 @@ public sealed class TerritoryWorldTests : IAsyncLifetime
         return parser.ParseFrom(envelope.Body);
     }
 
-    [Theory]
+    [ClientDataTheory]
     [InlineData(30311L, 1000001L)]
     [InlineData(30336L, 10001L)]
     public async Task LandActivityUsesExportedEditorPointInsteadOfDefaultOrigin(long mapId, long editorPointId)
@@ -162,7 +162,7 @@ public sealed class TerritoryWorldTests : IAsyncLifetime
         });
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task WorldPickupIsFiniteCappedAndDeathDropCanBeRecovered()
     {
         await using var bot = await InWorld("WorldGatherer");
@@ -215,7 +215,7 @@ public sealed class TerritoryWorldTests : IAsyncLifetime
         Assert.Equal(10, Session(bot).Progress!.Currency.GetValueOrDefault(133));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task StaticPickupKeepsOneNaturalSourceAndRespawnDeadlineAcrossRestart()
     {
         // Keep the configured game deadline fixed while the process restarts. Wall-clock startup
@@ -275,7 +275,7 @@ public sealed class TerritoryWorldTests : IAsyncLifetime
         Assert.Equal(1, PickupSources());
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task CommittedStaticPickupApplyFaultRetiresActorAndCannotRemintAfterRestart()
     {
         const long mapId = 30330;
@@ -312,7 +312,7 @@ public sealed class TerritoryWorldTests : IAsyncLifetime
         Assert.Equal(1, Assert.Single(DurableWars().WorldPickupOccurrences).Value.Ordinal);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task CommittedDeathDropApplyFaultPublishesExactlyOneDurableDrop()
     {
         const long mapId = 30330;

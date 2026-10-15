@@ -91,7 +91,7 @@ public sealed class SeasonPageTests : IAsyncLifetime
         return await Next(bot, SeasonPageService.ReceiveRankReward, SeasonPageReceiveRankRewardResp.Parser);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task AuthoritativeDungeonScoreEventsAreDeduplicatedAndReachTheWire()
     {
         await using var bot = await InWorld("ScoreAlice");
@@ -107,7 +107,7 @@ public sealed class SeasonPageTests : IAsyncLifetime
             ? System.Text.Json.JsonSerializer.Deserialize<SeasonPageService.PageMeta>(saved)!.DungeonScore : -1);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task OwnedCommemorativeMedalEntersHonorWallAndCanBeWorn()
     {
         await using var bot = await InWorld("HonorAlice");
@@ -122,7 +122,7 @@ public sealed class SeasonPageTests : IAsyncLifetime
         Assert.Equal(Service<SeasonService>().SeasonId, Session(bot).SeasonPage!.HonorBadgeData[1300046].GetSeasonId);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task BadgeAndBreakSnapshotWritesDoNotChangeMemoryBeforeCommit()
     {
         await using var bot = await InWorld("CommitAlice");
@@ -150,7 +150,7 @@ public sealed class SeasonPageTests : IAsyncLifetime
         Assert.Equal(200, session.SeasonPage!.HistorySnapshot!.FunctionScore[17]);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ExplicitCycleArchivesScoresAndReissuesUnclaimedRankOnce()
     {
         var bot = await InWorld("CycleAlice");
@@ -208,7 +208,7 @@ public sealed class SeasonPageTests : IAsyncLifetime
         Assert.True((long)receipt.ExecuteScalar()! > 0); // the retained mail goods have source legs
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task RolloverMailboxFailureRollsBackPageAndRetriesOnce()
     {
         await using var bot = await InWorld("RollbackAlice");
@@ -237,7 +237,7 @@ public sealed class SeasonPageTests : IAsyncLifetime
         Assert.Single((object?[])list["MailList"]!);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LoginSuppliesFiveClockStagesAndTrulyEmptyPageMaps()
     {
         await using var bot = await InWorld("Alice");
@@ -279,7 +279,7 @@ public sealed class SeasonPageTests : IAsyncLifetime
         });
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ClockPushesStateAndTimeAtTheBoundaryWithoutARequest()
     {
         await using var bot = await InWorld("Alice");
@@ -304,7 +304,7 @@ public sealed class SeasonPageTests : IAsyncLifetime
         Assert.Equal(101002, (await Page(bot)).StageID);
     }
 
-    [Theory]
+    [ClientDataTheory]
     [InlineData("2026-10-05", "2026-10-19")]
     [InlineData("2026-10-08", "2026-10-26")]
     [InlineData("2026-10-11", "2026-10-26")]
@@ -317,7 +317,7 @@ public sealed class SeasonPageTests : IAsyncLifetime
         Assert.Equal(1209600, times.StageTimeInfo[101003].EndTime - times.StageTimeInfo[101003].StartTime);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task GmPlaybookChangesApplyAtLoginWhileExistingSeasonKeepsAdvancing()
     {
         await using var alice = await InWorld("Alice");
@@ -353,7 +353,7 @@ public sealed class SeasonPageTests : IAsyncLifetime
         Assert.Equal(ErrorCodes.FeatureUnavailable, (await Next(bot, SeasonPageService.PutOnHonorBadge, SeasonPagePutOnHonorBadgeResp.Parser)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task RankPageUsesEarnedPointsAndTheClientDanThresholds()
     {
         await using var bot = await InWorld("Alice");
@@ -378,7 +378,7 @@ public sealed class SeasonPageTests : IAsyncLifetime
         Assert.Equal(3, service.DanLevel(17, 200)); Assert.Equal(26, service.DanLevel(17, long.MaxValue));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ClaimsGrantConfiguredItemsOnceAndPersistAcrossLogin()
     {
         long roleId;
@@ -413,7 +413,7 @@ public sealed class SeasonPageTests : IAsyncLifetime
         Assert.Equal(ErrorCodes.RewardClaimed, (await Claim(again, (2, 17))).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SuspendedRankClaimKeepsRewardPrivateAndDefersSameRoleGm()
     {
         await using var bot = await InWorld("HeldRank");
@@ -471,7 +471,7 @@ public sealed class SeasonPageTests : IAsyncLifetime
         Assert.Contains(window.Legs, leg => leg.Kind == EconomyLegKind.Source && leg.Asset.Id == 1200000 && leg.Delta == 2);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LostRankClaimAcknowledgementResolvesOneRewardAndOneSource()
     {
         await using var bot = await InWorld("AckRank");
@@ -490,7 +490,7 @@ public sealed class SeasonPageTests : IAsyncLifetime
         Assert.Single(window.Legs, leg => leg.Kind == EconomyLegKind.Source && leg.Asset.Id == 1200000);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ClaimsShareThreeFunctionLimitAndRejectMixedInvalidBatchesAtomically()
     {
         await using var bot = await InWorld("Alice");
@@ -507,7 +507,7 @@ public sealed class SeasonPageTests : IAsyncLifetime
         Assert.Equal(0, (await Claim(bot, (3, 36))).Result); // another dan has its own pool
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task HonorWearChecksOwnershipTwoBadgeLimitAndPersistence()
     {
         // Persisted earned-award fixture, not a fabricated client claim. Award acquisition is a separate system.
@@ -540,7 +540,7 @@ public sealed class SeasonPageTests : IAsyncLifetime
         Assert.Equal(1, full.HonorBadgeData[1300048].All.GetSeasonId);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ClaimStorageFailureRollsBackRewardsAndAllowsOneRetry()
     {
         await using var bot = await InWorld("Alice");

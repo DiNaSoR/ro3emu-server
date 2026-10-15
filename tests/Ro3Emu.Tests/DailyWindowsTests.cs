@@ -65,7 +65,7 @@ public sealed class DailyWindowsTests : IAsyncLifetime
         Assert.Equal(clock.Unix(end), window.End);
     }
 
-    [Fact]
+    [ClientDataFact]
     public void WeeklyLeagueUsesOpeningWeekdayAndSkipsEmptyCustomWeeks()
     {
         // Monday-open week 1: Wednesday/Friday/Saturday, not the Friday-open row selected by the old code.
@@ -82,7 +82,7 @@ public sealed class DailyWindowsTests : IAsyncLifetime
         Window(109, "2026-10-21 20:00:00", "2026-10-21 20:30:00");
     }
 
-    [Fact]
+    [ClientDataFact]
     public void ConfiguredTimedRowsUseCurrentThenNextOccurrence()
     {
         // Despite the task's example label, 115 is Wednesday-only and 125 is custom/weekly, not daily.
@@ -94,7 +94,7 @@ public sealed class DailyWindowsTests : IAsyncLifetime
         Window(200, "2026-10-10 10:00:00", "2026-10-10 22:00:00");
     }
 
-    [Fact]
+    [ClientDataFact]
     public void AllDayAndOvernightWindowsUseFiveAmAndCivilTimezone()
     {
         clock.Set("2026-10-09 04:59:59");
@@ -115,7 +115,7 @@ public sealed class DailyWindowsTests : IAsyncLifetime
         Window(101, "2026-10-09 05:00:00", "2026-10-10 05:00:00");
     }
 
-    [Fact]
+    [ClientDataFact]
     public void TimeLimitsAndControlPhasesKeepClosedRowsClosedAndPreserveGaps()
     {
         Window(122, "2026-10-09 20:00:00", "2026-10-09 21:30:00");
@@ -133,7 +133,7 @@ public sealed class DailyWindowsTests : IAsyncLifetime
         Assert.True(Service<TimedTodoSchedule>().IsOpen(3400));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task AbsoluteLimitClipsWindowAndCanFindAnOccurrenceBeyondNextWeek()
     {
         await OnLoop(() =>
@@ -151,7 +151,7 @@ public sealed class DailyWindowsTests : IAsyncLifetime
         Assert.Null(Service<TimedTodoSchedule>().CurrentOrNext(3004));
     }
 
-    [Theory]
+    [ClientDataTheory]
     [InlineData(8)]
     [InlineData(-12)]
     public async Task LoginCarriesUnixWindowsForEveryRowAndGuildGoHasCandidates(int utcOffset)
@@ -183,7 +183,7 @@ public sealed class DailyWindowsTests : IAsyncLifetime
         Assert.Equal(1, sync.ActivityData[3302].All.ActivityInfo.ActivityParam.RunRingTask.RemainRingCount);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task OccurrenceEndPushesOnlyTimeIncrementAndKeepsProgress()
     {
         clock.Set("2026-10-09 20:59:59");
@@ -210,7 +210,7 @@ public sealed class DailyWindowsTests : IAsyncLifetime
         Assert.Equal(2, Session(bot).DailyRows!.ActivityData[110].TaskCompleteTimes);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FiveAmRolloverAndReconnectPushFreshAllDayWindow()
     {
         clock.Set("2026-10-09 04:59:59");

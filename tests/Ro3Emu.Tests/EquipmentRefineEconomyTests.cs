@@ -109,7 +109,7 @@ public sealed class EquipmentRefineEconomyTests : IAsyncLifetime
             costs.Where(p => p.Item1 == 2).Sum(p => (long)p.Item2));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task HeldPaidFailurePublishesNeitherDebitNorLuckUntilCommit()
     {
         await using var bot = await Prepared();
@@ -146,7 +146,7 @@ public sealed class EquipmentRefineEconomyTests : IAsyncLifetime
         Assert.Equal(beforeCurrency - cost.Currency, Currency());
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LedgerFailureRollsBackPaidFailureAndKeepsItsResolvedStatePrivate()
     {
         await using var bot = await Prepared();
@@ -171,7 +171,7 @@ public sealed class EquipmentRefineEconomyTests : IAsyncLifetime
         Assert.Equal(500, (await Refine(bot)).RefineLuckyAdd);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LostCommitAcknowledgementResolvesTheSamePaidFailure()
     {
         await using var bot = await Prepared();
@@ -231,7 +231,7 @@ public sealed class EquipmentRefineEconomyTests : IAsyncLifetime
         await Task.Delay(Timeout.InfiniteTimeSpan); // The parent kills the process after the durable commit.
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ProcessDeathAfterPaidFailureCommitRestartsWithChargeLevelLuckAndReceipt()
     {
         string crashDir = Path.Combine(RepoRoot(), ".loadtest-temp", "ro3-refine-crash-" + Guid.NewGuid().ToString("N"));

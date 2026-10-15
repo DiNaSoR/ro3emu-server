@@ -104,7 +104,7 @@ public sealed class WildAfkTests : IAsyncLifetime
         await Query(bot); // request/response barrier for NullArg 31054
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task DirectRoleSelectionPersistsOldAfkAllowanceAndFraction()
     {
         await using var bot = await InWorld();
@@ -161,7 +161,7 @@ public sealed class WildAfkTests : IAsyncLifetime
         return npc;
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LoginInitializes5035AndLockedOrDungeonRequestsAreRefused()
     {
         await using var bot = await InWorld();
@@ -183,7 +183,7 @@ public sealed class WildAfkTests : IAsyncLifetime
         Assert.Equal(3600, await Query(bot));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FavoritesValidateCapDuplicatesRemovalAndSurviveReconnect()
     {
         long role;
@@ -213,7 +213,7 @@ public sealed class WildAfkTests : IAsyncLifetime
         Assert.Equal(3600, info.HighMultiplierTimeSeconds);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task RealFieldKillResumesTimerAndProducesPersistentDropsAndSnapshots()
     {
         await using var bot = await InWorld();
@@ -254,7 +254,7 @@ public sealed class WildAfkTests : IAsyncLifetime
         Assert.Equal(info.CurrentSnapshot.All, saved.Info.CurrentSnapshot);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ManualFieldKillUsesReducedExpAndBonusKillUsesConfiguredHigherTable()
     {
         await using var bot = await InWorld();
@@ -294,7 +294,7 @@ public sealed class WildAfkTests : IAsyncLifetime
         Assert.True(bonus > reduced);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task MonitorCapsIdleChargeAndAutoOffPauseAndSceneExitStopConsumption()
     {
         await using var bot = await InWorld();
@@ -324,7 +324,7 @@ public sealed class WildAfkTests : IAsyncLifetime
         Assert.Equal(ErrorCodes.AfkNotActive, (await Next(bot, WildAfkService.Pause, PauseHighMultiplierTimeRsp.Parser)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ConsumedHourCompletesDailyRowAndAwardsLivenessExactlyOnce()
     {
         await using var bot = await InWorld();
@@ -354,7 +354,7 @@ public sealed class WildAfkTests : IAsyncLifetime
         Assert.Equal(40, await State(bot, s => s.Progress!.Currency.GetValueOrDefault(5)));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task DailyRestoreAddsSixtyMinutesCapsBankAndDoesNotReplayOnRelog()
     {
         long remaining;
@@ -392,7 +392,7 @@ public sealed class WildAfkTests : IAsyncLifetime
         Assert.Equal(remaining, await Query(again));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FinalSecondBeforeDailyBoundarySettlesBeforeQuestReset()
     {
         await using var bot = await InWorld();
@@ -469,7 +469,7 @@ public sealed class WildAfkTests : IAsyncLifetime
     private Task<T> Stored<T>(BotClient bot, Func<long, RoleStore, T> read) =>
         State(bot, s => read(s.Role!.Id, Service<RoleStore>()));
 
-    [Fact]
+    [ClientDataFact]
     public async Task FailedDailyResetCommitKeepsTheWholeOldPeriodAndRetriesAsOneTransaction()
     {
         await using var bot = await InWorld();
@@ -508,7 +508,7 @@ public sealed class WildAfkTests : IAsyncLifetime
         Assert.Equal(4800, await Query(bot)); // no second restore after the committed one
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task DailyTickAfkTickAndClaimAtTheBoundaryResetThePeriodExactlyOnce()
     {
         await using var bot = await InWorld();
@@ -550,7 +550,7 @@ public sealed class WildAfkTests : IAsyncLifetime
         finally { release.TrySetResult(); accounts.BeforeOwnedCommitForTest = null; }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task DailyQuestResetCannotReplayYesterdayBeforeAfkTickerRestores()
     {
         await using var bot = await InWorld();
@@ -579,7 +579,7 @@ public sealed class WildAfkTests : IAsyncLifetime
         Assert.Equal(0, await State(bot, s => s.Progress!.Currency.GetValueOrDefault(5)));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task PendingOldDayAwardSurvivesLogoutAndSettlesOnLoginExactlyOnce()
     {
         long role, old = 0;
@@ -628,7 +628,7 @@ public sealed class WildAfkTests : IAsyncLifetime
 
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FailedDailyAwardRetriesWhileIdleAndBeforePeriodReset()
     {
         await using var bot = await InWorld();
@@ -660,7 +660,7 @@ public sealed class WildAfkTests : IAsyncLifetime
         Assert.Equal(0, await State(bot, s => s.WildAfk!.ConsumedTodaySeconds));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SettingsCanClearFalseAndPowerSavingDoesNotPauseServerState()
     {
         await using var bot = await InWorld();
@@ -691,7 +691,7 @@ public sealed class WildAfkTests : IAsyncLifetime
         Assert.True(await State(bot, s => s.WildAfk!.Info.IsHighMagnification));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task QueuedReconcileAfterLogoutDoesNotReadOrRestoreOldRoleState()
     {
         await using var bot = await InWorld();
@@ -713,7 +713,7 @@ public sealed class WildAfkTests : IAsyncLifetime
         Assert.NotNull(Service<RoleStore>().LoadWildAfk(session.Role!.Id));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task KillWaitingOnOldAfkGateCannotRewardNextRole()
     {
         await using var bot = await InWorld();
@@ -837,7 +837,7 @@ public sealed class WildAfkTests : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task KillGrantsQueuedOnStateLockAbortAfterWireRoleSwitch()
     {
         await using var bot = await InWorld();

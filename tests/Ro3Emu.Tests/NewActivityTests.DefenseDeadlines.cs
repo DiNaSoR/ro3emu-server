@@ -6,7 +6,7 @@ namespace Ro3Emu.Tests;
 
 public sealed partial class NewActivityTests
 {
-    [Fact]
+    [ClientDataFact]
     public async Task DefenseRoundAndIntensityProjectAtDeadlinesWithoutDefensePolling()
     {
         await using var bot = await InWorld("DefDeadline");

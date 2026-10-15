@@ -95,7 +95,7 @@ public sealed partial class MapTests : IAsyncLifetime
         return (sw, self.Base, npcs);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task NewRoleLandsOnWalkableGroundAndSeesTheMapsNpcs()
     {
         await using var alice = await InWorld("Alice");
@@ -112,7 +112,7 @@ public sealed partial class MapTests : IAsyncLifetime
         Assert.Contains(town.Bases, b => b.EntityTemplateID == 300001); // portal to Prontera
     }
 
-    [Fact]
+    [ClientDataFact]
     public void KafrasStandOnTheGroundSoTheClientsInteractDistanceReachesThem()
     {
         // Sograt Desert 10514: the scene editor puts the Kafra at y -4.958 over ground -8.5; the client checks a 3D 2 m distance.
@@ -123,7 +123,7 @@ public sealed partial class MapTests : IAsyncLifetime
         Assert.Contains(kafras, k => MathF.Abs(k.X - 205) < 1 && MathF.Abs(k.Z - 331) < 1 && k.Y < -7f);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task PortalLeadsToProntera()
     {
         await using var alice = await InWorld("Alice");
@@ -146,7 +146,7 @@ public sealed partial class MapTests : IAsyncLifetime
         Assert.True(pronteraNpcs.Bases.Count > 100);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task KafraTeleportsToTheTargetMapsKafraPoint()
     {
         await using var alice = await InWorld("Alice");
@@ -168,7 +168,7 @@ public sealed partial class MapTests : IAsyncLifetime
         Assert.NotEqual(0, (await Next(alice, SceneService.NpcInteraction, NpcInteractionRsp.Parser)).Result);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task WarpWithoutCoordinatesUsesTheBornPointAndDropsStaleWalks()
     {
         await using var alice = await InWorld("Alice");
@@ -183,7 +183,7 @@ public sealed partial class MapTests : IAsyncLifetime
         Assert.Equal(180f, self.Base.MovementInfo.Face);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task MonstersSpawnAndAPlayerCanKillOne()
     {
         await using var alice = await InWorld("Alice");
@@ -228,7 +228,7 @@ public sealed partial class MapTests : IAsyncLifetime
         await alice.Inbox.WaitAsync(e => e.IsGame(GameAoiSink.SyncAoiView) && AoIViewChangeData.Parser.ParseFrom(e.Body).LeaveAoi.Contains(monster.Uuid), TimeSpan.FromSeconds(6));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task PotionHealsWithCooldownAndSwordmanSkillsWork()
     {
         await using var alice = await InWorld("Alice");
@@ -270,7 +270,7 @@ public sealed partial class MapTests : IAsyncLifetime
         return MathF.Sqrt(dx * dx + dz * dz);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FunctionsOpenByLevelFromTheClientConditions()
     {
         await using var alice = await InWorld("Alice");
@@ -284,7 +284,7 @@ public sealed partial class MapTests : IAsyncLifetime
         Assert.True(more.FunctionOpenInfos[45].All);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task NoviceStoryStartsAtTheBornPointAndProgressesByEvents()
     {
         await using var alice = await InWorld("Alice");
@@ -331,7 +331,7 @@ public sealed partial class MapTests : IAsyncLifetime
         Assert.True(functions.FunctionOpenInfos[82].All); // Auto-Potion: condition 4004 task 10101060
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FieldMvpSpawnsAndItsKillPaysOutAndStartsTheRespawnTimer()
     {
         var errors = new MvpDiagnosticErrors();
@@ -733,7 +733,7 @@ public sealed partial class MapTests : IAsyncLifetime
         catch { await alice.DisposeAsync(); throw; }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FieldMvpApplyFaultPublishesOnlyTheCommittedFrozenSource()
     {
         var (alice, uid) = await ReadySoloMvpAsync();
@@ -783,7 +783,7 @@ public sealed partial class MapTests : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FieldMvpUnknownCommittedSourceReselectsWithoutGenericKillCredit()
     {
         var (alice, uid) = await ReadySoloMvpAsync();
@@ -902,7 +902,7 @@ public sealed partial class MapTests : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [ClientDataFact]
     public void NavGridMatchesTheClient()
     {
         var grid = NavGrid.Load(Path.Combine(RepoRoot(), "data", "nav", "sc_prontera_001_dynamicmapdata.bytes"));

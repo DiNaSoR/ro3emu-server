@@ -66,7 +66,7 @@ public sealed class WorldEffectsTests : IAsyncLifetime
         response.EnsureSuccessStatusCode();
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ForceFieldAndLatencyReplayOnLateSceneEntryAndExpire()
     {
         await using var alice = await InWorld("Alice");
@@ -103,7 +103,7 @@ public sealed class WorldEffectsTests : IAsyncLifetime
             p => p.ForceFields.Count == 1 && p.ForceFields[0].Remove)).ForceFields).Uuid);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task BossShoutAndTurningRequireVisibleLiveBoss()
     {
         await using var alice = await InWorld("Alice");
@@ -134,7 +134,7 @@ public sealed class WorldEffectsTests : IAsyncLifetime
         Assert.False(await loop.InvokeAsync(() => effects.TurnAsync(boss, float.NaN)));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LocalFaceIsSentOnlyToOwner()
     {
         await using var alice = await InWorld("Alice");

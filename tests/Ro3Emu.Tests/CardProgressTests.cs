@@ -70,7 +70,7 @@ public sealed class CardProgressTests : IAsyncLifetime
         return guid == 0 ? cards.First() : cards.Single(i => i.ItemGuid == guid);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task HeldExchangeCommitKeepsCardGrantAndLibraryInvisibleWhileLoopAdvances()
     {
         await using var alice = await InWorld("Alice");
@@ -106,7 +106,7 @@ public sealed class CardProgressTests : IAsyncLifetime
         finally { release.Set(); accounts.BeforeCommitForTest = null; }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task HeldTaskFollowupClearKeepsDebtAndUnlockReplyPendingWhileLoopAdvances()
     {
         await using var alice = await InWorld("Alice");
@@ -144,7 +144,7 @@ public sealed class CardProgressTests : IAsyncLifetime
         finally { release.Set(); accounts.BeforeCommitForTest = null; }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task CommittedLibraryUnlockStillAcknowledgesWhenCollectionSubscriberFails()
     {
         await using var alice = await InWorld("Alice");
@@ -169,7 +169,7 @@ public sealed class CardProgressTests : IAsyncLifetime
         finally { cards.CollectionChanged.Remove(failing); }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FlashSynthesisConsumesFourCopiesAndPersistsFlashLibraryAcrossRelog()
     {
         const int ingredient = 1440101; // eligible quality 4, FlashCardOutputConfig 10001
@@ -222,7 +222,7 @@ public sealed class CardProgressTests : IAsyncLifetime
         Assert.True(DBLibraryInfo.Parser.ParseFrom(library).Cards.ContainsKey(flashes[0].ItemEntry));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FlashSynthesisRejectsInvalidInputsAndRollsBackSqlFailureForReplay()
     {
         const int ingredient = 1440101, otherQuality = 1450100;
@@ -307,7 +307,7 @@ public sealed class CardProgressTests : IAsyncLifetime
         Assert.Equal(1, boundFlash.Attrs![530]);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LevelStarAndRevertPayOnceAndRememberHistoricalCosts()
     {
         long guid;
@@ -368,7 +368,7 @@ public sealed class CardProgressTests : IAsyncLifetime
         Assert.False(FullCard(final, guid).ItemInfos.ContainsKey(510));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task GenreCardSelectionKeepsMastersMissingCopyPolicy()
     {
         await using var alice = await InWorld("Alice");
@@ -401,7 +401,7 @@ public sealed class CardProgressTests : IAsyncLifetime
         Assert.Equal(1, DBStorageHoleInfo.Parser.ParseFrom(saved).CurrentPlan);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task PlanSwitchMovesOneCardAndNameAndSelectionSurviveRelog()
     {
         await using (var alice = await InWorld("Alice"))
@@ -448,7 +448,7 @@ public sealed class CardProgressTests : IAsyncLifetime
         Assert.Equal(Lunatic, saved.StoragePlans[2].All.CardInfo[1].CardSlotInfo[2].ItemId);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SocketedCardUsesItsActualLevelAndTierInStats()
     {
         await using var alice = await InWorld("Alice");
@@ -486,7 +486,7 @@ public sealed class CardProgressTests : IAsyncLifetime
         Assert.Equal(1, plan.StoragePlans[1].Inc.CardInfo[1].Inc.CardSlotInfo[1].Inc.StarLevel);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task StarUpReservesTargetAndCapsAtLastTier()
     {
         long guid;
@@ -529,7 +529,7 @@ public sealed class CardProgressTests : IAsyncLifetime
         Assert.Equal($"{Lunatic}|7|0|0|0", FullCard(bag, guid).ItemInfos[520].StrVal);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task RevertKeepsBoundFlashRefundSeparateFromNormalStack()
     {
         long target;
@@ -570,7 +570,7 @@ public sealed class CardProgressTests : IAsyncLifetime
         Assert.Equal(2, cards.Where(i => i.ItemInfos[530].LongVal == 0).Sum(i => i.Stack));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task RevertRefusalsPreserveProgressAndCannotRefundTwice()
     {
         long guid;
@@ -619,7 +619,7 @@ public sealed class CardProgressTests : IAsyncLifetime
         Assert.False(FullCard(full, guid).ItemInfos.ContainsKey(510));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task BadSocketAndCardRequestsUseSpecificResultsWithoutMutation()
     {
         await using var alice = await InWorld("Alice");

@@ -12,7 +12,7 @@ public sealed class PetCombatRulesTests
     private static readonly GameData Data = new(Options.Create(new ServerOptions { GameDataDir = Path.Combine(RepoRoot(), "data") }),
         NullLogger<GameData>.Instance);
 
-    [Theory]
+    [ClientDataTheory]
     [InlineData(13001, 1, 1, 0, 3165, 183, 20)]
     [InlineData(13001, 12, 1, 0, 3363, 218, 240)]
     [InlineData(13001, 12, 1, 1, 3498, 227, 250)]
@@ -39,7 +39,7 @@ public sealed class PetCombatRulesTests
         Assert.Null(PetCombatRules.Attributes(Data, 13001, new PetData { Level = 9999, Star = 1 }));
     }
 
-    [Fact]
+    [ClientDataFact]
     public void ShieldAndHealOperandsUseTheirConfiguredSourceAndPercent()
     {
         var source = new StatSheet(); source[101] = 3363;

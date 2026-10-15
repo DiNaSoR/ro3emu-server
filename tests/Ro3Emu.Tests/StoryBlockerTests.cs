@@ -80,7 +80,7 @@ public sealed class StoryBlockerTests : IAsyncLifetime
         await self.WaitAsync(Wait);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task ARegionWithTheServerAction613EntersItsStoryDungeonWhileItsQuestRuns()
     {
         // sc_pay_fild03_001 region 1010209001 "613|1021301|1|10102100" for 10102100 [101018,1021301,1].
@@ -99,7 +99,7 @@ public sealed class StoryBlockerTests : IAsyncLifetime
         await sw.WaitAsync(Wait);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task AFlyWingMovesThePlayerOnItsMapAndCountsForItsQuest()
     {
         // ItemConfig 1002001 [[101,0],[104],[106]]: 101 JumpSameMap is server-hosted; 10102150 [103042,1002001,1].
@@ -118,7 +118,7 @@ public sealed class StoryBlockerTests : IAsyncLifetime
         Assert.Equal(10220, await Read(s => s.SceneEntry));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task AButterflyWingGoesToTheMapPickedOnTheMapPanel()
     {
         // ItemConfig 1002000 [[8,...],[102,0],[104]]; the map panel sends ItemUseParamInfo.butterflyWings.mapId.
@@ -136,7 +136,7 @@ public sealed class StoryBlockerTests : IAsyncLifetime
         Assert.Equal(1, await Read(s => s.Items.Where(i => i.Entry == 1002000).Sum(i => i.Stack)));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task TheGrowthManualOffersOneTitleAtATimeAndItsChapterIsClaimedAfterItsChildren()
     {
         // NewbieTitlesConfig title 1: chapter 701990 [104004, 701010..701060]; title 2 is 702990.
@@ -161,7 +161,7 @@ public sealed class StoryBlockerTests : IAsyncLifetime
             Assert.Equal(TaskState.Running, await Read(s => s.Tasks!.Infos[id].Status));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task AGrowthChapterWithAnUnmetConditionIsOfferedLocked()
     {
         // 706990 _iCondition 88000070 (base level 53): offered after 705990, flagged isChapterLocked.

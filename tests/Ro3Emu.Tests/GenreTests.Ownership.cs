@@ -26,7 +26,7 @@ public sealed partial class GenreTests
         return reply.Code;
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task PairCommitPublishesBothRolesBeforeWaitingRenameAndPreservesWholeBlob()
     {
         await using var donor = await Enter("PairDonor");
@@ -96,7 +96,7 @@ public sealed partial class GenreTests
         return response.ResponseId;
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task OfflineSeekerLoginWaitsForPairApplyAndLoadsCommittedRecommendation()
     {
         await using var donor = await Enter("LoginDonor");
@@ -142,7 +142,7 @@ public sealed partial class GenreTests
         Assert.Equal(state.ToByteArray(), Service<RoleStore>().LoadGenre(seekerId));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task OfflineDonorLoginWaitsUntilRecommendationSnapshotIsApplied()
     {
         var donor = await Enter("OfflineDonor");
@@ -187,7 +187,7 @@ public sealed partial class GenreTests
         Assert.Equal(1, Service<ItemStore>().Load(Session(seeker).Role!.Id).Single(i => i.Guid == ownGuid).Grid);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task RecommendationHoldsDonorSnapshotAgainstGmThroughApplyAndHasNeutralExactLedger()
     {
         await using var donor = await Enter("SnapDonor");
@@ -245,7 +245,7 @@ public sealed partial class GenreTests
         Assert.Equal(ownGuid, target.EquipmentPlans.EquipPlans[1].ItemsEquipGrid[1]);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task DonorEquipmentCommandWaitsForRecommendationSnapshotReservation()
     {
         await using var donor = await Enter("EquipDonor");
@@ -287,7 +287,7 @@ public sealed partial class GenreTests
         Assert.NotEqual(donorGuid, ownGuid);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task GenreLedgerFaultRefusesWithoutPublishingEquipmentOrPlan()
     {
         await using var donor = await Enter("FaultDonor");

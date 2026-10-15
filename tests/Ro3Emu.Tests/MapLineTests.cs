@@ -80,7 +80,7 @@ public sealed class MapLineTests : IAsyncLifetime
     private static bool Chat(BotEvent e,string text)=>e.IsGame(ChatService.TunnelDown)&&e.Body.Length>=8
         &&BitConverter.ToUInt32(e.Body,0)==4&&NotifyNewTextChatMessage.Parser.ParseFrom(e.Body.AsSpan(8)).Msg.Content==text;
 
-    [Theory]
+    [ClientDataTheory]
     [InlineData("4_1")]
     [InlineData("@TGS#_4_1")]
     public async Task SameMapSwitchReservesUntilLoadedRejectsSecondAndIsolatesAoiChatAndSocial(string channel)
@@ -125,7 +125,7 @@ public sealed class MapLineTests : IAsyncLifetime
         await Load(bob,b);Assert.Contains(b,a.Visible);Assert.Contains(a,b.Visible);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task InvalidLineAndForgedOwnerRefusedThenFailedLoadRequiresReconnectOnValidLine()
     {
         var alice=await InWorld("Alice");var a=Player("Alice");
@@ -153,7 +153,7 @@ public sealed class MapLineTests : IAsyncLifetime
         Assert.Null(current.Handoff);Assert.False(current.SceneRecoveryRequired);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task HostilePlayersAtSamePositionCannotDamageAcrossLinesButCanAfterJoining()
     {
         await using var alice=await InWorld("Alice");await using var bob=await InWorld("Bob");
@@ -178,7 +178,7 @@ public sealed class MapLineTests : IAsyncLifetime
         await Until(()=>Service<CharacterService>().Stats(b)[2000]<hp);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task LoadDeadlineReleasesReservationAndFencesLateAcknowledgment()
     {
         await using var alice=await InWorld("Alice");var a=Player("Alice");
@@ -197,7 +197,7 @@ public sealed class MapLineTests : IAsyncLifetime
         Assert.DoesNotContain(a,Service<World>().PlayersIn(old.Destination.WorldScene));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SuspendedLoadPublicationCannotBeSupersededByAnotherLineOfTheSameMap()
     {
         await using var alice = await InWorld("Alice");
@@ -239,7 +239,7 @@ public sealed class MapLineTests : IAsyncLifetime
         Assert.Null(Service<PublicLineManager>().Reserved(player));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SuspendedCastCannotCreateGroundUnitAfterLineDeparture()
     {
         await using var alice=await InWorld("Alice");var a=Player("Alice");
@@ -277,7 +277,7 @@ public sealed class MapLineTests : IAsyncLifetime
         Assert.DoesNotContain(Service<PublicLineManager>().Snapshot(10100),l=>l.Map==old);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task FaultDuringLeaveReleasesExactDestinationAndCannotPublishOldLoad()
     {
         await using var alice=await InWorld("Alice");var a=Player("Alice");

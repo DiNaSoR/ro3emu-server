@@ -42,7 +42,7 @@ public sealed partial class LotteryActivityTests
         return (row.GetString(0), row.GetInt64(1));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task HeldDrawKeepsTicketPityAndResultUnpublishedWhileOtherRoleProgresses()
     {
         await using var buyer = await InWorld(create: true);

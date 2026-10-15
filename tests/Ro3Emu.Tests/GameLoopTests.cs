@@ -37,13 +37,16 @@ public sealed class GameLoopTests : IAsyncLifetime
     public async Task LateUntrackedContinuationRunsOnTheLoopInsteadOfThrowing()
     {
         var resumed = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         async Task Late()
         {
-            await Task.Delay(50);
+            await release.Task;
             resumed.TrySetResult(_loop.IsOnLoop);
         }
         // The dropped task outlives the invocation's permit; its continuation used to throw on a timer thread.
+        // It resumes only after the invocation has finished (a fixed delay could fire before that under load).
         await _loop.InvokeAsync(() => { _ = Late(); return Task.CompletedTask; });
+        release.SetResult();
         Assert.True(await resumed.Task.WaitAsync(TimeSpan.FromSeconds(5)));
         Assert.Equal(1, _loop.OrphanContinuations);
         Assert.Equal(0, _loop.DrainStatus.Outstanding);

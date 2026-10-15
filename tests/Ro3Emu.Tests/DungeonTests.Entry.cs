@@ -12,7 +12,7 @@ public sealed partial class DungeonTests
     /// idle safety past the observed two-second death, explicit player pull, real retaliation and settlement.
     /// Only the Normal boss's final HP is controlled to finish the reward regression quickly.
     /// </summary>
-    [Theory]
+    [ClientDataTheory]
     [InlineData(50101, 4300001, 30, 380963L, 603L, false)]
     [InlineData(50104, 4300000, 60, 10352920L, 12527L, true)]
     public async Task MatchedCulvertWaitsForPlayerEngagementBeforeBossDamage(int multi, int npc,

@@ -188,7 +188,7 @@ public sealed class SocialD13dTests : IAsyncLifetime
         finally { accounts.AfterWriterCommitForTest = null; }
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task HeldGiftKeepsRecipientGmBehindReceiptAndPreservesIndependentSocialRole()
     {
         var (alice, a) = await InWorld("GiftAlice");

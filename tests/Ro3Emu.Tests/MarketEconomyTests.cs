@@ -31,7 +31,7 @@ internal static class MarketEconomyEvidence
 
 public sealed partial class TradeTests
 {
-    [Fact]
+    [ClientDataFact]
     public async Task E03TradeEscrowMailClaimAndListingFeeHaveExactInstancesAndSources()
     {
         await using var seller = await InWorld("LedgerSeller");
@@ -75,7 +75,7 @@ public sealed partial class TradeTests
 
 public sealed partial class StallsTests
 {
-    [Fact]
+    [ClientDataFact]
     public async Task E03SystemStockReplacementRecordsGrossRetirementAndRestock()
     {
         await using var buyer = await InWorld("RestockLedger");
@@ -100,7 +100,7 @@ public sealed partial class StallsTests
                 && x.Location == holding.Location && x.Reason == EconomyReason.SystemRestock).Sum(x => x.Delta));
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task E03PlayerStallFeeSaleTaxAndReturnedStockAreExactTransfers()
     {
         await using var seller = await InWorld("LedgerStall"); await using var buyer = await InWorld("LedgerShopper");
@@ -130,7 +130,7 @@ public sealed partial class StallsTests
 
 public sealed partial class GuildTests
 {
-    [Fact]
+    [ClientDataFact]
     public async Task E03GuildMarketUpdateRequiresCapConfirmationAndKeepsRemainingEscrow()
     {
         await using var seller = await InWorld("CapEditor"); await Level("capeditor");
@@ -166,7 +166,7 @@ public sealed partial class GuildTests
         Assert.DoesNotContain(ledger.Legs, x => x.Kind == EconomyLegKind.Source);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task E03ConfirmedGuildPurchaseKeepsFullPriceAndRecordsCappedExcess()
     {
         await using var seller = await InWorld("CapVendor"); await using var buyer = await InWorld("CapBuyer");
@@ -200,7 +200,7 @@ public sealed partial class GuildTests
         Assert.DoesNotContain(ledger.Legs, x => x.Kind == EconomyLegKind.Source);
     }
 
-    [Theory]
+    [ClientDataTheory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task E03GuildMarketCapRefusalConfirmationAndExpiryRecordOnlyActualDiscard(bool expire)

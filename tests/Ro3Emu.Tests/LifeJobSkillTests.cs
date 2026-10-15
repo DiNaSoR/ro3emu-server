@@ -58,7 +58,7 @@ public sealed class LifeJobSkillTests : IAsyncLifetime
         return parser.ParseFrom(e.Body);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task SelectedMinerReductionChangesQuoteAndCommittedGatherCost()
     {
         await using (var b = new BotClient(http, File.ReadAllText(Path.Combine(dir, "gate_rsa_public.pem"))))
@@ -111,7 +111,7 @@ public sealed class LifeJobSkillTests : IAsyncLifetime
         Assert.Equal(1000, persisted.Skill); Assert.Equal(481, persisted.Vigor);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task TwentiethGatherAddsOneMainUnitAndStagesCounterOnly()
     {
         await using var b = new BotClient(http, File.ReadAllText(Path.Combine(dir, "gate_rsa_public.pem")));
@@ -151,7 +151,7 @@ public sealed class LifeJobSkillTests : IAsyncLifetime
         Assert.Equal(0, state.Staged); Assert.Equal(19, state.Published);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task AscensionPromotesOneForManyAndLostGrantRemovesExtraSlots()
     {
         await using var b = new BotClient(http, File.ReadAllText(Path.Combine(dir, "gate_rsa_public.pem")));

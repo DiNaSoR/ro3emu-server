@@ -29,7 +29,7 @@ public sealed class TrafficLogTests : IDisposable
     private string[] Lines() => Directory.Exists(Path.Combine(dir, "logs"))
         ? Directory.GetFiles(Path.Combine(dir, "logs"), "traffic-*.jsonl").SelectMany(File.ReadAllLines).ToArray() : [];
 
-    [Fact]
+    [ClientDataFact]
     public void OnModeFormatsBothDirectionsOffTheCallerThread()
     {
         var log = Create("on");
@@ -73,7 +73,7 @@ public sealed class TrafficLogTests : IDisposable
         try { Directory.Delete(dir, true); } catch (IOException) { }
     }
 
-    [Fact]
+    [ClientDataFact]
     public void OnlyALoadedCatalogCallsAnIdUnknownToTheClient()
     {
         // Audit 11.10: the dispatcher sends unknown ids to a runtime scope instead of the manifest's Realm default.
