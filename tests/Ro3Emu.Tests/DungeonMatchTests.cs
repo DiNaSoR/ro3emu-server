@@ -234,8 +234,9 @@ public sealed class DungeonMatchTests : IAsyncLifetime
     [ClientDataFact]
     public async Task ChickenRoutingCrossOwnerExclusionSwitchAndRoleCleanup()
     {
-        // TimedEventTests establish the exported Kafra window at this date/time; select it before role login.
-        clock.Set(new DateTimeOffset(2026, 11, 10, 16, 5, 0, TimeSpan.Zero));
+        // Inside the exported Kafra window (activity 114); select it before role login.
+        clock.Set(DateTimeOffset.FromUnixTimeSeconds(
+            ScheduleRows.Weekly(114, new DateTime(2026, 11, 10), clock.LocalTimeZone).Start + 300));
         await using var alice = await InWorld("Alice");
         await Gm(alice, "!lvl 99");
         Assert.True(Service<TimedTodoSchedule>().IsOpen(114));

@@ -106,6 +106,10 @@ public sealed class TimedEventTests : IAsyncLifetime
     }
 
     private GameSession Session(BotClient bot) => Service<SessionRegistry>().All().Single(s => s.Account == bot.Account && s.Role != null);
+
+    /// <summary>The exported weekly window of a timed match's activity row, past the realm's opening weeks.</summary>
+    private ScheduleRows.Window MatchWindow(int todo) =>
+        ScheduleRows.Weekly(todo, new DateTime(2026, 11, 10), clock.LocalTimeZone, Service<GameData>());
     private Task OverrideMatchShapeAsync(int entry, int players, int teamSize) => OnLoop(() =>
     {
         var name = entry == 2 ? "EatChickenMatchConfig" : "DragonIslandMatchConfig";
@@ -155,7 +159,7 @@ public sealed class TimedEventTests : IAsyncLifetime
     private async Task<DungeonBaseInfoNotify> StartChickenAsync(params BotClient[] players)
     {
         foreach (var player in players) await Gm(player, "!lvl 99");
-        clock.Set(new DateTimeOffset(2026, 11, 10, 16, 5, 0, TimeSpan.Zero).ToUnixTimeSeconds());
+        clock.Set(MatchWindow(114).Start + 300);
         await OverrideMatchShapeAsync(2, players.Length, 1);
         foreach (var player in players)
         {
@@ -335,9 +339,9 @@ public sealed class TimedEventTests : IAsyncLifetime
     }
 
     [ClientDataTheory]
-    [InlineData(2, 2240101, 114, 10)]
-    [InlineData(6, 3010303, 126, 11)]
-    public async Task TimedMatchRequiresWindowAndSettlesOnlyActualOpposingPlayerCombat(int entry, int sceneEntry, int todo, int day)
+    [InlineData(2, 2240101, 114)]
+    [InlineData(6, 3010303, 126)]
+    public async Task TimedMatchRequiresWindowAndSettlesOnlyActualOpposingPlayerCombat(int entry, int sceneEntry, int todo)
     {
         await using var alice = await InWorld("Alice");
         await using var bob = await InWorld("Bob");
@@ -346,7 +350,8 @@ public sealed class TimedEventTests : IAsyncLifetime
         Assert.Equal(ErrorCodes.FeatureUnavailable,
             (await Next(alice, TimedBattleService.StartMatch, StartMatchResp.Parser)).Result);
         await Gm(alice, "!lvl 99"); await Gm(bob, "!lvl 99");
-        clock.Set(new DateTimeOffset(2026, 11, day, 16, 5, 0, TimeSpan.Zero).ToUnixTimeSeconds());
+        var window = MatchWindow(todo);
+        clock.Set(window.Start + 300);
         Assert.True(Service<TimedTodoSchedule>().IsOpen(todo));
         var exportedMatch = Service<GameData>().Row(entry == 2 ? "EatChickenMatchConfig" : "DragonIslandMatchConfig", entry)!.Value;
         Assert.Equal(entry == 2 ? 100 : 30, GameData.Int(exportedMatch, "_kStartQuantity"));
@@ -367,9 +372,10 @@ public sealed class TimedEventTests : IAsyncLifetime
         if (entry == 6)
         {
             await Gm(bob, "!item 17 80"); // Controlled prior net score below rank-1 promotion threshold.
+            var today = window.LocalStart;
             await OnLoop(() =>
             {
-                Session(alice).TimedBattle!.DragonCurrencyDay = 20261111;
+                Session(alice).TimedBattle!.DragonCurrencyDay = today.Year * 10000L + today.Month * 100 + today.Day;
                 Session(alice).TimedBattle!.DragonCurrencyEarned = 950;
                 Session(bob).TimedBattle!.DragonScore = 80;
                 Session(bob).TimedBattle!.DragonRankScore = 80;
@@ -478,7 +484,7 @@ public sealed class TimedEventTests : IAsyncLifetime
         await using var dan = await InWorld("Dan");
         var players = new[] { alice, bob, cara, dan };
         foreach (var player in players) await Gm(player, "!lvl 99");
-        clock.Set(new DateTimeOffset(2026, 11, 10, 16, 5, 0, TimeSpan.Zero).ToUnixTimeSeconds());
+        clock.Set(MatchWindow(114).Start + 300);
         await OverrideMatchShapeAsync(2, 4, 2);
         foreach (var player in players)
         {

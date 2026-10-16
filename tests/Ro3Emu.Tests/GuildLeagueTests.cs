@@ -6,6 +6,7 @@ using Romsg;
 using Ro3Emu.Bot;
 using Ro3Emu.Server;
 using Ro3Emu.Server.Accounts;
+using Ro3Emu.Server.Data;
 using Ro3Emu.Server.Game;
 using Ro3Emu.Server.Maps;
 
@@ -176,10 +177,17 @@ public sealed class GuildLeagueTests : IAsyncLifetime
         Assert.Equal((At(3, 3, 5, 0), At(3, 3, 20, 0), At(3, 6, 20, 0), At(4, 6, 20, 0), At(4, 6, 20, 30)),
             (tournaments[1].Init, tournaments[1].Preliminary.Start, tournaments[1].Semifinal.Start, tournaments[1].Final.Start,
              tournaments[1].Final.End));
-        // Then _kDay 1/3/6/13 every two weeks: Monday 05:03, Wednesday, Saturday, Saturday of the next week.
-        Assert.Equal((3, At(5, 1, 5, 3), At(5, 3, 20, 30), At(5, 6, 20, 30), At(6, 6, 20, 30)),
+        // Then every two weeks from week 5 on the rows' own first _kDay and start (13 is Saturday of the next week).
+        long Steady(int week, int id)
+        {
+            var row = Service<GameData>().Row("DailyActivityConfig", id)!.Value;
+            int day = (int)GameData.Number(row.GetProperty("_kDay")[0])!.Value;
+            int start = (int)GameData.Number(row.GetProperty("_kTime")[0])!.Value;
+            return At(week, day, start / 100, start % 100);
+        }
+        Assert.Equal((3, Steady(5, 129), Steady(5, 109), Steady(5, 110), Steady(5, 111)),
             (tournaments[2].Index, tournaments[2].Init, tournaments[2].Preliminary.Start, tournaments[2].Semifinal.Start, tournaments[2].Final.Start));
-        Assert.Equal(At(7, 1, 5, 3), tournaments[3].Init);
+        Assert.Equal(Steady(7, 129), tournaments[3].Init);
 
         var info = calendar.Info(At(1, 1, 12, 0));
         Assert.Equal((GuildLeagueStatus.NotOpen, false, At(1, 3, 20, 30)), (info.EStatus, info.Open, info.NextPreliminaryTime));

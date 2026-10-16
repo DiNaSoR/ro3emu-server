@@ -65,6 +65,12 @@ public sealed class DailyWindowsTests : IAsyncLifetime
         Assert.Equal(clock.Unix(end), window.End);
     }
 
+    private void Window(int id, long start, long end)
+    {
+        var window = Assert.IsType<TimedTodoSchedule.Occurrence>(Service<TimedTodoSchedule>().CurrentOrNext(id));
+        Assert.Equal((start, end), (window.Start, window.End));
+    }
+
     [ClientDataFact]
     public void WeeklyLeagueUsesOpeningWeekdayAndSkipsEmptyCustomWeeks()
     {
@@ -85,8 +91,9 @@ public sealed class DailyWindowsTests : IAsyncLifetime
     [ClientDataFact]
     public void ConfiguredTimedRowsUseCurrentThenNextOccurrence()
     {
-        // Despite the task's example label, 115 is Wednesday-only and 125 is custom/weekly, not daily.
-        Window(115, "2026-10-14 20:30:00", "2026-10-14 21:30:00");
+        // Despite the task's example label, 115 is one weekday only and 125 is custom/weekly, not daily.
+        var weekly = ScheduleRows.Weekly(115, new DateTime(2026, 10, 9), clock.Zone, Service<GameData>());
+        Window(115, weekly.Start, weekly.End);
         Window(125, "2026-10-25 20:00:00", "2026-10-25 21:00:00");
         Window(200, "2026-10-09 10:00:00", "2026-10-09 22:00:00");
         clock.Set("2026-10-09 22:00:00");
@@ -123,10 +130,19 @@ public sealed class DailyWindowsTests : IAsyncLifetime
         Assert.False(Service<TimedTodoSchedule>().IsOpen(3004));
         Window(3301, "2026-10-09 18:30:00", "2026-10-09 19:00:00");
         Window(3303, "2026-10-15 20:30:00", "2026-10-15 21:00:00");
-        clock.Set("2026-10-11 16:15:00");
-        Window(3304, "2026-10-11 16:20:00", "2026-10-11 16:35:00");
+        // 3304's control phases are week offsets; each cycle group (Matching + Battling) is one occurrence.
+        var data = Service<GameData>();
+        long control = GameData.Int(data.Row("DailyActivityConfig", 3304)!.Value, "_iTimeCtrlId");
+        var cycles = data.Table("TimeLimitConfig").Values.Where(r => GameData.Int(r, "_iTimeLimitId") == control)
+            .GroupBy(r => GameData.Int(r, "_iCycleGroup")).OrderBy(g => g.Key)
+            .Select(g => (Start: g.Min(r => GameData.Int(r, "_iWeekStart")), End: g.Max(r => GameData.Int(r, "_iWeekEnd"))))
+            .ToArray();
+        long Week(long offset) => ScheduleRows.Unix(new DateTime(2026, 10, 12).AddSeconds(offset), clock.Zone);
+        Assert.True(cycles[1].Start > cycles[0].End);
+        clock.Set(Week(cycles[0].End));
+        Window(3304, Week(cycles[1].Start), Week(cycles[1].End));
         Assert.False(Service<TimedTodoSchedule>().IsOpen(3304));
-        clock.Set("2026-10-11 16:20:00");
+        clock.Set(Week(cycles[1].Start));
         Assert.True(Service<TimedTodoSchedule>().IsOpen(3304));
         clock.Set("2026-10-06 20:40:00");
         Window(3400, "2026-10-06 20:30:00", "2026-10-06 21:00:00"); // custom overrides conflicting 1079
@@ -245,6 +261,7 @@ public sealed class DailyWindowsTests : IAsyncLifetime
             return new DateTimeOffset(date, Zone.GetUtcOffset(date)).ToUnixTimeSeconds();
         }
         public void Set(string value) => Interlocked.Exchange(ref seconds, Unix(value));
+        public void Set(long value) => Interlocked.Exchange(ref seconds, value);
     }
 
     private static string RepoRoot()

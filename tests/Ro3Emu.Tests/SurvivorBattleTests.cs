@@ -20,7 +20,7 @@ namespace Ro3Emu.Tests;
 public sealed class SurvivorBattleTests : IAsyncLifetime
 {
     private readonly string dataDir = Path.Combine(Path.GetTempPath(), "ro3emu-survivor-" + Guid.NewGuid().ToString("N"));
-    private readonly ManualClock clock = new(new DateTimeOffset(2026, 11, 10, 16, 5, 0, TimeSpan.Zero)); // Tuesday, window 114
+    private readonly ManualClock clock = new(DateTimeOffset.UnixEpoch);
     private WebApplication app = null!;
     private string http = "";
     private T Service<T>() where T : notnull => app.Services.GetRequiredService<T>();
@@ -30,6 +30,8 @@ public sealed class SurvivorBattleTests : IAsyncLifetime
 
     private async Task HostAsync(int players, int teamSize)
     {
+        // Five minutes into the exported weekly window of activity 114, past the realm's opening weeks.
+        clock.Set(ScheduleRows.Weekly(114, new DateTime(2026, 11, 10), clock.LocalTimeZone).Start + 300);
         var (port, micro, game) = TestPorts.FreePorts();
         app = ServerHost.Create([], o =>
         {

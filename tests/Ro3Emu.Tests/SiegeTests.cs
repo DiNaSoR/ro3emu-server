@@ -18,18 +18,25 @@ public sealed class SiegeTests : IAsyncLifetime
 {
     private readonly string dataDir = Path.Combine(Path.GetTempPath(), "ro3emu-siege-" + Guid.NewGuid().ToString("N"));
     private static readonly TimeSpan Wait = TimeSpan.FromSeconds(12);
-    private sealed class Clock : TimeProvider
+    private static readonly TimeZoneInfo Zone = TimeZoneInfo.FindSystemTimeZoneById("Central European Standard Time");
+    private sealed class Clock(long start) : TimeProvider
     {
-        private long seconds = At(2026, 10, 14, 20, 29, 59);
+        private long seconds = start;
         public override DateTimeOffset GetUtcNow() => DateTimeOffset.FromUnixTimeSeconds(Interlocked.Read(ref seconds));
-        public override TimeZoneInfo LocalTimeZone => TimeZoneInfo.FindSystemTimeZoneById("Central European Standard Time");
+        public override TimeZoneInfo LocalTimeZone => Zone;
         public void Set(long value) => Interlocked.Exchange(ref seconds, value);
     }
-    private readonly Clock clock = new();
+    // The exported siege occurrence (DailyActivityConfig 115) in the week of 12 Oct 2026, and the following one.
+    private readonly ScheduleRows.Window siege, nextSiege;
+    private readonly Clock clock;
     private WebApplication app = null!;
     private string http = "";
-    private static long At(int year, int month, int day, int hour, int minute, int second = 0)
-        => new DateTimeOffset(year, month, day, hour, minute, second, TimeSpan.FromHours(2)).ToUnixTimeSeconds();
+    public SiegeTests()
+    {
+        siege = ScheduleRows.Weekly(115, new DateTime(2026, 10, 12), Zone);
+        nextSiege = ScheduleRows.Weekly(115, siege.LocalStart.Date.AddDays(1), Zone);
+        clock = new(siege.Start - 1);
+    }
     private T Service<T>() where T : notnull => app.Services.GetRequiredService<T>();
     private GameSession Session(BotClient bot) => Service<SessionRegistry>().All().Single(s => s.Account == bot.Account && s.Role != null);
     private Task OnLoop(Func<Task> action) => Service<GameLoop>().InvokeAsync(action);
@@ -100,7 +107,7 @@ public sealed class SiegeTests : IAsyncLifetime
     }
 
     [ClientDataFact]
-    public async Task PanelUsesRealWednesdayWindowAndNoHistoryRefusesWithoutFabrication()
+    public async Task PanelUsesTheExportedWindowAndNoHistoryRefusesWithoutFabrication()
     {
         await using var bot = await Bot("SiegePlain");
         var before = await Base(bot);
@@ -108,22 +115,22 @@ public sealed class SiegeTests : IAsyncLifetime
         Assert.Equal(40, before.SiegeBaseInfo.BattleInfos.Count);
         Assert.Equal(0, before.SiegeBaseInfo.CurrentCityId);
         var city = before.SiegeBaseInfo.BattleInfos[1001];
-        Assert.Equal(At(2026, 10, 14, 20, 30), city.StartTime);
-        Assert.Equal(At(2026, 10, 14, 21, 30), city.EndTime);
+        Assert.Equal(siege.Start, city.StartTime);
+        Assert.Equal(siege.End, city.EndTime);
         Assert.Equal(SiegeCityActivityState.NotOpen, city.ActivityState);
         Assert.Equal(0, city.AttackGuildInfo.Guid);
         Assert.Equal(0, Assert.Single(city.AttackGuildInfo.GuildManagerData).PlayerID);
         Assert.Equal("", Assert.Single(city.AttackGuildInfo.HistoryNames));
-        clock.Set(At(2026, 10, 14, 20, 30));
+        clock.Set(siege.Start);
         await OnLoop(Service<TerritoryWarsService>().ReconcileAsync);
         var open = await Base(bot, state: SiegeCityActivityState.Fighting);
         Assert.Equal(SiegeCityActivityState.Fighting, open.SiegeBaseInfo.BattleInfos[1001].ActivityState);
-        clock.Set(At(2026, 10, 14, 21, 30));
+        clock.Set(siege.End);
         await OnLoop(Service<TerritoryWarsService>().ReconcileAsync);
         var closed = await Base(bot, state: SiegeCityActivityState.NotOpen,
-            starts: At(2026, 10, 21, 20, 30));
+            starts: nextSiege.Start);
         Assert.Equal(SiegeCityActivityState.NotOpen, closed.SiegeBaseInfo.BattleInfos[1001].ActivityState);
-        Assert.Equal(At(2026, 10, 21, 20, 30), closed.SiegeBaseInfo.BattleInfos[1001].StartTime);
+        Assert.Equal(nextSiege.Start, closed.SiegeBaseInfo.BattleInfos[1001].StartTime);
         await bot.SendGameAsync(TerritoryWarsService.SiegeHistoryQuery, new SiegeCityHistoryInfoReq { CityIds = { 1001 } });
         Assert.Equal(ErrorCodes.DataNotFound, (await Next(bot, TerritoryWarsService.SiegeHistoryQuery, SiegeCityHistoryInfoResp.Parser)).Result);
         await bot.SendGameAsync(TerritoryWarsService.SiegeToolList, new GetGuildWartimeToolBelongListReq());
@@ -142,7 +149,7 @@ public sealed class SiegeTests : IAsyncLifetime
         await using var defense = await Bot("SiegeSeedDef");
         long ga = await Guild(gm, "SgSeedA"), gd = await Guild(defense, "SgSeedD");
         await gm.JoinChatAsync("4_1");
-        clock.Set(At(2026, 10, 14, 20, 30, 25));
+        clock.Set(siege.Start + 25);
         await gm.SendChatAsync("4_1", 2, $"!siege seed 1001 {ga} {gd}", channelIndex: 4);
         await Next(gm, GmCommands.BroadcastNotify, BroadCastNotify.Parser);
         var panel = await Base(gm, currentCity: 1001);
@@ -158,32 +165,32 @@ public sealed class SiegeTests : IAsyncLifetime
         await using var gm = await Bot("SiegeGm");
         await using var guest = await Bot("SiegeGuest");
         await gm.JoinChatAsync("4_1"); await guest.JoinChatAsync("4_1");
-        clock.Set(At(2026, 10, 14, 20, 30, 25));
-        Assert.Equal(At(2026, 10, 14, 20, 30), (await Base(gm, state: SiegeCityActivityState.Fighting)).SiegeBaseInfo.BattleInfos[1001].StartTime);
+        clock.Set(siege.Start + 25);
+        Assert.Equal(siege.Start, (await Base(gm, state: SiegeCityActivityState.Fighting)).SiegeBaseInfo.BattleInfos[1001].StartTime);
         await guest.SendChatAsync("4_1", 2, "!siege open", channelIndex: 4);
         Assert.Contains("not enabled", (await Next(guest, GmCommands.BroadcastNotify, BroadCastNotify.Parser)).Content);
         await gm.SendChatAsync("4_1", 2, "!siege open", channelIndex: 4);
         Assert.Contains("Fighting", (await Next(gm, GmCommands.BroadcastNotify, BroadCastNotify.Parser)).Content);
-        Assert.Equal(At(2026, 10, 14, 20, 30), (await Base(gm, state: SiegeCityActivityState.Fighting)).SiegeBaseInfo.BattleInfos[1001].StartTime);
-        clock.Set(At(2026, 10, 14, 20, 30, 26));
+        Assert.Equal(siege.Start, (await Base(gm, state: SiegeCityActivityState.Fighting)).SiegeBaseInfo.BattleInfos[1001].StartTime);
+        clock.Set(siege.Start + 26);
         await gm.SendChatAsync("4_1", 2, "!siege open", channelIndex: 4);
         Assert.Contains("Fighting", (await Next(gm, GmCommands.BroadcastNotify, BroadCastNotify.Parser)).Content);
-        Assert.Equal(At(2026, 10, 14, 20, 30), (await Base(gm, state: SiegeCityActivityState.Fighting)).SiegeBaseInfo.BattleInfos[1001].StartTime);
+        Assert.Equal(siege.Start, (await Base(gm, state: SiegeCityActivityState.Fighting)).SiegeBaseInfo.BattleInfos[1001].StartTime);
         await gm.SendChatAsync("4_1", 2, "!siege close", channelIndex: 4);
         Assert.Contains("NotOpen", (await Next(gm, GmCommands.BroadcastNotify, BroadCastNotify.Parser)).Content);
-        Assert.Equal(At(2026, 10, 21, 20, 30), (await Base(gm, state: SiegeCityActivityState.NotOpen,
-            starts: At(2026, 10, 21, 20, 30))).SiegeBaseInfo.BattleInfos[1001].StartTime);
+        Assert.Equal(nextSiege.Start, (await Base(gm, state: SiegeCityActivityState.NotOpen,
+            starts: nextSiege.Start)).SiegeBaseInfo.BattleInfos[1001].StartTime);
         await gm.SendGameAsync(30400, new EnterDungeonReq { SceneEntry = 2230101,
             InitData = new DungeonInitData { SiegeInitData = new SiegeInitData { CityId = 1001 } } });
         Assert.Equal(ErrorCodes.TerritoryWarClosed, (await Next(gm, 30400, EnterDungeonRsp.Parser)).Result);
-        clock.Set(At(2026, 10, 14, 21, 30));
+        clock.Set(siege.End);
         await gm.SendChatAsync("4_1", 2, "!siege close", channelIndex: 4);
         Assert.Contains("NotOpen", (await Next(gm, GmCommands.BroadcastNotify, BroadCastNotify.Parser)).Content);
-        Assert.Equal(At(2026, 10, 21, 20, 30), (await Base(gm, state: SiegeCityActivityState.NotOpen,
-            starts: At(2026, 10, 21, 20, 30))).SiegeBaseInfo.BattleInfos[1001].StartTime);
-        clock.Set(At(2026, 10, 21, 20, 30));
+        Assert.Equal(nextSiege.Start, (await Base(gm, state: SiegeCityActivityState.NotOpen,
+            starts: nextSiege.Start)).SiegeBaseInfo.BattleInfos[1001].StartTime);
+        clock.Set(nextSiege.Start);
         Assert.Equal(SiegeCityActivityState.Fighting, (await Base(gm, state: SiegeCityActivityState.Fighting,
-            starts: At(2026, 10, 21, 20, 30))).SiegeBaseInfo.BattleInfos[1001].ActivityState);
+            starts: nextSiege.Start)).SiegeBaseInfo.BattleInfos[1001].ActivityState);
     }
 
     [ClientDataFact]
@@ -193,7 +200,7 @@ public sealed class SiegeTests : IAsyncLifetime
         await using var defense = await Bot("SiegeSeniorDef");
         long ga = await Guild(attack, "SgSAtk"), gd = await Guild(defense, "SgSDef");
         var guilds = Service<GuildStore>();
-        long start = At(2026, 10, 14, 20, 30);
+        long start = siege.Start;
         await OnLoop(async () =>
         {
             var wars = Service<TerritoryWarsService>();
@@ -249,7 +256,7 @@ public sealed class SiegeTests : IAsyncLifetime
         Assert.Equal(1001, panel.SiegeBaseInfo.CurrentCityId);
         Assert.Equal(ga, panel.SiegeBaseInfo.BattleInfos[1001].AttackGuildInfo.Guid);
         Assert.Equal(gd, panel.SiegeBaseInfo.BattleInfos[1001].DefenseGuildInfo.Guid);
-        clock.Set(At(2026, 10, 14, 20, 30));
+        clock.Set(siege.Start);
         await OnLoop(Service<TerritoryWarsService>().ReconcileAsync);
         await outsider.SendGameAsync(30400, new EnterDungeonReq { SceneEntry = 2230101 });
         Assert.Equal(ErrorCodes.FeatureUnavailable, (await Next(outsider, 30400, EnterDungeonRsp.Parser)).Result);
@@ -294,7 +301,7 @@ public sealed class SiegeTests : IAsyncLifetime
         await Next(defense, MsgId.EntitySelf, EntitySelf.Parser);
         // CombatService's action tail uses MonsterService.NowMs (real time), not this test's window clock.
         await Task.Delay(1200);
-        clock.Set(At(2026, 10, 14, 20, 31));
+        clock.Set(siege.Start + 60);
         await OnLoop(Service<TerritoryWarsService>().ReconcileAsync);
         var point = Service<WorldData>().Map(2230101)!.Points[44];
         await OnLoop(async () =>
