@@ -376,6 +376,27 @@ public sealed class QuestEngineTests : IAsyncLifetime
     }
 
     [ClientDataFact]
+    public async Task CraftObjectiveMatchesTheMadeItemsEquipPartNotTheRecipeType()
+    {
+        // 701050 "Craft 1 Tier 2 Purple Accessories" is [103024, 4, 2, 1, 7]: part 7 is the made item's _iEquipPart.
+        // The accessory recipe's request subtype is its _iEquipType 70, so comparing that with 7 never matched.
+        await using var bot = await InWorld();
+        await Gm("!quest done 10103020"); // opens crafting
+        await Accept(701040, 701050);
+        var data = Service<GameData>();
+        var recipe = data.Table("EquipCraftConfig").Values.First(r => GameData.Int(r, "_iRank") == 2 && GameData.Int(r, "_iEquipType") == 70);
+        // _iOrangeGuarantee 11: purple or better comes within 12 crafts.
+        for (int i = 0; i < 12 && (await State(701050)).CompleteNum[0] == 0; i++)
+        {
+            foreach (var (entry, count) in GameData.Pairs(recipe, "_kCost")) await Gm($"!item {entry} {(long)count}");
+            await bot.SendGameAsync(EquipmentService.Craft, new EquipCraftReq { Rank = 2, Subtype = 70 });
+            Assert.Equal(0, (await Next(bot, EquipmentService.Craft, EquipCraftResp.Parser)).Result);
+        }
+        Assert.Equal(1, (await State(701050)).CompleteNum[0]);
+        Assert.Equal(0, (await State(701040)).CompleteNum[0]); // an accessory is not a top (part 4)
+    }
+
+    [ClientDataFact]
     public async Task EquipmentPlanSwitchRefreshesEquippedObjectivesWithoutAnotherProgressEvent()
     {
         await using var bot = await InWorld();

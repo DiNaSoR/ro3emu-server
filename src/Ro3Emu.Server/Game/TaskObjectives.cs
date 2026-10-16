@@ -177,6 +177,17 @@ public sealed partial class TaskService
 
     private long ItemQuality(int entry) => data.Row("ItemConfig", entry) is { } row ? GameData.Int(row, "_iQuality") : -1;
 
+    /// <summary>
+    /// 103024's last parameter is the crafted item's ItemConfig _iEquipPart (TaskConfig: 2 weapons, 4 tops, 7 accessories;
+    /// EquipCraftConfig 2070 makes only part 7), not the recipe's _iEquipType (70) the craft request carries. Part 2 is
+    /// read as any weapon, two-handed part 1 included (inferred: the weapon recipes make both).
+    /// </summary>
+    private bool CraftPartMatches(int entry, long part)
+    {
+        long made = data.Row("ItemConfig", entry) is { } row ? GameData.Int(row, "_iEquipPart") : -1;
+        return part == 0 || made == part || (part == 2 && made == 1);
+    }
+
     private bool IsDescendant(int career, long ancestor)
     {
         var seen = new HashSet<long>();
@@ -328,7 +339,7 @@ public sealed partial class TaskService
     /// <summary>Only EquipmentService's successful paid craft is a source, never possession or a GM item grant.</summary>
     private Task OnCraftedAsync(GameSession s, int entry, int rank, int subtype) => ProgressAsync(s, null, t => t[0] switch
     {
-        TCraft when t.Length == 5 && ItemQuality(entry) >= t[1] && rank == t[2] && (t[4] == 0 || subtype == t[4]) => 1,
+        TCraft when t.Length == 5 && ItemQuality(entry) >= t[1] && rank == t[2] && CraftPartMatches(entry, t[4]) => 1,
         TCraftQuality when t.Length == 3 && ItemQuality(entry) >= t[1] => 1,
         _ => 0,
     });

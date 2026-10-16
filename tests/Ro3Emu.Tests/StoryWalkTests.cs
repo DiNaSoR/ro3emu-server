@@ -843,10 +843,14 @@ public sealed class StoryWalkTests(ITestOutputHelper output) : IAsyncLifetime
     }
 
     /// <summary>The craft panel's 31409 until a piece of the asked quality comes out (quality is a weighted draw).</summary>
-    private async Task CraftAsync(long task, int index, int rank, int subtype, List<string> detail)
+    private async Task CraftAsync(long task, int index, int rank, int part, List<string> detail)
     {
-        var recipe = Service<GameData>().Table("EquipCraftConfig").Values
-            .First(r => GameData.Int(r, "_iRank") == rank && GameData.Int(r, "_iEquipType") == subtype);
+        // The target names the made item's _iEquipPart; the request names the recipe's _iEquipType.
+        var data = Service<GameData>();
+        var recipe = data.Table("EquipCraftConfig").Values.First(r => GameData.Int(r, "_iRank") == rank
+            && GameData.Pairs(r, "_kQualityEquipID").Any(o => data.Row("ItemConfig", (long)o.Value) is { } item
+                && GameData.Int(item, "_iEquipPart") is var made && (part == 0 || made == part || (part == 2 && made == 1))));
+        int subtype = (int)GameData.Int(recipe, "_iEquipType");
         int crafts = 0;
         for (; crafts < 100 && !TargetDone(task, index); crafts++)
         {
