@@ -81,205 +81,105 @@ server's encounter scripts are not in the client, so story dungeons and bosses a
 
 ## Getting started
 
-### Quick start: play on your own PC (Windows)
+### Quick start
 
-1. **Install the game.** You need the Ragnarök 3: Genesis PC client (the login screen shows `0.0.1_1.1.0 Build 140054`).
-   Nothing from the game is in this repository.
-2. **Download this project:** the green **Code** button above, then **Download ZIP**, and unzip it anywhere.
-3. **Double-click `start.cmd`.** On the first run it:
-   - offers to install what is missing (.NET 10 SDK, Node.js, Java) with winget,
-   - asks for the game folder (the one with `ro3.exe`),
-   - exports the game data from your client (5-10 minutes, only once),
-   - starts the server in its own window and then the game.
+1. Download **`RO3Emu-win-x64.zip`** from the [releases page](https://github.com/aethai/ro3emu-server/releases) and
+   extract it anywhere (Desktop, Downloads, a games folder).
+2. Double-click **`RO3Emu.exe`**. Nothing to install: no .NET, Java or Node.js, and no internet besides what the game
+   itself needs. If Windows says "Windows protected your PC" (RO3Emu is not signed), click *More info*, then
+   *Run anyway*.
+3. The first time, it finds your Ragnarok 3 game folder (or asks you to pick the one with `ro3.exe`), exports the game
+   data it needs from it (about a minute), starts the server on your PC, patches the game to talk to it and starts the
+   game. Next time it only starts the server and the game.
+4. Log in with any account name and password: the account is created on first login. Keep the RO3Emu window open while
+   you play; press **Q** there (or close it) to stop the server.
 
-Log in with any account name and password: a new account is created on first login. Next time, `start.cmd` goes
-straight to the game. Close the server window to stop the server.
+**Don't have the game?** RO3Emu.exe downloads it from the official Genesis servers (about 24 GB) and checks every
+file against the publisher's signature. It offers this when it finds no game folder, or run `RO3Emu.exe install`.
+`RO3Emu.exe update` brings an installed game up to date the same way (only the changed files). RO3Emu never hosts
+game files: everything comes from the publisher's own update service, verified with the publisher's own key.
 
-> [!NOTE]
-> The client does not connect anywhere until it is patched; `start.cmd` and `join.cmd` patch it every time they run.
-> The original files are kept in `ro3emu-backup` inside the game folder. If the game's own launcher repairs or
-> updates the client, just run `start.cmd` again. After a game update, delete that `ro3emu-backup` folder first.
-
-### Host a server for friends (Linux)
-
-Most servers run on Linux. Copy the game folder from Windows to the server (at least `ro3_Data/StreamingAssets`),
-download this project there and run:
-
-```bash
-./server.sh --client ~/ROO_PC --host 203.0.113.10 --gm myaccount --service
-```
-
-- `--host` is the address players connect to: the server's public IP.
-- `--gm` names an account that gets GM commands in game.
-- `--service` installs a systemd service that starts with the machine. Leave it out to run in the terminal.
-
-The script installs .NET 10 into `~/.dotnet`, offers to install Node.js and Java with apt or dnf, exports the game data
-once, builds and starts the server. Open TCP ports `5380`, `20000` and `33100`. After a client update, run it again
-with `--reexport`.
-
-### Join a server (Windows)
-
-Players install the game, download this project and **double-click `join.cmd`**: it asks for the game folder and the
-server's address, then patches and starts the game.
-
-### Troubleshooting
-
-| Problem | What to do |
+| Command | What it does |
 |---|---|
-| `literal not found (different client build?)` | Your client is a different build than the one this project supports (`Build 140054`). Open an issue with the build number from the login screen. |
-| The game shows the official login or cannot connect | Run `start.cmd` or `join.cmd` again: the game's own launcher undid the patch. |
-| The server window shows an error | Copy it into an [issue](https://github.com/aethai/ro3emu-server/issues/new/choose). |
-| Players cannot connect to a Linux server | Check `--host` (the public address) and the three open ports. |
+| `RO3Emu.exe` | play on your own server (the same as `RO3Emu.exe start`) |
+| `RO3Emu.exe join <address>` | play on someone else's server (`host`, `host:port` or `http://host:port`) |
+| `RO3Emu.exe host` | your server, open to friends on your network (`--public <ip>` for the Internet, `--gm <account>`) |
+| `RO3Emu.exe install [folder]` / `update [folder]` | the game from the official servers, every file checked |
+| `RO3Emu.exe restore` | undo the patch: the game talks to the official servers again |
+| `RO3Emu.exe check` | does this game version fit this RO3Emu? (changes nothing) |
+| `RO3Emu.exe diag` | `RO3Emu-diagnostics.zip` for a bug report |
 
-### Manual setup (developers)
-
-The server runs on **Windows and Linux**. The client is a Windows game, so patching the client and playing happen on
-Windows; the commands below use PowerShell there. Building the server alone needs no game files, but a playable setup
-needs your own RO3 PC client, exported game data and client hooks built against that client's DLLs.
-
-#### Prerequisites
-
-| Software | Used for |
-|---|---|
-| [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) | server, tools, tests |
-| [Node.js 20+](https://nodejs.org/) | export scripts in `tools/` |
-| Java 17+ and [unluac](https://sourceforge.net/projects/unluac/files/Unstable/) `unluac_2025_12_23.jar` (saved as `unluac.jar` in the repository root) | decompiling the client's Lua (data export only) |
-| Windows 10/11 x64 | the client, data export, client hooks and patching |
-| Linux x64 (optional) | hosting the server; the test suite runs there in CI |
-| The Ragnarok Online 3 PC client (`ROO_PC`) | your own copy; nothing from the game is distributed here |
-
-Clone the repository and work from its root:
-
-```powershell
-git clone https://github.com/aethai/ro3emu-server.git
-Set-Location ro3emu-server
-dotnet build src/Ro3Emu.Server/Ro3Emu.Server.csproj -c Release
-```
-
-Set `RO3_CLIENT_DIR` to your client folder (the one with `ro3.exe`). The client hooks build against its managed DLLs
-and several tools read its files from there:
-
-```powershell
-$env:RO3_CLIENT_DIR = 'C:\RO3\ROO_PC'
-Test-Path (Join-Path $env:RO3_CLIENT_DIR 'ro3.exe') # should print True
-```
-
-#### 1. Export the game data
-
-Game data comes from your client and never goes into git (`data/` and `re/` are ignored).
-
-```powershell
-# Lua: the client's obfuscated chunks to standard Lua 5.4 bytecode, then to source
-dotnet run --project tools/LuaDecode -c Release -- (Join-Path $env:RO3_CLIENT_DIR 'ro3_Data/StreamingAssets/Recovery/LuaPayload') re/clientB/luac
-javac -cp unluac.jar -d tools/unluac-batch tools/unluac-batch/BatchUnluac.java
-java -cp "unluac.jar;tools/unluac-batch" BatchUnluac re/clientB/luac re/clientB/lua-src
-
-# Config tables, scene editor data, walkability grids, message names
-dotnet run --project tools/ConfigExport -c Release -- re/clientB/luac data/config
-dotnet run --project tools/ConfigExport -c Release -- re/clientB/luac data/config Localization_en.luac
-dotnet run --project tools/ConfigExport -c Release -- re/clientB/luac data/sceneeditor 'Config\SceneEditor'
-node tools/WorldData/navexport.js data/nav
-node tools/msgtable.js re/clientB/lua-src data/msgtable.tsv
-```
-
-`data/config` holds the config tables (items, jobs, maps...) and the English texts (`Localization_en.json`), `data/sceneeditor` map points, NPCs and portals,
-`data/nav` the walkability grids and `data/msgtable.tsv` the message names. Without them the server still starts but
-knows no items, NPCs or maps. Check the exporter counts and `re/clientB/lua-src/_failures.tsv` before starting; the
-decompiler can report failed files. Code comments cite the decompiled client as `re/clientB/lua-src/...`.
-
-#### 2. Run the server
-
-```powershell
-dotnet run --project src/Ro3Emu.Server -c Release
-```
-
-The first start creates the gate key pair (`data/gate_rsa_*.pem`) and the database (`data/ro3emu.db`). Defaults:
-HTTP / SDK `5380`, micro gate `20000`, game gate `33100`, all on loopback.
-
-#### Running the server on Linux
-
-Export `data/` on Windows as in step 1, then copy it to the Linux machine. With the
-[.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) installed there:
-
-```bash
-git clone https://github.com/aethai/ro3emu-server.git
-cd ro3emu-server
-dotnet publish src/Ro3Emu.Server -c Release -o /srv/ro3emu/bin
-# copy the exported data/ to /srv/ro3emu/data
-```
-
-A published server looks for `data/` next to its binary, so point it at the copy. A systemd unit such as
-`/etc/systemd/system/ro3emu.service`:
-
-```ini
-[Unit]
-Description=RO3Emu server
-After=network.target
-
-[Service]
-User=ro3emu
-WorkingDirectory=/srv/ro3emu
-ExecStart=/srv/ro3emu/bin/Ro3Emu.Server
-Environment=ASPNETCORE_ENVIRONMENT=Production
-Environment=Ro3Emu__DataDir=/srv/ro3emu/data
-Environment=Ro3Emu__PublicHost=203.0.113.10
-Environment=Ro3Emu__GmAccounts__0=your-admin-login
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Replace `203.0.113.10` with the address players reach and open TCP `5380`, `20000` and `33100`. Then
-`systemctl daemon-reload` and `systemctl enable --now ro3emu`. Players patch their Windows client against that address
-as described in [Playing together](#playing-together); `tools/run-server.ps1` is the Windows equivalent of the unit.
-
-#### 3. Patch and start the client
-
-```powershell
-dotnet run --project src/Ro3Emu.ClientTools -- patch $env:RO3_CLIENT_DIR http://127.0.0.1:5380 data/gate_rsa_public.pem
-dotnet run --project src/Ro3Emu.ClientTools -- launch $env:RO3_CLIENT_DIR
-```
-
-Originals are kept in `<client>\ro3emu-backup`; `restore <client dir>` undoes the patch. Any account name and password
-works: unknown accounts are created on first login.
+What it changes: in the game folder, a few DLLs in `ro3_Data\Managed` (originals kept in `ro3emu-backup`) and
+`ro3emu\loc_en.tsv` (the English texts, built from your own game files); next to RO3Emu.exe, `data\` (game data, your
+characters), `logs\` and `RO3Emu.settings.json`. When anything fails it says what to do in plain words and writes
+`RO3Emu-diagnostics.zip`; attach that file to an [issue](https://github.com/aethai/ro3emu-server/issues).
 
 > [!WARNING]
-> Do not run the official launcher's Verify / Repair on a patched client: it puts the original DLLs back.
+> Do not use the publisher's launcher to repair a patched game folder: it puts the original DLLs back (RO3Emu.exe
+> patches again on its next start).
 
-**Images with baked-in Chinese text.** The hooks can swap client textures for English versions, but no images are
-shipped. Render your own with `tools/ClientTextures/render.ps1` from a texture dump of your client and put the PNGs in
-`src/Ro3Emu.ClientHooks/Textures/`.
+### Hardware
+
+| | Minimum | Load target (500 players) |
+|---|---|---|
+| CPU | 2 cores | ≤ 2 cores used by the server |
+| RAM | 2 GB | ≤ 2 GB working set |
+| Disk | 3 GB (game data export included), plus the game | SSD recommended (SQLite WAL, `synchronous=FULL`) |
 
 ## Playing together
 
-**Server machine**
+**On Windows**, the host runs `RO3Emu.exe host` (it prints the address friends use; Windows asks once whether the
+server may use the network: allow it) and friends run `RO3Emu.exe join <that address>`. For players outside your
+network, forward TCP `5380`, `20000` and `33100` to the host and start with `RO3Emu.exe host --public <public IP>`.
 
-1. Set `Ro3Emu:PublicHost` in `src/Ro3Emu.Server/appsettings.json` to the address players reach (LAN or public IP
-   literal) and open TCP `5380`, `20000` and `33100`. A loopback `PublicHost` binds loopback only; behind NAT forward the
-   ports and keep the public IP as `PublicHost`. `Ro3Emu:BindAddress` overrides the listening interface.
-2. Start it with `tools/run-server.ps1` (restarts on exit, logs to `data/logs/`). The database is backed up to
-   `data/backups/` at start and every 6 hours (newest 20 kept). Who is online: `http://127.0.0.1:5380/ro3emu/online`
-   (server machine only).
+**On Linux**, download **`RO3Emu-server-linux-x64.tar.gz`**, extract it and run its `server.sh`; nothing to install:
 
-**Players** need the client and either the single-exe tool or a launcher:
-
-```powershell
-dotnet publish src/Ro3Emu.ClientTools -c Release -r win-x64 -o dist
-$serverUrl = 'http://192.168.1.10:5380' # replace with your server's reachable address
-./dist/Ro3Emu.ClientTools.exe play $env:RO3_CLIENT_DIR $serverUrl
+```bash
+./server.sh --client /path/to/ROO_PC --host <public IP> --gm <your account>      # a game folder copied from Windows
+./server.sh --download /srv/ro3/ROO_PC --host <public IP> --gm <your account>    # or only the files it needs, from Genesis
+./server.sh --service ...                                                        # as a systemd service
 ```
 
-`play` downloads the server's gate key, patches the client and starts it. For a real player base, host a patch
-repository and hand out `Ro3Emu.Launcher` instead: it installs the client, keeps it updated and starts it
-([`docs/guide/launcher.md`](docs/guide/launcher.md)).
+Open TCP `5380`, `20000` and `33100`. The database is backed up to `data/backups/` at start and every 6 hours (newest
+20 kept). One account is one live session: a second login kicks the older connection. The client allows one instance
+per machine; `Ro3Emu.BotCli` stands in for more players when testing alone.
 
-One account is one live session: a second login kicks the older connection. The client allows one instance per machine;
-`Ro3Emu.BotCli` stands in for more players when testing alone.
+GM commands (`!help` in chat) are enabled per account with `--gm` (`Ro3Emu:GmAccounts`); on your own PC
+(`RO3Emu.exe start`) every account has them, a hosted server started as Production gives them to nobody else
+([`docs/guide/gm-access.md`](docs/guide/gm-access.md)). Players report bugs with the menu's Feedback button or `/bug <text>` in
+chat ([`docs/guide/feedback.md`](docs/guide/feedback.md)).
 
-GM commands (`!help` in chat) are enabled per account with `Ro3Emu:GmAccounts`; with the list empty, a server started
-as Production gives GM to nobody ([`docs/guide/gm-access.md`](docs/guide/gm-access.md)). Players report bugs with the
-menu's Feedback button or `/bug <text>` in chat ([`docs/guide/feedback.md`](docs/guide/feedback.md)).
+## Running from source
+
+Developers need only the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0). `start.cmd` builds the
+server, the client DLLs and RO3Emu from source and runs RO3Emu with this repository as its home (`data\`, `logs\`);
+`join.cmd <address>` joins a server the same way, and both take any RO3Emu.exe option (`start.cmd host --public …`).
+On Linux, `./server.sh` builds and runs the server from source.
+
+The parts, by hand:
+
+```bash
+# game data from your client into data/ (config, sceneeditor, skills, nav, msgtable.tsv, loc_en.tsv)
+dotnet run --project src/Ro3Emu.Setup -c Release -- export C:\Games\ROO_PC data
+# the server: HTTP / SDK 5380, micro gate 20000, game gate 33100, all on loopback; data/ holds its keys and database
+dotnet run --project src/Ro3Emu.Server -c Release
+# the client against it (originals kept in <client>\ro3emu-backup; restore <client> undoes it)
+dotnet run --project src/Ro3Emu.ClientTools -- play C:\Games\ROO_PC http://127.0.0.1:5380
+```
+
+The export runs the client's own Lua bytecode in a Lua 5.4 VM and reads its VFS directly (`src/Ro3Emu.DataExport`):
+no decompiler is involved. For reading the client's Lua, `tools/LuaDecode` turns its chunks into standard Lua 5.4
+bytecode for any decompiler; `tools/msgtable.js` and `tools/WorldData/navexport.js` are
+the older Node versions of the message table and nav export, kept as references.
+
+**Releases.** `pwsh tools/release/pack.ps1` builds `dist/RO3Emu-win-x64.zip` and `dist/RO3Emu-server-linux-x64.tar.gz`
+(self-contained, single-file) and fails if anything from the game would ship (allowlist of files, embedded resources
+checked). `pwsh tools/release/smoke.ps1` then tests the zip as a stranger would, for each local client: fresh folder, a
+copy of the client, no dotnet, Java or Node on PATH, export, bundled server, patch, a bot logging in, join, restore.
+The client hooks DLL is compiled against the 7 Oct 2026 client; CI has no client, so a tag build
+(`.github/workflows/release.yml`) uses `prebuilt/client`, which `pack.ps1 -UpdatePrebuiltClientDlls` refreshes on a
+machine with that client (commit it whenever `src/Ro3Emu.ClientHooks` or `src/Ro3Emu.Loc` change; CI refuses stale
+ones).
 
 ## Architecture
 

@@ -1,0 +1,41 @@
+name: release
+
+# A tag v* builds the two release archives (tools/release/pack.ps1) and attaches them to a draft release.
+# CI has no game client, so the client hooks/loc DLLs come from prebuilt/client: built by the maintainer against the
+# 7 Oct 2026 client with `pwsh tools/release/pack.ps1 -UpdatePrebuiltClientDlls` and committed; pack.ps1 refuses them
+# when they were built from other hooks/loc sources than the tagged ones. Run tools/release/smoke.ps1 locally (it needs
+# the clients) before publishing the draft.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  pack:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Setup tests
+        run: dotnet test tests/Ro3Emu.Setup.Tests -c Release --filter "Category!=Slow"
+      - name: Pack
+        shell: pwsh
+        run: |
+          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } else { '0.0.0' }
+          ./tools/release/pack.ps1 -UsePrebuiltClientDlls -Version $version
+      - uses: actions/upload-artifact@v5
+        with:
+          name: ro3emu-release
+          path: |
+            dist/RO3Emu-win-x64.zip
+            dist/RO3Emu-server-linux-x64.tar.gz
+      - name: Draft release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ github.ref_name }}" dist/RO3Emu-win-x64.zip dist/RO3Emu-server-linux-x64.tar.gz --draft --title "RO3Emu ${{ github.ref_name }}" --notes "Download RO3Emu-win-x64.zip, extract it and double-click RO3Emu.exe. Server hosts on Linux: RO3Emu-server-linux-x64.tar.gz."

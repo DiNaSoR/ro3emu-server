@@ -1,3 +1,4 @@
+// Developers only: RO3Emu.exe export reads the same table from the Lua bytecode (src/Ro3Emu.DataExport/MsgTableExporter.cs).
 // Extracts the romsg message table (id, name, request type, response type) from the decompiled
 // NW_Helper_PBDefine.lua / NW_Helper_EZPBDefine.lua / NW_AutoSyncClient_Define.lua into a TSV.
 // usage: node msgtable.js <lua-src dir> <out.tsv>

@@ -21,3 +21,9 @@ tools/unluac-batch/*.class
 
 # Server built by server.sh
 /server-bin/
+
+# RO3Emu.exe run from the repository (start.cmd: --home is the repository root)
+/logs/
+/downloads/
+/RO3Emu.settings.json
+/RO3Emu-diagnostics.zip

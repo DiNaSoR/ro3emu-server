@@ -26,10 +26,12 @@
     <Reference Include="System.Core"><HintPath>$(ClientManaged)\System.Core.dll</HintPath><Private>false</Private></Reference>
   </ItemGroup>
 
+  <!-- Ro3EmuNoClientData=true (the release build, tools/release/pack.ps1): nothing taken from a client goes in; RO3Emu.exe
+       writes the player's own map to <client>\ro3emu\loc_en.tsv instead. -->
   <ItemGroup>
-    <EmbeddedResource Include="..\..\data\loc\loc_en.tsv" LogicalName="loc_en.tsv" Condition="Exists('..\..\data\loc\loc_en.tsv')" />
+    <EmbeddedResource Include="..\..\data\loc\loc_en.tsv" LogicalName="loc_en.tsv" Condition="Exists('..\..\data\loc\loc_en.tsv') And '$(Ro3EmuNoClientData)' != 'true'" />
     <EmbeddedResource Include="en_overrides.tsv" LogicalName="en_overrides.tsv" />
-    <EmbeddedResource Include="..\..\data\loc\loc_sids.tsv" LogicalName="loc_sids.tsv" Condition="Exists('..\..\data\loc\loc_sids.tsv')" />
+    <EmbeddedResource Include="..\..\data\loc\loc_sids.tsv" LogicalName="loc_sids.tsv" Condition="Exists('..\..\data\loc\loc_sids.tsv') And '$(Ro3EmuNoClientData)' != 'true'" />
   </ItemGroup>
 
 </Project>

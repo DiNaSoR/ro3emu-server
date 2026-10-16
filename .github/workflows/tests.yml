@@ -16,3 +16,5 @@ jobs:
         run: dotnet test tests/Ro3Emu.Tests -c Release --filter "Category!=Slow"
       - name: Patcher tests
         run: dotnet test tests/Ro3Emu.Patcher.Tests -c Release
+      - name: Setup tests (RO3Emu.exe, data export, installer)
+        run: dotnet test tests/Ro3Emu.Setup.Tests -c Release --filter "Category!=Slow"

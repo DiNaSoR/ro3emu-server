@@ -15,6 +15,18 @@ public static class Launcher
 {
     public static int Launch(string clientDir, string[] gameArgs)
     {
+        using var game = Start(clientDir, gameArgs);
+        if (game.HasExited)
+        {
+            Console.WriteLine($"ro3.exe exited early with code {game.ExitCode}" + (game.ExitCode == 70 ? " (launcher proof rejected)" : ""));
+            return game.ExitCode;
+        }
+        return 0;
+    }
+
+    /// <summary>Starts the game and hands it the proof; returns once it has read it (or after it exited early).</summary>
+    public static Process Start(string clientDir, string[] gameArgs)
+    {
         var exe = Path.Combine(clientDir, "ro3.exe");
         if (!File.Exists(exe)) throw new FileNotFoundException("ro3.exe not found", exe);
 
@@ -27,7 +39,7 @@ public static class Launcher
         foreach (var a in gameArgs) start.ArgumentList.Add(a);
         start.Environment["RO3_LAUNCH_PIPE_HANDLE"] = pipe.GetClientHandleAsString();
 
-        using var game = Process.Start(start) ?? throw new InvalidOperationException("ro3.exe did not start");
+        var game = Process.Start(start) ?? throw new InvalidOperationException("ro3.exe did not start");
         pipe.DisposeLocalCopyOfClientHandle();
 
         long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
@@ -43,11 +55,7 @@ public static class Launcher
         Console.WriteLine($"started ro3.exe pid {game.Id}");
 
         // Keep our end open while the game reads the proof (it gives itself one second).
-        if (game.WaitForExit(5000))
-        {
-            Console.WriteLine($"ro3.exe exited early with code {game.ExitCode}" + (game.ExitCode == 70 ? " (launcher proof rejected)" : ""));
-            return game.ExitCode;
-        }
-        return 0;
+        game.WaitForExit(5000);
+        return game;
     }
 }

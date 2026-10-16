@@ -267,6 +267,13 @@ public static class ServerHost
         // Public status for the launcher's online pill: only a count, never account or character names.
         app.MapGet("/ro3emu/status", (SessionRegistry sessions) =>
             Results.Json(new { online = true, players = sessions.All().Count(s => s.Role != null) }));
+        // A clean stop for RO3Emu.exe (loopback only): the same shutdown as Ctrl+C, the loop drains and the database closes.
+        app.MapPost("/ro3emu/shutdown", (HttpContext context, IHostApplicationLifetime lifetime) =>
+        {
+            if (context.Connection.RemoteIpAddress is not { } ip || !System.Net.IPAddress.IsLoopback(ip)) return Results.NotFound();
+            lifetime.StopApplication();
+            return Results.Ok("stopping");
+        });
         // Who is online, for the admin (loopback only).
         app.MapGet("/ro3emu/online", (HttpContext context, SessionRegistry sessions) =>
         {

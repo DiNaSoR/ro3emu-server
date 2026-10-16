@@ -12,9 +12,9 @@ namespace Ro3Emu.ClientTools;
 /// </summary>
 public static class ClientPatcher
 {
-    private const string OriginalLoginUrl = "http://52.8.99.195/sdk/login";
-    private const string OriginalServerListUrl = "https://server.playragnarok3.com/serverlist/v2/168/serverlist.json?inline=true&force_refresh=true";
-    private const string ServerListPathAndQuery = "/serverlist/v2/168/serverlist.json?inline=true&force_refresh=true";
+    private const string LoginPath = "/sdk/login";
+    private const string ServerListPath = "/serverlist/v2/168/serverlist.json";
+    private const string ServerListPathAndQuery = ServerListPath + "?inline=true&force_refresh=true";
     private const string PemMarker = "-----BEGIN RSA PUBLIC KEY-----";
 
     private static readonly string[] PatchedFiles = ["Happyengine.Network.dll", "Assembly-CSharp.dll", "Phonest.Common.dll", "Happyengine.Base.Runtime.dll", "Unity.TextMeshPro.dll", "HUD.dll", "HappyEngine.Resource.dll", "UnityEngine.UI.dll"];
@@ -36,35 +36,44 @@ public static class ClientPatcher
     private const string HooksFile = "Ro3Emu.ClientHooks.dll";
     private const string LocFile = "Ro3Emu.Loc.dll";
 
-    public static void Patch(string clientDir, string serverBaseUrl, string publicKeyPem, string? hooksDll = null)
+    /// <summary>
+    /// The patched DLLs' SHA-256 as last written, one "file\thash" per line in the backup folder. A Managed DLL that
+    /// matches neither this nor its backup was replaced by someone else: a game update (the publisher's launcher or
+    /// RO3Emu.exe update), so it is the new original and becomes the backup.
+    /// </summary>
+    private const string PatchedRecord = "patched.sha256";
+
+    public static void Patch(string clientDir, string serverBaseUrl, string publicKeyPem, string? hooksDll = null, string? locDll = null)
     {
         var managed = ManagedDir(clientDir);
         var backup = BackupDir(clientDir);
         Directory.CreateDirectory(backup);
+        var record = ReadRecord(backup);
         foreach (var file in PatchedFiles)
         {
             var saved = Path.Combine(backup, file);
+            var current = Path.Combine(managed, file);
             if (!File.Exists(saved))
             {
-                File.Copy(Path.Combine(managed, file), saved);
+                File.Copy(current, saved);
                 Console.WriteLine($"backed up {file}");
+            }
+            else if (record.TryGetValue(file, out var written) && Sha256(current) is var now && now != written && now != Sha256(saved))
+            {
+                File.Copy(current, saved, overwrite: true);
+                Console.WriteLine($"backed up {file} again: the game updated it");
             }
         }
 
         string pem = publicKeyPem.Replace("\r\n", "\n").Trim();
         if (!pem.StartsWith(PemMarker, StringComparison.Ordinal)) throw new ArgumentException("the key file is not a PKCS#1 'RSA PUBLIC KEY' PEM");
 
-        var rules = new List<Rule>
-        {
-            new(OriginalLoginUrl, serverBaseUrl + "/sdk/login", Exact: true),
-            new(OriginalServerListUrl, serverBaseUrl + ServerListPathAndQuery, Exact: true),
-            new(PemMarker, pem, Exact: false),
-        };
+        var rules = Rules(serverBaseUrl, pem);
         hooksDll ??= DefaultHooksDll();
         if (!File.Exists(hooksDll)) throw new FileNotFoundException("build src/Ro3Emu.ClientHooks first", hooksDll);
         File.Copy(hooksDll, Path.Combine(managed, HooksFile), overwrite: true);
         Console.WriteLine($"installed {HooksFile}");
-        var locDll = Embedded(LocFile, "Ro3Emu.Loc");
+        locDll ??= Embedded(LocFile, "Ro3Emu.Loc");
         if (!File.Exists(locDll)) throw new FileNotFoundException("build src/Ro3Emu.Loc first", locDll);
         File.Copy(locDll, Path.Combine(managed, LocFile), overwrite: true);
         Console.WriteLine($"installed {LocFile}");
@@ -84,8 +93,11 @@ public static class ClientPatcher
             RewriteStrings(clientDir, file, rules, extra);
         }
 
-        var missing = rules.Where(r => r.Hits == 0).Select(r => r.Find).ToList();
-        if (missing.Count > 0) throw new InvalidOperationException($"literal not found: {string.Join(" | ", missing)} (different client build?)");
+        File.WriteAllLines(Path.Combine(backup, PatchedRecord), PatchedFiles.Select(f => f + "\t" + Sha256(Path.Combine(managed, f))));
+        var missing = rules.Where(r => r.Hits == 0).Select(r => r.Description).ToList();
+        if (missing.Count > 0) throw new InvalidOperationException($"literal not found: {string.Join(" | ", missing)} "
+            + "(a client build this patcher does not know; open an issue with .ro3-update/installed-release.txt)");
+        Console.WriteLine($"client hosts replaced: {string.Join(", ", rules.SelectMany(r => r.Hosts).Distinct())}");
         Console.WriteLine($"client now talks to {serverBaseUrl}; do not run RO3Launcher.exe on this copy (its repair restores the originals)");
     }
 
@@ -107,6 +119,126 @@ public static class ClientPatcher
             File.Delete(installed);
             Console.WriteLine($"removed {extra}");
         }
+        // The English map RO3Emu.exe writes from the client's own tables (a hand-made override file is kept).
+        var map = Path.Combine(clientDir, "ro3emu", "loc_en.tsv");
+        if (File.Exists(map) && File.ReadLines(map).FirstOrDefault()?.StartsWith(GeneratedLocHeader, StringComparison.Ordinal) == true)
+        {
+            File.Delete(map);
+            Console.WriteLine("removed ro3emu\\loc_en.tsv");
+        }
+    }
+
+    /// <summary>The first line of a generated loc_en.tsv (Ro3Emu.DataExport.LocMapBuilder).</summary>
+    public const string GeneratedLocHeader = "# zh\ten - generated by";
+
+    /// <summary>
+    /// The literals the patch rewrites, recognised by their role, not by the publisher's host: the publisher moved hosts
+    /// between releases (52.8.99.195 and server.playragnarok3.com until 7 Oct 2026, server.genesis3.is from 16 Oct).
+    /// </summary>
+    private static List<Rule> Rules(string serverBaseUrl, string pem) =>
+    [
+        new("SDK login URL (any host)/sdk/login", v => UrlPath(v) == LoginPath, serverBaseUrl + LoginPath),
+        new("server list URL (any host)" + ServerListPath, v => UrlPath(v) == ServerListPath, serverBaseUrl + ServerListPathAndQuery),
+        new(PemMarker, v => v.Contains(PemMarker, StringComparison.Ordinal), pem),
+    ];
+
+    /// <summary>
+    /// Whether this patcher and these client DLLs fit the client, without writing anything: the literals the patch
+    /// rewrites and the types it edits are there, and every type and member the hooks and Loc DLLs use exists in the
+    /// client's assemblies. Returns the problems found (empty = fine).
+    /// </summary>
+    public static List<string> Check(string clientDir, string? hooksDll = null, string? locDll = null)
+    {
+        var managed = ManagedDir(clientDir);
+        var problems = new List<string>();
+        var rules = Rules("http://127.0.0.1", PemMarker);
+        foreach (var file in PatchedFiles)
+        {
+            var source = File.Exists(Path.Combine(BackupDir(clientDir), file)) ? Path.Combine(BackupDir(clientDir), file) : Path.Combine(managed, file);
+            if (!File.Exists(source)) { problems.Add($"{file} is missing"); continue; }
+            using var assembly = AssemblyDefinition.ReadAssembly(source, new ReaderParameters { InMemory = true });
+            foreach (var (_, value) in Literals(assembly))
+                foreach (var rule in rules.Where(r => r.Match(value))) rule.Hits++;
+            if (file == "Assembly-CSharp.dll" && assembly.MainModule.GetType("NetworkLib.NW_ChatNetworkManager") == null) problems.Add("NW_ChatNetworkManager not found");
+            if (file == "Unity.TextMeshPro.dll" && assembly.MainModule.GetType("TMPro.TMP_Text") == null) problems.Add("TMPro.TMP_Text not found");
+        }
+        problems.AddRange(rules.Where(r => r.Hits == 0).Select(r => "literal not found: " + r.Description));
+
+        hooksDll ??= DefaultHooksDll();
+        locDll ??= Embedded(LocFile, "Ro3Emu.Loc");
+        foreach (var dll in new[] { hooksDll, locDll })
+        {
+            if (!File.Exists(dll)) { problems.Add($"{Path.GetFileName(dll)} is missing"); continue; }
+            problems.AddRange(UnresolvedReferences(dll, managed).Select(r => $"{Path.GetFileName(dll)}: {r} not in this client"));
+        }
+        return problems;
+    }
+
+    /// <summary>The type and member references of <paramref name="dll"/> that the client's assemblies do not define.</summary>
+    public static List<string> UnresolvedReferences(string dll, string managedDir)
+    {
+        // Only the client's folder and the DLL's own: never this tool's runtime, which has assemblies of the same names.
+        using var resolver = new FolderResolver([managedDir, Path.GetDirectoryName(Path.GetFullPath(dll))!]);
+        using var assembly = AssemblyDefinition.ReadAssembly(dll, new ReaderParameters { AssemblyResolver = resolver, InMemory = true });
+        var missing = new SortedSet<string>(StringComparer.Ordinal);
+        foreach (var type in assembly.MainModule.GetTypeReferences())
+        {
+            try { if (type.Resolve() == null) missing.Add(type.FullName); }
+            catch (AssemblyResolutionException e) { missing.Add($"{type.FullName} (assembly {e.AssemblyReference.Name})"); }
+        }
+        foreach (var member in assembly.MainModule.GetMemberReferences())
+        {
+            try
+            {
+                if (member.DeclaringType is ArrayType) continue; // array Get/Set/Address are runtime methods
+                if (member.Resolve() == null) missing.Add(member.FullName);
+            }
+            catch (AssemblyResolutionException e) { missing.Add($"{member.FullName} (assembly {e.AssemblyReference.Name})"); }
+        }
+        return missing.ToList();
+    }
+
+    /// <summary>Resolves assemblies by file name in the given folders only.</summary>
+    private sealed class FolderResolver(string[] folders) : IAssemblyResolver
+    {
+        private readonly Dictionary<string, AssemblyDefinition> _loaded = new(StringComparer.OrdinalIgnoreCase);
+
+        public AssemblyDefinition Resolve(AssemblyNameReference name) => Resolve(name, new ReaderParameters());
+
+        public AssemblyDefinition Resolve(AssemblyNameReference name, ReaderParameters parameters)
+        {
+            if (_loaded.TryGetValue(name.Name, out var cached)) return cached;
+            var path = folders.Select(f => Path.Combine(f, name.Name + ".dll")).FirstOrDefault(File.Exists)
+                ?? throw new AssemblyResolutionException(name);
+            var assembly = AssemblyDefinition.ReadAssembly(path, new ReaderParameters { AssemblyResolver = this, InMemory = true });
+            _loaded[name.Name] = assembly;
+            return assembly;
+        }
+
+        public void Dispose()
+        {
+            foreach (var a in _loaded.Values) a.Dispose();
+            _loaded.Clear();
+        }
+    }
+
+    private static Dictionary<string, string> ReadRecord(string backup)
+    {
+        var path = Path.Combine(backup, PatchedRecord);
+        var record = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (!File.Exists(path)) return record;
+        foreach (var line in File.ReadAllLines(path))
+        {
+            var cells = line.Split('\t');
+            if (cells.Length == 2) record[cells[0]] = cells[1];
+        }
+        return record;
+    }
+
+    private static string Sha256(string path)
+    {
+        using var stream = File.OpenRead(path);
+        return Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(stream));
     }
 
     /// <summary>Lists every string literal in every managed DLL that contains one of the needles.</summary>
@@ -139,12 +271,24 @@ public static class ClientPatcher
                 Console.WriteLine($"{t.FullName}::{m.Name}({string.Join(", ", m.Parameters.Select(p => p.ParameterType.Name + " " + p.Name))}) static={m.IsStatic} body={m.HasBody}");
     }
 
-    private sealed record Rule(string Find, string Replacement, bool Exact)
+    /// <summary>A literal rewrite: every literal <paramref name="Match"/> accepts becomes <paramref name="Replacement"/>.</summary>
+    private sealed record Rule(string Description, Func<string, bool> Match, string Replacement)
     {
         public int Hits { get; set; }
+        /// <summary>The hosts of the URLs replaced, for the log.</summary>
+        public HashSet<string> Hosts { get; } = new();
 
-        public bool Matches(string value) => Exact ? value == Find : value.Contains(Find, StringComparison.Ordinal);
+        public bool Matches(string value)
+        {
+            if (!Match(value)) return false;
+            if (Uri.TryCreate(value, UriKind.Absolute, out var uri)) Hosts.Add(uri.Host);
+            return true;
+        }
     }
+
+    /// <summary>The path of an absolute http(s) URL literal, else null.</summary>
+    private static string? UrlPath(string value) =>
+        Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https" ? uri.AbsolutePath : null;
 
     /// <summary>
     /// Chat runs on Tencent IM only. NW_ChatNetworkManager.Init (Obf_iXC) is rewritten to wrap our

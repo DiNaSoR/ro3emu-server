@@ -1,3 +1,4 @@
+// Developers only: RO3Emu.exe export does the same for any client folder (src/Ro3Emu.DataExport/NavExporter.cs).
 // Extract the nav grid (*_dynamicmapdata.bytes) of every MapResource row from the RO3 VFS.
 // usage: node navexport.js [outDir (default ./maps)]
 // MapResource._kNavDataName "X data.bytes" is loaded by the client as "X_dynamicmapdata.bytes" (RoSpace.LoadSpaceDirect).

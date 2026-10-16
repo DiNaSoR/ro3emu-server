@@ -31,6 +31,8 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Ro3Emu.Tests" />
+    <!-- Embedded only: no loose copies next to the server binary. -->
+    <Content Remove="Reconstructed\**" />
     <EmbeddedResource Include="Reconstructed\dungeon-monsters.json" LogicalName="Ro3Emu.Server.Reconstructed.dungeon-monsters.json" />
     <EmbeddedResource Include="Reconstructed\scripted-scenes.json" LogicalName="Ro3Emu.Server.Reconstructed.scripted-scenes.json" />
   </ItemGroup>
