@@ -207,12 +207,14 @@ internal sealed class EconomyTransactionPlan(RoleItemPlan child, EconomyMutation
             "cd13e/quest-award" => ["tasks", "task_runtime"],
             "cd13e/achievement-award" => ["achievements"],
             "cd13e/advguild-award" => ["adventure_group"],
+            "cd13e/monsterhunt-award" => ["area_concur"],
+            "cd13e/guild-award" => ["guild_info"],
             "cd13e/daily-stage" => ["daily"],
             "cd13e/journey-victory" => ["new_activities", "dungeons"],
             _ => throw new InvalidOperationException("Unrecognized owned economic command.")
         };
         string[] columns = [..sourceColumns, "daily", "library", "task_followup", "mounts", "activity_runtime"];
-        bool award = mutation.CommandKind is "cd13e/quest-award" or "cd13e/achievement-award" or "cd13e/advguild-award" or "cd13e/daily-stage" or
+        bool award = mutation.CommandKind is "cd13e/quest-award" or "cd13e/achievement-award" or "cd13e/advguild-award" or "cd13e/monsterhunt-award" or "cd13e/guild-award" or "cd13e/daily-stage" or
             "cd13e/journey-victory" or "cd13e/grant" or "cd13e/gm-grant";
         if (child.Parts.Count < 2 || child.Parts[0] is not ItemDeltaWritePlan ||
             (award ? child.Parts[1] is not RoleAwardStatePlan : child.Parts[1] is not RoleProgressWritePlan) ||
@@ -271,7 +273,7 @@ internal sealed class EconomyTransactionPlan(RoleItemPlan child, EconomyMutation
             ? true // The ordered typed grammar below validates the optional kill/card/AFK children.
             : actualColumns.SequenceEqual(requiredColumns.Concat(cardColumns));
         string[] allowedColumns = mutation.CommandKind == "monster-kill"
-            ? ["library", "task_followup", "tower", "tasks", "wild_afk"]
+            ? ["library", "task_followup", "tower", "tasks", "wild_afk", "area_concur"]
             : mutation.CommandKind is "gather-yield" or "dungeon-reward"
                 ? [..requiredColumns, "library", "task_followup"] : requiredColumns;
         var activation = extra.OfType<DungeonObligationActivatePlan>().SingleOrDefault();
@@ -285,6 +287,8 @@ internal sealed class EconomyTransactionPlan(RoleItemPlan child, EconomyMutation
                 if (index >= ordinaryExtra.Length || ordinaryExtra[index++] is not TowerFirstPassWritePlan) return false;
             }
             if (index < ordinaryExtra.Length && ordinaryExtra[index] is RoleBlobWritePlan { Column: "wild_afk" }) index++;
+            // Monster Hunt kill counters (MonsterHuntService), staged after the AFK child.
+            if (index < ordinaryExtra.Length && ordinaryExtra[index] is RoleBlobWritePlan { Column: "area_concur" }) index++;
             if (index < ordinaryExtra.Length && ordinaryExtra[index] is RoleBlobWritePlan { Column: "library" })
             {
                 index++;
@@ -297,7 +301,7 @@ internal sealed class EconomyTransactionPlan(RoleItemPlan child, EconomyMutation
         {
             "monster-kill" => (activation is null || extra[0] == activation &&
                     activation.KillSourceKey == mutation.SourceKey &&
-                    ordinaryExtra.All(x => x is RoleBlobWritePlan { Column: "library" or "task_followup" or "wild_afk" })) &&
+                    ordinaryExtra.All(x => x is RoleBlobWritePlan { Column: "library" or "task_followup" or "wild_afk" or "area_concur" })) &&
                 MonsterExtrasValid(),
             "gather-yield" => sourceExtra is [RoleBlobWritePlan { Column: "lifejob" },
                 RoleBlobWritePlan { Column: "life_restrict" }, RoleBlobWritePlan { Column: "life_runtime" }],
@@ -373,7 +377,7 @@ internal sealed class EconomyTransactionPlan(RoleItemPlan child, EconomyMutation
                     ? mutation.CommandKind switch
                     {
                         "world-revive" or "cd13e/tower-milestone" => EconomyReason.ItemUse,
-                        "cd13e/quest-award" or "cd13e/achievement-award" or "cd13e/advguild-award" or "cd13e/daily-stage" or
+                        "cd13e/quest-award" or "cd13e/achievement-award" or "cd13e/advguild-award" or "cd13e/monsterhunt-award" or "cd13e/guild-award" or "cd13e/daily-stage" or
                             "cd13e/journey-victory" => EconomyReason.OwnedAwardCost,
                         "cd13e/daily-reset" => EconomyReason.DailyReset,
                         _ => EconomyReason.NpcShopPayment
@@ -387,6 +391,8 @@ internal sealed class EconomyTransactionPlan(RoleItemPlan child, EconomyMutation
                     "cd13e/quest-award" => EconomyReason.QuestReward,
                     "cd13e/achievement-award" => EconomyReason.AchievementReward,
                     "cd13e/advguild-award" => EconomyReason.AdventureGroupReward,
+                    "cd13e/monsterhunt-award" => EconomyReason.MonsterHuntReward,
+                    "cd13e/guild-award" => EconomyReason.GuildReward,
                     "cd13e/daily-stage" => EconomyReason.DailyReward,
                     "cd13e/gm-grant" => EconomyReason.GmGrant,
                     "cd13e/grant" => EconomyReason.OwnedGrant,
@@ -564,7 +570,7 @@ internal sealed class EconomyTransactionPlan(RoleItemPlan child, EconomyMutation
                 throw new InvalidDataException("Daily reset typed child result is invalid.");
             return;
         }
-        bool ownedAward = commandKind is "cd13e/quest-award" or "cd13e/achievement-award" or "cd13e/advguild-award" or "cd13e/daily-stage" or
+        bool ownedAward = commandKind is "cd13e/quest-award" or "cd13e/achievement-award" or "cd13e/advguild-award" or "cd13e/monsterhunt-award" or "cd13e/guild-award" or "cd13e/daily-stage" or
             "cd13e/journey-victory" or "cd13e/grant" or "cd13e/gm-grant";
         bool hasTaskProgress = commandKind == "monster-kill" && values.Length > 2 && values[^1] is long[];
         if (hasTaskProgress && values[^1] is long[] credited &&

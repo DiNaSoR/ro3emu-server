@@ -61,7 +61,14 @@ public sealed partial class TimedBattleService
             if (AfterSettlementAdmissionForTest is { } admitted) await admitted();
             var survivors = RemainingFactions(match);
             int winnerFaction = survivors.Count == 1 ? survivors.Single() : 0;
-            if (winnerFaction == 0 && time.GetUtcNow().ToUnixTimeSeconds() >= match.Deadline)
+            if (match.Chicken != null)
+            {
+                // Survivor Battle: the last team standing, or at the end of the battle stage the best ranked standing
+                // team (ChickenRanks, (inferred) tie-break).
+                if (winnerFaction == 0 && survivors.Count > 1 && time.GetUtcNow().ToUnixTimeSeconds() >= match.Deadline)
+                    winnerFaction = ChickenRanks(match).Where(r => survivors.Contains(r.Key)).MinBy(r => r.Value).Key;
+            }
+            else if (winnerFaction == 0 && time.GetUtcNow().ToUnixTimeSeconds() >= match.Deadline)
             {
                 // (inferred) Unique confirmed-kill lead wins a timed-out round.
                 var ranked = match.Players.GroupBy(p => match.Faction[p]).Where(team => survivors.Contains(team.Key))
@@ -103,7 +110,9 @@ public sealed partial class TimedBattleService
                     long walletDelta = next.ChickenScore - character.CountOf(player, 7);
                     if (walletDelta > 0) grants.Add(new AwardGrant(7, checked((int)walletDelta)));
                     if (walletDelta < 0) costs.Add(new SettlementCost(7, checked((int)-walletDelta)));
-                    result = ChickenSnapshot(match, player, actualVictory).ToByteArray();
+                    if (next.ChickenRank > state.ChickenRank) WarnMissingChickenRankAward(next.ChickenRank);
+                    result = ChickenSnapshot(match, player, actualVictory, new ChickenScoreChange(next.ChickenScore - oldTotal,
+                        oldTotal, state.ChickenRank, next.ChickenRank)).ToByteArray();
                 }
                 else
                 {
@@ -244,7 +253,7 @@ public sealed partial class TimedBattleService
             try
             {
                 if (match.Room != null && player.InstanceId == match.Room.Id)
-                    await instances.LeaveAsync(player);
+                    await instances.LeaveAsync(player, recoverDeadOnReturn: match.Chicken != null);
             }
             catch (Exception error) when (error is not OperationCanceledException)
             { log.LogWarning(error, "Timed battle room leave failed for role {Role}", match.Participants[player].Id); }
@@ -252,10 +261,31 @@ public sealed partial class TimedBattleService
             {
                 player.EventFaction = 0;
                 active.Remove(player);
+                // A player in a handover may refuse the stat refresh; that must not keep the match open.
+                if (match.Chicken != null)
+                    try { await ChickenDetachAsync(match, player); }
+                    catch (Exception error) when (error is not OperationCanceledException)
+                    { log.LogWarning(error, "Survivor Battle detach failed for role {Role}", match.Participants[player].Id); }
             }
         });
         if (match.Room != null) matches.Remove(match.Room.Id);
         SettlementCompletedForTest?.Invoke();
+    }
+
+    /// <summary>
+    /// The rank rewards of Survivor Battle point at awards the client's AwardConfig does not have: EatChickenLevelConfig
+    /// _iAward and GenericStageRewardsConfig type 6 (6001..6026 -> 50001..50026); DailyActivityConfig 114 _iPreAward
+    /// 81014 is a preview only. Nothing is granted for them (inferred: skipped with a warning, no substitute data).
+    /// </summary>
+    private void WarnMissingChickenRankAward(int rank)
+    {
+        var ids = new List<long>();
+        if (data.Row("EatChickenLevelConfig", rank) is { } level && GameData.Int(level, "_iAward") is var award and > 0) ids.Add(award);
+        foreach (var row in data.Table("GenericStageRewardsConfig").Values)
+            if (GameData.Int(row, "_iType") == 6 && GameData.Int(row, "_iLevel") == rank && GameData.Int(row, "_iAward") is var stage and > 0)
+                ids.Add(stage);
+        foreach (long id in ids.Distinct().Where(id => data.Row("AwardConfig", id) == null))
+            log.LogWarning("Survivor Battle rank {Rank} award {Award} is missing from AwardConfig; skipped (inferred)", rank, id);
     }
 
     private async Task DeliverPendingAsync(GameSession session)

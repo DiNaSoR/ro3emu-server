@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "about": "Reconstructed scripted story scenes (no fight). The original server drove their stages with an encounter script the client does not ship. Each scene is a sequence of steps; a step names the DungeonQuestConfig quest the tracker shows (var 10001) and its goal counter (var 10003), the scene actors the server shows during it (client NPCConfig ids at scene-editor points, with the buffs that open their interactions), an optional story the client plays (dungeon var 100020016), the client events that complete it, and an optional teleport after it. Every decision carries its reason and the scene its confidence; what is guessed is listed per scene. Switch: Ro3Emu:ReconstructedDungeons. Never mixed into client data.",
+  "about": "Reconstructed scripted story scenes (no fight). The original server drove their stages with an encounter script the client does not ship. Each scene is a sequence of steps; a step names the DungeonQuestConfig quest the tracker shows (var 10001) and its goal counter (var 10003), the scene actors the server shows during it (client NPCConfig ids at scene-editor points, with the buffs that open their interactions), an optional story the client plays (dungeon var 100020016), the client events that complete it, and an optional teleport after it. A quest of the scene that only a branch the reconstruction cannot reach would show is listed under \"unplayed\" with its reason. Every decision carries its reason and the scene its confidence; what is guessed is listed per scene. Switch: Ro3Emu:ReconstructedDungeons. Never mixed into client data.",
   "contract": {
     "interaction": "32700 NpcInteractionReq {npc_uid, interaction_id} on a scene actor: the client sends it from LC_DAL_Interact.SendNPCInteractionReq when the player presses the interaction's skill button (InteractMode 3 ClickSkillIcon), walks into range (2 AutoInteractWhenInRange) or a dialogue option runs action 211 TriggerNpcInteract (LC_InteractActions.lua:5672-5698). The interaction must be one of the actor's NPCConfig _iInteractID; the server answers 32700 with the request echoed (LC_InteractManager._onInteractResponse then runs the client-hosted actions, e.g. 53 NPCInteractDialogue).",
     "message": "The NPCInteractConfig _iEXECAction [\"210\", id, ...] of that interaction: ActionConfig 210 SendDungeonMessage is server-hosted (_iEXECHost 1), so the client never runs it; it is the dungeon script's own message id (LC_InteractManager.lua:1975-2030 runs only client/all-hosted actions).",
@@ -135,6 +135,95 @@
         }
       ]
     },
+    "1010601": {
+      "name": "Royal Palace ball: the opening dance with Luna",
+      "confidence": "low",
+      "evidence": [
+        "DungeonQuestConfig 5300031-5300033: 1 'Complete the Opening Dance' (goal type 1 'Complete the opening dance with Luna.'), 2 'Talk to Luna to leave the ball.', 3 'Talk to Luna to perform the opening dance again.'. Task 201040 'Complete the Opening Dance' enters it by its accept action 3000 after 201030 'At the Ball' (Luna 400050's dialogue 2010301 'You promised me the opening dance', 'Take her hand'); 201050 'Next Lead' follows outside.",
+        "DungeonConfig 1010601: Royal Palace (map 10106), gameplay 26 DanceParty (GamePlayConfig: the plain lc_dungeon_base), one player, editor sc_zx_wuhui_pl01 ('dance party').",
+        "Editor sc_zx_wuhui_pl01: born point 24 (142.6, 84.8) facing north; point 38 (141.5, 94) and mark point 49 (143.5, 94) facing the born point; the scene's only region, 48, a 1.2 m server circle (regionType 2, triggerType 1) on mark 49. Three more pairs 2 m apart, all facing the same way: 32/33 (141.5 and 143.5, z 103), 34/35 (136 and 138, z 99), 36/37 (147 and 149, z 99): four couples, the front one Luna's place (38) and her partner's (49). Points 25-31 and 39-47 ring the floor, each turned to its centre.",
+        "NPCConfig: 400119 Luna (story unit, model 100107), 400113-400118 Alpha, Nia, Saipan, Lillian, Sif and Paul, 400100-400112 thirteen 'Audience', 400120 'Quest Area' (NPCType 4 Trap, unit 35004 'dance position circle'), 400121 'Spotlight', 400124-400126 blue, purple and red light orbs; 400122 Luna (empty model 99998) with 40012201 (click: dialogue 'That dance wasn't bad~ ... The church bells are ringing. It's my turn to patrol', option 'Goodbye' runs 211 TriggerNpcInteract 40012401 and 35 ExitDungeon) and 40012401 (message 66); 400123 Luna (empty model) with 40012301 ('Did you learn them from a drunken Orc? ... How about one more chance?', option 'Take her hand' runs 28 ResetMultiDungeon, which enters the dungeon again).",
+        "The dance itself: Change3CConfig 27 ('Tap Forward, Left, Back, Right, and learn Luna's dance moves') through TransformConfig 5400001; skills 5400001-5400301 'Perform a Dance Move in the designated direction' and buffs 5400101-5400104 'Dance Move Check' (down, up, left, light icons), 5401001 perfect and 5401101/5401701 miss (fx_branchline_dance_perfect / _miss). No sequence, timing or pass mark is in the client data.",
+        "LC_DunGeon_Helper.TryEndDungeon (action 35): EndDungeon sends 30402 CELL_LEAVE_DUNGEON right after the 32700 of 'Goodbye'."
+      ],
+      "guessed": [
+        "The dance is not reproduced: the original server judged dance moves whose sequence and timing are not in the client data. Taking the partner's place beside Luna (region 48, or within 3 m of its centre, mark 49) counts as the dance, and it always succeeds, so quest 3 (the retry after a failed dance, Luna 400123) is never shown.",
+        "The 'Quest Area' circle (400120), the spotlight (400121) and the light orbs (400124-400126, patrols 158-166 of group 88) are not shown: a Trap unit and moving actors are not scene actors here. Without the circle the partner's place is marked only by Luna; hence the 3 m.",
+        "Which couple stands where (Alpha and Nia at 32/33, Saipan and Lillian at 34/35, Sif and Paul at 36/37) and which audience member stands at which ring point is not in the data; the thirteen audience members fill the sixteen ring points in order, the first three twice.",
+        "After the dance Luna's dialogue NPC 400122 (empty model) stands on Luna (point 38): no other point is free for it, and its 2 m reach is meant for her."
+      ],
+      "unplayed": [
+        { "quest": 3, "why": "the retry after a failed dance: the dance always succeeds here" }
+      ],
+      "steps": [
+        {
+          "quest": 1,
+          "stage": "The opening dance: take the partner's place beside Luna",
+          "actors": [
+            { "npc": 400119, "point": 38, "why": "Luna at the front couple's first place, facing the hall" },
+            { "npc": 400113, "point": 32, "why": "Alpha, second couple" },
+            { "npc": 400114, "point": 33, "why": "Nia, second couple" },
+            { "npc": 400115, "point": 34, "why": "Saipan, third couple" },
+            { "npc": 400116, "point": 35, "why": "Lillian, third couple" },
+            { "npc": 400117, "point": 36, "why": "Sif, fourth couple" },
+            { "npc": 400118, "point": 37, "why": "Paul, fourth couple" },
+            { "npc": 400100, "point": 25, "why": "audience, north-west" },
+            { "npc": 400101, "point": 26, "why": "audience, north-west" },
+            { "npc": 400102, "point": 27, "why": "audience, west" },
+            { "npc": 400103, "point": 28, "why": "audience, west" },
+            { "npc": 400104, "point": 29, "why": "audience, north-east" },
+            { "npc": 400105, "point": 30, "why": "audience, north-east" },
+            { "npc": 400106, "point": 31, "why": "audience, east" },
+            { "npc": 400107, "point": 39, "why": "audience, east" },
+            { "npc": 400108, "point": 40, "why": "audience, south-east" },
+            { "npc": 400109, "point": 41, "why": "audience, south-east" },
+            { "npc": 400110, "point": 42, "why": "audience, south-west" },
+            { "npc": 400111, "point": 43, "why": "audience, south-west" },
+            { "npc": 400112, "point": 44, "why": "audience, south-east" },
+            { "npc": 400100, "point": 45, "why": "audience, south" },
+            { "npc": 400101, "point": 46, "why": "audience, south-west" },
+            { "npc": 400102, "point": 47, "why": "audience, south" }
+          ],
+          "complete": [
+            { "region": 48, "why": "the scene's one server region: the partner's place, 2 m east of Luna" },
+            { "point": 49, "radius": 3, "why": "mark 49, the same centre: the circle that shows it (400120) is not shown" }
+          ]
+        },
+        {
+          "quest": 2,
+          "stage": "Talk to Luna to leave the ball",
+          "actors": [
+            { "npc": 400119, "point": 38, "why": "Luna" },
+            { "npc": 400122, "point": 38, "why": "Luna's dialogue after a good dance: click opens 40012201, 'Goodbye' sends 40012401" },
+            { "npc": 400113, "point": 32, "why": "Alpha" },
+            { "npc": 400114, "point": 33, "why": "Nia" },
+            { "npc": 400115, "point": 34, "why": "Saipan" },
+            { "npc": 400116, "point": 35, "why": "Lillian" },
+            { "npc": 400117, "point": 36, "why": "Sif" },
+            { "npc": 400118, "point": 37, "why": "Paul" },
+            { "npc": 400100, "point": 25, "why": "audience" },
+            { "npc": 400101, "point": 26, "why": "audience" },
+            { "npc": 400102, "point": 27, "why": "audience" },
+            { "npc": 400103, "point": 28, "why": "audience" },
+            { "npc": 400104, "point": 29, "why": "audience" },
+            { "npc": 400105, "point": 30, "why": "audience" },
+            { "npc": 400106, "point": 31, "why": "audience" },
+            { "npc": 400107, "point": 39, "why": "audience" },
+            { "npc": 400108, "point": 40, "why": "audience" },
+            { "npc": 400109, "point": 41, "why": "audience" },
+            { "npc": 400110, "point": 42, "why": "audience" },
+            { "npc": 400111, "point": 43, "why": "audience" },
+            { "npc": 400112, "point": 44, "why": "audience" },
+            { "npc": 400100, "point": 45, "why": "audience" },
+            { "npc": 400101, "point": 46, "why": "audience" },
+            { "npc": 400102, "point": 47, "why": "audience" }
+          ],
+          "complete": [
+            { "message": 66, "why": "interaction 40012401 (run by 'Goodbye') sends dungeon message 66; the client then leaves (action 35)" }
+          ]
+        }
+      ]
+    },
     "3120402": {
       "name": "Culvert: Louie's game",
       "confidence": "medium",
@@ -191,6 +280,136 @@
           "stage": "Retrieve the Professor's instrument",
           "complete": [
             { "point": 37, "radius": 4, "why": "mark point 37, where guide point 38 leads from the game area" }
+          ]
+        }
+      ]
+    },
+    "3120703": {
+      "name": "Pharaoh: Louie's shell game",
+      "confidence": "medium",
+      "evidence": [
+        "DungeonQuestConfig 5300030, the scene's only quest: 1 'Complete Louie's game', goal [5,0,1] 'Find Kitty-Katie' (the Culvert's quest 1 texts). Task 205170 'A New Round' ('Play the shell game', target 'Complete the shell game') enters it by its accept and track action 3000 after 205160 'Help the Man'; 205180 'Return the Sword' follows on the field.",
+        "Editor sc_pm_branchstory_sphinx_001 is the Culvert editor's layout moved 5 m south: born point 22 (56.5, 67.5) facing south; group 24 (25 centre, 26 west, 27 east at z 60, facing the born point), where the Culvert's story 1013 leaves Louie (centre), Martha (west) and Katie (east); group 28 (29 west, 30 centre, 31 east at z 50), where the Culvert's Bells stand; marks 33-35 (z 55) and 37 (28.8, 93.8). No region, guide or NPC list.",
+        "ChatConfig 5310002-5310004 and 5310008-5310009, Louis's lines in the side-story block with Moonlight Flower's (5310001, 5310005-5310007), which no client code or other config references: 'Let's start the game! Guess where my cat will move!', 'Guess which Bell my cat is hiding in!', 'Congratulations, you got it right! Let's go again, this time it'll be harder!', 'Sorry, wrong guess! Let's try again.', 'Darn, you got it right again! I give up.'; bubbles 5310019-5310033 (Katie's meows, Louie's and Martha's taunts, 'It's only the first round.').",
+        "BuffConfig 5402101 (sound SFX_IO_BRANCHSTORY_SXGD_RIGHT, effects fx_substorylingdang_qinzhu and fx_substory_true) and 5402201 (SXGD_WRONG, fx_substorylingdang_sui 'the bell shatters' and fx_substory_false); SXGD is the shell game.",
+        "NPCs as in the Culvert: 400131 Louie, 400132 Martha, 400133 Katie (story units); rings 400134-400136 (auto dialogue 'Here's Katie the kitty!', 'Choose this one!' runs 211 TriggerNpcInteract on 5300040, 5300041 or 5300042, which send dungeon messages 11, 12 and 12); Bells 400137 and 400138, identical rows."
+      ],
+      "guessed": [
+        "Two rounds, from Louis's lines (right: 'Let's go again', right again: 'I give up'); a wrong guess (message 12) changes nothing and the round goes on ('Let's try again'). Louis's lines, the bubbles and the right/wrong effects (buffs 5402101, 5402201) are not shown: the engine sends no chat and reacts to no wrong guess.",
+        "Katie hides under the Bell straight ahead of where she stands (point 31, east) in round 1 and moves to the west Bell (point 29) in round 2; the shuffle is not animated. Louie and Martha watch from group 24; Katie, hidden, is not shown.",
+        "The Bells are 400138, the second Bell row (the Culvert uses 400137), at group 28 like the Culvert's; the rings stand on them.",
+        "Marks 33-35 and 37 are not used: the Culvert's mark 37 was the instrument, and this scene has no second quest."
+      ],
+      "steps": [
+        {
+          "quest": 1,
+          "stage": "Louie's shell game, round 1: guess which Bell Katie is hiding in",
+          "actors": [
+            { "npc": 400131, "point": 25, "why": "Louie at group 24's centre, facing the player" },
+            { "npc": 400132, "point": 26, "why": "Martha at group 24's west point" },
+            { "npc": 400138, "point": 29, "why": "the west Bell (group 28)" },
+            { "npc": 400138, "point": 30, "why": "the centre Bell (group 28)" },
+            { "npc": 400138, "point": 31, "why": "the east Bell, straight ahead of Katie's place (27)" },
+            { "npc": 400136, "point": 29, "why": "ring: 'Choose this one!' sends message 12" },
+            { "npc": 400135, "point": 30, "why": "ring: 'Choose this one!' sends message 12" },
+            { "npc": 400134, "point": 31, "why": "Katie's ring: 'Choose this one!' sends message 11" }
+          ],
+          "complete": [
+            { "message": 11, "why": "the one choice that sends a different message: interaction 5300040 of ring 400134" }
+          ],
+          "ignore": [
+            { "message": 12, "why": "the two other rings: a wrong guess, 'Let's try again'" }
+          ]
+        },
+        {
+          "quest": 1,
+          "stage": "Louie's shell game, round 2: the cat has moved",
+          "actors": [
+            { "npc": 400131, "point": 25, "why": "Louie" },
+            { "npc": 400132, "point": 26, "why": "Martha" },
+            { "npc": 400138, "point": 29, "why": "the west Bell" },
+            { "npc": 400138, "point": 30, "why": "the centre Bell" },
+            { "npc": 400138, "point": 31, "why": "the east Bell" },
+            { "npc": 400134, "point": 29, "why": "Katie's ring under the west Bell: message 11" },
+            { "npc": 400136, "point": 30, "why": "ring: message 12" },
+            { "npc": 400135, "point": 31, "why": "ring: message 12" }
+          ],
+          "complete": [
+            { "message": 11, "why": "ring 400134 again: 'Darn, you got it right again! I give up.'" }
+          ],
+          "ignore": [
+            { "message": 12, "why": "a wrong guess, the round goes on" }
+          ]
+        }
+      ]
+    },
+    "3120802": {
+      "name": "Moonlight Flower: the hide-and-seek game",
+      "confidence": "low",
+      "evidence": [
+        "DungeonQuestConfig 5300029, the scene's only quest: 1 'Complete Moonlight Flower's game', goal [5,0,1] 'Hide in the darkness. Don't let them Discover you.' Task 205110 'Falling into a Trap' ('Play hide-and-seek', target 'Complete the hide-and-seek game') enters it by its accept and track action 3000 after 205100 'Pet the Stray Cat'; 205120 'The Suspicious Stray Cat' follows on the field (map 10218).",
+        "Editor sc_pm_branchstory_paydun_001 (map 31208, the Moonlight Flower MVP room of 3120801): born point 22 in the open centre (74.7, 76.7); group 24 holds server spawn points 25 (direction 180, facing the born point) and 26 (direction 0), 0.8 m apart at (74.8, 92) north of it; group 27 holds 42 server spawn points (67-108) in clusters along the four sides and corners of the room, 15.6 to 32 m from the born point. No region, guide, mark or NPC list; no spawn point names its NPC (npcId 0, generic label).",
+        "NPCConfig 400097 Moonlight Flower: a story NPC (type 1, unit 33018, model ratio 1.8, no AI, no interaction), the only NPC named Moonlight Flower without AI (the MVP, raid and party ones, 5020014, 4380000-4380001, 24010198, 24010528 and 81000006, carry boss AI).",
+        "ChatConfig 5310005-5310014, which no client code or other config references (so the original scene script sent them): CombatCountdownTip 5310010 (type 16, 5000 ms) 'Hide in the darkness and don't let them Discover you!'; bubbles 5310011 'Meow, meow! Let the hide-and-seek begin!', 5310012 'Hehe, I'm the Moonlit Challenger of hide-and-seek!', 5310013 'Can your eyes see me?'; Moonlight Flower's lines 5310005 'I'm about to catch you! Watch out!', 5310006 'You're pretty good at hide-and-seek! Play with me a little longer!', 5310007 'I didn't know you were so good! I had a great time~'; bubble 5310014 'You're no good at hide-and-seek! Hahaha! Play with me again~'.",
+        "The letter after the game (LetterConfig 3, opened by task 205130): 'I can't believe you managed to slip away from Moonlight Flower ... you've barely passed the first round of our carefully designed qualification test', signed 'Z, awaiting your arrival in shadows beyond the moonlight's reach'."
+      ],
+      "guessed": [
+        "Nothing in the client data defines who discovers the player, where the darkness is or how long a round lasts: no region, buff, story or interaction belongs to this scene. The seek is not reproduced and the player cannot be discovered. In the original, being discovered restarted the game ('Play with me again~', 5310014), not the dungeon; here the step keeps waiting until the player hides, which is where such a restart returns.",
+        "The darkness is read as group 27: its 42 server spawn points ring the open centre where the player is born, away from Moonlight Flower; the step completes within 3 m of any of them. What the original spawned there (seekers, moonlight or hiding places) is not named by the client data.",
+        "Moonlight Flower (400097) stands at point 26, turned away from the room (direction 0) like a seeker counting; point 25, the same place facing the born point, is presumably where she talked to the player.",
+        "The rounds that 'Play with me a little longer!' implies are one round, and the ChatConfig lines are not shown: the engine sends no chat."
+      ],
+      "steps": [
+        {
+          "quest": 1,
+          "stage": "Moonlight Flower's game: hide in the darkness",
+          "actors": [
+            { "npc": 400097, "point": 26, "why": "Moonlight Flower (story NPC, no AI) at group 24's point turned away from the room, counting" }
+          ],
+          "complete": [
+            { "point": 67, "radius": 3, "why": "group 27, south-west (49.9, 59.1)" },
+            { "point": 68, "radius": 3, "why": "group 27, south-west (55.4, 59.8)" },
+            { "point": 69, "radius": 3, "why": "group 27, south-west (57.4, 57.1)" },
+            { "point": 70, "radius": 3, "why": "group 27, south-west (60.5, 61.1)" },
+            { "point": 71, "radius": 3, "why": "group 27, south-west (64.5, 59.3)" },
+            { "point": 72, "radius": 3, "why": "group 27, south-west (61.5, 54.7)" },
+            { "point": 73, "radius": 3, "why": "group 27, south-west (52.8, 54.2)" },
+            { "point": 74, "radius": 3, "why": "group 27, south-west (58.1, 51.4)" },
+            { "point": 75, "radius": 3, "why": "group 27, south-west (65.2, 51.3)" },
+            { "point": 76, "radius": 3, "why": "group 27, south-east (85.5, 60.4)" },
+            { "point": 77, "radius": 3, "why": "group 27, south-east (89.3, 62.7)" },
+            { "point": 78, "radius": 3, "why": "group 27, south-east (93.2, 64.6)" },
+            { "point": 79, "radius": 3, "why": "group 27, south-east (94.8, 58.6)" },
+            { "point": 80, "radius": 3, "why": "group 27, south-east (92.1, 59.7)" },
+            { "point": 81, "radius": 3, "why": "group 27, south-east (98.0, 62.0)" },
+            { "point": 82, "radius": 3, "why": "group 27, south-east (87.7, 56.1)" },
+            { "point": 83, "radius": 3, "why": "group 27, south-east (91.2, 53.1)" },
+            { "point": 84, "radius": 3, "why": "group 27, south-east (98.2, 54.8)" },
+            { "point": 85, "radius": 3, "why": "group 27, south-east (91.4, 56.7)" },
+            { "point": 86, "radius": 3, "why": "group 27, south-east (86.2, 51.4)" },
+            { "point": 87, "radius": 3, "why": "group 27, east (94.4, 77.1)" },
+            { "point": 88, "radius": 3, "why": "group 27, north-east (93.6, 82.8)" },
+            { "point": 89, "radius": 3, "why": "group 27, north-east (91.4, 87.3)" },
+            { "point": 90, "radius": 3, "why": "group 27, north-east (85.3, 92.3)" },
+            { "point": 91, "radius": 3, "why": "group 27, west (53.4, 76.2)" },
+            { "point": 92, "radius": 3, "why": "group 27, west (55.1, 79.2)" },
+            { "point": 93, "radius": 3, "why": "group 27, north-west (55.4, 84.3)" },
+            { "point": 94, "radius": 3, "why": "group 27, north-west (60.3, 88.3)" },
+            { "point": 95, "radius": 3, "why": "group 27, north-west (63.7, 91.8)" },
+            { "point": 96, "radius": 3, "why": "group 27, north-west (60.0, 93.6)" },
+            { "point": 97, "radius": 3, "why": "group 27, north-west (57.5, 92.4)" },
+            { "point": 98, "radius": 3, "why": "group 27, north-west (53.3, 93.7)" },
+            { "point": 99, "radius": 3, "why": "group 27, north-west (57.5, 98.2)" },
+            { "point": 100, "radius": 3, "why": "group 27, north-west (63.0, 98.9)" },
+            { "point": 101, "radius": 3, "why": "group 27, north-east (88.4, 97.1)" },
+            { "point": 102, "radius": 3, "why": "group 27, north-east (93.6, 94.1)" },
+            { "point": 103, "radius": 3, "why": "group 27, north-east (99.0, 93.3)" },
+            { "point": 104, "radius": 3, "why": "group 27, north-east (97.8, 89.6)" },
+            { "point": 105, "radius": 3, "why": "group 27, north-east (101.1, 83.8)" },
+            { "point": 106, "radius": 3, "why": "group 27, east (99.4, 79.3)" },
+            { "point": 107, "radius": 3, "why": "group 27, west (59.5, 72.7)" },
+            { "point": 108, "radius": 3, "why": "group 27, west (48.8, 72.7)" }
+
           ]
         }
       ]

@@ -25,6 +25,8 @@ namespace Ro3Emu.ClientHooks
     /// <item>For our open-content policy: the client's own server-day checks (season cards, guild challenge difficulties)
     /// follow what the server reports instead of the day count from the real opening time, and the season page opens in
     /// the season's hidden first week (ServerDayGates).</item>
+    /// <item>Map config modules this build does not ship (Dracula's Lair, the territory maps) go into package.loaded
+    /// before any scene needs them (MapModules).</item>
     /// </list>
     /// </summary>
     public static class LuaPatches
@@ -68,6 +70,7 @@ namespace Ro3Emu.ClientHooks
                 env = EnvOf(manager, out string why);
                 if (env == null) { Report(why); return; }
                 var global = ((Obf_R.Obf_Cf)env).Obf_A;
+                MapModules.Install(env, global); // own once-per-LuaEnv guard; needs only package.loaded
                 if (ReferenceEquals(env, _doneEnv)) { ServerDayGates.Probe(); return; }
                 _topBarClass = _evePanelClass = null;
                 // GlobalRequire sets LC_ItemShowHelper once the game's modules are up; before that, requiring is unsafe.

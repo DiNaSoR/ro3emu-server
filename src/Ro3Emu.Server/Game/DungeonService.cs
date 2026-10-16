@@ -133,6 +133,8 @@ public sealed partial class DungeonService
         /// <summary>The scripted scene actors shown now (also tracked by the room for cleanup).</summary>
         internal List<SceneActorUnit> SceneActors { get; } = new();
         internal GuildChallengeService.Run? GuildChallenge { get; set; }
+        /// <summary>Dracula's Lair: DraculaWeddingService owns admission, the bride, the key and the settlement.</summary>
+        internal DraculaWeddingService.Run? Dracula { get; set; }
     }
 
     private sealed class Preparation
@@ -216,6 +218,27 @@ public sealed partial class DungeonService
             ? (int)(GameData.Number(timeout) ?? 30) : 30;
         loop.ScheduleLegacy(TimeSpan.FromSeconds(seconds), () => p.Closed ? Task.CompletedTask : CancelAsync(p, ErrorCodes.Parameter, 0));
     }
+
+    /// <summary>
+    /// A Valhalla Trials layer (ValhallaService owns its admission): the ordinary private-room engine runs the boss,
+    /// the clear is a Records entry written with its reward (FreezeLockedAsync). 0 or the refusal to answer with.
+    /// </summary>
+    internal async Task<int> AdmitValhallaAsync(GameSession s, DungeonCatalog.Plan plan)
+    {
+        await DeliverPendingAsync(s);
+        int error = Admission(s, plan);
+        return error == 0 && pending.ContainsKey(s) ? ErrorCodes.DungeonPreparing : error;
+    }
+
+    /// <summary>After <see cref="AdmitValhallaAsync"/> and the 83490 reply that closes the entry panel.</summary>
+    internal Task BeginValhallaAsync(GameSession s, DungeonCatalog.Plan plan) => BeginAsync(plan, [s], s.Role!.Id, 0);
+
+    /// <summary>The cleared Valhalla layers: Records keyed <c>valhalla:&lt;layer&gt;</c>.</summary>
+    internal static IEnumerable<long> ValhallaCleared(State? state) => state == null ? []
+        : state.Records.Where(r => r.Value.Passed && r.Key.StartsWith(ValhallaPrefix, StringComparison.Ordinal))
+            .Select(r => long.Parse(r.Key.AsSpan(ValhallaPrefix.Length), System.Globalization.CultureInfo.InvariantCulture));
+
+    internal const string ValhallaPrefix = "valhalla:";
 
     /// <summary>42033 is the actual prepare-panel producer (LC_DAL_Team.lua:3337-3587), not teleport invite 30118.</summary>
     private Task BroadcastReadyAsync(Preparation p, bool cancel = false, int error = 0, long role = 0)
@@ -360,6 +383,7 @@ public sealed partial class DungeonService
             snapshot.Stage = snapshot.StageModuleData.Stage = a.Settled ? 2 : a.Started ? 1 : 0;
             snapshot.StageModuleData.MapStateEndTime = challenge.End * 1000;
         }
+        if (a.Dracula is { } dracula) snapshot.Vars.Add(dracula.Vars());
         return snapshot;
     }
 
@@ -447,6 +471,7 @@ public sealed partial class DungeonService
         // Seen live: the task widget takes its vars from 30401 only, not from this event; a later wave whose
         // quest is known republishes the state so the tracker moves on (the first one follows StartAsync's).
         if (a.Wave > 0 && QuestList(a) != null) await BroadcastAsync(a, BaseInfo, Snapshot(a));
+        if (a.Dracula is { } dracula) await dracula.Owner.WaveAsync(a);
         if (Step(a) is { } step)
         {
             await BeginStepAsync(a, step);
@@ -633,6 +658,12 @@ public sealed partial class DungeonService
             await s.SendGameAsync(ClientEvent, new NullArg());
             return;
         }
+        // (inferred) The lair is the whole guild's room: no member's give-up or reset ends it for the others.
+        if (s.DungeonAttempt?.Dracula != null)
+        {
+            await s.SendGameAsync(ClientEvent, new NullArg());
+            return;
+        }
         // LC_DAL_Dungeon.lua:69-87: only control events with no client-authored rewards/functions are accepted.
         // Leader-only surrender and reset-after-settlement into a fresh room are (inferred control policy).
         if (s.DungeonAttempt is { } a && s.InstanceId == a.Room.Id && !s.SceneLoading && s.Role!.Id == a.Leader)
@@ -673,6 +704,7 @@ public sealed partial class DungeonService
         if (pending.TryGetValue(s, out var p)) await CancelAsync(p, ErrorCodes.MemberLeft, s.Role?.Id ?? 0);
         if (s.DungeonAttempt is not { } a) return;
         s.DungeonAttempt = null; s.Attack = null;
+        if (a.Dracula is { } dracula) await dracula.Owner.LeftAsync(a, s);
         await ClearBondsAsync(s, a);
         await instances.AbandonAsync(s);
         var remaining = Present(a);
@@ -696,6 +728,15 @@ public sealed partial class DungeonService
             await instances.ClearMonstersAsync(a.Room);
             await BroadcastAsync(a, BaseInfo, Snapshot(a));
             await challenge.Owner.SettleAsync(a, won);
+            return;
+        }
+        if (a.Dracula is { } dracula)
+        {
+            a.Settled = true;
+            await instances.ClearMonstersAsync(a.Room);
+            a.SceneActors.Clear(); // removed with the room's monsters
+            await BroadcastAsync(a, BaseInfo, Snapshot(a));
+            await dracula.Owner.SettleAsync(a, won);
             return;
         }
         if (a.ObligationsFrozen && !a.ObligationsActivated)

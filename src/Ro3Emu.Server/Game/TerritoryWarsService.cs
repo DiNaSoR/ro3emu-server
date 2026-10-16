@@ -482,7 +482,7 @@ public sealed partial class TerritoryWarsService : IGameTicker
             15 or 99 => TerritoryWarsBattleState.End,
             _ => TerritoryWarsBattleState.NotOpen,
         };
-        // Legacy auction UI subtracts GetSystemTime directly; activity 5013 uses milliseconds separately.
+        // Seconds: the legacy auction UI subtracts GetSystemTime directly, as activity 5013 does (BuildActivityState).
         return new() { State = value, StartTime = stage.StartTime, EndTime = stage.EndTime };
     }
 
@@ -560,11 +560,20 @@ public sealed partial class TerritoryWarsService : IGameTicker
         });
     }
 
+    /// <summary>
+    /// territoryWarStage times are epoch seconds: LC_ActivityParser_TerritoryWar.lua:316-337 stores them raw as
+    /// lStartTime/lEndTime, and every reader compares them with TimerManager:GetSystemTime(), which is seconds
+    /// (Lua_TimerManager.lua:710-732 stores the server's ms * 0.001): LC_TerritoryWarActivityHelper.lua:300-322
+    /// (remaining time), UI_Sys_TerritoryWars_BasicsMapInformationWidgetCtrl.lua:207-226 (start &lt;= now &lt; end),
+    /// UI_Sys_TerritoryWars_StrongholdAuctionPanelCtrl.lua:1220-1235; LC_TerritoryWarActivityHelper_Test.lua formats
+    /// them with os.date and defaults the end to start + 3600. territoryWarData.stage has no client reader and
+    /// follows the same unit (inferred).
+    /// </summary>
     private PlayerActivityTerritoryWar BuildActivityState(GameSession s)
     {
         var stage = clock.Current;
         var war = new DBTerritoryWarData { ZoneData = new(), BattleZoneData = new(),
-            Stage = new TerritoryStage { StageType = stage.Type, StartTime = stage.StartTime * 1000, EndTime = stage.EndTime * 1000 } };
+            Stage = new TerritoryStage { StageType = stage.Type, StartTime = stage.StartTime, EndTime = stage.EndTime } };
         foreach (var z in Zones)
         {
             int id = (int)Id(z);
@@ -578,7 +587,7 @@ public sealed partial class TerritoryWarsService : IGameTicker
         return new PlayerActivityTerritoryWar
         {
             TerritoryWarData = war, TerritoryWarStage = new TerritoryWarStage { StageType = (TerritoryWarStageType)stage.Type,
-                StartTime = stage.StartTime * 1000, EndTime = stage.EndTime * 1000 },
+                StartTime = stage.StartTime, EndTime = stage.EndTime },
         };
     }
 

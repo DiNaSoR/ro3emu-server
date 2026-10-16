@@ -74,8 +74,10 @@ public static class ServerHost
         builder.Services.AddSingleton<LotteryService>();
         builder.Services.AddSingleton<GuildHomeService>();
         builder.Services.AddSingleton<GuildCampfireService>();
+        builder.Services.AddSingleton<GuildHuntingService>();
         builder.Services.AddSingleton<GuildChallengeStore>();
         builder.Services.AddSingleton<GuildChallengeService>();
+        builder.Services.AddSingleton<DraculaWeddingService>();
         builder.Services.AddSingleton<WildAfkService>();
         builder.Services.AddSingleton<LifeJobService>();
         builder.Services.AddSingleton<GatheringService>();
@@ -115,7 +117,11 @@ public static class ServerHost
         builder.Services.AddSingleton<TerritoryWarsClock>();
         builder.Services.AddSingleton<TerritoryWarsService>();
         builder.Services.AddSingleton<TerritoryEscortService>();
+        builder.Services.AddSingleton<GuildLeagueCalendar>();
+        builder.Services.AddSingleton<GuildLeagueService>();
         builder.Services.AddSingleton<TowerService>();
+        builder.Services.AddSingleton<ValhallaService>();
+        builder.Services.AddSingleton<MonsterHuntService>();
         builder.Services.AddSingleton<AppraisalService>();
         builder.Services.AddSingleton<EnchantService>();
         builder.Services.AddSingleton<PetFollowerService>();
@@ -166,6 +172,8 @@ public static class ServerHost
         builder.Services.AddSingleton<IMicroService, NameService>();
         builder.Services.AddSingleton<IMicroService, PartyService>();
         builder.Services.AddSingleton<IMicroService>(sp => sp.GetRequiredService<Game.MailService>());
+        builder.Services.AddSingleton<RankService>();
+        builder.Services.AddSingleton<IMicroService>(sp => sp.GetRequiredService<RankService>());
         builder.Services.AddSingleton<MicroServiceRouter>();
         builder.Services.AddHostedService<MicroGateServer>();
         builder.Services.AddHostedService<GameGateServer>();
@@ -291,7 +299,9 @@ public static class ServerHost
         app.Services.GetRequiredService<TrainingService>();
         app.Services.GetRequiredService<GuildHomeService>();
         app.Services.GetRequiredService<GuildCampfireService>();
+        app.Services.GetRequiredService<GuildHuntingService>(); // boss kills, damage, home entry and the 5840 guard
         app.Services.GetRequiredService<GuildChallengeService>();
+        app.Services.GetRequiredService<DraculaWeddingService>(); // home scene hook, lair tasks and the !dracula aid
         app.Services.GetRequiredService<AdventureGroupService>(); // creation-instance NPCs, group quest gate, scene hook
         app.Services.GetRequiredService<GuildCaravanService>(); // 05:00 settlement also covers offline orders
         app.Services.GetRequiredService<WildAfkService>(); // field drop accounting and Bonus Time ticker
@@ -304,8 +314,10 @@ public static class ServerHost
         territory.GuildEscortScore = (guild, round) => escort.GetGuildEscortScore(guild, round);
         app.Services.GetRequiredService<GuildService>().ItemDataOf = escort.GuildItems;
         var territoryCombat = app.Services.GetRequiredService<CombatService>();
-        territoryCombat.PlayerHostile = (a, b) => territory.Hostile(a, b) || escort.Hostile(a, b) || territory.WorldHostile(a, b);
-        territoryCombat.MonsterTargetAllowed = (s, m) => territory.CanHitObjective(s, m) && escort.CanHitCart(s, m);
+        var league = app.Services.GetRequiredService<GuildLeagueService>(); // 30410-30412 hooks, battlefield scene/combat hooks
+        territoryCombat.PlayerHostile = (a, b) => territory.Hostile(a, b) || escort.Hostile(a, b) || territory.WorldHostile(a, b)
+            || league.Hostile(a, b);
+        territoryCombat.MonsterTargetAllowed = (s, m) => territory.CanHitObjective(s, m) && escort.CanHitCart(s, m) && league.CanHit(s, m);
         app.Services.GetRequiredService<WorldEffectsService>(); // scene/monster effect hooks before clients connect
         app.Services.GetRequiredService<WorldCoreService>();
         app.Services.GetRequiredService<WorldInteractionService>();
@@ -403,13 +415,16 @@ internal sealed class GameLoopTickers(IServiceProvider services) : IHostedServic
         Add<TrainingService>();
         Add<GuildHomeService>();
         Add<GuildCampfireService>();
+        Add<GuildHuntingService>();
         Add<GuildChallengeService>();
+        Add<DraculaWeddingService>();
         Add<AdventureGroupService>();
         Add<GuildCaravanService>();
         Add<WildAfkService>();
         Add<MvpService>();
         Add<TerritoryWarsService>();
         Add<TerritoryEscortService>();
+        Add<GuildLeagueService>();
         Add<WorldCoreService>();
         Add<EmojiService>();
         Add<AchievementService>();

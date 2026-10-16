@@ -141,7 +141,7 @@ public static partial class EconomySnapshotReader
                     Guard(key, () =>
                     {
                         using var doc = Json(bytes); var state = doc.RootElement;
-                        Fields(state, "Id Name Announce Notice CreateTime Status HelperDeadlineMs Level Background Icon AutoAccept AutoCreateHelper JoinLevelLimit Money Contribute Materials Reputation AuctionMaterials LastChangeNameTime LastChangeNoticeTime LastRecruitMs HistoryNames Members Applications Rights Buildings BuildingEndTimes");
+                        Fields(state, "Id Name Announce Notice CreateTime Status HelperDeadlineMs Level Background Icon AutoAccept AutoCreateHelper JoinLevelLimit Money Contribute Materials Reputation AuctionMaterials LastChangeNameTime LastChangeNoticeTime LastRecruitMs HistoryNames Members Applications HelperApplies Rights Buildings BuildingEndTimes CurActivity LastWeekActivity ActivityWeek");
                         if (Long(state, "Id") != id) throw new FormatException("Guild identity mismatch.");
                         var owner = new EconomyOwner(EconomyOwnerKind.Guild, Id(id));
                         foreach (var field in new[] { ("Money", 1L), ("Contribute", 2L), ("Materials", 3L),
@@ -152,7 +152,8 @@ public static partial class EconomySnapshotReader
                             if (quantity > 0) Resource(EconomyAssetKind.GuildResource, field.Item2, quantity,
                                 owner, EconomyCompartment.GuildTreasury, key + "/" + field.Item1);
                         }
-                        // Member CurContribute/HistoryContribute are progression/history mirrors, not a purse.
+                        // Member CurContribute/HistoryContribute are progression/history mirrors, not a purse; guild and
+                        // member activity counters and a member's brought-in funds (ContributeMoney) are counters too.
                     });
                     });
                 }
@@ -173,7 +174,7 @@ public static partial class EconomySnapshotReader
                             throw new FormatException("Invalid or live guild recovery identity.");
                         using var doc = Json(bytes);
                         var state = doc.RootElement;
-                        Fields(state, "Id Name Announce Notice CreateTime Status HelperDeadlineMs Level Background Icon AutoAccept AutoCreateHelper JoinLevelLimit Money Contribute Materials Reputation AuctionMaterials LastChangeNameTime LastChangeNoticeTime LastRecruitMs HistoryNames Members Applications Rights Buildings BuildingEndTimes");
+                        Fields(state, "Id Name Announce Notice CreateTime Status HelperDeadlineMs Level Background Icon AutoAccept AutoCreateHelper JoinLevelLimit Money Contribute Materials Reputation AuctionMaterials LastChangeNameTime LastChangeNoticeTime LastRecruitMs HistoryNames Members Applications HelperApplies Rights Buildings BuildingEndTimes CurActivity LastWeekActivity ActivityWeek");
                         if (Long(state, "Id") != id) throw new FormatException("Guild recovery snapshot identity mismatch.");
                         var owner = new EconomyOwner(EconomyOwnerKind.Guild, Id(id));
                         foreach (var field in new[] { ("Money", 1L), ("Contribute", 2L), ("Materials", 3L),

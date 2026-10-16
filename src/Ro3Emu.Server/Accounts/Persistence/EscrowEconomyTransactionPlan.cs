@@ -173,7 +173,7 @@ internal sealed class EscrowEconomyTransactionPlan(RoleItemPlan child, EscrowEco
                 "AuctionPrebuyWritePlan" or "AuctionBonusWritePlan" or "AuctionBonusClaimPlan" or
                 "AuctionSourceClaimPlan" or "AuctionRunSavePlan" or "AuctionRunClearPlan" or
                 "AuctionPersonalCasPlan" or "GuildSavePlan" or "GuildMarketSavePlan" or
-                "GuildMaterialContributionPlan" or "GuildCaravanRewardPlan" or
+                "GuildMaterialContributionPlan" or "GuildCaravanRewardPlan" or "GuildEventAppendPlan" or
                 "FriendGiftWritePlan" or "FriendGiftGuardPlan" or "FriendGiftSourcePlan" or
                 "ActivityEveGlobalPlan" or "ActivityPreDonationPlan" or "ActivityInventoryGuardPlan" or
                 "CaravanMemberWritePlan"))

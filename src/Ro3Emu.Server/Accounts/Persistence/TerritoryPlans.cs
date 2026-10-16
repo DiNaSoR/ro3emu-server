@@ -20,11 +20,18 @@ internal sealed class TerritorySchemaPlan(RealmStateKind kind) : DbPlan
                 """,
             RealmStateKind.TerritoryEscort =>
                 "CREATE TABLE IF NOT EXISTS territory_escort(id INTEGER PRIMARY KEY CHECK(id=1),state BLOB NOT NULL)",
+            RealmStateKind.GuildLeague =>
+                "CREATE TABLE IF NOT EXISTS guild_league(id INTEGER PRIMARY KEY CHECK(id=1),state BLOB NOT NULL)",
             _ => throw new ArgumentOutOfRangeException(nameof(kind))
         };
         using var cmd = DbSql.Command(db, tx, sql);
         int changed = cmd.ExecuteNonQuery();
-        string table = kind == RealmStateKind.TerritoryWars ? "territory_wars" : "territory_escort";
+        string table = kind switch
+        {
+            RealmStateKind.TerritoryWars => "territory_wars",
+            RealmStateKind.TerritoryEscort => "territory_escort",
+            _ => "guild_league",
+        };
         using var realm = DbSql.Command(db, tx, $"""
             INSERT OR IGNORE INTO owner_revision(kind,id,part,revision)
                 SELECT 'realm',$kind,'state',0 FROM {table} WHERE id=1
@@ -52,6 +59,7 @@ internal sealed class TerritoryRealmReadPlan(RealmStateKind kind) : DbReadPlan
         {
             RealmStateKind.TerritoryWars => "territory_wars",
             RealmStateKind.TerritoryEscort => "territory_escort",
+            RealmStateKind.GuildLeague => "guild_league",
             _ => throw new ArgumentOutOfRangeException(nameof(kind))
         };
         using var cmd = DbSql.Command(db, tx, $"SELECT state FROM {table} WHERE id=1");

@@ -115,6 +115,8 @@ public sealed partial class GuildService
     public Task SyncOnceAsync(GameSession s, SyncGuildDataOnceReq req) => RunGuildAsync(s, [], [], () => SyncOnceCoreAsync(s, req));
     public Task MemberIdsAsync(GameSession s, GuildMemberIDListReq req) => RunGuildAsync(s, [], [], () => MemberIdsCoreAsync(s, req));
     public Task LeagueMgrDataAsync(GameSession s, uint id) => RunGuildAsync(s, [], [], () => LeagueMgrDataCoreAsync(s, id));
+    public Task LeagueInfoAsync(GameSession s, uint id) => RunGuildAsync(s, [], [], () => LeagueInfoCoreAsync(s, id));
+    public Task LeagueGroupInfoAsync(GameSession s, uint id) => RunGuildAsync(s, [], [], () => LeagueGroupInfoCoreAsync(s, id));
 
     /// <summary>Stage roster and role projections together, including generated guild identities.
     /// The membership index stays authoritative; Apply publishes every live view

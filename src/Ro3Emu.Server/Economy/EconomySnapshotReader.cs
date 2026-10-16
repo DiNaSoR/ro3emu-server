@@ -46,7 +46,7 @@ public static partial class EconomySnapshotReader
         ["emblems"] = BlobFormat.Json, ["pets"] = BlobFormat.Protobuf,
         ["mounts"] = BlobFormat.Json, ["wardrobe"] = BlobFormat.Protobuf,
         ["totems"] = BlobFormat.Protobuf, ["totem_refine_epoch"] = BlobFormat.RawEpoch,
-        ["genre"] = BlobFormat.Protobuf, ["career_special"] = BlobFormat.Protobuf
+        ["genre"] = BlobFormat.Protobuf, ["career_special"] = BlobFormat.Protobuf, ["heroic_spirit"] = BlobFormat.Protobuf, ["area_concur"] = BlobFormat.Protobuf
     };
 
     private enum BlobFormat { Json, Protobuf, Mailbox, TerritoryRole, RawEpoch, StringSet }

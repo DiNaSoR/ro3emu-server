@@ -28,9 +28,10 @@ public sealed partial class DungeonTests
         Assert.Equal(scripted.Steps.Count, plan.Waves.Count);
         Assert.All(plan.Waves, w => Assert.Empty(w.Spawns));
         Assert.Equal(scripted.Steps, plan.Waves.Select(w => w.Step!));
-        // The tracker walks the scene's configured DungeonQuestConfig quests in order, each of them.
+        // The tracker walks the scene's configured DungeonQuestConfig quests in order, each of them but the unplayed.
         var quests = Service<GameData>().Table("DungeonQuestConfig").Values
-            .Where(q => GameData.Int(q, "_iDungeonID") == scene).Select(q => (int)GameData.Int(q, "_iQuestID")).Order();
+            .Where(q => GameData.Int(q, "_iDungeonID") == scene).Select(q => (int)GameData.Int(q, "_iQuestID"))
+            .Where(q => !scripted.Unplayed.Contains(q)).Order();
         Assert.Equal(quests, plan.Waves.Select(w => w.Quest).Distinct());
         Assert.Equal(plan.Waves.Select(w => w.Quest).Order(), plan.Waves.Select(w => w.Quest));
     }
@@ -117,8 +118,14 @@ public sealed partial class DungeonTests
                 await Next(alice, BuffService.BuffUpdate, BuffUpdateNotify.Parser,
                     n => n.UnitId == actor.Uid && n.Buffs.Any(b => b.ConfigId == 5365401));
             await Beside(alice, actor.X, actor.Y, actor.Z);
+            // The reverse dungeon's client reports the NPC's place (31089) before each interaction (LC_DAL_Interact.SyncNpcPos).
+            await alice.SendGameAsync(WorldCoreService.TeleportObject, new ClientTeleportObject
+            { TargetUid = actor.Uid, TargetPos = new Vec3 { X = actor.X, Y = actor.Y, Z = actor.Z } });
             Assert.Equal(0, await Interact(alice, actor, chain[step].Interaction));
         }
+        // ... and gets no error tip for it.
+        Assert.DoesNotContain(alice.Inbox.Snapshot(), e => e.IsGame(99999)
+            && APIErrorMsg.Parser.ParseFrom(e.Body).OriginMsgId == WorldCoreService.TeleportObject);
         var result = await Next(alice, DungeonService.Result, DungeonResNotify.Parser);
         Assert.Equal((DungeonRes)1, result.Res);
         var end = Service<WorldData>().Map(scene)!.Points[31]; // the ride ends in the end region
@@ -174,6 +181,121 @@ public sealed partial class DungeonTests
         await StoryMovesOn(alice, 10106270, 10106280);
         Assert.DoesNotContain(alice.Inbox.Snapshot().Where(e => e.IsGame(DungeonService.BaseInfo))
             .SelectMany(e => DungeonBaseInfoNotify.Parser.ParseFrom(e.Body).Vars), v => v.VarId == DungeonService.StoryVar);
+    }
+
+    [ClientDataFact]
+    public async Task MoonlightFlowersGameEndsWhenThePlayerHidesAwayFromTheOpenCentre()
+    {
+        const long scene = 3120802;
+        await using var alice = await InWorld("Alice");
+        await Gm(alice, "!quest accept 205110"); // Falling into a Trap: [101018, 3120802, 1]
+        Assert.Equal(0, await Enter(alice, new EnterDungeonReq { SceneEntry = scene }));
+        await Load(alice, scene);
+        var stage = await Stage(alice, 1, quest: 1);
+        Assert.Equal([0L, 1L], stage.Vars.Single(v => v.VarId == 10003).Vi64); // 'Hide in the darkness' (0/1)
+        var flower = Assert.Single(await ActorsIn(alice, 1));
+        Assert.Equal((400097, 1, 26L), (flower.NpcId, flower.EntityType, flower.Point)); // turned away, counting
+
+        // The open centre and Moonlight Flower's side are not hiding places: the game goes on.
+        var map = Service<WorldData>().Map(scene)!;
+        var born = map.Points[22];
+        await WalkTo(alice, born.X, born.Y, born.Z);
+        await WalkTo(alice, flower.X + 2, flower.Y, flower.Z);
+        var hide = map.Points[107]; // group 27, west of the born point
+        await WalkTo(alice, hide.X, hide.Y, hide.Z + 4); // not yet within its 3 m
+        await Task.Delay(200);
+        Assert.False(Session(alice).DungeonAttempt!.Settled);
+
+        await WalkTo(alice, hide.X, hide.Y, hide.Z + 1);
+        var result = await Next(alice, DungeonService.Result, DungeonResNotify.Parser);
+        Assert.Equal((DungeonRes)1, result.Res);
+        await StoryMovesOn(alice, 205110, 205120);
+    }
+
+    [ClientDataFact]
+    public async Task LouiesShellGameTakesTwoRightGuessesWhileWrongOnesChangeNothing()
+    {
+        const long scene = 3120703;
+        await using var alice = await InWorld("Alice");
+        await Gm(alice, "!quest accept 205170"); // A New Round: [101018, 3120703, 1]
+        Assert.Equal(0, await Enter(alice, new EnterDungeonReq { SceneEntry = scene }));
+        await Load(alice, scene);
+        var stage = await Stage(alice, 1, quest: 1);
+        Assert.Equal([0L, 1L], stage.Vars.Single(v => v.VarId == 10003).Vi64); // 'Find Kitty-Katie' (0/1)
+        var round1 = await ActorsIn(alice, 8);
+        Assert.Equal([25L, 26L], round1.Where(a => a.NpcId is 400131 or 400132).Select(a => a.Point).Order()); // Louie, Martha
+        Assert.Equal(3, round1.Count(a => a.NpcId == 400138)); // the Bells
+        Assert.DoesNotContain(round1, a => a.NpcId == 400133); // Katie hides
+
+        // A wrong guess: the ring's dialogue opens, 'Choose this one!' sends message 12, and the round goes on.
+        var wrong = round1.Single(a => a.NpcId == 400135);
+        await Beside(alice, wrong.X, wrong.Y, wrong.Z);
+        Assert.Equal(0, await Interact(alice, wrong, 20004001));
+        Assert.Equal(0, await Interact(alice, wrong, 5300041));
+        await Task.Delay(200);
+        Assert.Equal(1, Session(alice).DungeonAttempt!.Wave + 1);
+        var katie = round1.Single(a => a.NpcId == 400134);
+        Assert.Equal(31L, katie.Point); // straight ahead of Katie's place
+        await Beside(alice, katie.X, katie.Y, katie.Z);
+        Assert.Equal(0, await Interact(alice, katie, 20003001));
+        Assert.Equal(0, await Interact(alice, katie, 5300040)); // message 11: right
+
+        // Round 2: the cat has moved; the Bells, Louie and Martha stay, the rings change places.
+        await Stage(alice, 2, quest: 1);
+        var round2 = await ActorsWhen(alice, shown => shown.Count == 8 && shown.Any(a => a.NpcId == 400134 && a.Point == 29));
+        Assert.All(round1.Where(a => a.NpcId is 400131 or 400132 or 400138), kept => Assert.Contains(kept, round2));
+        Assert.False(Session(alice).DungeonAttempt!.Settled);
+        var stale = round2.Single(a => a.NpcId == 400135);
+        await Beside(alice, stale.X, stale.Y, stale.Z);
+        Assert.Equal(0, await Interact(alice, stale, 5300041)); // a wrong guess in round 2 changes nothing either
+        await Task.Delay(200);
+        Assert.Equal(2, Session(alice).DungeonAttempt!.Wave + 1);
+        katie = round2.Single(a => a.NpcId == 400134);
+        await Beside(alice, katie.X, katie.Y, katie.Z);
+        Assert.Equal(0, await Interact(alice, katie, 5300040));
+        var result = await Next(alice, DungeonService.Result, DungeonResNotify.Parser);
+        Assert.Equal((DungeonRes)1, result.Res);
+        await StoryMovesOn(alice, 205170, 205180);
+    }
+
+    [ClientDataFact]
+    public async Task TheOpeningDanceEndsWithLunasGoodbyeEvenWhenTheClientLeavesAtOnce()
+    {
+        const long scene = 1010601;
+        await using var alice = await InWorld("Alice");
+        await Gm(alice, "!quest accept 201040"); // Complete the Opening Dance: [101018, 1010601, 1]
+        Assert.Equal(0, await Enter(alice, new EnterDungeonReq { SceneEntry = scene }));
+        await Load(alice, scene);
+        await Stage(alice, 1, quest: 1);
+        var hall = await ActorsIn(alice, 23);
+        var luna = hall.Single(a => a.NpcId == 400119);
+        Assert.Equal((38L, 1), (luna.Point, luna.EntityType));
+        Assert.DoesNotContain(hall, a => a.NpcId is 400122 or 400123); // no dialogue before the dance
+
+        // Walking up on Luna's other side is not the partner's place; within 3 m of mark 49 (region 48) is.
+        var map = Service<WorldData>().Map(scene)!;
+        var partner = map.Points[49];
+        await WalkTo(alice, luna.X - 2, luna.Y, luna.Z);
+        await Task.Delay(200);
+        Assert.Equal(1, Session(alice).DungeonAttempt!.Wave + 1);
+        await WalkTo(alice, partner.X, partner.Y, partner.Z - 2.5f);
+
+        await Stage(alice, 2, quest: 2);
+        var shell = Assert.Single(await ActorsIn(alice, 1, a => a.NpcId == 400122));
+        Assert.Equal((38L, 2), (shell.Point, shell.EntityType)); // on Luna, an NPC the client clicks
+        Assert.DoesNotContain(await ActorsIn(alice, 24), a => a.NpcId == 400123); // the dance never fails here
+        await Beside(alice, shell.X, shell.Y, shell.Z);
+        Assert.Equal(0, await Interact(alice, shell, 40012201)); // the click opens her dialogue
+        Assert.Equal(2, Session(alice).DungeonAttempt!.Wave + 1);
+        // 'Goodbye': 211 TriggerNpcInteract 40012401 (message 66), then 35 ExitDungeon sends 30402 without waiting.
+        await alice.SendGameAsync(SceneService.NpcInteraction, new NpcInteractionReq
+        {
+            NpcUid = shell.Uid, InteractionId = 40012401, SceneConfigId = shell.SceneEntry,
+        });
+        await alice.SendGameAsync(TowerService.LeaveDungeon, new LeaveDungeonReq());
+        var result = await Next(alice, DungeonService.Result, DungeonResNotify.Parser);
+        Assert.Equal((DungeonRes)1, result.Res);
+        await StoryMovesOn(alice, 201040, 201050);
     }
 
     [Fact]

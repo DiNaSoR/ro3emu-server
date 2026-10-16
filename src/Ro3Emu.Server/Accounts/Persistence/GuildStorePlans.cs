@@ -29,6 +29,12 @@ internal sealed class GuildSchemaPlan : DbPlan
                 state BLOB NOT NULL,
                 created_ms INTEGER NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS guild_event (
+                guild_id INTEGER NOT NULL,
+                idx INTEGER NOT NULL,
+                data BLOB NOT NULL,
+                PRIMARY KEY(guild_id, idx)
+            );
             """);
         cmd.ExecuteNonQuery();
         SchemaSql.Execute(db, tx, """
@@ -134,7 +140,7 @@ internal sealed class GuildDeletePlan(long guild) : DbPlan
     {
         DbWriter.AfterJob(GuildStore.Invalidate);
         using var cmd = DbSql.Command(db, tx,
-            "DELETE FROM guild_member WHERE guild_id=$id; DELETE FROM guild WHERE id=$id");
+            "DELETE FROM guild_member WHERE guild_id=$id; DELETE FROM guild_event WHERE guild_id=$id; DELETE FROM guild WHERE id=$id");
         cmd.Parameters.AddWithValue("$id", guild);
         return cmd.ExecuteNonQuery();
     }

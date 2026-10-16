@@ -237,7 +237,7 @@ public sealed class TrainingService : IGameTicker
             [ReservationKey.Entity("training-claims", s.Role!.Id.ToString())]);
         int result = Gate(s);
         if (result == 0 && (req.AimAwardIds.Count == 0 || req.AimAwardIds.Distinct().Count() != req.AimAwardIds.Count)) result = ErrorCodes.Parameter;
-        long rootJob = RootJob(s.Progress?.Career ?? 0);
+        long rootJob = RootJob(data, s.Progress?.Career ?? 0);
         var grants = new List<AwardGrant>(); var next = s.Training?.Clone() ?? new DBTrainingGroundInfo();
         if (result == 0)
             foreach (long id in req.AimAwardIds)
@@ -269,7 +269,7 @@ public sealed class TrainingService : IGameTicker
         await s.SendGameAsync(84062, new TrainingAimAwardResp { Result = result });
     }
 
-    private long RootJob(long job)
+    internal static long RootJob(GameData data, long job)
     {
         // Lua_CFG_JobConfig.GetRootJob stops at the direct child of novice1000, at most ten ancestors.
         for (int depth = 0; depth < 10; depth++)

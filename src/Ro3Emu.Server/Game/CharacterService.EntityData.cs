@@ -46,6 +46,37 @@ public sealed partial class CharacterService
         var raw = new Dictionary<int, double>();
         void Add(long id, double v) => raw[(int)id] = raw.GetValueOrDefault((int)id) + v;
 
+        if (MatchAttributes?.Invoke(session) is { } matchAttributes)
+        {
+            // A Survivor Battle career replaces the character's own build for the match (TimedBattleService.Chicken):
+            // EatChickenGameCareer._iJobAttr and the worn match equipment, plus the buffs of the match.
+            foreach (var (id, value) in matchAttributes) Add(id, value);
+            foreach (var buff in session.Buffs)
+                foreach (var (id, v) in buff.Changes) Add(id, v);
+        }
+        else AddOwnAttributes(session, p, Add);
+        if (!raw.ContainsKey(Speed)) raw[Speed] = RoleSessionService.DefaultSpeed;
+        raw[Speed] += session.SpeedBonus;
+        if (!raw.ContainsKey(BaseAspd)) raw[BaseAspd] = 100;
+
+        var sheet = EquipmentStunts.ApplyConversions(session, raw, data);
+        long maxHp = sheet[MaxHp], maxSp = sheet[MaxSp];
+        sheet[Hp] = Math.Clamp(session.CurrentHp ?? maxHp, 0, maxHp);
+        sheet[Sp] = Math.Clamp(session.CurrentSp ?? maxSp, 0, maxSp);
+        foreach (var provider in DynamicProperties)
+            foreach (var (id, value) in provider(session))
+            {
+                // Independent active shield owners (totems and timed buffs) contribute to property 2003.
+                if (id == 2003) sheet[id] = (long)Math.Clamp((decimal)sheet[id] + value, 0, long.MaxValue);
+                else sheet[id] = value;
+            }
+        sheet[Lv] = p.Level;
+        return sheet;
+    }
+
+    /// <summary>The character's own raw contributions (gear, cards, talents, buffs, level and job rows, conversions).</summary>
+    private void AddOwnAttributes(GameSession session, RoleProgress p, Action<long, double> Add)
+    {
         var baseStats = new double[6];
         for (int i = 0; i < 6; i++) baseStats[i] = p.Stats[i];
         foreach (var item in Equipped(session))
@@ -134,23 +165,6 @@ public sealed partial class CharacterService
             if (data.Row("AttributeConversionConfig", stat) is not { } conversion) continue;
             foreach (var (id, perPoint) in GameData.Pairs(conversion, ranged ? "_kAttribute2" : "_kAttribute1")) Add(id, perPoint * baseStats[stat - 1]);
         }
-        if (!raw.ContainsKey(Speed)) raw[Speed] = RoleSessionService.DefaultSpeed;
-        raw[Speed] += session.SpeedBonus;
-        if (!raw.ContainsKey(BaseAspd)) raw[BaseAspd] = 100;
-
-        var sheet = EquipmentStunts.ApplyConversions(session, raw, data);
-        long maxHp = sheet[MaxHp], maxSp = sheet[MaxSp];
-        sheet[Hp] = Math.Clamp(session.CurrentHp ?? maxHp, 0, maxHp);
-        sheet[Sp] = Math.Clamp(session.CurrentSp ?? maxSp, 0, maxSp);
-        foreach (var provider in DynamicProperties)
-            foreach (var (id, value) in provider(session))
-            {
-                // Independent active shield owners (totems and timed buffs) contribute to property 2003.
-                if (id == 2003) sheet[id] = (long)Math.Clamp((decimal)sheet[id] + value, 0, long.MaxValue);
-                else sheet[id] = value;
-            }
-        sheet[Lv] = p.Level;
-        return sheet;
     }
 
     /// <summary>The self property list: the fixed set plus every member attribute the sheet carries (1031 ...).</summary>
@@ -168,6 +182,9 @@ public sealed partial class CharacterService
 
     /// <summary>Configured contributions from other owned systems (pet lineup/collection).</summary>
     public List<Func<GameSession, IEnumerable<(long Id, double Value)>>> ExtraAttributes { get; } = new();
+
+    /// <summary>A match owner's replacement build (null: the character's own), e.g. a Survivor Battle career.</summary>
+    public Func<GameSession, IReadOnlyList<(long Id, double Value)>?>? MatchAttributes { get; set; }
 
     /// <summary>Runtime properties such as an absorb shield, projected on full stats and late AOI snapshots.</summary>
     public List<Func<GameSession, IEnumerable<(int Id, long Value)>>> DynamicProperties { get; } = new();

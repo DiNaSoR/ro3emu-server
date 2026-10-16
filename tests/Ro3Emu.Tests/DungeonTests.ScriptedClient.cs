@@ -14,6 +14,9 @@ namespace Ro3Emu.Tests;
 /// StartLogic; every 0.2 s it is in range when the player is within its _iInteractDistance, and of the units in range
 /// the one with the highest _iInteractRank, then the nearest, is possessed; an interaction is offered when its
 /// _iNPCCondition holds, here 1004 CheckHaveBuff on the unit's buff groups, keyed by BuffConfig _iBuffID).
+/// The range is measured from where the client holds the player, not from the server's copy: in the reverse dungeon
+/// (PublicParamConfig.NoviceDungeonReverseDungeonID, 1000301) every unit moves on surfaces and the client ignores a
+/// MOVEMENT_CHANGE ForceTeleport of its own unit (LC_Scene_Sync.lua:3569-3603); it applies ResetPos there.
 /// </summary>
 public sealed partial class DungeonTests
 {
@@ -57,15 +60,19 @@ public sealed partial class DungeonTests
                     int offered = Reachable(actor.NpcId, interaction);
                     Assert.True(ConditionHolds(offered, view.BuffGroups),
                         $"interaction {offered} of {actor.NpcId}: NPC condition fails with buff groups [{string.Join(',', view.BuffGroups)}]");
-                    // The GM aid puts the player on the actor; the client's next 0.2 s check finds it in range and
-                    // possesses it (no other interactive unit is preferred).
+                    // The GM aid puts the player beside the actor; the client's next 0.2 s check finds it in range and
+                    // possesses it (no other interactive unit is preferred). Where the player is, is the client's own
+                    // view: the teleport counts only if the client applies it to its controlled unit.
                     await Gm(alice, $"!actors {actor.NpcId}");
-                    var at = await Service<GameLoop>().InvokeAsync(() => Task.FromResult(Session(alice).Position));
-                    for (int i = 0; i < 100 && MonsterService.Distance(at.X, at.Z, actor.X, actor.Z) > 1.5f; i++)
+                    long me = Session(alice).Role!.Id;
+                    bool onSurface = MovesOnSurface(scene);
+                    var at = ClientPlayerAt(alice, me, onSurface);
+                    for (int i = 0; i < 100 && (at == null || MonsterService.Distance(at.X, at.Z, actor.X, actor.Z) > 1.5f); i++)
                     {
                         await Task.Delay(20);
-                        at = await Service<GameLoop>().InvokeAsync(() => Task.FromResult(Session(alice).Position));
+                        at = ClientPlayerAt(alice, me, onSurface);
                     }
+                    Assert.NotNull(at);
                     Assert.Equal(actor.Uid, Possessed(alice, at.X, at.Y, at.Z));
                     Assert.Equal(0, await Interact(alice, actor, (int)interaction));
                     break;
@@ -201,6 +208,37 @@ public sealed partial class DungeonTests
             bool has = groups.Contains((long)GameData.Number(d[1])!);
             return p.TryGetProperty("m_bInverse", out var inv) && inv.ValueKind == JsonValueKind.True ? !has : has;
         });
+    }
+
+    /// <summary>
+    /// Whether the client moves every unit of the scene on surfaces, from the client data alone: the scene id equals
+    /// PublicParamConfig.NoviceDungeonReverseDungeonID (LC_Scene_Sync.lua:1142-1145 m_bReverseDungeon, LC_UnitBase.lua:765-776
+    /// m_bReverseMode, LC_Movement_Base.lua:237-240 SetMoveOnSurface).
+    /// </summary>
+    private bool MovesOnSurface(long scene) =>
+        Service<GameData>().Table("PublicParamConfig").TryGetValue("NoviceDungeonReverseDungeonID", out var id)
+        && GameData.Number(id) == scene;
+
+    /// <summary>
+    /// The local player's position as the client holds it: the last ENTITYSELF base (31005), then each MOVEMENT_CHANGE
+    /// (31081) for its own unit that the client applies to its controlled unit (LC_Scene_Sync.lua:3566-3706,
+    /// _syncUnitMoveState): ResetPos always, ForceTeleport only when the unit does not move on surfaces.
+    /// </summary>
+    private static Vec3? ClientPlayerAt(BotClient bot, long uid, bool onSurface)
+    {
+        Vec3? at = null;
+        foreach (var e in bot.Inbox.Snapshot())
+        {
+            if (e.IsGame(MsgId.EntitySelf))
+            {
+                if (EntitySelf.Parser.ParseFrom(e.Body).Base?.MovementInfo?.Pos is { } pos) at = pos;
+            }
+            else if (e.IsGame(GameAoiSink.MovementChange) && MovementChangeNtf.Parser.ParseFrom(e.Body) is { } move && move.Uid == uid
+                && (move.TransType == MovementTransitionType.MoveTransResetPos
+                    || move.TransType == MovementTransitionType.MoveTransForceTeleport && !onSurface))
+                at = move.MovementInfo.Pos;
+        }
+        return at;
     }
 
     /// <summary>The unit the client possesses at the player's position among the units it holds (LC_InteractManager).</summary>

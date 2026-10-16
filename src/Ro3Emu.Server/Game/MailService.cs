@@ -389,6 +389,10 @@ public sealed partial class MailService(AccountStore accounts, RoleStore roles, 
             parentEconomy);
     }
 
+    /// <summary>A template's fixed _iAward grants (as <see cref="SendTemplateAsync(long, int, DateTimeOffset?, int, int)"/>
+    /// resolves them), for a source that delivers the letter once with <see cref="SendTemplateOnceAsync"/>.</summary>
+    internal IReadOnlyList<Attachment> TemplateAward(int templateId) => ResolveTemplateAward(templateId);
+
     private IReadOnlyList<Attachment> ResolveTemplateAward(int templateId)
     {
         var template = data.Row("MailConfig", templateId)

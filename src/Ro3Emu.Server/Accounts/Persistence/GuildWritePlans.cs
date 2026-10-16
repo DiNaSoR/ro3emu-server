@@ -144,10 +144,12 @@ internal sealed class GuildCaravanRewardPlan(long guild, long role, long funds, 
         }
         var current = JsonSerializer.Deserialize<GuildStore.State>(bytes)!;
         current.Money = checked(current.Money + funds);
-        if (contribution > 0 && current.Members.TryGetValue(role, out var member))
+        if (current.Members.TryGetValue(role, out var member))
         {
             member.CurContribute = checked(member.CurContribute + contribution);
             member.HistoryContribute = checked(member.HistoryContribute + contribution);
+            // 32291 Fund Rankings: the funds a member brought in (UITips 17023: earned by the Royal Caravan).
+            member.ContributeMoney = checked(member.ContributeMoney + funds);
         }
         new GuildSavePlan(current, "Guild caravan guild update failed").Execute(db, tx);
         return true;

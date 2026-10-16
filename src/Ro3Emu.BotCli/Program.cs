@@ -11,6 +11,7 @@ using Ro3Emu.Bot;
 //   face <deg>
 //   wait <secs>
 //   party                 create a party;  invite <roleId>  invite into it;  friend <roleId>  send a friend request
+//   guildapply <guildId>  apply to a guild;  guildhelp <guildId>  respond to a guild being founded;  guildleave
 //   quit
 string name = args.Length > 0 ? args[0] : "Botty";
 string http = args.Length > 1 ? args[1] : "http://127.0.0.1:5380";
@@ -80,6 +81,15 @@ while ((line = Console.ReadLine()) != null)
                 break;
             case "friend":
                 await bot.MicroAsync("FriendService", "apply", new() { ["Uid"] = roleId.ToString(), ["Target"] = p[1] });
+                break;
+            case "guildapply":
+                await bot.SendGameAsync(32223, new Romsg.GuildEnterApplyReq { GuildIds = { long.Parse(p[1], CultureInfo.InvariantCulture) } });
+                break;
+            case "guildhelp":
+                await bot.SendGameAsync(32220, new Romsg.GuildCreateHelperOpeReq { GuildIds = { long.Parse(p[1], CultureInfo.InvariantCulture) } });
+                break;
+            case "guildleave":
+                await bot.SendGameAsync(32234, new Romsg.GuildMemberLeaveReq());
                 break;
             case "quit":
                 return;

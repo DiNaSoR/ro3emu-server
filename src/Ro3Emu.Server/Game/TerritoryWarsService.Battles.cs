@@ -24,6 +24,8 @@ public sealed partial class TerritoryWarsService
         public Dictionary<long, long> Scores { get; set; } = new();
         public Dictionary<long, long> Resources { get; set; } = new();
         public Dictionary<int, CapturePoint> Points { get; set; } = new();
+        /// <summary>30129 gameplay points of the stronghold scene, by spawn point id (TerritoryWarsService.ScenePoints.cs).</summary>
+        public Dictionary<int, ScenePoint> ScenePoints { get; set; } = new();
         public Dictionary<long, Participant> Players { get; set; } = new();
         public byte[]? Result { get; set; }
     }
@@ -74,6 +76,7 @@ public sealed partial class TerritoryWarsService
               : throw new InvalidOperationException("Territory battle has no active or retiring epoch state.");
         internal Dictionary<int, MonsterUnit> Actors { get; } = new();
         internal HashSet<long> CapturedActors { get; } = new();
+        internal Dictionary<int, ScenePointUnit> ScenePointActors { get; } = new();
         internal bool Spawning;
     }
     private sealed class QueueEntry
@@ -157,7 +160,8 @@ public sealed partial class TerritoryWarsService
         int npc = (int)GameData.Int(cfg, "_iNPCID");
         if (npc == 0) npc = 4905101; // recovered Stronghold Flag template; zero-column reconstruction (inferred).
         var record = new BattleState { Zone = zone, Round = round, Scene = entry, StatisticsId = statisticsId,
-            Start = stage.StartTime, End = stage.EndTime, LastTick = clock.Now, Guilds = QualifiedFor(zone, round).ToList() };
+            Start = stage.StartTime, End = stage.EndTime, LastTick = clock.Now, Guilds = QualifiedFor(zone, round).ToList(),
+            ScenePoints = DefaultScenePoints(entry) };
         record.Points[0] = new CapturePoint { Id = 0, Npc = npc, EditorPoint = editorId > 0 ? editorId : 33,
             X = selected.X, Y = selected.Y, Z = selected.Z, Owner = OwnerOf(zone), Crystal = true };
         // GVGConfig.GVGHelpText: four majority-capture fields, shared resource income, and final crystal owner.
@@ -269,6 +273,7 @@ public sealed partial class TerritoryWarsService
         s.TerritoryBattle = battle;
         s.TerritoryWars = stagedRole;
         await SpawnObjectivesAsync(battle);
+        await SpawnScenePointsAsync(battle);
         await SendCountsAsync(battle);
     }
     private async Task SpawnObjectivesAsync(Battle b)
@@ -318,6 +323,7 @@ public sealed partial class TerritoryWarsService
         await SaveAsync(state);
         await Send(s, 30401, BaseInfo(b));
         await SendObjectsAsync(s, b);
+        await SendScenePointsAsync(s, b);
         await SyncSiegeAsync(s);
         await SendMarkersAsync(s);
         await UpdateFieldBuffsAsync(b);
@@ -572,6 +578,7 @@ public sealed partial class TerritoryWarsService
             await RoleFanout.EachAsync(b.Room.ActiveMembers.Select(m => m.Session), async s =>
             { if (!s.SceneLoading && s.TerritoryBattle == b && !Member(s, b)) await instances.LeaveAsync(s); });
             await SpawnObjectivesAsync(b);
+            await SpawnScenePointsAsync(b);
             foreach (var p in r.Points.Values.Where(p => !p.Crystal && clock.Now >= p.GuardUntil))
             {
                 var groups = b.Room.ActiveMembers.Select(m => m.Session).Where(s => !s.Dead && Member(s, b)

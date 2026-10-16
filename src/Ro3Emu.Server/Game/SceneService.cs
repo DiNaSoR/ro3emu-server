@@ -434,7 +434,25 @@ public sealed partial class SceneService(IOptions<ServerOptions> options, World 
         return true;
     }
 
-    /// <summary>Same-map teleport: force-teleport the local player (MOVEMENT_CHANGE transType 2) and tell the watchers.</summary>
+    /// <summary>
+    /// Whether the client moves every unit of this scene on surfaces: the novice "reverse" dungeon
+    /// (PublicParamConfig.NoviceDungeonReverseDungeonID, 1000301 Ant Queen's Nest, walked on its ceiling). (proven)
+    /// LC_Scene_Sync.lua:1142-1145 sets m_bReverseDungeon for that scene id, LC_UnitBase.lua:765-776 copies it to every
+    /// unit's m_bReverseMode and LC_Movement_Base.lua:237-240 turns it into m_bMoveOnSurface, the local player's
+    /// movement included (LC_Movement_AStarAgentNew -> LC_Movement_Smooth_Local -> LC_Movement_Smooth -> LC_Movement_Base).
+    /// </summary>
+    public bool MovesOnSurface(long sceneEntry) =>
+        sceneEntry != 0 && data.Table("PublicParamConfig").TryGetValue("NoviceDungeonReverseDungeonID", out var id)
+        && Data.GameData.Number(id) == sceneEntry;
+
+    /// <summary>
+    /// Same-map teleport of the local player (MOVEMENT_CHANGE), then the watchers are told. (proven) The client applies
+    /// transType 2 ForceTeleport to its controlled unit only when that unit does not move on surfaces
+    /// (LC_Scene_Sync.lua:3569-3603, _syncUnitMoveState); in a surface scene it ignores it and the player stays where
+    /// it was, so there the teleport goes as transType 1 ResetPos, which it applies to its controlled unit in every
+    /// scene (LC_Scene_Sync.lua:3613-3688 -> LC_Unit_Player.ResetPos, LC_Unit_Player.lua:1808-1830). Watchers apply
+    /// either type to other units (LC_Scene_Sync.lua:3707-3724).
+    /// </summary>
     public async Task TeleportInMapAsync(GameSession s, MapPoint at)
     {
         if (worldData.Map(s.SceneEntry) is { } map) at = map.Grounded(at);
@@ -442,7 +460,7 @@ public sealed partial class SceneService(IOptions<ServerOptions> options, World 
         await s.SendGameAsync(GameAoiSink.MovementChange, new MovementChangeNtf
         {
             Uid = s.Role!.Id,
-            TransType = MovementTransitionType.MoveTransForceTeleport,
+            TransType = MovesOnSurface(s.SceneEntry) ? MovementTransitionType.MoveTransResetPos : MovementTransitionType.MoveTransForceTeleport,
             MovementInfo = new MovementInfo { Pos = pos, Face = at.Face, ServerTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() },
         });
         s.PreviousPosition = s.Position;

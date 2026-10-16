@@ -38,7 +38,7 @@ public sealed class EconomyMutation
         if (CharacterFamilyEconomy.IsKind(kind)) return true;
         if (!kind.StartsWith("cd13b/", StringComparison.Ordinal)) return false;
         string name = kind[6..];
-        return new[] { "pet", "mount", "wardrobe", "totem", "emblem", "genre" }
+        return new[] { "pet", "mount", "wardrobe", "totem", "emblem", "genre", "valhalla" }
             .Any(family => name == family || name.StartsWith(family + "-", StringComparison.Ordinal));
     }
     public string OperationId { get; }
@@ -117,12 +117,12 @@ public sealed class EconomyMutation
 
     public static bool IsRewardCommand(string command) => command is
         "monster-kill" or "gather-yield" or "dungeon-reward" or "tower-reward" or "world-revive" or
-        "cd13e/quest-award" or "cd13e/achievement-award" or "cd13e/advguild-award" or "cd13e/daily-stage" or "cd13e/journey-victory" or
+        "cd13e/quest-award" or "cd13e/achievement-award" or "cd13e/advguild-award" or "cd13e/monsterhunt-award" or "cd13e/guild-award" or "cd13e/daily-stage" or "cd13e/journey-victory" or
         "cd13e/character-exp" or "cd13e/grant" or "cd13e/gm-grant";
 
     public static bool IsOwnedExchangeCommand(string command) => command is
         "cd13e/tower-milestone" or "cd13e/grant" or "cd13e/character-exp" or
-        "cd13e/quest-award" or "cd13e/achievement-award" or "cd13e/advguild-award" or "cd13e/daily-stage" or "cd13e/journey-victory" or
+        "cd13e/quest-award" or "cd13e/achievement-award" or "cd13e/advguild-award" or "cd13e/monsterhunt-award" or "cd13e/guild-award" or "cd13e/daily-stage" or "cd13e/journey-victory" or
         "cd13e/gm-grant" or "cd13e/daily-reset";
 
     private static EconomyRewardEvidence Freeze(EconomyRewardEvidence value) => value with

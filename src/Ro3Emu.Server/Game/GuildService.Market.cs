@@ -307,6 +307,7 @@ public sealed partial class GuildService
                             }
                             market.Stalls.RemoveAll(x => x.RemainCount == 0);
                             guild!.Money -= total;
+                            Journal(guild, EvPurchase, [s.Role!.Id], Str(s.Role.Name), Int(total), Int(req.BuyCount), Int(GuildMaterialItem));
                             guild.Materials = (long)Math.Min(cap, (decimal)guild.Materials + req.BuyCount);
                             market.RecentPrices.Add(req.UnitPrice);
                             int sample = (int)Math.Clamp(MarketParam("BlackMarketRecentAvgSample", 10), 1, 1000);

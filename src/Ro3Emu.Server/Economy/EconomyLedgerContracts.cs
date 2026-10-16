@@ -28,9 +28,12 @@ public enum EconomyReason
     OwnedGrant = 120, OwnedAwardCost = 121, DailyReset = 122,
     AchievementReward = 123, // achievement / Trophy tier claims (cd13e/achievement-award)
     AdventureGroupReward = 124, // Adventure Group level reward claims (cd13e/advguild-award)
+    MonsterHuntReward = 125, // Monster Hunt monster and area stage claims (cd13e/monsterhunt-award)
+    GuildReward = 126, // guild weekly activity chests and activity dividends (cd13e/guild-award)
     // C/D 13d used 41-45 on its branch; renumbered at merge (the values are persisted).
     FriendGiftCost = 55, CaravanPendingDelivery = 56, GuildActivityCost = 57,
     GuildServiceCost = 58, ChallengePendingDelivery = 59,
+    ValhallaCost = 60, // Valhalla Trials Blessing: Einherjar Coins spent on the Odin statue (cd13b/valhalla-pray)
     // Persisted values 200..219 are reserved exclusively for C/D 13c / E05c.
     LifeCost = 200, LifeGoods = 201, SeasonCost = 202, SeasonGoods = 203,
     SeasonRefund = 204, SkillPlanCost = 205, SkillPlanRefund = 206,
@@ -41,7 +44,7 @@ public enum EconomyReason
 
 public static class EconomyReasonCatalog
 {
-    public const string Version = "economy-reasons-v9"; // each merge of a branch's reasons gets a new version
+    public const string Version = "economy-reasons-v12"; // each merge of a branch's reasons gets a new version
 
     public static bool Allows(EconomyReason reason, EconomyLegKind kind) => reason switch
     {
@@ -53,7 +56,7 @@ public static class EconomyReasonCatalog
         EconomyReason.WardrobeGoods or EconomyReason.TotemGoods or EconomyReason.EmblemGoods or
         EconomyReason.GenreGoods or EconomyReason.PetGoods or EconomyReason.TotemRefund or
         EconomyReason.EnchantRefund or EconomyReason.CardOutput or EconomyReason.ShopGoods or
-        EconomyReason.OwnedGrant or EconomyReason.AchievementReward or EconomyReason.AdventureGroupReward or
+        EconomyReason.OwnedGrant or EconomyReason.AchievementReward or EconomyReason.AdventureGroupReward or EconomyReason.MonsterHuntReward or EconomyReason.GuildReward or
         EconomyReason.LifeGoods or EconomyReason.SeasonGoods or EconomyReason.SeasonRefund or
         EconomyReason.SkillPlanRefund or EconomyReason.CastAdmissionRefund => kind == EconomyLegKind.Source,
         EconomyReason.GmRemove or EconomyReason.NpcShopPayment or EconomyReason.CraftInput or
@@ -69,7 +72,7 @@ public static class EconomyReasonCatalog
         EconomyReason.FriendGiftCost or EconomyReason.GuildActivityCost or EconomyReason.GuildServiceCost or
         EconomyReason.LifeCost or EconomyReason.SeasonCost or EconomyReason.SkillPlanCost or
         EconomyReason.CastAdmissionCost or EconomyReason.MarketSlotUnlock or
-        EconomyReason.StallOpenFee or EconomyReason.GuildMarketFee => kind == EconomyLegKind.Sink,
+        EconomyReason.StallOpenFee or EconomyReason.GuildMarketFee or EconomyReason.ValhallaCost => kind == EconomyLegKind.Sink,
         EconomyReason.MailDelivery or EconomyReason.MailClaim or EconomyReason.MailReturn or
         EconomyReason.TradeEscrow or EconomyReason.AuctionReserve or EconomyReason.AuctionRefund or
         EconomyReason.AuctionSettlement or EconomyReason.GuildResourceTransfer or EconomyReason.InventoryRelocation or

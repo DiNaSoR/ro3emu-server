@@ -204,9 +204,12 @@ public static class ErrorCodes
     public const int AlreadyInGuild = 463, GuildMissing = 464, GuildPermission = 466, GuildNameTaken = 470;
     public const int GuildPositionFull = 471, GuildApplicationMissing = 482, GuildInviteInvalid = 481;
     public const int GuildApplicationLimit = 468, GuildApplicationListFull = 469;
+    // Guild League (ErrorCodeConfig 516-524).
+    public const int LeagueClosed = 516, LeagueTemporary = 517, LeagueElite = 518, LeagueMainFull = 523;
     public const int GuildOfficerKick = 10068, GuildInviteRefused = 10069, GuildTextNumbers = 10066;
     public const int GuildMemberMissing = 454, NotInGuild = 462, GuildFull = 453;
     public const int AlreadyInGuildHome = 550;  // NW_ProtobufDefine.ERR_AlreadyInGuildHome "You are already at the guild base."
+    public const int GuildHunting = 5840;       // "This action cannot be performed during the Hunting Challenge."
     public const int GuildNameInvalid = 10000, GuildNameNumbers = 10001, GuildLevelCreate = 10002;
     public const int GuildIconLocked = 10003, GuildFrameLocked = 10004, GuildJoinLevel = 10008;
     public const int GuildTextLength = 10027;

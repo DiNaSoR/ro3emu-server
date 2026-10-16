@@ -25,6 +25,8 @@ public sealed partial class AuctionService
                 mail.QueueTemplateLocked(winner, $"auction:{row.Id}:award", template, attachments, tx,
                     row.Price, row.Currency, MailTab(row), row.Entry);
         }
+        if (row.Type == AuctionType.Guild && winner != 0 && row.GuildId != 0)
+            guilds.EnlistEvents(row.GuildId, [GuildService.AuctionWonRow(winner, roles.Get(winner)?.Name ?? "", row.Entry)], tx);
         if (row.Type is not (AuctionType.Dungeon or AuctionType.Guild or AuctionType.World or AuctionType.Act)) return;
         string key = $"{row.Type.ToString().ToLowerInvariant()}:{row.Id}";
         // DBAuction keeps only the guild participation history (MG_DB.proto DBAuction); World/Act history is the

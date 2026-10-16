@@ -136,6 +136,10 @@ internal sealed class RoleSchemaPlan : DbPlan
         SchemaSql.AddColumn(db, tx, "role", "genre", "BLOB");
         // Serialized romsg.DBCareerSpecial (leased Special Class Items: pendant and mount slot; AUTO_SYNC 5002).
         SchemaSql.AddColumn(db, tx, "role", "career_special", "BLOB");
+        // Serialized romsg.DBOdinStatue (Valhalla Trials Blessing statue; part of AUTO_SYNC 5046, ValhallaService).
+        SchemaSql.AddColumn(db, tx, "role", "heroic_spirit", "BLOB");
+        // Serialized romsg.DBAreaConcurInfo (Monster Hunt kill counters and claimed stages; AUTO_SYNC 5053).
+        SchemaSql.AddColumn(db, tx, "role", "area_concur", "BLOB");
         // Unix seconds of a deletion; deleted roles are kept (items, progress) but no longer listed or selectable.
         SchemaSql.AddColumn(db, tx, "role", "deleted_time", "INTEGER NOT NULL DEFAULT 0");
         SchemaSql.Execute(db, tx, """

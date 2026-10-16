@@ -480,6 +480,17 @@ public sealed class InstanceService
         await world.RemoveUnitAsync(prop);
     });
 
+    /// <summary>Remove one tracked monster of the room (an event boss whose phase ended); the room's other actors stay.</summary>
+    public Task RemoveMonsterAsync(Room room, MonsterUnit actor) => loop.TrackAsync("room actor removal", async () =>
+    {
+        bool tracked;
+        lock (room.Gate) tracked = room.Actors.Remove(actor);
+        if (!tracked) return; // already cleared with the room
+        actor.Dead = true;
+        actor.Target = null;
+        await world.RemoveUnitAsync(actor);
+    });
+
     /// <summary>Idempotent actor removal, including a generation barrier for spawns already in flight.</summary>
     public Task ClearMonstersAsync(Room room)
         => loop.TrackAsync("room removal", () => ClearMonstersCoreAsync(room));

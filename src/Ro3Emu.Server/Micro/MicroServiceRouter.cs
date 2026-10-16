@@ -27,7 +27,8 @@ public sealed class MicroServiceRouter(IEnumerable<IMicroService> services, ILog
         if (_services.TryGetValue(service, out var handler))
         {
             // PhonestGate touches only the micro connection and the locked GateAuthRegistry: no Realm admission.
-            if (loop == null || owners == null || service is "FriendService" or "UserDataService" or "MailService" or "PhonestGate")
+            // RankService only reads committed rows through the read pool and its own cached snapshot.
+            if (loop == null || owners == null || service is "FriendService" or "UserDataService" or "MailService" or "PhonestGate" or "RankService")
                 result = await handler.InvokeAsync(session, method, args);
             else result = await loop.InvokeAsync(async () =>
             {

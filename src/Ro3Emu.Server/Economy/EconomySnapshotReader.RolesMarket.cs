@@ -152,7 +152,7 @@ public static partial class EconomySnapshotReader
             ["equip_plans"] = DBEquipInfo.Descriptor, ["auto_decompose"] = AutoDecomposeSetting.Descriptor,
             ["bag_state"] = DBItemsInfo.Descriptor, ["stat_plans"] = BaseAttrInfo.Descriptor,
             ["pets"] = DBPetInfo.Descriptor, ["wardrobe"] = DBWardRobeInfo.Descriptor,
-            ["totems"] = DBTotemInfo.Descriptor, ["genre"] = DBGenre.Descriptor, ["career_special"] = DBCareerSpecial.Descriptor,
+            ["totems"] = DBTotemInfo.Descriptor, ["genre"] = DBGenre.Descriptor, ["career_special"] = DBCareerSpecial.Descriptor, ["heroic_spirit"] = DBOdinStatue.Descriptor, ["area_concur"] = DBAreaConcurInfo.Descriptor,
             ["new_activities"] = DBNewActivityInfo.Descriptor, ["training"] = DBTrainingGroundInfo.Descriptor
         };
 

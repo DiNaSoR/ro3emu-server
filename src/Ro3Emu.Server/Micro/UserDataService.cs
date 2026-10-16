@@ -13,7 +13,7 @@ namespace Ro3Emu.Server.Micro;
 /// including itself.
 /// </summary>
 public sealed class UserDataService(SocialOwnerCache cache, OwnerRegistry owners, GameLoop loop, SessionRegistry sessions, GuildService guilds,
-    IOptions<ServerOptions> options, ILogger<UserDataService> log) : IMicroService
+    GuildStore guildStore, IOptions<ServerOptions> options, ILogger<UserDataService> log) : IMicroService
 {
     // (inferred) Full profile replies use increasing versions, so a previous guild/online snapshot is replaceable.
     // The original per-field version allocation is not exported; this service already returns all requested roles.
@@ -44,14 +44,34 @@ public sealed class UserDataService(SocialOwnerCache cache, OwnerRegistry owners
                 var profiles = await cache.LoadProfilesAsync(ids, stable);
                 foreach (var key in uids.Keys)
                 {
-                    if (!long.TryParse(key.ToString(), out long uid) || !profiles.TryGetValue(uid, out var profile) || profile is null) continue;
-                    results.Add(Entry(profile));
+                    if (!long.TryParse(key.ToString(), out long uid)) continue;
+                    if (profiles.TryGetValue(uid, out var profile) && profile is not null) results.Add(Entry(profile));
+                    else if (GuildEntry(uid) is { } guild) results.Add(guild);
                 }
                 break;
             }
         }
         log.LogDebug("getAttributeBatchByVersion -> {Count} role(s)", results.Count);
         return new Dictionary<string, object?> { ["Ret"] = MicroServiceRouter.Ret(true), ["Results"] = results.ToArray() };
+    }
+
+    /// <summary>
+    /// Guild rows of the leaderboards bind GuildSnap by guild id, not by role (UI_Sys_RankPower_ListCellWidgetCtrl
+    /// _bindGuildId 1610-1641 / _onGuildLeaderChanged 2895-2921), through the same global cache request. Guild ids
+    /// (guild table, from 1) never meet role ids (role sequence starts at 100000), so an unknown role uid that names a
+    /// formal guild is answered with that guild's GuildSnap only; LC_DAL_RolePublic decodes Base only when present
+    /// (:627-640).
+    /// </summary>
+    private Dictionary<string, object?>? GuildEntry(long uid)
+    {
+        if (uid <= 0 || guildStore.Get(uid) is not { Status: (int)GuildStatus.Normal } guild) return null;
+        long snapshotVersion = Interlocked.Increment(ref version);
+        return new()
+        {
+            ["Uid"] = uid,
+            ["FieldsVersion"] = new Dictionary<string, object?> { ["GuildSnap"] = snapshotVersion },
+            ["Data"] = new Dictionary<string, object?> { ["GuildSnap"] = guilds.Snapshot(guild).ToByteArray() },
+        };
     }
 
     /// <summary>

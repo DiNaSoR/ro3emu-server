@@ -6,6 +6,7 @@ using Ro3Emu.Server.Data;
 using Ro3Emu.Server.Maps;
 using Ro3Emu.Server.Game.Ownership;
 using Ro3Emu.Server.Economy;
+using Microsoft.Extensions.Options;
 
 namespace Ro3Emu.Server.Game;
 
@@ -60,6 +61,11 @@ public sealed partial class TimedBattleService : IGameTicker
     private readonly SceneService scene;
     private readonly WorldData worldData;
     private readonly MonsterService monsters;
+    private readonly CombatService combat;
+    private readonly BuffService buffs;
+    private readonly SkillService skills;
+    private readonly World world;
+    private readonly ServerOptions options;
     private readonly SessionRegistry sessions;
     private readonly GameLoop loop;
     private readonly ILogger<TimedBattleService> log;
@@ -105,6 +111,8 @@ public sealed partial class TimedBattleService : IGameTicker
         public HashSet<GameSession> Fallen { get; } = new();
         public HashSet<GameSession> Absent { get; } = new();
         public bool Settled;
+        /// <summary>Survivor Battle's in-scene state (entry 2), from the room's creation.</summary>
+        public ChickenRun? Chicken;
     }
 
     private sealed record Participant(Role Role, string Name, int Career, RoleOwner? Owner,
@@ -123,6 +131,9 @@ public sealed partial class TimedBattleService : IGameTicker
             : (original.Id, original.Name, original.Career);
     }
 
+    /// <summary>TEST AID set by GM "!chicken shape" (not original behaviour): a Survivor Battle lobby size and team size
+    /// instead of EatChickenMatchConfig; overrides ServerOptions.ChickenTestPlayers/TeamSize. In memory only.</summary>
+    internal (int Players, int TeamSize)? ChickenTestShape { get; set; }
     internal Func<Task>? AfterSettlementAdmissionForTest { get; set; }
     internal Action? SettlementCompletedForTest { get; set; }
     internal int ActiveMatchCountForTest => matches.Count;
@@ -130,15 +141,22 @@ public sealed partial class TimedBattleService : IGameTicker
     public TimedBattleService(GameData data, TimedTodoSchedule schedule, TimeProvider time, RoleStore roles, AccountStore accounts,
         CharacterService character, FunctionService functions, AwardService awards, TaskService tasks, InstanceService instances, SceneService scene, WorldData worldData,
         MonsterService monsters, CombatService combat, SessionRegistry sessions, GameLoop loop,
-        ILogger<TimedBattleService> log)
+        BuffService buffs, SkillService skills, World world, IOptions<ServerOptions> options, ILogger<TimedBattleService> log)
     {
         this.data = data; this.schedule = schedule; this.time = time; this.roles = roles; this.accounts = accounts;
         this.character = character;
         this.functions = functions; this.awards = awards; this.tasks = tasks; this.instances = instances; this.scene = scene; this.worldData = worldData; this.monsters = monsters;
         this.sessions = sessions; this.loop = loop; this.log = log;
+        this.combat = combat; this.buffs = buffs; this.skills = skills; this.world = world; this.options = options.Value;
         scene.Loaded.Add(LoadedAsync);
         scene.Leaving.Add(LeavingAsync);
         combat.Killed.Add(OnePieceKilledAsync);
+        combat.PlayerDied.Add(ChickenDiedAsync);
+        combat.ReviveInfoOwners.Add(OwnsRevive);
+        combat.PvpDealt.Add(ChickenDealt);
+        combat.Healed.Add(ChickenHealed);
+        combat.MatchSkillRule = MatchSkillRule;
+        character.MatchAttributes = MatchAttributes;
     }
 
     public async Task LoginAsync(GameSession session)
@@ -206,6 +224,10 @@ public sealed partial class TimedBattleService : IGameTicker
         var row = data.Row(entry == ChickenEntry ? "EatChickenMatchConfig" : "DragonIslandMatchConfig", entry);
         int players = row is { } configured ? (int)GameData.Int(configured, "_kStartQuantity") : 0;
         int teamSize = row is { } team ? (int)GameData.Int(team, "_kTeamQuantity") : 0;
+        // TEST AID (not original behaviour): ServerOptions.ChickenTestPlayers/ChickenTestTeamSize or GM "!chicken shape"
+        // start a Survivor Battle with a small lobby (the config asks for 100 entrants in teams of 5).
+        if (entry == ChickenEntry && (ChickenTestShape ?? (options.ChickenTestPlayers, options.ChickenTestTeamSize)) is (> 0 and var testPlayers, > 0 and var testTeam))
+            (players, teamSize) = (testPlayers, testTeam);
         return players > teamSize && players <= 1000 && teamSize > 0 && players % teamSize == 0
             ? (players, teamSize) : (0, 0);
     }
@@ -289,7 +311,8 @@ public sealed partial class TimedBattleService : IGameTicker
         if (waiting.Count == 0) queue.Remove(entry);
         long now = time.GetUtcNow().ToUnixTimeSeconds();
         var match = new Match { Entry = entry, Players = players, TeamSize = shape.TeamSize, Open = now,
-            Deadline = now + (entry == ChickenEntry ? ChickenDuration() : 300) };
+            // Survivor Battle's end is set when its battle stage starts (TimedBattleService.Chicken).
+            Deadline = entry == ChickenEntry ? long.MaxValue : now + 300 };
         for (int i = 0; i < players.Length; i++)
         {
             var player = players[i];
@@ -300,9 +323,6 @@ public sealed partial class TimedBattleService : IGameTicker
         foreach (var player in players) preparing[player] = match;
         await BroadcastReadyAsync(match);
     }
-
-    private int ChickenDuration() => data.Table("PublicParamConfig").TryGetValue("EatChickenTimeLive", out var row)
-        ? Math.Clamp((int)(GameData.Number(row) ?? 180), 30, 3600) : 180;
 
     public async Task<bool> CancelMatchAsync(GameSession session, CancelMatchReq req)
     {
@@ -366,6 +386,7 @@ public sealed partial class TimedBattleService : IGameTicker
         catch (Exception e) { log.LogWarning(e, "Timed battle room create failed"); await CancelReadyAsync(match, false); return; }
         foreach (var player in match.Players) preparing.Remove(player);
         matches[match.Room.Id] = match;
+        if (match.Entry == ChickenEntry) match.Chicken = NewRun(match);
         await RoleFanout.EachAsync(match.Players, async player =>
         {
             active[player] = match;
@@ -395,11 +416,15 @@ public sealed partial class TimedBattleService : IGameTicker
         && !a.Absent.Contains(attacker) && !a.Absent.Contains(target)
         && attacker.ActivitiesReady && target.ActivitiesReady
         && !attacker.Dead && (!requireAlive || !target.Dead)
+        && (a.Chicken is not { } run || run.Stage == ChickenRules.StageStartGame)
         && time.GetUtcNow().ToUnixTimeSeconds() < a.Deadline;
 
     /// <summary>Actual CombatService-confirmed PvP death; no client request can set a winner.</summary>
     public async Task PlayerKilledAsync(GameSession killer, GameSession victim)
     {
+        // Survivor Battle: the death itself (and whether the victim is out) is ChickenDiedAsync's; this is the credit.
+        if (active.TryGetValue(killer, out var chicken) && chicken.Chicken != null && active.GetValueOrDefault(victim) == chicken)
+        { await ChickenKillAsync(chicken, killer, victim); return; }
         if (!CanParticipate(killer, victim, requireAlive: false)) return;
         var match = active[killer];
         match.Kills[killer] = match.Kills.GetValueOrDefault(killer) + 1;
@@ -415,19 +440,65 @@ public sealed partial class TimedBattleService : IGameTicker
     private Task SettleMatchAsync(Match match) => SettleMatchCoreAsync(match);
 
 
-    private static ChickenResultNotify ChickenSnapshot(Match match, GameSession recipient, bool actualVictory)
+    /// <summary>The recipient's own rank-score change in its 82633 (UI_Sys_Chicken_RankPanl_FlashAniCom.lua:76-120).</summary>
+    private sealed record ChickenScoreChange(long Added, long Previous, int PreviousRank, int CurrentRank);
+
+    /// <summary>
+    /// 82633: LC_SceneCom_ChickenSettlement.lua:198-353 reads the extraData maps (keys enum_ChickenSettlementAttrDefine,
+    /// Lua_GameDefine.lua:14610-14693). battleStartTime goes to GetRoundStartTimeStr without a
+    /// /1000 (LC_ChickenHelper.lua:3806-3826): seconds. The rescue/revive keys' exact meaning is (inferred).
+    /// </summary>
+    private ChickenResultNotify ChickenSnapshot(Match match, GameSession recipient, bool actualVictory,
+        ChickenScoreChange? score = null)
     {
-        var result = new ChickenResultNotify { HasAborted = !actualVictory, BattleStartTime = match.Open * 1000,
-            TeamStatistics = new TeamStatisticsInfo { TeamId = match.Faction[recipient] } };
+        var run = match.Chicken;
+        var ranks = ChickenRanks(match);
+        long start = run is { BattleStartMs: > 0 } ? run.BattleStartMs / 1000 : match.Open;
+        long end = Math.Min(time.GetUtcNow().ToUnixTimeMilliseconds(), run is { BattleEndMs: > 0 } ? run.BattleEndMs : long.MaxValue);
+        int faction = match.Faction[recipient];
+        int first = ranks.MinBy(r => r.Value).Key;
+        var mvp = match.Players.Where(p => match.Faction[p] == first)
+            .OrderByDescending(p => match.Kills.GetValueOrDefault(p)).ThenByDescending(p => run?.Players[p].Damage ?? 0)
+            .ThenBy(p => match.Participants[p].Id).FirstOrDefault();
+        long mvpId = actualVictory && mvp != null ? match.Participants[mvp].Id : 0;
+        var result = new ChickenResultNotify { HasAborted = !actualVictory, BattleStartTime = start,
+            TeamStatistics = new TeamStatisticsInfo { TeamId = faction } };
         result.TeamStatistics.MemberIds.AddRange(match.Players
-            .Where(p => match.Faction[p] == match.Faction[recipient]).Select(p => match.Participants[p].Id));
+            .Where(p => match.Faction[p] == faction).Select(p => match.Participants[p].Id));
+        result.TeamStatistics.ExtraData[1012001] = new ExtraValueData { LongValue = ranks.GetValueOrDefault(faction) };
+        result.TeamStatistics.ExtraData[1012002] = new ExtraValueData { LongValue = mvpId };
+        result.SceneStatistics[1015001] = new ExtraValueData { LongValue = match.Players.Length };
+        result.SceneStatistics[1015002] = new ExtraValueData { LongValue = match.TeamCount };
         foreach (var player in match.Players)
         {
             var (id, name, career) = Presentation(match, player);
-            result.RoleStatistics[id] = new RoleStatisticsInfo
+            var role = new RoleStatisticsInfo
             { BaseInfo = new StatisticsRoleBaseInfo { Id = id, Name = name,
                 Job = career, CampId = match.Faction[player], TeamId = match.Faction[player] },
                 Totalscore = match.Kills.GetValueOrDefault(player) };
+            if (run?.Players.GetValueOrDefault(player) is { } me)
+            {
+                role.TotalDamage = me.Damage; role.TotalBeDamage = me.Injury; role.TotalCure = me.Cure;
+                long survived = run.BattleStartMs == 0 ? 0
+                    : Math.Max(0, (me.EliminatedMs > 0 && match.Fallen.Contains(player) ? me.EliminatedMs : end) - run.BattleStartMs) / 1000;
+                foreach (var (key, value) in new (int, long)[]
+                {
+                    (1001001, me.Damage), (1001002, me.Injury), (1001003, me.Cure), (1001004, match.Kills.GetValueOrDefault(player)),
+                    (1001005, me.Assists), (1001006, me.Deaths), (1001007, 0), (1001008, 0), (1001009, me.Rescued),
+                    (1001010, me.Help), (1001011, me.Resurrections), (1001012, me.Revived),
+                    (1011001, survived), (1011003, ranks.GetValueOrDefault(match.Faction[player])),
+                    (1011004, id == mvpId && mvpId != 0 ? 1 : 0), (1011005, me.Career),
+                })
+                    role.ExtraData[key] = new ExtraValueData { LongValue = value };
+            }
+            if (player == recipient && score != null)
+                foreach (var (key, value) in new (int, long)[]
+                {
+                    (1011006, score.Added), (1011007, 0), (1011008, score.Previous), (1011009, 0),
+                    (1011010, score.PreviousRank), (1011011, score.CurrentRank),
+                })
+                    role.ExtraData[key] = new ExtraValueData { LongValue = value };
+            result.RoleStatistics[id] = role;
         }
         return result;
     }
@@ -509,17 +580,16 @@ public sealed partial class TimedBattleService : IGameTicker
 
     private async Task LoadedAsync(GameSession session)
     {
-        if (active.TryGetValue(session, out var match) && match.Room?.Id == session.InstanceId && match.Loaded.Add(session))
+        if (active.TryGetValue(session, out var chickenMatch) && chickenMatch.Chicken != null && !chickenMatch.Settled
+            && chickenMatch.Room?.Id == session.InstanceId)
+        {
+            // Every load of the match scene, a reload too: the whole round state and the current stage.
+            chickenMatch.Loaded.Add(session);
+            await ChickenLoadedAsync(chickenMatch, session);
+        }
+        else if (active.TryGetValue(session, out var match) && match.Room?.Id == session.InstanceId && match.Loaded.Add(session))
         {
             var init = new DungeonInitData();
-            if (match.Entry == ChickenEntry)
-            {
-                var chicken = new ChickenInitData { TeamCount = match.TeamCount,
-                    TeamMemberCount = match.TeamSize, MatchEntry = ChickenEntry };
-                foreach (var player in match.Players) chicken.PlayerToTeamId[match.Participants[player].Id] = match.Faction[player];
-                init.ChickenInitData = chicken;
-            }
-            else
             {
                 var dragon = new DragonIslandBattleInitData { MatchEntryId = DragonEntry };
                 foreach (var player in match.Players)
@@ -608,9 +678,29 @@ public sealed partial class TimedBattleService : IGameTicker
             match.Absent.Add(session);
             match.Fallen.Add(session);
             session.EventFaction = 0;
+            if (match.Chicken is { } chicken)
+            {
+                // Survivor Battle: a departure is that player's forfeit; the others play on (inferred). Before the
+                // battle stage a lobby left with one team is cancelled rather than won.
+                chicken.Players[session].State = RoundRoleStatus.Leave;
+                RecordEliminations(match, chicken);
+                active.Remove(session);
+                await ChickenDetachAsync(match, session);
+                if (chicken.Stage < ChickenRules.StageStartGame)
+                {
+                    if (match.Players.Where(p => !match.Absent.Contains(p)).Select(p => match.Faction[p]).Distinct().Count() < 2)
+                        await AbortMatchAsync(match, session);
+                }
+                else if (RemainingFactions(match).Count <= 1) settle = match;
+                else
+                {
+                    await SyncTeamAsync(match, match.Faction[session]);
+                    await BroadcastHudAsync(match);
+                }
+            }
             // A fully loaded live match treats departure as a forfeit; before both entered, cancel without prizes.
             // Both are inferred small-realm policies; the departed role never receives settlement rewards.
-            if (match.Loaded.Count == match.Players.Length)
+            else if (match.Loaded.Count == match.Players.Length)
             {
                 active.Remove(session);
                 if (RemainingFactions(match).Count <= 1) settle = match;
@@ -631,9 +721,12 @@ public sealed partial class TimedBattleService : IGameTicker
         await RoleFanout.EachAsync(match.Players.Where(player => player != departed), async player =>
         {
             if (match.Entry == ChickenEntry)
+            {
                 await player.SendGameAsync(ChickenResult, ChickenSnapshot(match, player, false));
+                await ChickenDetachAsync(match, player);
+            }
             else await player.SendGameAsync(DragonSettle, new DragonIslandSettleNtf { ResultType = 0 });
-            if (match.Room != null && (player.InstanceId != match.Room.Id || !await instances.LeaveAsync(player)))
+            if (match.Room != null && (player.InstanceId != match.Room.Id || !await instances.LeaveAsync(player, recoverDeadOnReturn: match.Chicken != null)))
                 await instances.AbandonAsync(match.Room, player);
         });
         if (match.Room != null) matches.Remove(match.Room.Id);
@@ -670,7 +763,9 @@ public sealed partial class TimedBattleService : IGameTicker
                 if (waiting.Count == 0) queue.Remove(entry);
             });
         foreach (var match in matches.Values.Distinct().ToArray())
-            if (!match.Settled && match.Loaded.Count < match.Players.Length && now >= match.Open + 60)
+            if (!match.Settled && match.Chicken != null && now < match.Deadline)
+                loop.PostRuntime(() => ChickenTickAsync(match)); // its own loading rule: AdvanceStageAsync
+            else if (!match.Settled && match.Chicken == null && match.Loaded.Count < match.Players.Length && now >= match.Open + 60)
                 loop.PostRuntime(() => RunMatchTransitionAsync(match, "timed match entry timeout",
                     () => AbortMatchAsync(match, null)));
             else if (!match.Settled && now >= match.Deadline) loop.PostRuntime(() => SettleMatchAsync(match));

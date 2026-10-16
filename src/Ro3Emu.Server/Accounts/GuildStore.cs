@@ -40,9 +40,17 @@ public sealed class GuildStore
         public List<string> HistoryNames { get; set; } = new();
         public Dictionary<long, Member> Members { get; set; } = new();
         public Dictionary<long, Application> Applications { get; set; } = new();
+        /// <summary>Founding responses waiting for the founder's approval (ApplyTime in ms; GuildService.Responders).</summary>
+        public Dictionary<long, Application> HelperApplies { get; set; } = new();
         public Dictionary<int, List<int>> Rights { get; set; } = new();
         public Dictionary<long, long> Buildings { get; set; } = new();
         public Dictionary<long, long> BuildingEndTimes { get; set; } = new();
+        /// <summary>Guild Activity (item 106) earned this week and last week; ActivityWeek = the week's Monday 05:00 (unix s).</summary>
+        public long CurActivity { get; set; }
+        public long LastWeekActivity { get; set; }
+        public long ActivityWeek { get; set; }
+        /// <summary>32228 journal rows (GuildEventData bytes) to append with this state's next save; not part of the state.</summary>
+        internal List<byte[]> PendingEvents { get; } = new();
     }
 
     public sealed class Member
@@ -56,6 +64,11 @@ public sealed class GuildStore
         public long OfflineTime { get; set; }
         public long CurContribute { get; set; }
         public long HistoryContribute { get; set; }
+        /// <summary>The member's Guild Activity this week and last week (GuildService.Activity).</summary>
+        public long WeekActivity { get; set; }
+        public long LastWeekActivity { get; set; }
+        /// <summary>Guild Funds (item 104) the member brought in (32291 Fund Rankings).</summary>
+        public long ContributeMoney { get; set; }
     }
 
     public sealed class Application
@@ -214,6 +227,19 @@ public sealed class GuildStore
         return state;
     }
 
+    /// <summary>GuildSetting GuildEventDateMaxNum: journal rows kept per guild.</summary>
+    internal int JournalCap { get; set; } = 500;
+
+    /// <summary>The guild's journal, newest first.</summary>
+    internal List<(long Index, byte[] Data)> Journal(long guildId) =>
+        accounts.ReadSync<List<(long Index, byte[] Data)>>(new GuildEventReadPlan(guildId));
+
+    /// <summary>Append journal rows in a transaction that does not save the guild itself (e.g. an auction settlement).</summary>
+    internal void EnlistEvents(long guildId, byte[][] events, RoleItemPlanBuilder transaction)
+    {
+        if (events.Length > 0) transaction.Add(new GuildEventAppendPlan(guildId, "", events, JournalCap));
+    }
+
     public IReadOnlyList<State> List() => accounts.ReadSync<List<State>>(new GuildReadPlan(GuildReadKind.List));
 
     public bool NameExists(string name, long exceptId = 0) =>
@@ -243,6 +269,12 @@ public sealed class GuildStore
                 ? new OwnerRevisionValue(current.Key, current.Revision + 1, true)
                 : new OwnerRevisionValue(RevisionStore.Entity("guild", state.Id), 1, true);
         });
+        if (state.PendingEvents.Count > 0)
+        {
+            var events = state.PendingEvents.ToArray();
+            transaction.Add(new GuildEventAppendPlan(state.Id, state.Name, events, JournalCap),
+                _ => state.PendingEvents.RemoveAll(e => events.Contains(e)));
+        }
     }
 
     internal void EnlistMaterialContribution(long role, long guild, long amount, RoleItemPlanBuilder transaction)

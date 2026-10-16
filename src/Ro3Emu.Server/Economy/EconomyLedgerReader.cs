@@ -435,6 +435,10 @@ public static class EconomyLedgerReader
                             "cd13e/achievement-award" when leg.Kind == EconomyLegKind.Sink => EconomyReason.OwnedAwardCost,
                             "cd13e/advguild-award" when leg.Kind == EconomyLegKind.Source => EconomyReason.AdventureGroupReward,
                             "cd13e/advguild-award" when leg.Kind == EconomyLegKind.Sink => EconomyReason.OwnedAwardCost,
+                            "cd13e/monsterhunt-award" when leg.Kind == EconomyLegKind.Source => EconomyReason.MonsterHuntReward,
+                            "cd13e/monsterhunt-award" when leg.Kind == EconomyLegKind.Sink => EconomyReason.OwnedAwardCost,
+                            "cd13e/guild-award" when leg.Kind == EconomyLegKind.Source => EconomyReason.GuildReward,
+                            "cd13e/guild-award" when leg.Kind == EconomyLegKind.Sink => EconomyReason.OwnedAwardCost,
                             "cd13e/daily-stage" when leg.Kind == EconomyLegKind.Source => EconomyReason.DailyReward,
                             "cd13e/daily-stage" when leg.Kind == EconomyLegKind.Sink => EconomyReason.OwnedAwardCost,
                             "cd13e/journey-victory" when leg.Kind == EconomyLegKind.Source => EconomyReason.ActivityReward,
@@ -755,6 +759,7 @@ public static class EconomyLedgerReader
             command == "cd13b/totem-upgrade" ? EconomyReason.TotemRefund : EconomyReason.TotemGoods),
         "emblem" => (EconomyReason.EmblemCost, EconomyReason.EmblemGoods),
         "genre" => (EconomyReason.GenreCost, EconomyReason.GenreGoods),
+        "valhalla" => (EconomyReason.ValhallaCost, EconomyReason.ValhallaCost),
         _ => throw new InvalidDataException("Unknown family reason namespace.")
     };
 
@@ -896,6 +901,8 @@ public static class EconomyLedgerReader
             "cd13e/quest-award" => ["inventory", "progress", "tasks", "task_runtime"],
             "cd13e/achievement-award" => ["inventory", "progress", "achievements"],
             "cd13e/advguild-award" => ["inventory", "progress", "adventure_group"],
+            "cd13e/monsterhunt-award" => ["inventory", "progress", "area_concur"],
+            "cd13e/guild-award" => ["inventory", "progress", "guild_info"],
             "cd13e/daily-stage" => ["inventory", "progress", "daily"],
             "cd13e/daily-reset" => ["progress", "daily", "tasks"],
             "cd13e/journey-victory" => ["inventory", "progress", "new_activities", "dungeons"],
@@ -904,11 +911,11 @@ public static class EconomyLedgerReader
         };
         string[] allowed = commandKind switch
         {
-            "monster-kill" => ["inventory", "progress", "library", "task_followup", "tower", "tasks", "wild_afk"],
+            "monster-kill" => ["inventory", "progress", "library", "task_followup", "tower", "tasks", "wild_afk", "area_concur"],
             "cd13e/daily-reset" => [..required, "wild_afk"],
             "gather-yield" => [..required, "library", "task_followup"],
             "dungeon-reward" => [..required, "auction_order", "library", "task_followup"],
-            "cd13e/tower-milestone" or "cd13e/quest-award" or "cd13e/achievement-award" or "cd13e/advguild-award" or "cd13e/daily-stage" or
+            "cd13e/tower-milestone" or "cd13e/quest-award" or "cd13e/achievement-award" or "cd13e/advguild-award" or "cd13e/monsterhunt-award" or "cd13e/guild-award" or "cd13e/daily-stage" or
             "cd13e/grant" or "cd13e/gm-grant" or "cd13e/character-exp" or
                 "cd13e/journey-victory" => [..required, "daily", "library", "task_followup", "activity_runtime", "mounts"],
             _ => required

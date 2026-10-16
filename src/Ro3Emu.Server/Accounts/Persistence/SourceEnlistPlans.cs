@@ -119,7 +119,7 @@ internal sealed class GuildChallengeClearPlan : DbPlan
     }
 }
 
-internal enum RealmStateKind { TerritoryWars, TerritoryEscort }
+internal enum RealmStateKind { TerritoryWars, TerritoryEscort, GuildLeague }
 
 internal sealed class RealmStatePlan : DbPlan
 {
@@ -138,6 +138,7 @@ internal sealed class RealmStatePlan : DbPlan
         {
             RealmStateKind.TerritoryWars => "territory_wars",
             RealmStateKind.TerritoryEscort => "territory_escort",
+            RealmStateKind.GuildLeague => "guild_league",
             _ => throw new ArgumentOutOfRangeException()
         };
         using var cmd = DbSql.Command(db, tx,

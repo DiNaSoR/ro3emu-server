@@ -16,7 +16,7 @@ internal static class EconomyChildIntent
         "item/write-snapshot", "friend/gift-enlisted", "friend/SaveMetadata", "friend/SetIntimacy",
         "guild/save", "guild/role-view", "guild/recover-delete", "guild/delete", "guild/market-save",
         "guild/escort-materials", "guild/caravan-reward", "guild_campfire/save", "guild-campfire/save",
-        "guild-caravan/member", "guild-caravan/version", "guild-challenge/state",
+        "guild-caravan/member", "guild-caravan/version", "guild-challenge/state", "guild/event-append",
         "guild_challenge/clear", "mail/financial-append", "auction/source-claim", "auction/item"
     };
 

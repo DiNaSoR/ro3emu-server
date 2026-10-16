@@ -9,7 +9,7 @@ namespace Ro3Emu.Server.Game;
 /// they are admitted: role creation under its account, the session's own continuations as runtime, the few that
 /// change only the sender's role under that role.
 /// </summary>
-public sealed class CoreMessages(RoleSessionService roleSessions, ChatService chat, BuffService buffs, GmCommands gm, SceneService scene, TaskService tasks, DailyActivityService daily, TeamService teams, GuildService guilds, DungeonService dungeons, Ownership.RoleHandover handover) : Messaging.IMessageModule
+public sealed class CoreMessages(RoleSessionService roleSessions, ChatService chat, BuffService buffs, GmCommands gm, SceneService scene, TaskService tasks, DailyActivityService daily, TeamService teams, GuildService guilds, DungeonService dungeons, Ownership.RoleHandover handover, Micro.RankService ranks) : Messaging.IMessageModule
 {
     private const uint EquipGetRank = 31470;
 
@@ -49,6 +49,10 @@ public sealed class CoreMessages(RoleSessionService roleSessions, ChatService ch
         });
         routes.Map(WorldCoreService.TeleportObject, "handler", async (session, msgId, body) =>
         {
+            // In the reverse dungeon (SceneService.MovesOnSurface) the client reports where it shows an NPC before every
+            // interaction it sends (LC_DAL_Interact.SyncNpcPos: only for units in m_bReverseMode, then 32700), and waits
+            // for no answer: accepted without a reply, as an error tip would show on every press. Elsewhere it is not sent.
+            if (scene.MovesOnSurface(session.SceneEntry)) return;
             await WorldCoreService.ErrorAsync(session, msgId, ErrorCodes.Parameter);
         });
         routes.Map(31204, "tasks", async (session, msgId, body) =>
@@ -121,9 +125,11 @@ public sealed class CoreMessages(RoleSessionService roleSessions, ChatService ch
         });
         routes.Map(EquipGetRank, "handler", async (session, msgId, body) =>
         {
-            // Equipment ranking in tooltips: both ids echoed (an empty reply caches item 0), unranked.
+            // Equipment ranking in tooltips (UI_Com_ItemTips_Equip_HeadWidgetCtrl._requestRankData, board 1401): both ids
+            // echoed (an empty reply caches item 0), 0 when the instance is not on the board.
             var rank = QueryEquipRankReq.Parser.ParseFrom(body.Span);
-            await session.SendGameAsync(EquipGetRank, new QueryEquipRankRes { Rankid = rank.Rankid, Itemuid = rank.Itemuid, Rank = 0 });
+            await session.SendGameAsync(EquipGetRank, new QueryEquipRankRes { Rankid = rank.Rankid, Itemuid = rank.Itemuid,
+                Rank = await ranks.EquipRankAsync(rank.Rankid, rank.Itemuid) });
         });
         routes.Map(AuctionService.Sync, "handler", async (session, msgId, body) =>
         {

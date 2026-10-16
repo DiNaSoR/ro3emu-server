@@ -57,6 +57,7 @@ public sealed class GmCommands(IOptions<ServerOptions> options, GameData data, S
         if (!line.StartsWith('!')) return false;
         var parts = line[1..].Split(' ', StringSplitOptions.RemoveEmptyEntries);
         return parts.Length > 0 && (parts[0].Equals("siege", StringComparison.OrdinalIgnoreCase) ||
+            parts[0].Equals("twpoint", StringComparison.OrdinalIgnoreCase) ||
             parts[0].Equals("mvp", StringComparison.OrdinalIgnoreCase) &&
             (parts.Length < 2 || !parts[1].Equals("goto", StringComparison.OrdinalIgnoreCase)));
     }
@@ -220,6 +221,24 @@ public sealed class GmCommands(IOptions<ServerOptions> options, GameData data, S
             await services.GetRequiredService<DungeonService>().EnterAsync(s, new Romsg.EnterDungeonReq { SceneEntry = scene });
             await ReplyAsync(s, $"Dungeon {scene}: entry requested (test aid).");
         }),
+        ["chicken"] = ("shape <players> <team>|shape reset|skip (Survivor Battle test aids)", async (s, a) =>
+        {
+            // Test aids, not original behaviour: a small Survivor Battle lobby, and skipping a pre-battle stage.
+            var battles = services.GetRequiredService<TimedBattleService>();
+            if (a.Length == 3 && a[0] == "shape" && int.TryParse(a[1], out int players) && int.TryParse(a[2], out int team)
+                && team > 0 && players > team && players % team == 0)
+            {
+                battles.ChickenTestShape = (players, team);
+                await ReplyAsync(s, $"Survivor Battle TEST AID: {players} entrants in teams of {team} (in memory).");
+            }
+            else if (a.Length == 2 && a[0] == "shape" && a[1] == "reset")
+            {
+                battles.ChickenTestShape = null;
+                await ReplyAsync(s, "Survivor Battle shape from the config again.");
+            }
+            else if (a.Length == 1 && a[0] == "skip") await ReplyAsync(s, await battles.SkipStageAsync(s));
+            else throw new ArgumentException("shape <players> <team> (players a multiple of team, more than one team) | shape reset | skip");
+        }),
         ["online"] = ("", Online),
         ["warp"] = ("<sceneEntry> [x z]", Warp),
         ["jump"] = ("<x> <z>", Jump),
@@ -262,6 +281,8 @@ public sealed class GmCommands(IOptions<ServerOptions> options, GameData data, S
         }),
         ["siege"] = ("open|close|state|seed <city> <attackGuild> <defenseGuild> (test aid)", async (s, a) =>
             await ReplyAsync(s, await services.GetRequiredService<TerritoryWarsService>().SiegeGmAsync(a))),
+        ["twpoint"] = ("<point> unready|ready|complete [readySeconds] [owner|self] (test aid: 30129 stronghold gameplay point)", async (s, a) =>
+            await ReplyAsync(s, await services.GetRequiredService<TerritoryWarsService>().ScenePointGmAsync(s, a))),
         // Test aids, not original behaviour. Window override lives only in memory and affects activity 125.
         ["guildchallenge"] = ("open|close (test aid)", async (s, a) =>
         {
@@ -269,6 +290,14 @@ public sealed class GmCommands(IOptions<ServerOptions> options, GameData data, S
             await services.GetRequiredService<GuildChallengeService>().TestWindowAsync(a[0] == "open");
             await ReplyAsync(s, a[0] == "open" ? "Guild Challenge test window open for 90 minutes; close or restart restores the real schedule."
                 : "Guild Challenge test window closed; real schedule restored.");
+        }),
+        // Test aid: activity 3303's occurrence starts now (in memory), so the Hunting Challenge runs its 1074 phases.
+        ["guildhunt"] = ("open|close (test aid)", async (s, a) =>
+        {
+            if (a.Length != 1 || a[0] is not ("open" or "close")) throw new ArgumentException("Use !guildhunt open|close");
+            services.GetRequiredService<GuildHuntingService>().TestWindow(a[0] == "open");
+            await ReplyAsync(s, a[0] == "open" ? "Hunting Challenge test window open: candidates now, combat in 2 minutes."
+                : "Hunting Challenge test window removed; real schedule restored.");
         }),
         // stage 0 = full-clear shortcut to the final stage's real drop pool, not the preview-only base award.
         ["guildauction"] = ("[challengeId=1001] [stage=0]", async (s, a) =>

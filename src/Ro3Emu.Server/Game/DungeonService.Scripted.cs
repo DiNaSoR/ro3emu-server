@@ -164,12 +164,15 @@ public sealed partial class DungeonService
         int code = actor == null ? ErrorCodes.NpcMissing
             : req.SceneConfigId != 0 && req.SceneConfigId != s.SceneEntry ? ErrorCodes.NpcParameter
             : !catalog.Interactions(actor.NpcId).Contains(req.InteractionId) ? ErrorCodes.NpcParameter
-            : MonsterService.Distance(s.Position.X, s.Position.Z, actor.X, actor.Z) > SceneActorReach ? ErrorCodes.NpcTooFar : 0;
+            : MonsterService.Distance(s.Position.X, s.Position.Z, actor.X, actor.Z) > SceneActorReach ? ErrorCodes.NpcTooFar
+            : a!.Dracula is { } lair ? lair.Owner.InteractionError(a, s, actor.NpcId) : 0;
         log.LogInformation("{Name} interacts {Interaction} with scene actor {Npc} {Uid} (scene {Scene}, config scene {ConfigScene}, "
             + "distance {Distance:0.0} m): {Result}", s.Role?.Name, req.InteractionId, actor?.NpcId, req.NpcUid, s.SceneEntry,
             req.SceneConfigId, actor == null ? -1 : MonsterService.Distance(s.Position.X, s.Position.Z, actor.X, actor.Z), code);
         await s.SendGameAsync(SceneService.NpcInteraction, new NpcInteractionRsp { Result = code, Req = req });
         if (code != 0) return true;
+        // Dracula's Lair: a bush search may find the key; its finder is the rescuer, the only one the cage opens for.
+        if (a!.Dracula is { } dracula) await dracula.Owner.InteractedAsync(a, s, actor!.NpcId);
         var events = new List<(Kind, long)> { (Kind.Interaction, req.InteractionId) };
         if (catalog.DungeonMessage(req.InteractionId) is { } message) events.Add((Kind.Message, message));
         await StepEventAsync(a!, s, events);
@@ -237,7 +240,8 @@ public sealed partial class DungeonService
         if (!int.TryParse(args[0], out int npc) || a.SceneActors.FirstOrDefault(u => u.NpcId == npc) is not { } actor)
             throw new ArgumentException("<npcId> of a scene actor shown now (see !actors)");
         // One metre beside it (inside every reach used here, 2-5 m), not on its exact point: a zero-length
-        // line-of-sight test (LC_InteractManager's CheckDirectPass) is not something to rely on.
+        // line-of-sight test (LC_InteractManager's CheckDirectPass) is not something to rely on. The jump goes in the
+        // form the client applies to its own unit (ResetPos in the reverse dungeon 1000301, SceneService.MovesOnSurface).
         await scenes.TeleportInMapAsync(s, new MapPoint(actor.X + 1, actor.Y, actor.Z, s.Face));
         await GmCommands.ReplyAsync(s, FormattableString.Invariant($"Beside {npc} at {actor.X + 1:0.0},{actor.Z:0.0}, 1 m from it (reach {Reach(actor)} m)."));
     }

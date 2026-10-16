@@ -381,6 +381,9 @@ public sealed class RoleStore
 
     public byte[]? LoadCareerSpecial(long id) => LoadBlob(id, "career_special");
     public void SaveCareerSpecial(long id, byte[] value) => SaveBlob(id, "career_special", value);
+    public byte[]? LoadHeroicSpirit(long id) => LoadBlob(id, "heroic_spirit");
+    public byte[]? LoadAreaConcur(long id) => LoadBlob(id, "area_concur");
+    public void SaveAreaConcur(long id, byte[] value, RoleItemPlanBuilder? transaction = null) => SaveBlob(id, "area_concur", value, transaction);
     public byte[]? LoadMounts(long id) => LoadBlob(id, "mounts");
     public void SaveMounts(long id, byte[] state, RoleItemPlanBuilder? transaction = null) => SaveBlob(id, "mounts", state, transaction);
     public byte[]? LoadWardrobe(long id) => LoadBlob(id, "wardrobe");
@@ -541,6 +544,8 @@ public sealed class RoleStore
         builder.ReadRoleBlob(_accounts, role, "task_followup");
     internal byte[]? ReadWildAfk(RoleItemPlanBuilder builder, long role) =>
         builder.ReadRoleBlob(_accounts, role, "wild_afk");
+    internal byte[]? ReadAreaConcur(RoleItemPlanBuilder builder, long role) =>
+        builder.ReadRoleBlob(_accounts, role, "area_concur");
 
     /// <summary>Only a fully settled task pass may erase the debt; its tasks/runtime snapshot and
     /// debt clear commit together. Award failures leave the original source for reconnect recovery.</summary>

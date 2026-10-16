@@ -8,13 +8,15 @@ namespace Ro3Emu.Server.Game;
 /// selection check), when it moves and when it leaves. RoleSessionService runs the selection around these; the order
 /// here is the client's, see the comments on each step.
 /// </summary>
-public sealed class RoleSystems(Maps.World world, ChatService chat, CharacterService character, SkillService skills, FunctionService functions, CombatService combat, BuffService buffs, SceneService scene, TaskService tasks, DailyActivityService daily, GuideService guides, EmojiService emoji, AchievementService achievements, Micro.FriendService friends, MvpService mvps, CardService cards, ShopService shops, EmblemService emblems, SeasonService seasons, SeasonPageService seasonPage, SeasonRefineService seasonRefine, SeasonTalentService talents, PetService pets, TowerService tower, MailService mail, AuctionService auctions, GuildService guilds, AdventureGroupService adventureGroups, GuildCaravanService caravan, GuildChallengeService guildChallenge, DungeonService dungeons, DungeonMatchService dungeonMatches, InstanceService instances, TradeService trade, StallsService stalls, LifeJobService life, GatheringService gathering, WildAfkService afk, WorldCoreService worldCore, WorldInteractionService interaction, NewActivityService activities, TimedEventService timedEvents, PronteraDefenseService defense, TimedBattleService timedBattles, FestivalService festival, TrainingService training, LotteryService lottery, MountService mounts, CareerSpecialService careerSpecial, WardrobeService wardrobe, TotemService totems, GenreService genre, TerritoryWarsService territory, TerritoryEscortService escort, Persistence.SettingsPersistence settings, ILogger<RoleSystems> log)
+public sealed class RoleSystems(Maps.World world, ChatService chat, CharacterService character, SkillService skills, FunctionService functions, CombatService combat, BuffService buffs, SceneService scene, TaskService tasks, DailyActivityService daily, GuideService guides, EmojiService emoji, AchievementService achievements, Micro.FriendService friends, MvpService mvps, CardService cards, ShopService shops, EmblemService emblems, SeasonService seasons, SeasonPageService seasonPage, SeasonRefineService seasonRefine, SeasonTalentService talents, PetService pets, TowerService tower, ValhallaService valhalla, MonsterHuntService monsterHunt, MailService mail, AuctionService auctions, GuildService guilds, AdventureGroupService adventureGroups, GuildCaravanService caravan, GuildChallengeService guildChallenge, DungeonService dungeons, DungeonMatchService dungeonMatches, InstanceService instances, TradeService trade, StallsService stalls, LifeJobService life, GatheringService gathering, WildAfkService afk, WorldCoreService worldCore, WorldInteractionService interaction, NewActivityService activities, TimedEventService timedEvents, PronteraDefenseService defense, TimedBattleService timedBattles, FestivalService festival, TrainingService training, LotteryService lottery, MountService mounts, CareerSpecialService careerSpecial, WardrobeService wardrobe, TotemService totems, GenreService genre, TerritoryWarsService territory, TerritoryEscortService escort, Persistence.SettingsPersistence settings, ILogger<RoleSystems> log)
 {
     internal async Task LoadAsync(GameSession session)
     {
         character.Load(session);
         await character.FinishLoadAsync(session);
         careerSpecial.Load(session); // before mounts: a leased mount entitles the battle slot
+        valhalla.Load(session);
+        monsterHunt.Load(session);
         mounts.Load(session);
         totems.Load(session);
         await life.LoadAsync(session);
@@ -74,6 +76,8 @@ public sealed class RoleSystems(Maps.World world, ChatService chat, CharacterSer
         await tower.LoginAsync(session); // 5065 before tower-dependent functions and shop conditions
         checkpoint();
         await dungeons.LoginAsync(session); // 5062 before opening the Dungeon menu
+        await valhalla.LoginAsync(session); // 5046 after 5062: cleared layers are dungeon records
+        await monsterHunt.LoginAsync(session); // 5053
         checkpoint();
         await emblems.LoginAsync(session); // after 5009: plan GUIDs refer to item instances
         checkpoint();

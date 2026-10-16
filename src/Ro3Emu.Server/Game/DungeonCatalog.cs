@@ -20,13 +20,18 @@ public sealed class DungeonCatalog(GameData data, WorldData worldData, MonsterSe
     /// (<paramref name="Step"/>, ReconstructedDungeons.Scripted) has no monsters: it completes on its client events.
     /// </summary>
     public sealed record Wave(int Number, IReadOnlyList<Spawn> Spawns, int Quest = 0, ReconstructedDungeons.ScriptedStep? Step = null);
+    /// <summary><paramref name="Layer"/>: a Valhalla Trials run (HeroicSpiritLayerConfig row), see ValhallaService.</summary>
     public sealed record Plan(JsonElement Config, JsonElement? Multi, JsonElement? Boss, int Mark,
-        int MinPlayers, int MaxPlayers, IReadOnlyList<Wave> Waves)
+        int MinPlayers, int MaxPlayers, IReadOnlyList<Wave> Waves, JsonElement? Layer = null)
     {
+        public long LayerId => Layer is { } row ? GameData.Int(row, "_iID") : 0;
         public long SceneEntry => GameData.Int(Config, "_iID");
         public int MultiId => Multi is { } row ? (int)GameData.Int(row, "_iID") : 0;
         public int DurationMs => (int)Math.Clamp(GameData.Int(Config, "_iLimitTime"), 1000, int.MaxValue);
-        public DungeonInitData Init(long teamId = 0, long instanceId = 0) => MultiId == 0 ? new()
+        public DungeonInitData Init(long teamId = 0, long instanceId = 0) => LayerId != 0
+            // The client never reads it (LC_DunGeon_Valhalla); filled as the proto defines it (inferred).
+            ? new() { HeroicSpiritDungeonInitData = new HeroicSpiritDungeonInitData { ChallengeId = LayerId } }
+            : MultiId == 0 ? new()
             : new() { MultiDungeonInitData = new MultiDungeonInitData
             { MultiDungeonId = MultiId, MarkId = Mark, TeamID = teamId, DungeonId = instanceId } };
     }
@@ -82,7 +87,9 @@ public sealed class DungeonCatalog(GameData data, WorldData worldData, MonsterSe
             min = (int)(GameData.Number(limits[0]) ?? 1);
             max = Math.Min(max, (int)(GameData.Number(limits[1]) ?? max));
         }
-        else if (kind is not (1 or 2) || mode is not (6 or 24)
+        // A scripted scene may also be a DanceParty (26: the opening dance, 1010601), which the client runs with the
+        // plain lc_dungeon_base like an ordinary dungeon (GamePlayConfig.lua:136-140).
+        else if (kind is not (1 or 2) || mode is not (6 or 24) && !(mode == 26 && reconstructed?.Scripted(req.SceneEntry) != null)
             || data.Table("TenGameplayBossConfig").Values.Any(r => GameData.Int(r, "_iDungeon") == req.SceneEntry)) return null;
         var waves = mode == 24 && selected == null ? JourneySpawns(config) : Spawns(config, boss, worldData.Map(req.SceneEntry)!);
         return max >= min && waves.Count > 0 ? new Plan(config, multi, boss, mark, min, max, waves) : null;
@@ -123,6 +130,49 @@ public sealed class DungeonCatalog(GameData data, WorldData worldData, MonsterSe
         // (inferred) Recommended Players is advisory; no configured minimum was recovered. Solo entry is allowed.
         return spawns.Count == 0 ? null : new Plan(config, null, null, 0, 1,
             Math.Min(limit, (int)GameData.Int(config, "_iRoleCntLimit")), [new Wave(1, spawns)]);
+    }
+
+    /// <summary>
+    /// One boss at a uniquely named "BOSS" point, else at the first ungrouped server spawn point (inferred: the
+    /// encounter scripts that placed bosses are not in the client). 3020101 has no ungrouped point but authors one
+    /// exact "BOSS" point (93, group 90).
+    /// </summary>
+    private IReadOnlyList<Wave> BossWave(int npc, JsonElement[] serverPoints, Func<JsonElement, MapPoint> place)
+    {
+        var tagged = serverPoints.Where(p => p.TryGetProperty("name", out var label)
+            && label.ValueKind == JsonValueKind.String && string.Equals(label.GetString(), "BOSS", StringComparison.OrdinalIgnoreCase)).ToArray();
+        var point = tagged.Length == 1 ? tagged[0] : serverPoints.FirstOrDefault(p => GameData.Int(p, "GroupId") == 0);
+        return point.ValueKind == JsonValueKind.Object && monsters.Template(npc) != null
+            ? [new Wave(1, [new Spawn(npc, place(point))])] : [];
+    }
+
+    /// <summary>
+    /// A Valhalla Trials layer (HeroicSpiritLayerConfig): its dungeon (_iGamePlayType 23) with the layer's boss,
+    /// _kMonsterPreview[0], as the only enemy, placed as <see cref="BossWave"/> does (inferred: the client names the
+    /// boss but not its spawn point; every spawn point of these scenes has npcId 0). Solo: the panel challenges alone,
+    /// although DungeonConfig allows 10 (inferred).
+    /// </summary>
+    internal Plan? Valhalla(JsonElement layer)
+    {
+        long scene = GameData.Int(layer, "_iDungeonId");
+        if (data.Row("DungeonConfig", scene) is not { } config || GameData.Int(config, "_iGamePlayType") != 23
+            || worldData.Map(scene) is not { Born: not null }
+            || !layer.TryGetProperty("_kMonsterPreview", out var bosses) || bosses.ValueKind != JsonValueKind.Array
+            || bosses.GetArrayLength() == 0) return null;
+        string editor = config.GetProperty("_kResSceneEditorName").GetString() ?? "";
+        string path = Path.Combine(options.Value.GameDataDir ?? options.Value.DataDir, "sceneeditor", editor.ToLowerInvariant() + ".json");
+        if (!File.Exists(path)) return null;
+        using var doc = JsonDocument.Parse(File.ReadAllBytes(path));
+        if (!doc.RootElement.TryGetProperty("m_kMonsterSpawnPoints", out var points) || points.ValueKind != JsonValueKind.Object) return null;
+        var serverPoints = points.EnumerateObject().Select(p => p.Value.Clone())
+            .Where(p => GameData.Int(p, "monsterType") == 0 && p.TryGetProperty("position", out _))
+            .OrderBy(p => GameData.Int(p, "Id")).ToArray();
+        var waves = BossWave((int)(GameData.Number(bosses[0]) ?? 0), serverPoints, p =>
+        {
+            var v = p.GetProperty("position");
+            return new MapPoint(WorldNpc.Float(v, "x"), WorldNpc.Float(v, "y"), WorldNpc.Float(v, "z"), WorldNpc.Float(p, "direction"));
+        });
+        return waves.Count == 0 ? null : new Plan(config, null, null, 0, 1, 1, waves, layer);
     }
 
     /// <summary>Journey action 407 maps to the authored NPC/map/point relation, not a guessed scene actor.</summary>
@@ -195,16 +245,7 @@ public sealed class DungeonCatalog(GameData data, WorldData worldData, MonsterSe
             }
             return waves;
         }
-        if (boss is { } b)
-        {
-            int npc = (int)GameData.Int(b, "_iBoss");
-            // 3020101 has no ungrouped point but authors one exact "BOSS" point (93, group 90).
-            var tagged = serverPoints.Where(p => p.TryGetProperty("name", out var label)
-                && label.ValueKind == JsonValueKind.String && string.Equals(label.GetString(), "BOSS", StringComparison.OrdinalIgnoreCase)).ToArray();
-            var point = tagged.Length == 1 ? tagged[0] : serverPoints.FirstOrDefault(p => GameData.Int(p, "GroupId") == 0);
-            return point.ValueKind == JsonValueKind.Object && monsters.Template(npc) != null
-                ? [new Wave(1, [new Spawn(npc, Point(point))])] : [];
-        }
+        if (boss is { } b) return BossWave((int)GameData.Int(b, "_iBoss"), serverPoints, Point);
         var explicitPoints = serverPoints.Where(p => GameData.Int(p, "npcId") > 0).ToArray();
         if (explicitPoints.Any(p => monsters.Template((int)GameData.Int(p, "npcId")) == null)) return [];
         if (explicitPoints.Length > 0)
@@ -292,7 +333,86 @@ public sealed class DungeonCatalog(GameData data, WorldData worldData, MonsterSe
             }
             waves.Add(new Wave(waves.Count + 1, [], step.Quest, step));
         }
+        // An unplayed quest is one of the scene's own quests that no step shows.
+        if (scene.Unplayed.Any(q => scene.Steps.Any(s => s.Quest == q) || !data.Table("DungeonQuestConfig").Values.Any(r =>
+                GameData.Int(r, "_iDungeonID") == scene.Scene && GameData.Int(r, "_iQuestID") == q))) return [];
         return waves;
+    }
+
+    /// <summary>
+    /// The lair's four fights, in task order (TaskConfig 9000101/103/105/107 "Defeat the Marionette / Wraith /
+    /// Doppelganger / Wind Ghost"): the elite (its NpcLevelPointRespawnConfig point is 1号..4号精英怪, elite 1 to 4), the
+    /// scene-editor region the preceding chase ends in (406 傀儡娃娃, 407 恶灵, 408 死灵, 409 风魔巫师 任务区域: the
+    /// elite's "task region") and its m_kGroups (118 第一波怪 "first wave" to 121 "fourth wave"; the third wave is
+    /// 120, 280 and 281). Joining them by their names is (inferred); every id is client data.
+    /// </summary>
+    internal static readonly (int Elite, long Region, int[] Groups)[] DraculaFights =
+        [(4114025, 406, [118]), (4114027, 407, [119]), (4114029, 408, [120, 280, 281]), (4114031, 409, [121])];
+    /// <summary>Region 410 德古拉任务区域 (Dracula's task region), where the last chase ends and Dracula fights.</summary>
+    internal const long DraculaRegion = 410;
+    /// <summary>The four "Search" bushes (6000018-6000021) and the "Unlock" cage (6000023, condition 7000039: the key
+    /// buff 4121301), NPCConfig type 2 bound to points 186/200/228/250/293 (NpcLevelPointRespawnConfig, NotGroundBorn).</summary>
+    internal static readonly int[] DraculaBushes = [4114033, 4114034, 4114035, 4114036];
+    internal const int DraculaCage = 4114038, DraculaUnlock = 6000023;
+
+    /// <summary>
+    /// Dracula's Lair (DungeonConfig 3010401, gameplay 31 DraculaWedding) for DraculaWeddingService: one wave per dungeon
+    /// task of the lair (TaskConfig 9000100-9000110: _iDungeonID 3010401, a _kPreTask chain alternating "chase Dracula"
+    /// and "defeat ..."). A chase is a scripted step that completes when a participant walks into the next foe's task
+    /// region (<see cref="DraculaFights"/>); a fight spawns the elite at its point with its wave groups, each point's
+    /// monster bound by NpcLevelPointRespawnConfig (Deviruchi, Whisper, Nightmare, Ghoul). Dracula
+    /// (PublicParamConfig.DraculaNpcConfigId 4114015) fights at the centre of region 410 (inferred: his own point 127 is
+    /// beside the entrance, where the lair story 3003 shows him taking the bride). The last step shows the bushes and the
+    /// cage and completes on the cage's Unlock. The mines, falling rocks and bats of the chases (4114004-4114014,
+    /// unselectable, AI 25000009) need the original server script and are not spawned. Null when any reference is missing.
+    /// </summary>
+    internal Plan? Dracula(long scene)
+    {
+        if (data.Row("DungeonConfig", scene) is not { } config || GameData.Int(config, "_iGamePlayType") != 31
+            || worldData.Map(scene) is not { Born: not null } map) return null;
+        var bound = data.Table("NpcLevelPointRespawnConfig").Values.Where(r => GameData.Int(r, "_iMapid") == scene)
+            .GroupBy(r => GameData.Int(r, "_iRespawnpointid")).ToDictionary(g => g.Key, g => (int)GameData.Int(g.First(), "_iNpcid"));
+        Spawn? At(long point) => bound.TryGetValue(point, out int npc) && map.Points.TryGetValue(point, out var p)
+            && monsters.Template(npc) != null ? new Spawn(npc, p) : null;
+        ReconstructedDungeons.ScriptedStep Chase(long region) => new($"chase to region {region}", 0, (0, 1), [], 0,
+            [new(ReconstructedDungeons.TriggerKind.Region, region)], [], 0);
+        var waves = new List<Wave>();
+        foreach (var (elite, region, groups) in DraculaFights)
+        {
+            if (!map.Regions.ContainsKey(region)) return null;
+            waves.Add(new Wave(waves.Count + 1, [], 0, Chase(region)));
+            var spawns = new List<Spawn>();
+            long elitePoint = bound.Where(p => p.Value == elite).Select(p => p.Key).SingleOrDefault();
+            if (At(elitePoint) is not { } boss) return null;
+            spawns.Add(boss);
+            foreach (int group in groups)
+            {
+                if (!map.DungeonGroups.TryGetValue(group, out var members) || members.Count == 0) return null;
+                foreach (var member in members)
+                    if (At(member.Id) is { } minion) spawns.Add(minion);
+                    else return null;
+            }
+            waves.Add(new Wave(waves.Count + 1, spawns));
+        }
+        int dracula = data.Table("PublicParamConfig").TryGetValue("DraculaNpcConfigId", out var id)
+            ? (int)(GameData.Number(id) ?? 0) : 0;
+        if (!map.Regions.TryGetValue(DraculaRegion, out var lair) || monsters.Template(dracula) == null) return null;
+        waves.Add(new Wave(waves.Count + 1, [], 0, Chase(DraculaRegion)));
+        waves.Add(new Wave(waves.Count + 1, [new Spawn(dracula, map.Grounded(new MapPoint(lair.X, lair.Y, lair.Z, lair.Direction)))]));
+        var actors = new List<ReconstructedDungeons.SceneActor>();
+        foreach (int npc in DraculaBushes.Append(DraculaCage))
+        {
+            long point = bound.Where(p => p.Value == npc).Select(p => p.Key).SingleOrDefault();
+            if (!map.Points.ContainsKey(point) || data.Row("NPCConfig", npc) is not { } row || GameData.Int(row, "_iNPCType") != 2
+                || Interactions(npc).Count == 0) return null;
+            actors.Add(new(npc, point, []));
+        }
+        if (!Interactions(DraculaCage).Contains(DraculaUnlock)) return null;
+        waves.Add(new Wave(waves.Count + 1, [], 0, new ReconstructedDungeons.ScriptedStep("find the key", 0, (0, 1), actors, 0,
+            [new(ReconstructedDungeons.TriggerKind.Interaction, DraculaUnlock)],
+            DraculaBushes.SelectMany(Interactions).Select(i => new ReconstructedDungeons.StepTrigger(
+                ReconstructedDungeons.TriggerKind.Interaction, i)).ToArray(), 0)));
+        return new Plan(config, null, null, 0, 1, (int)GameData.Int(config, "_iRoleCntLimit"), waves);
     }
 
     /// <summary>A scene-editor point (m_kAllPoints) of the scene's map.</summary>

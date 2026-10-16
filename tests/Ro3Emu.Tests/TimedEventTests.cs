@@ -117,7 +117,42 @@ public sealed class TimedEventTests : IAsyncLifetime
         return Task.CompletedTask;
     });
 
-    private async Task StartChickenAsync(params BotClient[] players)
+    /// <summary>Survivor Battle stages (TimedBattleService.Chicken): each ends when the clock passes its 30401 end time.</summary>
+    private async Task<DungeonBaseInfoNotify> NextChickenStageAsync(BotClient[] players, DungeonBaseInfoNotify current)
+    {
+        int stage = current.StageModuleData.Stage + 1;
+        clock.Set(current.StageModuleData.StageEndTime / 1000 + 1);
+        await OnLoop(() => { Service<TimedBattleService>().Tick(default); return Task.CompletedTask; });
+        DungeonBaseInfoNotify next = null!;
+        foreach (var player in players)
+            next = await Next(player, DungeonService.BaseInfo, DungeonBaseInfoNotify.Parser, s => s.StageModuleData?.Stage == stage);
+        return next;
+    }
+
+    /// <summary>Career and landing (everyone on the island centre) into the battle, by default past its 3-minute free
+    /// revive window so a death is final; waits for the zone's first shrink so that tick has finished.</summary>
+    private async Task<DungeonBaseInfoNotify> ChickenBattleAsync(BotClient[] players, DungeonBaseInfoNotify stage0, bool pastFreeRevive = true)
+    {
+        var info = await NextChickenStageAsync(players, stage0);
+        info = await NextChickenStageAsync(players, info);
+        foreach (var player in players)
+        {
+            await player.SendGameAsync(TimedBattleService.SelectPosition, new SelectRolePositionReq { PositionX = 430, PositionY = 402 });
+            Assert.Equal(0, (await Next(player, TimedBattleService.SelectPosition, SelectRolePositionResp.Parser)).Result);
+        }
+        info = await NextChickenStageAsync(players, info);
+        Assert.Equal(3, info.StageModuleData.Stage);
+        if (pastFreeRevive)
+        {
+            clock.Set(info.StageModuleData.StageStartTime / 1000 + 181);
+            await OnLoop(() => { Service<TimedBattleService>().Tick(default); return Task.CompletedTask; });
+            foreach (var player in players)
+                await Next(player, DungeonService.Event, DungeonEventNotify.Parser, e => e.Vars.Any(v => v.VarId == 100010003));
+        }
+        return info;
+    }
+
+    private async Task<DungeonBaseInfoNotify> StartChickenAsync(params BotClient[] players)
     {
         foreach (var player in players) await Gm(player, "!lvl 99");
         clock.Set(new DateTimeOffset(2026, 11, 10, 16, 5, 0, TimeSpan.Zero).ToUnixTimeSeconds());
@@ -136,6 +171,7 @@ public sealed class TimedEventTests : IAsyncLifetime
             Assert.Equal(0, (await Next(player, TimedBattleService.Ready, MatchReadyResp.Parser)).Result);
         }
         long room = 0;
+        DungeonBaseInfoNotify info = null!;
         foreach (var player in players)
         {
             var transfer = await Next(player, MsgId.SwitchSceneLine, SwitchSceneLineResp.Parser,
@@ -145,8 +181,9 @@ public sealed class TimedEventTests : IAsyncLifetime
             await player.SendGameAsync(MsgId.SceneLoaded, new SceneLoadedReq { SceneId = 2240101 });
             Assert.Equal(0, (await Next(player, MsgId.SceneLoaded, SceneLoadedResp.Parser,
                 s => s.SceneId == 2240101)).Result);
-            await Next(player, DungeonService.BaseInfo, DungeonBaseInfoNotify.Parser, s => s.DungeonId == room);
+            info = await Next(player, DungeonService.BaseInfo, DungeonBaseInfoNotify.Parser, s => s.DungeonId == room);
         }
+        return info;
     }
 
     private Task BeginHandover(GameSession session)
@@ -366,8 +403,18 @@ public sealed class TimedEventTests : IAsyncLifetime
         await bob.SendGameAsync(MsgId.SceneLoaded, new SceneLoadedReq { SceneId = sceneEntry });
         Assert.Equal(0, (await Next(alice, MsgId.SceneLoaded, SceneLoadedResp.Parser, s => s.SceneId == sceneEntry)).Result);
         Assert.Equal(0, (await Next(bob, MsgId.SceneLoaded, SceneLoadedResp.Parser, s => s.SceneId == sceneEntry)).Result);
-        await Next(alice, DungeonService.BaseInfo, DungeonBaseInfoNotify.Parser, s => s.DungeonId == switchA.SceneID);
+        var loaded = await Next(alice, DungeonService.BaseInfo, DungeonBaseInfoNotify.Parser, s => s.DungeonId == switchA.SceneID);
         await Next(bob, DungeonService.BaseInfo, DungeonBaseInfoNotify.Parser, s => s.DungeonId == switchB.SceneID);
+        if (entry == 2)
+        {
+            // Survivor Battle fights only in its battle stage, after the career and landing picks.
+            await OnLoop(() =>
+            {
+                Assert.False(Service<TimedBattleService>().CanFight(Session(alice), Session(bob)));
+                return Task.CompletedTask;
+            });
+            await ChickenBattleAsync([alice, bob], loaded);
+        }
         await OnLoop(() =>
         {
             Assert.True(Service<TimedBattleService>().CanFight(Session(alice), Session(bob)));
@@ -447,6 +494,7 @@ public sealed class TimedEventTests : IAsyncLifetime
             Assert.Equal(0, (await Next(player, TimedBattleService.Ready, MatchReadyResp.Parser)).Result);
         }
         long room = 0;
+        DungeonBaseInfoNotify info = null!;
         foreach (var player in players)
         {
             var transfer = await Next(player, MsgId.SwitchSceneLine, SwitchSceneLineResp.Parser,
@@ -456,7 +504,7 @@ public sealed class TimedEventTests : IAsyncLifetime
             await player.SendGameAsync(MsgId.SceneLoaded, new SceneLoadedReq { SceneId = 2240101 });
             Assert.Equal(0, (await Next(player, MsgId.SceneLoaded, SceneLoadedResp.Parser,
                 s => s.SceneId == 2240101)).Result);
-            var info = await Next(player, DungeonService.BaseInfo, DungeonBaseInfoNotify.Parser,
+            info = await Next(player, DungeonService.BaseInfo, DungeonBaseInfoNotify.Parser,
                 s => s.DungeonId == room);
             Assert.Equal(2, info.InitData.ChickenInitData.TeamCount);
             Assert.Equal(2, info.InitData.ChickenInitData.TeamMemberCount);
@@ -465,6 +513,7 @@ public sealed class TimedEventTests : IAsyncLifetime
             Assert.Equal(2, info.InitData.ChickenInitData.PlayerToTeamId[(long)cara.Self!.Uuid]);
             Assert.Equal(2, info.InitData.ChickenInitData.PlayerToTeamId[(long)dan.Self!.Uuid]);
         }
+        await ChickenBattleAsync(players, info);
         await OnLoop(() =>
         {
             Assert.False(Service<TimedBattleService>().CanFight(Session(alice), Session(bob)));
@@ -512,7 +561,7 @@ public sealed class TimedEventTests : IAsyncLifetime
     {
         await using var alice = await InWorld("Alice");
         await using var bob = await InWorld("Bob");
-        await StartChickenAsync(alice, bob);
+        await ChickenBattleAsync([alice, bob], await StartChickenAsync(alice, bob));
         var a = Session(alice); var b = Session(bob);
         var aWaiting = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var bWaiting = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -567,7 +616,7 @@ public sealed class TimedEventTests : IAsyncLifetime
         await using var alice = await InWorld("Alice");
         await using var bob = await InWorld("Bob");
         await using var cara = await InWorld("Cara");
-        await StartChickenAsync(alice, bob, cara);
+        var battle = await ChickenBattleAsync([alice, bob, cara], await StartChickenAsync(alice, bob, cara));
         var a = Session(alice); var b = Session(bob); var c = Session(cara);
         long room = c.InstanceId;
         long aliceId = (long)alice.Self!.Uuid, bobId = (long)bob.Self!.Uuid, caraId = (long)cara.Self!.Uuid;
@@ -598,7 +647,7 @@ public sealed class TimedEventTests : IAsyncLifetime
         {
             var detachB = BeginHandover(b);
             await bWaiting.Task.WaitAsync(TimeSpan.FromSeconds(8));
-            clock.Set(new DateTimeOffset(2026, 11, 10, 16, 10, 0, TimeSpan.Zero).ToUnixTimeSeconds());
+            clock.Set(battle.StageModuleData.StageEndTime / 1000 + 1); // the 20-minute battle stage is over
             await OnLoop(() => { Service<TimedBattleService>().Tick(default); return Task.CompletedTask; });
             await settled.Task.WaitAsync(TimeSpan.FromSeconds(8));
             var result = await Next(cara, TimedBattleService.ChickenResult, ChickenResultNotify.Parser);
@@ -634,7 +683,7 @@ public sealed class TimedEventTests : IAsyncLifetime
         await using var alice = await InWorld("Alice");
         await using var bob = await InWorld("Bob");
         await using var cara = await InWorld("Cara");
-        await StartChickenAsync(alice, bob);
+        var battle = await ChickenBattleAsync([alice, bob], await StartChickenAsync(alice, bob));
         var a = Session(alice); var b = Session(bob);
         long roomId = a.InstanceId;
         string source = $"timed-battle/match/{roomId}";
@@ -664,12 +713,15 @@ public sealed class TimedEventTests : IAsyncLifetime
             commitEntered.TrySetResult();
             return releaseCommit.Task;
         };
+        var settlementDone = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        Service<TimedBattleService>().SettlementCompletedForTest = () => settlementDone.TrySetResult();
         Service<RoleHandover>().PhaseForTest = (phase, session) =>
         { if (phase == "Quiescing" && ReferenceEquals(session, b)) quiescing.TrySetResult(); };
         try
         {
-            var settlement = OnLoop(() => Service<OwnerRegistry>().RunRuntimeAsync("confirmed timed battle kill",
-                () => Service<TimedBattleService>().PlayerKilledAsync(a, b)));
+            // A final Survivor Battle death (past the free revive window): the match settles on its own.
+            var settlement = OnLoop(() => Service<OwnerRegistry>().RunRuntimeAsync("confirmed timed battle death",
+                async () => await Service<CombatService>().EnvironmentDamageAsync(b, 100_000_000)));
             await admitted.Task.WaitAsync(TimeSpan.FromSeconds(8));
             var detachB = BeginHandover(b);
             await quiescing.Task.WaitAsync(TimeSpan.FromSeconds(8));
@@ -681,7 +733,7 @@ public sealed class TimedEventTests : IAsyncLifetime
             Assert.Equal(0, Service<CharacterService>().CountOf(a, 7));
             Assert.Equal(0, CountRows(receiptCount));
             Assert.Equal(0, CountRows(obligationCount));
-            clock.Set(new DateTimeOffset(2026, 11, 10, 16, 10, 0, TimeSpan.Zero).ToUnixTimeSeconds());
+            clock.Set(battle.StageModuleData.StageEndTime / 1000 + 1);
             await OnLoop(() => { Service<TimedBattleService>().Tick(default); return Task.CompletedTask; });
             await cara.SendGameAsync(TimedBattleService.DragonClaim, new DragonIslandClaimRankRewardReq());
             Assert.Equal(ErrorCodes.FeatureUnavailable,
@@ -699,6 +751,8 @@ public sealed class TimedEventTests : IAsyncLifetime
                 Service<RoleStore>().LoadTimedBattle((long)bob.Self!.Uuid)!)!.ChickenMatches);
             Assert.Equal(1, CountRows(receiptCount));
             Assert.Equal(2, CountRows(obligationCount));
+            // The results go out before the players leave the match room; the match closes after that fan-out.
+            await settlementDone.Task.WaitAsync(TimeSpan.FromSeconds(8));
             Assert.Equal(0, Service<TimedBattleService>().ActiveMatchCountForTest);
         }
         finally

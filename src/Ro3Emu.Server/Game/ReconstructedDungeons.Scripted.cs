@@ -28,7 +28,12 @@ public sealed partial class ReconstructedDungeons
     public sealed record ScriptedStep(string Stage, int Quest, (int Done, int Total) Goal, IReadOnlyList<SceneActor> Actors,
         long Story, IReadOnlyList<StepTrigger> Complete, IReadOnlyList<StepTrigger> Ignore, long TeleportAfter);
 
-    public sealed record ScriptedScene(long Scene, string Name, string Confidence, IReadOnlyList<ScriptedStep> Steps);
+    /// <summary>
+    /// A scene. <paramref name="Unplayed"/> are DungeonQuestConfig quests of the scene that no step shows: the branch
+    /// that shows them cannot be reached in the reconstruction (each has its reason in the json, "unplayed").
+    /// </summary>
+    public sealed record ScriptedScene(long Scene, string Name, string Confidence, IReadOnlyList<ScriptedStep> Steps,
+        IReadOnlyList<int> Unplayed);
 
     private readonly Dictionary<long, ScriptedScene> _scripted = new();
 
@@ -47,8 +52,10 @@ public sealed partial class ReconstructedDungeons
             long scene = long.Parse(entry.Name, CultureInfo.InvariantCulture);
             var steps = entry.Value.GetProperty("steps").EnumerateArray().Select(Step).ToArray();
             if (steps.Length == 0) throw new InvalidOperationException($"Scripted scene {scene} has no steps.");
+            var unplayed = entry.Value.TryGetProperty("unplayed", out var u)
+                ? u.EnumerateArray().Select(q => q.GetProperty("quest").GetInt32()).ToArray() : [];
             _scripted[scene] = new ScriptedScene(scene, entry.Value.GetProperty("name").GetString() ?? "",
-                entry.Value.GetProperty("confidence").GetString() ?? "", steps);
+                entry.Value.GetProperty("confidence").GetString() ?? "", steps, unplayed);
         }
     }
 

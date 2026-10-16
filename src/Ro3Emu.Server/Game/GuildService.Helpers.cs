@@ -28,7 +28,7 @@ public sealed partial class GuildService
             if (guild == null) guildlessRecruitMs[s.Role!.Id] = now;
             else { guild.LastRecruitMs = now; await SaveGuildAsync(guild); }
             await chat.PublishRecruitmentAsync(s, req.Content, guild?.Id ?? 0,
-                guild?.Status == (int)GuildStatus.PreCreate, guild?.Members.Count - 1 ?? 0);
+                guild?.Status == (int)GuildStatus.PreCreate, guild?.Members.Count ?? 0);
         }
         await s.SendGameAsync(Recruit, new GuildRecruitResp { Result = code, Content = req.Content,
             NextTime = code == 0 ? now / 1000 + delay : previous / 1000 + delay,
@@ -55,8 +55,8 @@ public sealed partial class GuildService
     }
 
     /// <summary>
-    /// 32220: a guildless player volunteers as a creation helper. The threshold of
-    /// GuildResponsePeopleLimit helpers and immediate Normal transition are (inferred).
+    /// 32220: a guildless player responds to guilds being founded: joins one at once when its founder needs no
+    /// approval, otherwise waits in each founder's list (GuildService.Responders).
     /// </summary>
     private async Task HelperOpeCoreAsync(GameSession s, GuildCreateHelperOpeReq req)
     {
@@ -65,40 +65,14 @@ public sealed partial class GuildService
         else if (Own(s) != null) rsp.Result = ErrorCodes.AlreadyInGuild;
         else
         {
+            int failure = 0;
             foreach (var id in req.GuildIds.Distinct())
             {
-                var guild = store.Get(id);
-                bool accepted = guild is { Status: (int)GuildStatus.PreCreate }
-                    && guild.HelperDeadlineMs > NowMs()
-                    && guild.Members.Count - 1 < Setting("GuildResponsePeopleLimit", 3)[0]
-                    && s.Progress!.Level >= guild.JoinLevelLimit;
-                if (accepted)
-                {
-                    var member = NewMember(s, 20);
-                    guild!.Members[member.RoleId] = member;
-                    if (guild.Members.Count - 1 >= Setting("GuildResponsePeopleLimit", 3)[0])
-                    {
-                        guild.Status = (int)GuildStatus.Normal;
-                        guild.HelperDeadlineMs = 0;
-                    }
-                    if (!await SaveGuildAsync(guild)) accepted = false;
-                    else
-                    {
-                        await SyncRole(s);
-                        await SendFull(s, guild, true);
-                        var info = new GuildCreateHelperInfo { PlayerID = member.RoleId, Name = member.Name,
-                            Level = member.Level, Career = member.Career, CreateTime = member.EnterTime, IsOnline = true };
-                        foreach (var peer in guild.Members.Values)
-                            if (Online(peer.RoleId) is { } online)
-                                await online.SendGameAsync(HelperChange, new GuildCreateHelperMemberChangeNtf
-                                { Status = GuildCreateHelperMemberChangeNtf.Types.ChangeType.Add, Info = info });
-                        if (guild.Status == (int)GuildStatus.Normal) await RefreshMembers(guild);
-                    }
-                }
-                rsp.HelperResult.Add(new GuildCreateHelperOpeResp.Types.helperResultData { GuildId = id, Success = accepted });
-                if (accepted) break; // one active guild per role
+                int code = Own(s) != null ? ErrorCodes.AlreadyInGuild : await RespondAsync(s, store.Get(id));
+                if (code != 0 && failure == 0) failure = code;
+                rsp.HelperResult.Add(new GuildCreateHelperOpeResp.Types.helperResultData { GuildId = id, Success = code == 0 });
             }
-            if (!rsp.HelperResult.Any(x => x.Success)) rsp.Result = ErrorCodes.GuildMissing;
+            if (!rsp.HelperResult.Any(x => x.Success)) rsp.Result = failure;
         }
         await s.SendGameAsync(HelperOpe, rsp);
     }

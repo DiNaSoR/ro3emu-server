@@ -22,11 +22,13 @@ internal static class DatabaseSchema
         new MvpSchemaPlan(),
         new FestivalSchemaPlan(),
         new CampfireSchemaPlan(),
+        new GuildHuntingSchemaPlan(),
         new CaravanSchemaPlan(),
         new AdventureSchemaPlan(),
         new PronteraDefenseSchemaPlan(),
         new TerritorySchemaPlan(RealmStateKind.TerritoryWars),
         new TerritorySchemaPlan(RealmStateKind.TerritoryEscort),
+        new TerritorySchemaPlan(RealmStateKind.GuildLeague),
         new TimedBattleSchemaPlan(),
     ];
 }

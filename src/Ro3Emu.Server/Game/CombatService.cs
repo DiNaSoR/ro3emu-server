@@ -243,6 +243,8 @@ public sealed partial class CombatService : IGameTicker
     public List<Func<MonsterUnit, GameSession, DamageHitResult, long, Task<long>>> IncomingDamageAdjusters { get; } = new();
     public List<Func<MonsterUnit, GameSession, long, Task>> TakenAsync { get; } = new();
     public List<Func<GameSession, Task>> PlayerRevived { get; } = new();
+    /// <summary>A match owner decides which skills a participant may cast (true/false), or defers (null).</summary>
+    public Func<GameSession, int, bool?>? MatchSkillRule { get; set; }
     /// <summary>World-core owns the dead player's explicit accept/decline invitation.</summary>
     public Func<GameSession, GameSession, JsonElement, Task>? ReviveOffer { get; set; }
     public Func<GameSession, int>? ReviveCheck { get; set; }
@@ -697,6 +699,26 @@ public sealed partial class CombatService : IGameTicker
         foreach (var handler in PlayerDied) await handler(p);
         }
         finally { if (ownsPublication) ReleaseDeathPublication(p); }
+    }
+
+    /// <summary>
+    /// Damage without an attacker (the Survivor Battle poison zone, inferred): the same protected HP transition as a
+    /// monster hit (shields, lethal prevention), the HP publication and, when lethal, the ordinary death. Returns the
+    /// HP actually lost.
+    /// </summary>
+    public async Task<long> EnvironmentDamageAsync(GameSession p, long damage, Func<bool>? valid = null)
+    {
+        if (damage <= 0 || p.Role == null) return 0;
+        var committed = await CommitPlayerDamageAsync(p, damage, null, valid);
+        if (committed == null) return 0;
+        var (_, hp, effective, _) = committed.Value;
+        try
+        {
+            await character.SetHpSpAsync(p, null, null);
+            if (hp == 0) await PlayerDiesAsync(p);
+        }
+        finally { if (hp == 0) ReleaseDeathPublication(p); }
+        return effective;
     }
 
     private static EntityBase LifeState(GameSession p) => new()

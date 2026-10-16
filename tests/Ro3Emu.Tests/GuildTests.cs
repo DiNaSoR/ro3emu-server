@@ -325,7 +325,8 @@ public sealed partial class GuildTests : IAsyncLifetime
         Assert.Equal(0, list.Result);
         Assert.Equal(pre.Guid, Assert.Single(list.Data).Guild.Guid);
 
-        foreach (var helper in new[] { helper1, helper2, helper3 })
+        // GuildResponsePeopleLimit 3 counts the founder: two responders found the guild.
+        foreach (var helper in new[] { helper1, helper2 })
         {
             await helper.SendGameAsync(GuildService.HelperOpe, new GuildCreateHelperOpeReq { GuildIds = { pre.Guid } });
             var rsp = await Next(helper, GuildService.HelperOpe, GuildCreateHelperOpeResp.Parser);
@@ -334,7 +335,9 @@ public sealed partial class GuildTests : IAsyncLifetime
         }
         var normal = await Next(founder, GuildService.Full, GuildFullInfoNtf.Parser,
             x => x.Guid == pre.Guid && x.Status == GuildStatus.Normal);
-        Assert.Equal(4, normal.MemberInfo.Count);
+        Assert.Equal(3, normal.MemberInfo.Count);
+        await helper3.SendGameAsync(GuildService.HelperOpe, new GuildCreateHelperOpeReq { GuildIds = { pre.Guid } });
+        Assert.False(Assert.Single((await Next(helper3, GuildService.HelperOpe, GuildCreateHelperOpeResp.Parser)).HelperResult).Success);
 
         await helper1.SendGameAsync(ChatService.JoinChannel, new JoinChatChannelReq { GroupId = "@TGS#_8_0" });
         Assert.Equal(0, (await Next(helper1, ChatService.JoinChannel, JoinChatChannelRsp.Parser)).Result);

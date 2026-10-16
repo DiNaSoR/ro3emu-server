@@ -271,6 +271,19 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
     /// <summary>Leased Special Class Items (5002, role blob "career_special"); CareerSpecialService.</summary>
     public Romsg.DBCareerSpecial? CareerSpecial { get; set; }
 
+    /// <summary>Valhalla Trials Blessing statue (role blob "heroic_spirit"); ValhallaService. Cleared layers live in <see cref="Dungeons"/>.</summary>
+    public Romsg.DBOdinStatue? OdinStatue { get; set; }
+
+    /// <summary>The layer of the last admitted Valhalla challenge (5046 latestChallengeId; the client never reads it).</summary>
+    public long ValhallaLatest { get; set; }
+
+    /// <summary>Monster Hunt counters and claims (5053, role blob "area_concur"); MonsterHuntService.</summary>
+    public Romsg.DBAreaConcurInfo? AreaConcur { get; set; }
+    /// <summary>The bytes of <see cref="AreaConcur"/> as stored: a kill's staged write checks them in its transaction.</summary>
+    public byte[] AreaConcurPersisted { get; set; } = [];
+    /// <summary>A committed kill changed the counters; the 5053 sync follows the kill.</summary>
+    public bool AreaConcurChanged { get; set; }
+
     /// <summary>The leased items' PendantConfig ids (EntityBase.pendantInfo), derived from <see cref="CareerSpecial"/>.</summary>
     public int[] CareerPendants { get; set; } = [];
     public Romsg.DBWardRobeInfo? Wardrobe { get; set; }

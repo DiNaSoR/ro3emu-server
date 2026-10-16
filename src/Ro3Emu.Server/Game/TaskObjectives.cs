@@ -31,6 +31,26 @@ public sealed partial class TaskService
     // now, like the other Check* state targets (inferred).
     private const int TRentCareerSpecial = 309003;
 
+    // 334001 CheckHeroicSpiritChallengedId [334001, HeroicSpiritLayerConfig id] ("Clear Valhalla ${1}", the Tower Trial
+    // side quests 302040/304050/305050/384050/385050): R is 1 (LC_InteractCondition.lua:4851-4875); the client condition
+    // reads the layer as completed (:4830-4848), so it is the cleared state, like the other Check* targets.
+    private const int TValhallaLayer = 334001;
+
+    // 318004 [318004, AreaConcurConfig id, n] "Reach @{1} progress toward the <Area> Monster Hunt full collection reward"
+    // (growth manual 703040/704050/705030/706030): R is p2 (LC_InteractCondition.lua:5246-5266). The area's collection
+    // progress, its claimed monster stages (MonsterHuntService; inferred: the original counter is not recovered).
+    private const int TMonsterHunt = 318004;
+
+    // 210011 [210011, n]: TaskConfig 1602120 "Guild Activities - Hunting Challenge" (type 16, _kEXECAction 115 3015) is
+    // its only user. The client has no formatter for it; R is the trailing count, as the sibling 104011 caravan departure
+    // (inferred). Credited once per event when a member takes part (GuildHuntingService).
+    private const int TGuildHunt = 210011;
+
+    // 210010 [210010, n] "Guild Activities - Wedding Crashers" (guild quest 1602110, accepted by the hidden DailyActivity
+    // 3014's _iTaskReceiveAction ["31","1","1602110"]): one per Wedding Crashers clear (DraculaWeddingService). Its
+    // TaskTargetConfig row is not exported; counting a successful rescue, not an entry, is (inferred).
+    private const int TDraculaWedding = 210010;
+
     private readonly ConditionalWeakTable<MonsterUnit, HashSet<long>> _participants = new();
     private readonly HashSet<GameSession> _refreshQueued = new();
 
@@ -48,13 +68,14 @@ public sealed partial class TaskService
     private long Required(GameSession? session, long[] t) => t switch
     {
         [TDialog, _, _, _] or [TArea, _, _] or [TJobChange, _] or [TTaskDone, _] or [TJobRank, _] or [TAreaAction, _, _, _]
-            or [TGuide, _] or [TPydDownload, 1] or [TRentCareerSpecial, _] => 1,
+            or [TGuide, _] or [TPydDownload, 1] or [TRentCareerSpecial, _] or [TValhallaLayer, _] => 1,
         [TPlot or TBaseLevel or TSkillPoints or TStatPoints or TResonance or TTotalRefine or TRefineSlots
             or TRefineCount or TMvp or TMvpOnce or TCargo or TAfkSeconds or TTimedBattle or TCaravan
-            or TTalentLevels or TPetsDeployed or TTowerFloor, var n] => n,
+            or TTalentLevels or TPetsDeployed or TTowerFloor or TGuildHunt or TDraculaWedding, var n] => n,
         [TOnePieceCount, _, _, var limit] => data.Row("RestrictConfig", limit) is { } restrict
             ? GameData.Int(restrict, "_iMaxRestrictNum") : -1,
         [TKillOnMap, var n, _] => n,
+        [TMonsterHunt, _, var n] => n,
         [TDungeonPass, _, var n] => n,
         [TSaplingChosen or TDeclaration, var n] => n, // Adventure Group (TaskService.AdventureGroup.cs)
         [TWaterSapling, var n, _] => n,
@@ -93,6 +114,8 @@ public sealed partial class TaskService
             TSlotRefine or TStrength => t[1] is >= 1 and <= 7,
             TEquipment => t[1] >= 0 && t[2] >= 0,
             TCraft => t[1] >= 0 && t[2] > 0 && t[4] is >= 0 and <= 10,
+            TValhallaLayer => data.Row("HeroicSpiritLayerConfig", t[1]) != null,
+            TMonsterHunt => data.Row("AreaConcurConfig", t[1]) != null,
             _ => true, // Only the explicit formatter cases above can reach here.
         };
     }
@@ -146,6 +169,8 @@ public sealed partial class TaskService
                 ? GameData.Int(floor, "_iFloor") : 0,
             TStrength => s.EquipLevels.Strength.GetValueOrDefault((int)t[1]),
             TRentCareerSpecial => CareerSpecialService.HoldsSubType(s, data, t[1]) ? 1 : 0,
+            TValhallaLayer => DungeonService.ValhallaCleared(s.Dungeons).Contains(t[1]) ? 1 : 0,
+            TMonsterHunt => MonsterHuntService.AreaProgress(s, t[1]),
             _ => -1,
         };
     }
@@ -173,10 +198,11 @@ public sealed partial class TaskService
     private ReservationKey[] GetKillTaskParticipantKeys(GameSession killer, MonsterUnit monster)
     {
         var settlement = monster.RewardSettlement ?? throw new InvalidOperationException("Kill source was not staged.");
-        if (settlement.TaskObligationsStaged || settlement.AfkRecordStaged)
+        if (settlement.TaskObligationsStaged || settlement.AfkRecordStaged || settlement.HuntStaged)
         {
-            // A failed lethal admission restores HP. Rebuild both callbacks from the next admitted
-            // state rather than replaying stale task/AFK snapshots over intervening owner work.
+            // A failed lethal admission restores HP. Rebuild the callbacks from the next admitted state rather
+            // than replaying stale task/AFK/Monster Hunt snapshots over intervening owner work (latest stage first).
+            settlement.ResetHuntStage?.Invoke();
             settlement.ResetAfkStage?.Invoke();
             settlement.ResetTaskStage?.Invoke();
             settlement.TaskParticipantIds = null;

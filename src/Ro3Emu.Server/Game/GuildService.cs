@@ -12,15 +12,16 @@ using Ro3Emu.Server.Data;
 namespace Ro3Emu.Server.Game;
 
 /// <summary>
-/// Guild membership and roster. The default create widget sends autoCreateHelper=false;
-/// helper creation is a distinct pre-create state and is refused until its transition is established.
+/// Guild membership and roster. ServerOptions.GuildFounding "responders" founds every guild
+/// through responders as the original (PreCreate, GuildService.Responders); "instant" (default) keeps the shortcut:
+/// a guild created without the create widget's autoCreateHelper toggle is Normal at once.
 /// Guild funds, contribution and buildings are persisted and shown; no unproven contribution-earning formula is used.
 /// (inferred) Default building rows, initial rank, hall level mapping, rank order, name character whitelist,
 /// invitation token lifecycle and post-mutation push order are recorded in docs/systems/guild.md.
 /// </summary>
 public sealed partial class GuildService(GameData data, GuildStore store, RoleStore roles, SessionRegistry sessions,
     CharacterService character, FunctionService functions, ChatService chat, IOptions<ServerOptions> options,
-    TimeProvider clock, Ownership.OwnerRegistry ownerRegistry)
+    TimeProvider clock, Ownership.OwnerRegistry ownerRegistry, AwardService awards, GameLoop loop, SceneService scene)
 {
     public const uint GuildSync = 5047, Create = 32210, Recommend = 32211, HelperList = 32212, Full = 32213, MemberChange = 32214;
     public const uint CheckSensitive = 10003;
@@ -48,12 +49,18 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
 
     private async Task LoginCoreAsync(GameSession session)
     {
+        HookDeposits();
         // Authoritative membership index wins over any stale role blob after reconnect/role switch.
         var guild = Own(session);
         var personal = Personal(session.Role!.Id);
         await SavePersonalAsync(session, guild == null ? WithoutGuild(personal) : RoleInfo(guild, guild.Members[session.Role.Id], personal));
         await SyncRole(session);
-        if (guild != null) await SendFull(session, guild, false);
+        if (guild != null)
+        {
+            await SendFull(session, guild, false);
+            await PushDividendAsync(session, guild); // the full info has no dividend field (32231 tp=14)
+            if (guild.Status == (int)GuildStatus.PreCreate && IsFounder(guild, session.Role.Id)) await PushRedDotAsync(guild);
+        }
     }
 
     private async Task OnlineChangedCoreAsync(GameSession session, bool online)
@@ -82,6 +89,14 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
     private Task SyncRole(GameSession session)
     {
         var info = session.Guild ?? new DBRoleGuildInfo();
+        // Last week's chests expired with the week (UITips 17019); the client shows any key as received.
+        if (info.ActiveRewardReceived.Any(r => r.Value < WeekStart))
+        {
+            info = info.Clone();
+            foreach (long key in info.ActiveRewardReceived.Where(r => r.Value < WeekStart).Select(r => r.Key).ToArray())
+                info.ActiveRewardReceived.Remove(key);
+            session.Guild = info;
+        }
         return CharacterService.SyncAsync(session, GuildSync, info);
     }
 
@@ -99,10 +114,11 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
             CatShopInfo = prior?.GuildId == guild.Id ? prior.CatShopInfo?.Clone() ?? new DBGuildCatShopInfo()
                 : new DBGuildCatShopInfo(),
             IsCatShopAllSubmit = prior?.GuildId == guild.Id && prior.IsCatShopAllSubmit,
+            ActiveRewardReceived = { prior?.GuildId == guild.Id ? prior.ActiveRewardReceived : new Google.Protobuf.Collections.MapField<long, long>() },
         };
     }
 
-    private static GuildHeadIcon Icon(GuildStore.State g) => new() { BackgroundType = g.Background, IconType = g.Icon };
+    internal static GuildHeadIcon Icon(GuildStore.State g) => new() { BackgroundType = g.Background, IconType = g.Icon };
     private static GuildResource Resource(GuildStore.State g) => new()
     {
         Money = g.Money, Contribute = g.Contribute, Materials = g.Materials,
@@ -132,10 +148,20 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
         return result;
     }
 
-    private bool HasRight(GuildStore.State g, long actor, int right) => g.Members.TryGetValue(actor, out var m)
+    internal bool HasRight(GuildStore.State g, long actor, int right) => g.Members.TryGetValue(actor, out var m)
         && (m.Official == 1 || g.Rights.GetValueOrDefault(right)?.Contains(m.Official) == true);
 
-    private long MaxMembers(GuildStore.State g)
+    /// <summary>The committed guild's GuildPermissionConfig right for one member (e.g. 26 GuildHuntCommander).</summary>
+    internal bool HasRight(long guildId, long actor, int right) => store.Get(guildId) is { } g && HasRight(g, actor, right);
+
+    /// <summary>
+    /// GuildHuntingService: true while the guild races in an unsettled Hunting Challenge. Leaving and kicking then answer
+    /// 5840 "This action cannot be performed during the Hunting Challenge." (ErrorCodeConfig 5840; which requests answer
+    /// it is inferred: the roster decides who is rewarded).
+    /// </summary>
+    internal Func<long, bool>? HuntingBusy { get; set; }
+
+    internal long MaxMembers(GuildStore.State g)
     {
         var hall = data.Table("GuildBuildingConfig").Values.FirstOrDefault(r =>
             GameData.Int(r, "_iType") == 1 && GameData.Int(r, "_iLv") == g.Buildings.GetValueOrDefault(1, 1));
@@ -148,6 +174,7 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
         Official = m.Official, EnterTime = m.EnterTime,
         OfflineTime = m.RoleId != excludeOnlineRole && Online(m.RoleId) != null ? -1 : m.OfflineTime,
         CurContribute = m.CurContribute, HistoryContribute = m.HistoryContribute,
+        LastWeekActivity = store.ForRole(m.RoleId) is { } g ? (int)Math.Min(int.MaxValue, LastWeekActivity(g, m)) : 0,
     };
 
     internal GuildSnapInfo Snapshot(GuildStore.State g, long viewer = 0)
@@ -158,7 +185,7 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
             Guid = g.Id, ShortUid = g.Id, Name = g.Name, Level = g.Level, Announce = g.Announce,
             MemberCount = g.Members.Count, TotalMemberCount = MaxMembers(g), Icon = Icon(g),
             LeaderId = leader.RoleId, LeaderName = leader.Name, AutoAcceptApply = g.AutoAccept,
-            IsApplyed = g.Applications.ContainsKey(viewer), JoinLevelLimit = g.JoinLevelLimit, Reputation = g.Reputation,
+            IsApplyed = g.Applications.ContainsKey(viewer) || g.HelperApplies.ContainsKey(viewer), JoinLevelLimit = g.JoinLevelLimit, Reputation = g.Reputation,
         };
         // The client blindly copies historyNames and iterates guildManagerData; include actual current name/leader.
         snap.HistoryNames.AddRange(g.HistoryNames.Count > 0 ? g.HistoryNames : [g.Name]);
@@ -179,14 +206,17 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
             CreateHelperEndTime = g.HelperDeadlineMs,
             MaxCreateHelperNum = Setting("GuildResponsePeopleLimit", 3)[0],
             JoinLevelLimit = g.JoinLevelLimit, LastChangeNameTime = g.LastChangeNameTime,
-            LastChangeNoticeTime = (int)g.LastChangeNoticeTime, IsJoin = isJoin,
+            LastChangeNoticeTime = (int)g.LastChangeNoticeTime, IsJoin = isJoin, ActivityInfo = ActivityInfo(g),
         };
         full.HistoryNames.AddRange(g.HistoryNames.Count > 0 ? g.HistoryNames : [g.Name]);
         full.MemberInfo.AddRange(g.Members.Values.Select(m => MemberInfo(m)));
         if (g.Status == (int)GuildStatus.PreCreate)
-            full.CreateHelperInfo.AddRange(g.Members.Values.Where(m => m.Official != 1).Select(m => new GuildCreateHelperInfo
-            { PlayerID = m.RoleId, Name = m.Name, Level = m.Level, Career = m.Career, CreateTime = m.EnterTime,
-                IsOnline = Online(m.RoleId) != null }));
+            // Responders in join order, the founder last (GuildService.Responders).
+            full.CreateHelperInfo.AddRange(g.Members.Values.OrderBy(m => m.Official == 1).ThenBy(m => m.EnterTime)
+                .Select(m => HelperInfo(m.RoleId, m.Name, m.Level, m.Career, m.EnterTime)));
+        if (g.Status == (int)GuildStatus.PreCreate)
+            full.CreateHelperApplyData.AddRange(LiveResponses(g).OrderBy(a => a.ApplyTime)
+                .Select(a => HelperInfo(a.RoleId, a.Name, a.Level, a.Career, a.ApplyTime)));
         full.ApplyInfo.AddRange(g.Applications.Values.Select(ApplyInfo));
         full.Building.AddRange(g.Buildings.Select(k => BuildingInfo(g, k.Key)));
         return full;
@@ -318,12 +348,14 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
         if (code == 0 && !req.OnlyCheck)
         {
             var cost = Setting("GuildCreateCost", 0, 0);
+            bool founding = req.AutoCreateHelper || options.Value.GuildFounding == "responders";
             var guild = new GuildStore.State
             {
                 Name = req.Name, Announce = req.Announce, CreateTime = NowMs(),
                 Background = req.Icon.BackgroundType, Icon = req.Icon.IconType, Rights = DefaultRights(),
-                Status = req.AutoCreateHelper ? (int)GuildStatus.PreCreate : (int)GuildStatus.Normal,
-                HelperDeadlineMs = req.AutoCreateHelper ? NowMs() + Setting("GuildResponseTimeLimit", 86400)[0] * 1000 : 0,
+                Status = founding ? (int)GuildStatus.PreCreate : (int)GuildStatus.Normal,
+                HelperDeadlineMs = founding ? NowMs() + Setting("GuildResponseTimeLimit", 86400)[0] * 1000 : 0,
+                AutoCreateHelper = req.AutoCreateHelper,
             };
             foreach (var row in data.Table("GuildBuildingConfig").Values.Where(r => GameData.Int(r, "_iLv") == 1))
                 guild.Buildings[GameData.Int(row, "_iType")] = 1;
@@ -426,12 +458,15 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
         return s.SendGameAsync(MemberIds, response);
     }
 
-    private async Task JoinAsync(long roleId, GuildStore.State g)
+    private async Task JoinAsync(long roleId, GuildStore.State g, GuildStore.Member? approver = null)
     {
         var online = Online(roleId);
         var member = online != null ? NewMember(online, 20) : NewMember(roles.Get(roleId)!, 20);
         g.Members[member.RoleId] = member;
         g.Applications.Remove(member.RoleId);
+        if (approver != null)
+            Journal(g, EvApproved, [approver.RoleId, member.RoleId], Str(approver.Name), Str(member.Name), Str(member.Name));
+        else Journal(g, EvJoined, [member.RoleId], Str(member.Name));
         if (!await SaveGuildAsync(g)) throw new InvalidOperationException("exclusive guild membership changed during join");
         if (online != null)
         {
@@ -530,7 +565,7 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
                 g.Applications.Remove(id);
                 if (!req.Agree) await SaveGuildAsync(g);
                 await PushApplications(g, a, GuildEnterApplyChangeNtf.Types.ChangeType.Delete);
-                if (req.Agree) await JoinAsync(id, g);
+                if (req.Agree) await JoinAsync(id, g, g.Members[s.Role!.Id]);
             }
             resp.Data.Add(new GuildEnterApplyOpeResp.Types.ApplyRes { PlayerId = id, Result = code });
             // Per-target result remains visible even when another target in the batch succeeds.
@@ -588,6 +623,7 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
         {
             var actor = g.Members[s.Role!.Id];
             var target = g.Members[req.TarPlayerID];
+            int previous = target.Official;
             if (next == 1)
             {
                 if (actor.Official != 1 || target.RoleId == actor.RoleId) code = ErrorCodes.GuildPermission;
@@ -600,6 +636,10 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
                 if (limit >= 0 && g.Members.Values.Count(m => m.Official == next) >= limit) code = ErrorCodes.GuildPositionFull;
                 else target.Official = next;
             }
+            if (code == 0 && next == 1)
+                Journal(g, EvLeader, [actor.RoleId, target.RoleId], Str(actor.Name), Str(target.Name));
+            else if (code == 0 && previous != next)
+                Journal(g, EvPosition, [actor.RoleId, target.RoleId], Str(actor.Name), Str(target.Name), Int(previous), Int(next));
             if (code == 0)
             {
                 await SaveGuildAsync(g);
@@ -615,13 +655,17 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
     {
         var g = Own(s);
         int code = g == null ? ErrorCodes.NotInGuild : g.Members[s.Role!.Id].Official == 1 && g.Members.Count > 1
-            ? ErrorCodes.GuildPermission : 0;
+            ? ErrorCodes.GuildPermission : HuntingBusy?.Invoke(g.Id) == true ? ErrorCodes.GuildHunting : 0;
         if (code == 0 && g != null)
         {
             var member = g.Members[s.Role!.Id];
             g.Members.Remove(member.RoleId);
             if (g.Members.Count == 0) await DeleteGuildAsync(g, [member.RoleId]);
-            else await SaveGuildAsync(g, [member.RoleId]);
+            else
+            {
+                Journal(g, EvLeft, [member.RoleId], Str(member.Name));
+                await SaveGuildAsync(g, [member.RoleId]);
+            }
             await s.SendGameAsync(Leave, new GuildMemberLeaveResp { Result = 0 });
             await PushMember(g, member, GuildMemberInfoChangeNtf.Types.ChangeType.Leave);
             await ClearMember(s, g);
@@ -634,7 +678,8 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
     {
         var g = Own(s);
         int code = g == null ? ErrorCodes.NotInGuild : !HasRight(g, s.Role!.Id, req.IfSingleKick ? 3 : 8)
-            ? ErrorCodes.GuildPermission : req.TarPlayerIDs.Count == 0 ? ErrorCodes.Parameter : 0;
+            ? ErrorCodes.GuildPermission : req.TarPlayerIDs.Count == 0 ? ErrorCodes.Parameter
+            : HuntingBusy?.Invoke(g.Id) == true ? ErrorCodes.GuildHunting : 0;
         var removed = new List<GuildStore.Member>();
         var targetViews = new List<(GuildStore.Member Member, GameSession? Session, DBRoleGuildInfo Personal)>();
         if (code == 0 && g != null)
@@ -656,7 +701,12 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
                     personal.LastGuildId = g.Id;
                     targetViews.Add((m, target, personal));
                 }
-                foreach (var m in removed) g.Members.Remove(m.RoleId);
+                var kicker = g.Members[s.Role!.Id];
+                foreach (var m in removed)
+                {
+                    g.Members.Remove(m.RoleId);
+                    Journal(g, EvKicked, [kicker.RoleId, m.RoleId], Str(kicker.Name), Str(m.Name));
+                }
                 // The roster index and every personal view share a single commit. No session or chat state
                 // changes until the transaction succeeds, so a failed later role write rolls all removals back.
                 var transaction = roles.NewTransaction();
@@ -843,12 +893,17 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
             IsOpeRecruit = req.IsOpeRecruit });
     }
 
+    /// <summary>The Guild League's handlers for 30410/30411/30412 (GuildLeagueService), run inside this family's guild scope.</summary>
+    internal sealed record LeagueHooks(Func<GameSession, uint, Task> MgrData, Func<GameSession, uint, Task> Info, Func<GameSession, uint, Task> GroupInfo);
+    internal LeagueHooks? League { get; set; }
+
     /// <summary>
-    /// 30410 Guild League manager data. The league is not run yet: the "not open" activity state, and the own guild
-    /// unranked (LC_DAL_GuildLeague reads activityInfo and myGuildInfo without nil checks).
+    /// 30410 Guild League manager data. Without the league service the activity is "not open" and the own guild unranked
+    /// (LC_DAL_GuildLeague reads activityInfo and myGuildInfo without nil checks).
     /// </summary>
     private Task LeagueMgrDataCoreAsync(GameSession s, uint msgId)
     {
+        if (League is { } league) return league.MgrData(s, msgId);
         var g = Own(s);
         return s.SendGameAsync(msgId, new GetGuildLeagueMgrDataRsp
         {
@@ -856,6 +911,12 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
             MyGuildInfo = g == null ? new GuildLeagueGuildDungeonData() : new GuildLeagueGuildDungeonData { GuildID = g.Id, Name = g.Name, Icon = Icon(g) },
         });
     }
+
+    private Task LeagueInfoCoreAsync(GameSession s, uint msgId) => League is { } league ? league.Info(s, msgId)
+        : s.SendGameAsync(msgId, new GetGuildLeagueInfoRsp { Info = new GuildLeagueInfo() });
+
+    private Task LeagueGroupInfoCoreAsync(GameSession s, uint msgId) => League is { } league ? league.GroupInfo(s, msgId)
+        : s.SendGameAsync(msgId, new GetGuildLeagueGroupInfoRsp { EStatus = GuildLeagueStatus.NotOpen });
 
     /// <summary>32242: config's current-level 107 contribution cost and _iTime minutes. Completion timing is inferred.</summary>
     private async Task BuildUpgradeCoreAsync(GameSession s, GuildBuildLevelUpReq req)
@@ -887,6 +948,7 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
             {
                 g.Contribute -= amount;
                 g.BuildingEndTimes[type] = NowMs() + GameData.Int(row, "_iTime") * 60_000;
+                Journal(g, EvBuilding, [s.Role!.Id], Str(s.Role.Name), Int(amount), Int(type), Int(g.Buildings[type] + 1));
                 var economy = new Ro3Emu.Server.Economy.EconomyEnvelope(Guid.NewGuid().ToString("N"), s.Account!, s.Role!.Id,
                     "guild-build", $"{g.Id}:{type}:{g.Buildings[type]}", $"guild-build:{g.Id}:{type}:{g.Buildings[type]}", NowMs(),
                     [new(new(Ro3Emu.Server.Economy.EconomyAssetKind.GuildResource, 2),

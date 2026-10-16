@@ -11,13 +11,12 @@ namespace Ro3Emu.Tests;
 /// </summary>
 internal static class TestPorts
 {
-    private const int MaxAttempts = 4096;
     // The default pool stays below client ephemeral ranges (Windows: 49152+, Linux: 32768+).
     // RO3EMU_TEST_PORT_RANGE overrides it (inclusive, e.g. 40000-48999 on Windows); partitions apply to either.
     // A port-0 probe can otherwise be consumed by an outgoing connection while the test host is starting.
     // This still is not a lease against unrelated processes deliberately binding the same server port.
-    // One full run takes ~3 ports per host for ~600 hosts; a quarter of the default range leaves headroom.
-    private const int Partitions = 4;
+    // One full run takes ~3 ports per host for ~1100 hosts (16.10); half of the default range leaves headroom.
+    private const int Partitions = 2;
     private static readonly object Gate = new();
     private static readonly HashSet<int> Selected = new();
     private static FileStream? _partitionLock; // held until the process exits
@@ -46,9 +45,12 @@ internal static class TestPorts
     {
         lock (Gate)
         {
-            for (int attempt = 0; attempt < MaxAttempts; attempt++)
+            // Every port of the partition is tried once from a random start: random probes alone stop finding the last
+            // free ports of a nearly used-up partition.
+            int size = Range.End - Range.First, start = Random.Shared.Next(size);
+            for (int i = 0; i < size; i++)
             {
-                int port = Random.Shared.Next(Range.First, Range.End);
+                int port = Range.First + (start + i) % size;
                 if (port is 5380 or 20000 or 33100) continue; // Never use the application's default ports.
                 if (Selected.Contains(port)) continue;
                 using var listener = new TcpListener(IPAddress.Loopback, port) { ExclusiveAddressUse = true };
@@ -58,7 +60,7 @@ internal static class TestPorts
                 Selected.Add(port);
                 return port;
             }
-            throw new InvalidOperationException($"Could not select a distinct loopback test port after {MaxAttempts} probes ({Selected.Count} already selected).");
+            throw new InvalidOperationException($"No free distinct loopback test port in {Range.First}-{Range.End - 1} ({Selected.Count} already selected).");
         }
     }
 

@@ -97,11 +97,32 @@ public sealed class ServerOptions
     public string[] GuildBlockedWords { get; set; } = [];
 
     /// <summary>
+    /// "instant": a guild is Normal at once unless the founder ticks the create widget's responder toggle (this server's
+    /// shortcut). "responders": every guild is founded through GuildResponsePeopleLimit responders, as the original;
+    /// the toggle then only waives the founder's approval of each response.
+    /// </summary>
+    public string GuildFounding { get; set; } = "instant";
+
+    /// <summary>
+    /// Guild League registration's membership threshold. Unset: GuildSettingConfig GuildLeaguePeopleNum (40, read as the
+    /// "Guild membership reaches ${1}" requirement, inferred). A small realm or a test can lower it.
+    /// </summary>
+    public int? GuildLeagueMinMembers { get; set; }
+
+    /// <summary>
     /// Seconds an in-game role stays in the world after its game socket drops, waiting for the client's silent
     /// reconnect (Phonest ConnectServerReq ReConnection). 60 is the reference
     /// AVATAR_LOSE_CONNECTION_TIMEOUT_SECONDS; it must exceed the client's 20 s + 10 s budgets. 0 turns grace off.
     /// </summary>
     public int ReconnectGraceSeconds { get; set; } = 60;
+
+    /// <summary>
+    /// TEST AID, not original behaviour: Survivor Battle (match entry 2) starts with this many entrants in teams of
+    /// <see cref="ChickenTestTeamSize"/> instead of EatChickenMatchConfig's 100 in teams of 5 (the client gives no sign of
+    /// server-side filler bots). 0 keeps the config. GM "!chicken shape" sets the same in memory.
+    /// </summary>
+    public int ChickenTestPlayers { get; set; }
+    public int ChickenTestTeamSize { get; set; }
 }
 
 /// <summary>In-game bug reports: the menu's Feedback button and "/bug" in chat (FeedbackService).</summary>
@@ -141,13 +162,13 @@ public sealed class OpenContentOptions
 
     /// <summary>
     /// Functions the original never opened (base level 999/9999) whose client UI and data work: 7201 Realm War map,
-    /// 70122 Totem Shop, 41 Feedback, 1000000 Adv. Guild (AdventureGroupService) (its panel comes from Ro3Emu.ClientHooks.FeedbackButton, its backend is
-    /// FeedbackService). Shells without a working panel (Title 14, Academy 34...) stay closed so the menu shows no dead
+    /// 70122 Totem Shop, 41 Feedback, 1000000 Adv. Guild (AdventureGroupService), 96 Valhalla Trials (ValhallaService)
+    /// (Feedback's panel comes from Ro3Emu.ClientHooks.FeedbackButton, its backend is FeedbackService). Shells without a working panel (Title 14, Academy 34...) stay closed so the menu shows no dead
     /// buttons; a function joins this list together with its backend. Novice Challenge (90, activity 112) is left out
     /// (owner, 2026-10-11): its 15 random event texts are "Event Text..."/"Option A" filler and the first node's
     /// dialogues 9901-9904 do not exist, so the original never finished it.
     /// </summary>
-    public long[] Functions { get; set; } = [7201, 70122, 41, 1000000];
+    public long[] Functions { get; set; } = [7201, 70122, 41, 1000000, 96];
 
     /// <summary>
     /// NewActivityConfig rows whose own open condition is a level the cap never reaches (e.g. 112 Novice Challenge).

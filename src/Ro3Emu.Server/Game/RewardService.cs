@@ -32,6 +32,10 @@ public sealed class RewardService
     /// <summary>Actual committed kill drops, after EXP correction; excludes GM, quest and other item grants.</summary>
     public List<Func<GameSession, MonsterUnit, IReadOnlyList<(int Entry, long Count)>, Task>> KillDropsGranted { get; } = new();
     internal Action<GameSession, MonsterUnit, RewardSettlement, IReadOnlyList<(int Entry, int Count)>, long, long>? StageAfkKill { get; set; }
+    /// <summary>Monster Hunt: the area drop rolled with an ordinary field kill (MonsterHuntService).</summary>
+    internal Func<GameSession, MonsterUnit, IEnumerable<(int Entry, int Count)>>? ExtraKillDrops { get; set; }
+    /// <summary>Monster Hunt: its kill counters join the kill's own transaction, after the AFK child (MonsterHuntService).</summary>
+    internal Action<GameSession, MonsterUnit, RewardSettlement>? StageHuntKill { get; set; }
 
     public RewardService(CombatService combat, CharacterService character, TeamService teams, GameData data, ILogger<RewardService> log)
     {
@@ -94,7 +98,10 @@ public sealed class RewardService
                 outcomes.Add(monster, outcome);
             }
             character.StageKillTaskObligations?.Invoke(player, monster, settlement);
+            // A retry re-stages: the later stage is undone first, so the AFK reset never restores a stale wrapper.
+            settlement.ResetHuntStage?.Invoke();
             StageAfkKill?.Invoke(player, monster, settlement, outcome.Items, outcome.BaseExp, outcome.JobExp);
+            StageHuntKill?.Invoke(player, monster, settlement);
             await character.ExchangeLockedAsync(player, [], outcome.Items, popup: false, sync: outcome.Items.Count > 0,
                 baseExp: outcome.BaseExp, jobExp: outcome.JobExp, rewardSettlement: settlement,
                 persist: settlement.Enlist, committed: settlement.Applied);
@@ -151,6 +158,7 @@ public sealed class RewardService
             }
         }
 
+        if (ExtraKillDrops != null) drops.AddRange(ExtraKillDrops(player, monster));
         long baseExp = drops.Where(d => d.Entry == BaseExpItem).Sum(d => (long)d.Count);
         var items = drops.Where(d => d.Entry is not (BaseExpItem or JobExpItem) && data.Row("ItemConfig", d.Entry) != null).ToList();
         if (baseExp > 0)

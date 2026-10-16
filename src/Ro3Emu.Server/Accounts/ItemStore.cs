@@ -78,20 +78,40 @@ public sealed class ItemStore
         cmd.Parameters.AddWithValue("$r", roleId);
         using var r = cmd.ExecuteReader();
         var items = new List<InvItem>();
+        while (r.Read()) items.Add(Row(r));
+        return items;
+    }
+
+    /// <summary>
+    /// Instances with per-instance itemInfos (equipment, Soul Echoes, cards) of every live role, for leaderboards that
+    /// rank offline roles too. Plain stackables (attrs NULL) are skipped.
+    /// </summary>
+    internal static Dictionary<long, List<InvItem>> ReadAttributedItems(SqliteConnection db, SqliteTransaction tx)
+    {
+        using var cmd = db.CreateCommand();
+        cmd.Transaction = tx;
+        cmd.CommandText = "SELECT i.guid, i.entry, i.stack, i.pack, i.sort, i.grid, i.attrs, i.is_locked, i.enchantments, i.str_attrs, i.bind_type, i.bind_expire, i.role_id "
+            + "FROM item i JOIN role r ON r.id = i.role_id WHERE r.deleted_time = 0 AND i.attrs IS NOT NULL ORDER BY i.guid";
+        using var r = cmd.ExecuteReader();
+        var items = new Dictionary<long, List<InvItem>>();
         while (r.Read())
         {
-            items.Add(new InvItem
-            {
-                Guid = r.GetInt64(0), Entry = r.GetInt32(1), Stack = r.GetInt32(2), Pack = r.GetInt32(3), Sort = r.GetInt64(4), Grid = r.GetInt32(5),
-                Attrs = r.IsDBNull(6) ? null : System.Text.Json.JsonSerializer.Deserialize<Dictionary<int, long>>(r.GetString(6)),
-                IsLocked = r.GetBoolean(7),
-                Enchantments = r.IsDBNull(8) ? new() : System.Text.Json.JsonSerializer.Deserialize<Dictionary<int, ItemEnchantment>>(r.GetString(8)) ?? new(),
-                StringAttrs = r.IsDBNull(9) ? null : System.Text.Json.JsonSerializer.Deserialize<Dictionary<int, string>>(r.GetString(9)),
-                BindType = r.GetInt32(10), BindExpire = r.GetInt64(11),
-            });
+            long role = r.GetInt64(12);
+            if (!items.TryGetValue(role, out var list)) items[role] = list = new();
+            list.Add(Row(r));
         }
         return items;
     }
+
+    private static InvItem Row(SqliteDataReader r) => new()
+    {
+        Guid = r.GetInt64(0), Entry = r.GetInt32(1), Stack = r.GetInt32(2), Pack = r.GetInt32(3), Sort = r.GetInt64(4), Grid = r.GetInt32(5),
+        Attrs = r.IsDBNull(6) ? null : System.Text.Json.JsonSerializer.Deserialize<Dictionary<int, long>>(r.GetString(6)),
+        IsLocked = r.GetBoolean(7),
+        Enchantments = r.IsDBNull(8) ? new() : System.Text.Json.JsonSerializer.Deserialize<Dictionary<int, ItemEnchantment>>(r.GetString(8)) ?? new(),
+        StringAttrs = r.IsDBNull(9) ? null : System.Text.Json.JsonSerializer.Deserialize<Dictionary<int, string>>(r.GetString(9)),
+        BindType = r.GetInt32(10), BindExpire = r.GetInt64(11),
+    };
 
     /// <summary>Stores a new instance and assigns its guid.</summary>
     public void Insert(long roleId, InvItem item, RoleItemPlanBuilder? transaction = null)

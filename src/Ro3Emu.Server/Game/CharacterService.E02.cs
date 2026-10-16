@@ -40,7 +40,7 @@ public sealed partial class CharacterService
         RoleProgress before, RoleProgress after, IReadOnlyList<(int Entry, long Count)> costs,
         long baseExp, long jobExp, ItemAutoDecomposeTipsNtf conversion)
     {
-        if (source.CommandKind is not ("cd13e/quest-award" or "cd13e/achievement-award" or "cd13e/advguild-award" or "cd13e/daily-stage" or
+        if (source.CommandKind is not ("cd13e/quest-award" or "cd13e/achievement-award" or "cd13e/advguild-award" or "cd13e/monsterhunt-award" or "cd13e/guild-award" or "cd13e/daily-stage" or
             "cd13e/journey-victory" or "cd13e/grant" or "cd13e/gm-grant"))
             throw new ArgumentException("Unsupported owned award source.", nameof(source));
         EconomyAsset Asset(int entry) => data.Row("ItemConfig", entry) is { } row

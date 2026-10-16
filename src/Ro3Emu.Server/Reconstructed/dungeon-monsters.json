@@ -686,7 +686,7 @@
     "1054001": "Ant Hell scene without spawn points.",
     "3120402": "Louie's game (find Kitty-Katie), retrieving an instrument; a minigame, not a fight. Rebuilt as a scripted scene: scripted-scenes.json.",
     "3120703": "Louie's game, as 3120402.",
-    "3120802": "Moonlight Flower's hide-and-seek; being discovered is the failure, not a fight.",
+    "3120802": "Moonlight Flower's hide-and-seek; being discovered is the failure, not a fight. Rebuilt as a scripted scene: scripted-scenes.json.",
     "4400001": "Ring Test; a test map without stages.",
     "5000101": "MVP role-playing party for up to 2000 players; an event, not a story dungeon."
   }

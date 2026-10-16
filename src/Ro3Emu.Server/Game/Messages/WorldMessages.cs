@@ -5,7 +5,7 @@ using Romsg;
 namespace Ro3Emu.Server.Game;
 
 /// <summary>The world around the role: scenes, combat targets, MVPs, world interaction, revival and the territory war.</summary>
-public sealed class WorldMessages(Maps.World world, CombatService combat, SceneService scene, MvpService mvps, TowerService tower, DungeonService dungeons, WorldCoreService worldCore, WorldCommonService common, WorldInteractionService interaction, TimedBattleService timedBattles, FestivalService festival, GuildHomeService guildHome, TrainingService training, TerritoryWarsService territory, TerritoryEscortService escort) : Messaging.IMessageModule
+public sealed class WorldMessages(Maps.World world, CombatService combat, SceneService scene, MvpService mvps, TowerService tower, DungeonService dungeons, WorldCoreService worldCore, WorldCommonService common, WorldInteractionService interaction, TimedBattleService timedBattles, FestivalService festival, GuildHomeService guildHome, DraculaWeddingService dracula, TrainingService training, TerritoryWarsService territory, TerritoryEscortService escort, GuildLeagueService league) : Messaging.IMessageModule
 {
     private const uint ChangeViewCfg = 30007, SyncMiniMapStatus = 31043, SceneGetLineInfo = 70009;
 
@@ -28,6 +28,7 @@ public sealed class WorldMessages(Maps.World world, CombatService combat, SceneS
         routes.Intercept("territory", TerritoryWarsService.IsOwnerRequest, territory.HandleAsync);
         routes.Intercept("escort", TerritoryEscortService.IsOwnerRequest, escort.HandleAsync);
         routes.Intercept("territory/siege", DungeonStatistics, territory.SiegeSharedAsync);
+        routes.Intercept("guildLeague", DungeonStatistics, league.StatisticsAsync);
         routes.Intercept("territory/battle", DungeonStatistics, territory.SharedAsync);
         routes.Intercept("escort/actors", id => id is 32287 || NpcInteraction(id), escort.HandleSharedAsync); // guild goods, cargo NPCs
         routes.Intercept("territory/world", NpcInteraction, territory.WorldSharedAsync);
@@ -127,13 +128,15 @@ public sealed class WorldMessages(Maps.World world, CombatService combat, SceneS
         routes.Map(DungeonService.Enter, "territory", async (session, msgId, body) =>
         {
             var dungeonRequest = EnterDungeonReq.Parser.ParseFrom(body.Span);
-            if (await territory.EnterAsync(session, dungeonRequest) || await territory.SiegeEnterAsync(session, dungeonRequest)) return;
-            if (!await training.TryEnterAsync(session, dungeonRequest) && !await festival.TryEnterAsync(session, dungeonRequest) && !await timedBattles.TryEnterOnePieceAsync(session, dungeonRequest) && !await guildHome.TryEnterViaDungeonAsync(session, dungeonRequest))
+            if (await territory.EnterAsync(session, dungeonRequest) || await territory.SiegeEnterAsync(session, dungeonRequest)
+                || await league.TryEnterAsync(session, dungeonRequest)) return;
+            if (!await training.TryEnterAsync(session, dungeonRequest) && !await festival.TryEnterAsync(session, dungeonRequest) && !await timedBattles.TryEnterOnePieceAsync(session, dungeonRequest) && !await guildHome.TryEnterViaDungeonAsync(session, dungeonRequest)
+                && !await dracula.TryEnterAsync(session, dungeonRequest))
                 await dungeons.EnterAsync(session, dungeonRequest);
         });
         routes.Map(TowerService.LeaveDungeon, "territory", async (session, msgId, body) =>
         {
-            if (await territory.LeaveAsync(session)) return;
+            if (await territory.LeaveAsync(session) || await league.LeaveAsync(session)) return;
             if (session.TowerAttempt != null) await tower.LeaveAsync(session);
             else await dungeons.LeaveAsync(session);
         });
@@ -198,7 +201,9 @@ public sealed class WorldMessages(Maps.World world, CombatService combat, SceneS
         });
         routes.Map(CombatService.Relive, "territory", async (session, msgId, body) =>
         {
+            if (await timedBattles.TryRefuseReliveAsync(session)) return; // Survivor Battle revives with 82661
             if (await territory.ReviveAsync(session, EntityReliveReq.Parser.ParseFrom(body.Span), combat)) return;
+            if (await league.ReviveAsync(session)) return;
             if (session.DungeonAttempt != null) await dungeons.ReviveAsync(session, EntityReliveReq.Parser.ParseFrom(body.Span));
             else await combat.ReviveAsync(session, EntityReliveReq.Parser.ParseFrom(body.Span));
         });

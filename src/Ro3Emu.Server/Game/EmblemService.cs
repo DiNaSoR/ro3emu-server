@@ -162,6 +162,17 @@ public sealed partial class EmblemService
     private long PlanPower(IReadOnlyList<InvItem> inventory, Plan plan) => plan.Slots.Values.Distinct()
         .Sum(guid => inventory.FirstOrDefault(i => i.Guid == guid) is { } item ? Score(item) : 0);
 
+    /// <summary>
+    /// <see cref="CurrentPower"/> of a role from its committed "emblems" blob and item rows, for roles that are not
+    /// online (leaderboards). Slots that do not resolve to an owned instance count 0, as in <see cref="PlanPower"/>.
+    /// </summary>
+    internal long StoredPower(byte[]? emblems, IReadOnlyList<InvItem> inventory)
+    {
+        if (emblems == null || JsonSerializer.Deserialize<EmblemState>(emblems) is not { } state
+            || !state.Plans.TryGetValue(state.CurrentPlan, out var plan)) return 0;
+        return PlanPower(inventory, plan);
+    }
+
     private long StageHistory(EmblemState state, IReadOnlyList<InvItem> inventory)
     {
         long current = PlanPower(inventory, state.Plans[state.CurrentPlan]);

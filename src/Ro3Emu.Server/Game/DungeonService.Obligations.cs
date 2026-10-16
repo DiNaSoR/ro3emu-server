@@ -147,6 +147,20 @@ public sealed partial class DungeonService
                     newRecord = old == null || old.FastestMs == 0 || duration < old.FastestMs;
                     next.Records[key] = new Record { Passed = true, FastestMs = newRecord ? duration : old!.FastestMs };
                 }
+                // Valhalla Trials: a layer pays its _iPassReward once, and the clear is recorded with that payment.
+                if (success && a.Plan.Layer is { } layer)
+                {
+                    string key = ValhallaPrefix + a.Plan.LayerId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    if (next.Records.GetValueOrDefault(key)?.Passed != true)
+                    {
+                        goods = (Award(GameData.Int(layer, "_iPassReward"), s)
+                            ?? throw new InvalidOperationException("Missing Valhalla layer award config"))
+                            .Select(g => new DungeonRewardGood(g.Entry, g.Count, g.Bind,
+                                GameData.Int(data.Row("ItemConfig", g.Entry)!.Value, "_iType") == 1
+                                    ? EconomyAssetKind.Currency : EconomyAssetKind.Item)).ToList();
+                        next.Records[key] = new Record { Passed = true, FastestMs = duration };
+                    }
+                }
                 StoreHistory(next, a);
                 if (success && GameData.Int(a.Plan.Config, "_iGamePlayType") == 24
                     && CaptureJourneyVictory(s, a.Plan.SceneEntry,

@@ -59,6 +59,7 @@ public sealed partial class TimedBattleService
     /// <summary>32700 for the OnePieceMapConfig point and NPCConfig 16100001 interact 161000011.</summary>
     public async Task<bool> TryInteractAsync(GameSession session, NpcInteractionReq req)
     {
+        if (await TryChestInteractAsync(session, req)) return true;
         if (req.NpcUid != TreasureNpcUid || req.InteractionId is not (TreasureInteraction or 161000071)) return false;
         using var scope = session.Role != null && loop.Owners is { } owners
             ? await owners.EnterAsync("timed battle onepiece interaction", [ReservationKey.Role(session.Role.Id)]) : null;

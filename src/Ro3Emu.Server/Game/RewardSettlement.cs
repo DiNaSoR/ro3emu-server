@@ -33,6 +33,8 @@ public sealed class RewardSettlement(string sourceKey, string commandKind, bool 
     internal Action? ResetTaskStage { get; set; }
     internal bool AfkRecordStaged { get; set; }
     internal Action? ResetAfkStage { get; set; }
+    internal bool HuntStaged { get; set; }
+    internal Action? ResetHuntStage { get; set; }
     internal Action? Applied { get; set; }
     internal async Task PresentAsync()
     {
