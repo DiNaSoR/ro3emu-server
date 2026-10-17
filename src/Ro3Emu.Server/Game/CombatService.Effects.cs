@@ -97,7 +97,10 @@ public sealed partial class CombatService
                 SourcePosition = s.Position.Clone(), TargetPosition = target.Pos.Clone(), StartTimestampMs = Now,
             }, high);
         }
-        ScheduleRuntime(action.WorldScene, TimeSpan.FromMilliseconds(bullet.FlightMs), async () =>
+        // Loop timers fire on the next 50 ms tick, so a timer set for the full flight lands up to a tick after the
+        // bolt; one tick early keeps the hit inside the bolt's last tick.
+        var land = TimeSpan.FromMilliseconds(Math.Max(0, bullet.FlightMs - GameLoop.TickInterval.TotalMilliseconds));
+        ScheduleRuntime(action.WorldScene, land, async () =>
         {
             if (CurrentCastMap(s, action)) await ApplyEffectsAsync(s, action, center);
         });
