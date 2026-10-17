@@ -39,6 +39,7 @@ public sealed class SkillService
         this.roles = roles;
         this.log = log;
         character.ProgressHandlers.Add(SyncAsync);
+        character.EquipmentChanged.Add(WeaponChangedAsync);
     }
 
     /// <summary>SkillConfig row id of a group at a level (mode 0), or 0.</summary>
@@ -55,11 +56,98 @@ public sealed class SkillService
     public int MaxLevel(int group) => data.Row("SkillConfig", RealId(group, 1)) is { } row
         ? (int)GameData.Int(row, "_iMaxLevel") : 0;
 
-    /// <summary>The career's normal attack: JobConfig._kSkillNormalID (a row id).</summary>
+    /// <summary>The career's normal attack without a weapon rule: JobConfig._kSkillNormalID (a row id).</summary>
     public int NormalAttack(int career) =>
         data.Row("JobConfig", career) is { } job && job.TryGetProperty("_kSkillNormalID", out var n) && n.ValueKind == JsonValueKind.Array && n.GetArrayLength() > 0
             ? n[0].GetInt32()
             : 1000001;
+
+    /// <summary>
+    /// The role's normal attack now, as the client's Lua_CFG_JobAttackConfig.GetNormalSkillID picks it: JobAttackConfig
+    /// by job and weapon (ItemConfig._iSubType of the main hand * 10 + dual wield), then the job's any-weapon row
+    /// (_kWeaponType empty), then JobConfig._kSkillNormalID. A Thief with a Dagger attacks with 1005001 "Basic Attack"
+    /// (ATK x 50% + 45), with a Katar 1005101, with two Daggers 1005201, otherwise 1500001 "Normal Attack" (ATK x 50%);
+    /// a Swordman with 1001001, a Knight or Crusader with 1001101. All of a career's rows count as learned, because the
+    /// skill window shows GetNormalSkillID's group in the Novice tree's Normal Attack cell
+    /// (UI_Sys_Skill_AddBitWidgetBaseCtrl). Battle-mount rows are not applied (inferred: unmounted rows only).
+    /// </summary>
+    public int NormalAttack(GameSession session)
+    {
+        int career = session.Progress!.Career;
+        var (subType, dual) = Weapon(session);
+        return JobAttack(career, subType * 10 + (dual ? 1 : 0)) is int id && data.Row("SkillConfig", id) != null
+            ? id : NormalAttack(career);
+    }
+
+    private const int MainHandGrid = 1, ViceHandGrid = 2;
+
+    /// <summary>
+    /// LC_UnitBase weapon state: the main hand's ItemConfig._iSubType (the off hand's when the main hand is empty;
+    /// 0 bare-handed) and dual wield (both hands hold the same subtype). Subtype 1 is a Dagger, 12 a Katar.
+    /// </summary>
+    internal (int SubType, bool Dual) Weapon(GameSession session)
+    {
+        int main = session.Items.FirstOrDefault(i => i.Grid == MainHandGrid)?.Entry ?? 0;
+        int vice = session.Items.FirstOrDefault(i => i.Grid == ViceHandGrid)?.Entry ?? 0;
+        int mainSub = SubType(main), viceSub = SubType(vice);
+        return (main > 0 ? mainSub : viceSub, main > 0 && vice > 0 && mainSub == viceSub);
+    }
+
+    private int SubType(int entry) =>
+        entry > 0 && data.Row("ItemConfig", entry) is { } row ? (int)GameData.Int(row, "_iSubType") : 0;
+
+    private Dictionary<int, Dictionary<int, int>>? _jobAttacks;
+
+    /// <summary>JobAttackConfig keyed as Lua_CFG_JobAttackConfig.ctor: job -> weapon key -> row (unmounted rows only).</summary>
+    private Dictionary<int, Dictionary<int, int>> JobAttacks => _jobAttacks ??= BuildJobAttacks();
+
+    private Dictionary<int, Dictionary<int, int>> BuildJobAttacks()
+    {
+        var map = new Dictionary<int, Dictionary<int, int>>();
+        foreach (var row in data.Table("JobAttackConfig").Values)
+        {
+            if (GameData.Int(row, "_iMountID") != 0) continue;
+            int[] weapon = row.TryGetProperty("_kWeaponType", out var w) && w.ValueKind == JsonValueKind.Array
+                ? w.EnumerateArray().Select(v => (int)(GameData.Number(v) ?? 0)).ToArray() : [];
+            int key = weapon.Length == 0 ? -1 : weapon[0] * 10 + (weapon.Length > 1 ? weapon[1] : 0);
+            int job = (int)GameData.Int(row, "_iJobID");
+            if (!map.TryGetValue(job, out var byWeapon)) map[job] = byWeapon = new();
+            byWeapon[key] = (int)GameData.Int(row, "_iSkillID");
+        }
+        return map;
+    }
+
+    /// <summary>Lua_CFG_JobAttackConfig._getData: the weapon's row, else the job's any-weapon row.</summary>
+    private int? JobAttack(int career, int weaponKey) =>
+        JobAttacks.TryGetValue(career, out var byWeapon)
+            && (byWeapon.TryGetValue(weaponKey, out int id) || byWeapon.TryGetValue(-1, out id)) ? id : null;
+
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<int, HashSet<int>> _normalGroups = new();
+
+    /// <summary>Every normal attack group a career can hold (any weapon, and JobConfig's): all count as learned.</summary>
+    internal HashSet<int> NormalGroups(int career) => _normalGroups.GetOrAdd(career, c =>
+        JobAttacks.GetValueOrDefault(c)?.Values.Append(NormalAttack(c)).Distinct()
+            .Select(id => data.Row("SkillConfig", id) is { } row ? (int)GameData.Int(row, "_iSkillID") : 0)
+            .Where(g => g > 0).ToHashSet()
+        ?? (data.Row("SkillConfig", NormalAttack(c)) is { } only ? [(int)GameData.Int(only, "_iSkillID")] : []));
+
+    private int GroupOf(int rowId) => data.Row("SkillConfig", rowId) is { } row ? (int)GameData.Int(row, "_iSkillID") : 0;
+
+    /// <summary>
+    /// A bar slot's group as cast. Past Novice the skill window shows the Novice tree's Normal Attack cell as the
+    /// current normal attack (UI_Sys_Skill_AddBitWidgetBaseCtrl replaces the Novice attack's group with
+    /// GetNormalSkillID's), so a bar slot left holding that or another normal attack casts the current one.
+    /// </summary>
+    private int WheelGroup(RoleProgress p, int group, int atkGroup) =>
+        p.Career != 1000 && atkGroup > 0 && (NormalGroups(1000).Contains(group) || NormalGroups(p.Career).Contains(group))
+            ? atkGroup : group;
+
+    /// <summary>A weapon change can change the normal attack: resend 5025 (atkSkillId, the learned attack group).</summary>
+    private async Task WeaponChangedAsync(GameSession session)
+    {
+        if (session.SkillPlans is null || session.Progress is null) return;
+        await CharacterService.SyncAsync(session, SkillDataSync, Build(session));
+    }
 
     internal int Rank(int career) => (int)(data.Row("JobConfig", career) is { } job ? Math.Max(1, GameData.Int(job, "_iJobRank")) : 1);
 
@@ -137,8 +225,7 @@ public sealed class SkillService
     public int Level(RoleProgress p, int group)
     {
         int initial = InTree(p.Career, group) ? Initial(p, group) : 0;
-        if (data.Row("SkillConfig", NormalAttack(p.Career)) is { } atk && GameData.Int(atk, "_iSkillID") == group)
-            initial = Math.Max(1, initial);
+        if (NormalGroups(p.Career).Contains(group)) initial = Math.Max(1, initial);
         int saved = p.Skills.GetValueOrDefault(group);
         foreach (var (old, replacement) in Replacements(p.Career))
             if (replacement == group) saved = Math.Max(saved, p.Skills.GetValueOrDefault(old));
@@ -148,8 +235,8 @@ public sealed class SkillService
     private DBSkillData BuildFresh(GameSession session)
     {
         var p = session.Progress!;
-        int atk = NormalAttack(p.Career);
-        int atkGroup = data.Row("SkillConfig", atk) is { } a ? (int)GameData.Int(a, "_iSkillID") : 0;
+        int atk = NormalAttack(session);
+        int atkGroup = GroupOf(atk);
         var tree = Tree(p.Career);
         var skillData = new DBSkillData { MaxPlanCount = PlanCount, CurrentPlanIndex = 0, CurrentAtkSkillId = atk };
         if (atkGroup > 0) skillData.SkillList.Add(atkGroup);
@@ -179,8 +266,9 @@ public sealed class SkillService
         }
 
         var wheel = new SkillWheel { AtkSkillId = atk };
-        foreach (var (slot, group) in Bar(p))
-            if (RealId(group, Level(p, group)) is var id and > 0) wheel.WhellSkills[slot] = new SkillWheelSlot { SkillConfigId = id, Enable = true };
+        foreach (var (slot, saved) in Bar(p))
+            if (WheelGroup(p, saved, atkGroup) is var group && RealId(group, Level(p, group)) is var id and > 0)
+                wheel.WhellSkills[slot] = new SkillWheelSlot { SkillConfigId = id, Enable = true };
         skillData.SkillWheel = wheel;
         skillData.OriginSkillWheel = wheel.Clone();
         return skillData;
@@ -394,9 +482,11 @@ public sealed class SkillService
         if (selected.ManualLoadSkill.Any(skill => skill.SkillId > 0))
         {
             state.SkillWheel.WhellSkills.Clear();
+            int atkGroup = GroupOf(generated.CurrentAtkSkillId);
             for (int slot = 1; slot <= Math.Min(BarSlots, selected.ManualLoadSkill.Count); slot++)
                 if (selected.ManualLoadSkill[slot - 1] is { SkillId: > 0 } skill
-                    && RealId(skill.SkillId, skill.SkillLevel) is var id and > 0)
+                    && WheelGroup(session.Progress!, skill.SkillId, atkGroup) is var group
+                    && RealId(group, group == skill.SkillId ? skill.SkillLevel : Level(session.Progress!, group)) is var id and > 0)
                     state.SkillWheel.WhellSkills[slot] = new SkillWheelSlot { SkillConfigId = id, Enable = true };
         }
         foreach (var (_, skill) in selected.SkillQueue.OrderBy(kv => kv.Key))
@@ -434,8 +524,7 @@ public sealed class SkillService
     private bool IsActive(int group) =>
         RealId(group, 1) is var id and > 0 && data.Row("SkillConfig", id) is { } row && GameData.Int(row, "_iBasicType") == 1;
 
-    private bool IsNormalGroup(RoleProgress p, int group) =>
-        data.Row("SkillConfig", NormalAttack(p.Career)) is { } row && GameData.Int(row, "_iSkillID") == group;
+    private bool IsNormalGroup(RoleProgress p, int group) => NormalGroups(p.Career).Contains(group);
 
     public async Task SyncAsync(GameSession session)
     {
@@ -452,9 +541,7 @@ public sealed class SkillService
         var tree = Tree(progress.Career).ToDictionary(t => t.Group, t => t.Career);
         // BuildFresh stores normal attacks in plans, but Level grants the current attack implicitly.
         // Ignore those from the current career chain when an older plan is selected after a job change.
-        var normalAttacks = CareerChain(progress.Career)
-            .Select(c => data.Row("SkillConfig", NormalAttack(c)) is { } row ? (int)GameData.Int(row, "_iSkillID") : 0)
-            .Where(group => group > 0).ToHashSet();
+        var normalAttacks = CareerChain(progress.Career).SelectMany(NormalGroups).ToHashSet();
         progress.Skills.Clear();
         foreach (var (group, assignment) in source.SkillAssigns)
         {

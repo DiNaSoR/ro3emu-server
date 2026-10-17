@@ -511,6 +511,33 @@ public sealed class CharacterTests : IAsyncLifetime
     }
 
     [ClientDataFact]
+    public async Task ThiefNormalAttackFollowsTheWeaponAsJobAttackConfigPicksIt()
+    {
+        await using var alice = await InWorld("Alice");
+        var bag = await Next(alice, CharacterService.ItemsSync, DBItemsInfoIncrement.Parser);
+        long dagger = bag.PackInfo[2].All.Items.Values.Single(i => i.ItemEntry == Dagger).ItemGuid;
+        await Gm("alice", "!job 5100");
+        var bare = await Next(alice, SkillService.SkillDataSync, DBSkillDataIncrement.Parser, m => !m.SyncAllMark && m.HasCurrentAtkSkillId);
+        Assert.Equal(1500001, bare.CurrentAtkSkillId); // JobAttackConfig 5100 any weapon: "Normal Attack", ATK x 50%
+
+        await alice.SendGameAsync(CharacterService.EquipItemOpr, new EquipItemOprReq { Opr = 0, Pos = (EquipGridType)1, ItemGUID = dagger });
+        var armed = await Next(alice, SkillService.SkillDataSync, DBSkillDataIncrement.Parser, m => !m.SyncAllMark && m.HasCurrentAtkSkillId);
+        Assert.Equal(1005001, armed.CurrentAtkSkillId); // Dagger (subtype 1, key 10): "Basic Attack", ATK x 50% + 45
+
+        // The skill window shows this attack in the Novice tree's Normal Attack cell: its group is learned (1/1).
+        await alice.SendGameAsync(1023, new PlayerAssetReq { AssetType = { 5 } });
+        var full = await Next(alice, SkillService.SkillDataSync, DBSkillDataIncrement.Parser, m => m.SyncAllMark && m.CurrentAtkSkillId == 1005001);
+        Assert.Equal(1005001, full.SkillWheel.All.AtkSkillId);
+        var plan = full.SkillAssignPlans.All.Value[full.CurrentPlanIndex];
+        Assert.Equal(1, plan.SkillAssigns[10050].SkillLevel);
+        Assert.Contains(10050, full.SkillList.All.Value);
+
+        await alice.SendGameAsync(CharacterService.EquipItemOpr, new EquipItemOprReq { Opr = (EquipItemOprType)1, Pos = (EquipGridType)1, ItemGUID = dagger });
+        var unarmed = await Next(alice, SkillService.SkillDataSync, DBSkillDataIncrement.Parser, m => !m.SyncAllMark && m.HasCurrentAtkSkillId);
+        Assert.Equal(1500001, unarmed.CurrentAtkSkillId);
+    }
+
+    [ClientDataFact]
     public async Task SkillDataCarriesTheNormalAttackAndBashCanBeLearned()
     {
         await using var alice = await InWorld("Alice");
@@ -535,7 +562,7 @@ public sealed class CharacterTests : IAsyncLifetime
 
         await Gm("alice", "!job 1100");
         var swordman = await Next(alice, SkillService.SkillDataSync, DBSkillDataIncrement.Parser, m => !m.SyncAllMark && m.HasCurrentAtkSkillId);
-        Assert.Equal(1100001, swordman.CurrentAtkSkillId); // JobConfig._kSkillNormalID
+        Assert.Equal(1001001, swordman.CurrentAtkSkillId); // JobAttackConfig 1100 any weapon (JobConfig says 1100001)
 
         // Job 15 of rank 2 = 15 points (JobLvConfig 201..215); learn Bash level 3.
         var req = new SkillGrowthSkillPlanUpdateReq { Plan = 0 };
