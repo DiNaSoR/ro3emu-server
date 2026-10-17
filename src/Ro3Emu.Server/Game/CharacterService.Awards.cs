@@ -224,6 +224,9 @@ public sealed partial class CharacterService
         // Other ApplyAward callers have no quest delivery boundary and retain their standalone behavior.
         var decomposed = deliveredTaskState == null && ownedAward?.CommandKind != "cd13e/grant" ? new ItemAutoDecomposeTipsNtf()
             : StageAutoDecomposeAward(session, items, staged, received, beforeGrants, gained);
+        // Base EXP brings 20% Job EXP (JobExpFromBase), quest EXP included. An award that lists its own Job EXP keeps
+        // exactly that amount (inferred: only the 1001040-1001044 packs list both).
+        if (jobExp == 0) jobExp = JobExpFromBase(baseExp);
         AddVirtualReward(notification, BaseExpItem, baseExp);
         AddVirtualReward(notification, JobExpItem, jobExp);
         int oldLevel = staged.Level, oldJob = staged.JobLevel;

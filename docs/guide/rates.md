@@ -34,9 +34,11 @@ award chests and every other award keep their configured amounts.
 
 ## Job EXP
 
-The client's drop tables give Base EXP (item 100) only; no DropGroupConfig row drops Job EXP (item 101). How the
-original server derives a kill's Job EXP is unknown, so this server starts it equal to the Base EXP **(inferred)**
-and `JobExp` scales that.
+The client's drop tables give Base EXP (item 100) only; no DropGroupConfig row drops Job EXP (item 101). Job EXP is
+`PublicParamConfig.BaseToJobConversionPercent` (2000, so 20%) of the Base EXP, rounded down, for kills and for quest
+and other award EXP. Beta footage agrees: kills of 5, 9 and 23 Base EXP gave 1, 1 and 4 Job EXP, a 70,000 Base EXP quest
+gave 14,000 Job EXP, and a base level 18 character (236,056 Base EXP earned) was at job level 25 (about 47,200 Job EXP
+earned). An award that lists its own Job EXP keeps that amount. For kills, `JobExp` scales the result.
 
 For scale: a first job needs 287,240 Job EXP from job level 15 to 40 (JobLvConfig rank 2), while base level 10 to 40
 needs 3,853,500 Base EXP (BaseLvConfig). Kill EXP in the tables is small next to that: a level 20 monster gives

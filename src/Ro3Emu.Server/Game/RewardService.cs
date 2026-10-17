@@ -11,7 +11,7 @@ namespace Ro3Emu.Server.Game;
 /// Kill rewards: the monster's drop chains are rolled for the killer
 /// (NPCConfig._iDrop / _iNormalDrop → MultiverseGroupConfig → NPCDropConfig[env 0 reduced / env 1 Bonus Time, inferred]
 /// / additive NpcNormalDropConfig → DropPoolConfig slots → weighted DropGroupConfig rows). Item 100 rows are Base EXP,
-/// scaled by LvExpCorrectionConfig; Job EXP equals Base EXP (inferred). ServerOptions.Rates then scales EXP, roll
+/// scaled by LvExpCorrectionConfig; Job EXP is BaseToJobConversionPercent (20%) of Base EXP. ServerOptions.Rates then scales EXP, roll
 /// chances and currency amounts. Currencies go to the currency map, everything
 /// else to the bag; then one 31322 drop notify makes
 /// the client animate the loot from the corpse.
@@ -155,6 +155,7 @@ public sealed class RewardService
         if (Resolve(GameData.Int(npc, "_iDrop")) is var dropId and > 0 && data.Row("NPCDropConfig", dropId) is { } nd
             && nd.ValueKind == JsonValueKind.Object && nd.TryGetProperty(bonus ? "1" : "0", out var env))
             RollPools(env, player, drops, monster.Template.Level, chanceRate);
+        int dropTableCount = drops.Count;
         if (npc.TryGetProperty("_iNormalDrop", out var normals) && normals.ValueKind == JsonValueKind.Array)
         {
             foreach (var n in normals.EnumerateArray())
@@ -167,6 +168,13 @@ public sealed class RewardService
             }
         }
 
+        // Beta footage (Poring 5, Boa 23, Willow 9 Base EXP) matches the _iNormalDrop amount alone, not the sum with the
+        // _iDrop environment's EXP row. So when the normal drops granted Base EXP, the _iDrop table's EXP is dropped;
+        // its items stay. Above player level 36 the normal EXP rows stop and the _iDrop EXP applies again (inferred).
+        if (drops.Skip(dropTableCount).Any(d => d.Entry == BaseExpItem))
+            for (int i = dropTableCount - 1; i >= 0; i--)
+                if (drops[i].Entry == BaseExpItem) drops.RemoveAt(i);
+
         if (ExtraKillDrops != null) drops.AddRange(ExtraKillDrops(player, monster));
         long baseExp = drops.Where(d => d.Entry == BaseExpItem).Sum(d => (long)d.Count);
         var items = drops.Where(d => d.Entry is not (BaseExpItem or JobExpItem) && data.Row("ItemConfig", d.Entry) != null).ToList();
@@ -176,9 +184,10 @@ public sealed class RewardService
             baseExp = baseExp * Correction((int)Math.Clamp(gap, -200, 200)) / 10000;
             baseExp = Math.Max(1, baseExp * teams.ExpBonus(player) / 10000);
         }
+        // Job EXP is 20% of the kill's Base EXP before the catch-up bonus (CharacterService.JobExpFromBase).
         // BaseExpAddConfig catch-up below the server level raises Base EXP only (CharacterService.LevelRules);
         // the server rates then scale both.
-        return ApplyRates(items, character.WithPursueBonus(player.Progress!.Level, baseExp), baseExp);
+        return ApplyRates(items, character.WithPursueBonus(player.Progress!.Level, baseExp), character.JobExpFromBase(baseExp));
     }
 
     /// <summary>ServerOptions.Rates on a resolved kill: currency amounts, then Base and Job EXP (Job defaults to Base).</summary>
