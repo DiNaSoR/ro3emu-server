@@ -185,7 +185,7 @@ public sealed partial class CombatService
             && data.Row("SkillConfig", effect.SkillId) != null
             ? ToPlayerAndViewersAsync(source, highLevel ? SkillEffectHigh : SkillEffect, effect) : Task.CompletedTask;
 
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<long, (int Effect, int FlightMs)> _serverBullets = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<long, (int Effect, int FlightMs, float Speed)> _serverBullets = new();
 
     /// <summary>
     /// The fixed-time bullet a skill's server script launches, e.g. Fire Bolt template 12004 -> effect 1200411.
@@ -194,14 +194,14 @@ public sealed partial class CombatService
     /// them from 31120/31108. Reading "the one unreferenced bullet in the block" as the script's bullet is (inferred):
     /// a block with none or several candidates (12337 has four) gets no bullet.
     /// </summary>
-    internal (int Effect, int FlightMs) ServerBullet(long scriptShow) => scriptShow <= 0 ? default
+    internal (int Effect, int FlightMs, float Speed) ServerBullet(long scriptShow) => scriptShow <= 0 ? default
         : _serverBullets.GetOrAdd(scriptShow, show =>
         {
             if (data.SkillTemplate(show) is not { } template || template.TryGetProperty("m_kClientPoints", out _)) return default;
             var referenced = new HashSet<long>();
             CollectNumbers(template, referenced);
             var effects = data.SkillTemplateTable("Lua_Config_EffectData");
-            (int Effect, int FlightMs) found = default;
+            (int Effect, int FlightMs, float Speed) found = default;
             int count = 0;
             for (long id = show * 100; id < show * 100 + 100; id++)
             {
@@ -209,9 +209,11 @@ public sealed partial class CombatService
                     || !effect.TryGetProperty("m_kDamage", out var damage) || damage.ValueKind != JsonValueKind.Object
                     || GameData.Int(damage, "m_kDamageType") != 2
                     || !damage.TryGetProperty("m_kBulletData", out var bullet) || bullet.ValueKind != JsonValueKind.Object) continue;
-                // LC_Bullet_Helper: control type 0 (Time) flies m_fBulletLifeTime ms; type 1 (Speed) depends on distance.
-                int flight = GameData.Int(bullet, "m_iBulletControlType") == 0 ? (int)GameData.Int(bullet, "m_fBulletLifeTime") : 0;
-                found = ((int)id, Math.Max(1, flight));
+                // LC_Bullet_Helper: control type 0 (Time) flies m_fBulletLifeTime ms; otherwise distance / m_fBulletSpeed.
+                bool timed = GameData.Int(bullet, "m_iBulletControlType") == 0;
+                int flight = timed ? (int)GameData.Int(bullet, "m_fBulletLifeTime") : 0;
+                float speed = timed || !bullet.TryGetProperty("m_fBulletSpeed", out var v) || !v.TryGetDouble(out double sp) ? 0 : (float)sp;
+                found = ((int)id, Math.Max(1, flight), speed);
                 count++;
             }
             return count == 1 ? found : default;

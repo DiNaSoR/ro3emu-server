@@ -233,18 +233,16 @@ public sealed partial class MapTests : IAsyncLifetime
     {
         await using var alice = await InWorld("Alice");
         var units = await Next(alice, GameAoiSink.SyncAoiView, AoIViewChangeData.Parser, v => v.Bases.Any(b => b.EntityType == 1));
-        var monster = units.Bases.Where(b => b.EntityType == 1).OrderBy(b => Dist(b, alice.Self!)).First();
+        var monsters = units.Bases.Where(b => b.EntityType == 1).OrderBy(b => Dist(b, alice.Self!)).ToList();
         await Gm("alice", "!job 2100");
         var learn = new SkillGrowthSkillPlanUpdateReq();
         learn.LevelUpList[12004] = new SkillData { SkillId = 12004, SkillLevel = 4 };
         await alice.SendGameAsync(SkillService.PlanUpdate, learn);
         Assert.Equal(0, (await Next(alice, SkillService.PlanUpdate, SkillGrowthSkillPlanUpdateResp.Parser)).Result);
-        await Gm("alice", $"!jump {monster.MovementInfo.Pos.X:0.0} {monster.MovementInfo.Pos.Z + 3:0.0}".Replace(',', '.'));
 
         // Fire Bolt level 4 (SkillConfig 1200404, _kShowDmg [4]). Its template 12004 shows only chant/cast effects;
         // the bolt is effect 1200411, which only a 31120 from the server makes the client fly.
-        await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1200404, TargetId = (long)monster.Uuid });
-        Assert.Equal(0, (await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
+        var monster = await CastNextToAMonster(alice, monsters, 1200404);
         long self = (long)alice.Self!.Uuid;
         var bolt = await Next(alice, CombatService.SkillBullet, SkillFixTimeBulletNotify.Parser, b => b.SourceId == self);
         Assert.Equal(1200411, bolt.EffectId);
@@ -259,13 +257,52 @@ public sealed partial class MapTests : IAsyncLifetime
         Assert.Equal(1200404, hit.ShowPoint); // the fire hit spark, played once per split
         Assert.Equal(4, hit.Split);
 
-        // Walking away while the bolt flies does not cancel it: the hit still lands.
+        // Walking away while the bolt flies does not cancel it: the hit still lands. The first cast may have killed
+        // its monster, so the next live one takes the second bolt.
         await Task.Delay(600); // _iCD 500
-        await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1200404, TargetId = (long)monster.Uuid });
-        Assert.Equal(0, (await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
+        monster = await CastNextToAMonster(alice, monsters, 1200404);
         await Next(alice, CombatService.SkillBullet, SkillFixTimeBulletNotify.Parser, b => b.SourceId == self && b.TargetId == (long)monster.Uuid);
         await alice.WalkAsync(monster.MovementInfo.Pos.X + 2, alice.Self!.MovementInfo.Pos.Y, monster.MovementInfo.Pos.Z + 3, stop: true);
         await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser, h => h.SrcID == self && h.SessionId != hit.SessionId);
+    }
+
+    /// <summary>Jumps 3 m from each nearby monster in turn and casts at it until one accepts (some wander off or can't be hit).</summary>
+    private async Task<EntityBase> CastNextToAMonster(BotClient alice, List<EntityBase> monsters, int skillId)
+    {
+        foreach (var monster in monsters.Take(5))
+        {
+            await Gm("alice", $"!jump {monster.MovementInfo.Pos.X:0.0} {monster.MovementInfo.Pos.Z + 3:0.0}".Replace(',', '.'));
+            await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = skillId, TargetId = (long)monster.Uuid });
+            if ((await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser)).Result == 0) return monster;
+        }
+        throw new Xunit.Sdk.XunitException("no nearby monster accepted the cast");
+    }
+
+    [ClientDataFact]
+    public async Task SoulStrikeBoltsFlyForTheirDistanceOverSpeed()
+    {
+        await using var alice = await InWorld("Alice");
+        var units = await Next(alice, GameAoiSink.SyncAoiView, AoIViewChangeData.Parser, v => v.Bases.Any(b => b.EntityType == 1));
+        var monsters = units.Bases.Where(b => b.EntityType == 1).OrderBy(b => Dist(b, alice.Self!)).ToList();
+        await Gm("alice", "!job 2100");
+        var learn = new SkillGrowthSkillPlanUpdateReq();
+        learn.LevelUpList[12016] = new SkillData { SkillId = 12016, SkillLevel = 5 }; // Soul Strike needs 12016 at 5
+        learn.LevelUpList[12008] = new SkillData { SkillId = 12008, SkillLevel = 1 };
+        await alice.SendGameAsync(SkillService.PlanUpdate, learn);
+        Assert.Equal(0, (await Next(alice, SkillService.PlanUpdate, SkillGrowthSkillPlanUpdateResp.Parser)).Result);
+
+        // Soul Strike's bolt 1200803 is speed-controlled (m_fBulletSpeed 10): LC_Bullet_Helper flies it distance / speed,
+        // so 3 m takes 300 ms, and the hit waits for it.
+        await CastNextToAMonster(alice, monsters, 1200801);
+        long self = (long)alice.Self!.Uuid;
+        var bolt = await Next(alice, CombatService.SkillBullet, SkillFixTimeBulletNotify.Parser, b => b.SourceId == self);
+        Assert.Equal(1200803, bolt.EffectId);
+        Assert.Equal(5, bolt.Split);
+        float dx = bolt.TargetPosition.X - bolt.SourcePosition.X, dz = bolt.TargetPosition.Z - bolt.SourcePosition.Z;
+        Assert.InRange(bolt.FixedTime, MathF.Sqrt(dx * dx + dz * dz) * 100 - 2, MathF.Sqrt(dx * dx + dz * dz) * 100 + 2); // ms = m / 10 per s
+        var flight = System.Diagnostics.Stopwatch.StartNew();
+        await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser, h => h.SrcID == self);
+        Assert.True(flight.ElapsedMilliseconds >= bolt.FixedTime - 100, $"the hit came {flight.ElapsedMilliseconds} ms after launch, the bolt flies {bolt.FixedTime} ms");
     }
 
     [ClientDataFact]

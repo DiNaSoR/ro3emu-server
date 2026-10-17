@@ -79,7 +79,7 @@ public sealed partial class CombatService
     /// Moving or casting again after launch no longer cancels it; caster death, a scene change or a new
     /// attachment still does (ApplyEffectsAsync's own checks).
     /// </summary>
-    private async Task LaunchBulletAsync(GameSession s, ActiveSkillCast action, (int Effect, int FlightMs) bullet)
+    private async Task LaunchBulletAsync(GameSession s, ActiveSkillCast action, (int Effect, int FlightMs, float Speed) bullet)
     {
         var row = action.Row;
         var center = action.Request.TargetPos ?? action.Origin;
@@ -87,19 +87,23 @@ public sealed partial class CombatService
         action.Launched = true;
         int split = ShowHits(row);
         bool high = GameData.Int(row, "_iSkillEffectLevel") > 0;
+        // Speed bullets (Soul Strike 1200803, 10/s) fly distance / speed like LC_Bullet_Helper; the hit follows the first target's flight.
+        int Flight(MonsterUnit target) => bullet.Speed > 0
+            ? Math.Max(1, (int)Math.Round(Distance(s.Position, target.Pos) / bullet.Speed * 1000)) : bullet.FlightMs;
+        int landMs = targets.Count > 0 ? Flight(targets[0]) : bullet.FlightMs;
         foreach (var target in targets)
         {
             if (!CurrentCastMap(s, action)) return;
             await SendSkillBulletAsync(s, new SkillFixTimeBulletNotify
             {
                 SourceId = s.Role!.Id, MasterId = s.Role.Id, TargetId = target.Uid, EffectId = bullet.Effect,
-                FixedTime = bullet.FlightMs, Split = split, SkillConfigId = action.Request.SkillId,
+                FixedTime = Flight(target), Split = split, SkillConfigId = action.Request.SkillId,
                 SourcePosition = s.Position.Clone(), TargetPosition = target.Pos.Clone(), StartTimestampMs = Now,
             }, high);
         }
         // Loop timers fire on the next 50 ms tick, so a timer set for the full flight lands up to a tick after the
         // bolt; one tick early keeps the hit inside the bolt's last tick.
-        var land = TimeSpan.FromMilliseconds(Math.Max(0, bullet.FlightMs - GameLoop.TickInterval.TotalMilliseconds));
+        var land = TimeSpan.FromMilliseconds(Math.Max(0, landMs - GameLoop.TickInterval.TotalMilliseconds));
         ScheduleRuntime(action.WorldScene, land, async () =>
         {
             if (CurrentCastMap(s, action)) await ApplyEffectsAsync(s, action, center);
