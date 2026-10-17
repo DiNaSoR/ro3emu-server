@@ -38,6 +38,9 @@ namespace Ro3Emu.ClientHooks
                         foreach (var name in (parts.Length > 1 ? parts[1] : "").Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries))
                             SpritePng(name);
                         break;
+                    case "audio":
+                        AudioDiagnostics.Run(parts.Length > 1 ? parts[1] : "");
+                        break;
                     default:
                         Debug.Log("[Ro3Emu.Diag] unknown command " + line);
                         break;
@@ -224,6 +227,8 @@ namespace Ro3Emu.ClientHooks
             File.WriteAllBytes(file, ImageConversion.EncodeToPNG(copy));
             UnityEngine.Object.Destroy(copy);
         }
+
+        internal static string PathOf(Transform t) => Path(t);
 
         private static string Path(Transform t)
         {
