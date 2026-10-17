@@ -384,6 +384,11 @@ public sealed class RoleStore
     public byte[]? LoadHeroicSpirit(long id) => LoadBlob(id, "heroic_spirit");
     public byte[]? LoadAreaConcur(long id) => LoadBlob(id, "area_concur");
     public void SaveAreaConcur(long id, byte[] value, RoleItemPlanBuilder? transaction = null) => SaveBlob(id, "area_concur", value, transaction);
+    public byte[]? LoadGrowthClass(long id) => LoadBlob(id, "growth_class");
+    public void SaveGrowthClass(long id, byte[] value, RoleItemPlanBuilder? transaction = null) => SaveBlob(id, "growth_class", value, transaction);
+    public byte[]? LoadFirstHeart(long id) => LoadBlob(id, "first_heart");
+    public void SaveFirstHeart(long id, byte[] value, RoleItemPlanBuilder? transaction = null) => SaveBlob(id, "first_heart", value, transaction);
+    public byte[]? LoadPersonal(long id) => LoadBlob(id, "personal");
     public byte[]? LoadMounts(long id) => LoadBlob(id, "mounts");
     public void SaveMounts(long id, byte[] state, RoleItemPlanBuilder? transaction = null) => SaveBlob(id, "mounts", state, transaction);
     public byte[]? LoadWardrobe(long id) => LoadBlob(id, "wardrobe");

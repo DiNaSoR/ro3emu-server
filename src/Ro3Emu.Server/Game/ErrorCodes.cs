@@ -243,6 +243,9 @@ public static class ErrorCodes
     public const int SlotEmpty = 1810;          // "There is no card in this slot"
     public const int SlotSealed = 1811;         // "Card slot has not been unsealed"
     public const int AlreadyUnlocked = 1813;    // "Already unlocked"
+    // Codex and Growth Classroom (ErrorCodeConfig; the request mapping is inferred).
+    public const int CodexUnavailable = 3802;   // "Unable to view the Codex."
+    public const int NoRankReward = 3900;       // "No Rank Reward available to Claim."
 
     // Pets (ErrorCodeConfig 1848..1880, Localization_en 10630000526..555).
     public const int PetFastRoomLevel = 1848;   // "Hatchery level too low for Quick Hatch"

@@ -124,6 +124,14 @@ public sealed partial class TaskService
 
     private bool GuideExists(long group) => group > 0 && data.Row("GuideConfig", group) != null;
 
+    /// <summary>A state target read for another progress owner (FirstHeartService): its current value and R, or null
+    /// when this server has no snapshot owner for it.</summary>
+    internal (long Value, long Required)? SnapshotTarget(GameSession s, long[] t)
+    {
+        if (s.Progress == null || !Supported(t) || PassiveValue(s, t) is not (var value and >= 0)) return null;
+        return (value, Required(s, t));
+    }
+
     /// <summary>
     /// Snapshot objectives read committed owner state, at acceptance/login/change and again before delivery.
     /// Minimum quality/star comparisons, currently-owned collection, positive refinement slots, and totals across

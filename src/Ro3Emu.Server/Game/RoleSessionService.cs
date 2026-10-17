@@ -272,6 +272,7 @@ public sealed class RoleSessionService(RoleStore roles, Data.GameData data, Buff
         session.CurrentSp = null;
         session.Dead = false;
         session.CareerSpecial = null; session.CareerPendants = [];
+        session.Personal = null;
         session.Mounts = null; session.MountState = new(); session.Wardrobe = null; session.Totems = null; session.Genre = null;
         session.TotemSwitchUtc = default;
         session.SceneLoading = true;

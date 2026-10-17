@@ -5,11 +5,13 @@ using Romsg;
 namespace Ro3Emu.Server.Game;
 
 /// <summary>The role itself: stats, skills, equipment, cards, pets, mounts, wardrobe, life jobs, emotes and achievements.</summary>
-public sealed class CharacterMessages(CharacterService character, SkillService skills, CombatService combat, SceneService scene, TaskService tasks, GuideService guides, EmojiService emoji, AchievementService achievements, CardService cards, EquipmentService equipment, AppraisalService appraisal, EnchantService enchants, SeasonPageService seasonPage, SeasonRefineService seasonRefine, SeasonTalentService talents, PetService pets, DungeonService dungeons, LifeJobService life, GatheringService gathering, TimedBattleService timedBattles, GuildCampfireService campfire, MountService mounts, CareerSpecialService careerSpecial, WardrobeService wardrobe, TotemService totems) : Messaging.IMessageModule
+public sealed class CharacterMessages(CharacterService character, SkillService skills, CombatService combat, SceneService scene, TaskService tasks, GuideService guides, EmojiService emoji, AchievementService achievements, CardService cards, EquipmentService equipment, AppraisalService appraisal, EnchantService enchants, SeasonPageService seasonPage, SeasonRefineService seasonRefine, SeasonTalentService talents, PetService pets, DungeonService dungeons, LifeJobService life, GatheringService gathering, TimedBattleService timedBattles, GuildCampfireService campfire, MountService mounts, CareerSpecialService careerSpecial, WardrobeService wardrobe, TotemService totems, GrowthClassService growthClass) : Messaging.IMessageModule
 {
     public void Map(Messaging.MessageRoutes routes)
     {
         routes.AdmitEconomic(id => id is GatheringService.MiniGame);
+        // The Codex monster unlock pays its Collection Points, a Growth Classroom rank its reward.
+        routes.AdmitEconomic(id => id is CardService.LibraryMonsterUnlock or GrowthClassService.GetRankReward);
         // Messages that change only the sender's role.
         routes.AdmitRole(id => id is CharacterService.PlayerTransformJob or CharacterService.ChangeStatPlan
             or CharacterService.RenameStatPlan
@@ -429,6 +431,14 @@ public sealed class CharacterMessages(CharacterService character, SkillService s
         routes.Map(CardService.LibraryCardUnlock, "cards", async (session, msgId, body) =>
         {
             await cards.UnlockAsync(session, LibraryCardUnlockReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(CardService.LibraryMonsterUnlock, "cards", async (session, msgId, body) =>
+        {
+            await cards.UnlockMonsterAsync(session, LibraryMonsterUnlockReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(GrowthClassService.GetRankReward, "growthClass", async (session, msgId, body) =>
+        {
+            await growthClass.ClaimAsync(session, GrowthClassGetRankRewardReq.Parser.ParseFrom(body.Span));
         });
         routes.Map(CharacterService.AllocateAttrPoints, "character", async (session, msgId, body) =>
         {

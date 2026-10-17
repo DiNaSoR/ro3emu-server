@@ -45,7 +45,9 @@ public sealed class UserDataService(SocialOwnerCache cache, OwnerRegistry owners
                 foreach (var key in uids.Keys)
                 {
                     if (!long.TryParse(key.ToString(), out long uid)) continue;
-                    if (profiles.TryGetValue(uid, out var profile) && profile is not null) results.Add(Entry(profile));
+                    var asked = uids[key] is IDictionary<object, object?> types
+                        ? types.Keys.Select(t => t?.ToString() ?? "").ToHashSet() : [];
+                    if (profiles.TryGetValue(uid, out var profile) && profile is not null) results.Add(Entry(profile, asked));
                     else if (GuildEntry(uid) is { } guild) results.Add(guild);
                 }
                 break;
@@ -53,6 +55,14 @@ public sealed class UserDataService(SocialOwnerCache cache, OwnerRegistry owners
         }
         log.LogDebug("getAttributeBatchByVersion -> {Count} role(s)", results.Count);
         return new Dictionary<string, object?> { ["Ret"] = MicroServiceRouter.Ret(true), ["Results"] = results.ToArray() };
+    }
+
+    /// <summary>A message whose int fields 1..n are all present and 0 (PopularityStarData, PersonalUpvoteCount).</summary>
+    private static byte[] ExplicitZeros(int fields)
+    {
+        var bytes = new byte[fields * 2];
+        for (int field = 1; field <= fields; field++) bytes[(field - 1) * 2] = (byte)(field << 3);
+        return bytes;
     }
 
     /// <summary>
@@ -81,7 +91,7 @@ public sealed class UserDataService(SocialOwnerCache cache, OwnerRegistry owners
     /// Membership comes from the exclusive guild index; a stale personal 5047 blob cannot restore a departed guild.
     /// GuildSnap bytes also reset after leaving (LC_DAL_RolePublic.lua:960-980).
     /// </summary>
-    private Dictionary<string, object?> Entry(Accounts.Persistence.ProfileSnapshot profile)
+    private Dictionary<string, object?> Entry(Accounts.Persistence.ProfileSnapshot profile, IReadOnlySet<string> asked)
     {
         var role = profile.Role;
         var session = sessions.All().FirstOrDefault(s => s.Role?.Id == role.Id);
@@ -99,6 +109,14 @@ public sealed class UserDataService(SocialOwnerCache cache, OwnerRegistry owners
         };
         additional.Appearances.Add(session?.Wardrobe?.CurUseAppearances.ToDictionary(p => p.Key, p => p.Value)
             ?? RoleProto.Appearances(role, profile.Wardrobe));
+        // The profile card's current preset: Base carries its avatar, frame and title (inferred mirror of PersonalInfo).
+        var card = PersonalService.Current(session?.Personal
+            ?? (profile.Personal is { Length: > 0 } stored ? DBPersonalInfo.Parser.ParseFrom(stored) : null));
+        if (card != null)
+        {
+            additional.AvatarId = card.AvatarId; additional.AvatarFrameId = card.AvatarFrameId;
+            additional.PersonalTitleId = card.PersonalTitleId;
+        }
         var fields = new Dictionary<string, object?>
         {
             ["Base"] = additional.ToByteArray(),
@@ -109,6 +127,14 @@ public sealed class UserDataService(SocialOwnerCache cache, OwnerRegistry owners
             ["ClusterId"] = options.Value.ClusterId,
             ["GuildSnap"] = (guild == null ? new GuildSnapInfo() : guilds.Snapshot(guild)).ToByteArray(),
         };
+        // "Personal" (romsg.PersonalInfo bytes) only when asked for (UI_Sys_PersonalPanelModel.BindRoleGuid) and parseable.
+        if (asked.Contains("Personal") && card != null && PersonalService.Parseable(card)) fields["Personal"] = card.ToByteArray();
+        // The profile card asks for PopularityStar with resend-until-present (UI_Sys_Personal_InfoWidgetCtrl.GetPopularity:
+        // BindPersonalDataChangeByUIDAndTypeDoOnce), and every reply bumps the versions here, so without it the card
+        // refreshes and asks again about five times a second. (inferred) No popularity or likes are kept yet: zeros,
+        // written explicitly so the decoded fields are 0, not nil (_refreshPopularity, the like counter).
+        if (asked.Contains("PopularityStar")) fields["PopularityStar"] = ExplicitZeros(5);
+        if (asked.Contains("PersonalUpvoteCount")) fields["PersonalUpvoteCount"] = ExplicitZeros(1);
         long snapshotVersion = Interlocked.Increment(ref version);
         return new()
         {

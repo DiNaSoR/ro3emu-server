@@ -543,7 +543,11 @@ public sealed partial class TaskService
         if (settled && roles.HasTaskFollowup(session.Role!.Id))
             await roles.SaveSettledTasksAsync(session.Role.Id, session.Tasks!.ToByteArray(), JsonSerializer.SerializeToUtf8Bytes(session.TaskRuntime));
         else Save(session);
-        if (!session.DeferTaskSync) await SyncTasksAsync(session);
+        if (!session.DeferTaskSync)
+        {
+            await SyncTasksAsync(session);
+            if (SyncGrowthClass is { } growth) await growth(session); // 5045 reads the delivered growth quests
+        }
         if (session.DailyReady && RefreshDailyTracking is { } refresh) await refresh(session);
         await talents.SyncAsync(session); // 5050 before 5056 when quest 10103160 opens function 1003
         await functions.SyncAsync(session);
@@ -634,7 +638,7 @@ public sealed partial class TaskService
                 accepted++;
             }
         }
-        return accepted + AcceptGrowthTitle(session);
+        return accepted + AcceptGrowthTitle(session) + AcceptGrowthClass(session);
     }
 
     private bool Ready(GameSession session, TaskDef def) =>

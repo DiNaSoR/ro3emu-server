@@ -19,7 +19,7 @@ namespace Ro3Emu.Server.Game;
 /// </summary>
 public sealed partial class DailyActivityService : IGameTicker
 {
-    public const uint ActivitySync = 5004, StageSync = 5059, RingAccept = 43504, StageGain = 31178;
+    public const uint ActivitySync = 5004, StageSync = 5059, RingAccept = 43504, StageGain = 31178, StageBatchGain = 31175;
     private const int Liveness = 5, RingActivity = 3302, TodoFunction = 25, RingFunction = 5902;
     private const int RingRuns = 1; // PublicParamConfig.RunRingTaskRefreshCount (inferred as one accept per reset).
     private static readonly int[] RingStarts = [3001, 3011, 3021];
@@ -305,15 +305,10 @@ public sealed partial class DailyActivityService : IGameTicker
             return;
         }
         await ReconcileCoreAsync(session);
-        var row = data.Row("GenericStageRewardsConfig", req.StageId);
-        int result = row is not { } r || GameData.Int(r, "_iType") != 7 || GameData.Int(r, "_iItem") != Liveness ? ErrorCodes.RewardMissing
-            : !functions.IsOpen(session, TodoFunction) ? ErrorCodes.FeatureUnavailable
-            : session.Daily!.Claims.Contains(req.StageId) ? ErrorCodes.RewardClaimed
-            : character.CountOf(session, Liveness) < GameData.Int(r, "_iScore") ? ErrorCodes.CurrencyShort
-            : 0;
+        int result = StageError(session, req.StageId);
         if (result == 0)
         {
-            var grant = StageAward(session, (int)GameData.Int(row!.Value, "_iAward"));
+            var grant = StageAward(session, (int)GameData.Int(data.Row("GenericStageRewardsConfig", req.StageId)!.Value, "_iAward"));
             if (grant.Count == 0) result = ErrorCodes.RewardMissing;
             else
             {
@@ -328,6 +323,52 @@ public sealed partial class DailyActivityService : IGameTicker
         }
         await session.SendGameAsync(StageGain, new StageRewardGainResp { Result = result, StageId = req.StageId });
     }
+
+    /// <summary>
+    /// 31175 (LC_StageRewardHelper.GetStageRewardByIdList): every listed stage under the 31178 rule, paid and marked in one
+    /// commit. All or nothing (inferred: the client lists only stages it shows as claimable and reads no reply; 5059 is
+    /// what updates it).
+    /// </summary>
+    public async Task BatchClaimAsync(GameSession session, StageRewardBatchGainReq req)
+    {
+        using var gate = await TaskService.LockTasksAsync(session);
+        if (session.Role == null || session.Progress == null || session.Daily == null || !session.DailyReady)
+        {
+            await session.SendGameAsync(StageBatchGain, new StageRewardBatchGainResp { Result = ErrorCodes.FeatureUnavailable, Req = req });
+            return;
+        }
+        await ReconcileCoreAsync(session);
+        var ids = req.StageIds.Distinct().ToArray();
+        int result = ids.Length == 0 ? ErrorCodes.Parameter : 0;
+        foreach (int id in ids)
+            if (result == 0) result = StageError(session, id);
+        var grant = new List<(int Entry, int Count, int Bind)>();
+        foreach (int id in ids)
+        {
+            if (result != 0) break;
+            var award = StageAward(session, (int)GameData.Int(data.Row("GenericStageRewardsConfig", id)!.Value, "_iAward"));
+            if (award.Count == 0) result = ErrorCodes.RewardMissing;
+            grant.AddRange(award);
+        }
+        if (result == 0)
+        {
+            var before = JsonSerializer.SerializeToUtf8Bytes(session.Daily);
+            var next = JsonSerializer.Deserialize<DailyState>(before)!;
+            next.Claims.UnionWith(ids);
+            var after = JsonSerializer.SerializeToUtf8Bytes(next);
+            result = await character.GrantDailyStageAsync(session, grant, before, after) ? 0 : ErrorCodes.Unknown;
+            if (result == 0) await SyncClaimsAsync(session);
+        }
+        await session.SendGameAsync(StageBatchGain, new StageRewardBatchGainResp { Result = result, Req = req });
+    }
+
+    /// <summary>One stage's claim rule: the type-7 row, function 25, not yet claimed, the item-5 threshold reached.</summary>
+    private int StageError(GameSession session, int stageId) =>
+        data.Row("GenericStageRewardsConfig", stageId) is not { } r || GameData.Int(r, "_iType") != 7 || GameData.Int(r, "_iItem") != Liveness ? ErrorCodes.RewardMissing
+            : !functions.IsOpen(session, TodoFunction) ? ErrorCodes.FeatureUnavailable
+            : session.Daily!.Claims.Contains(stageId) ? ErrorCodes.RewardClaimed
+            : character.CountOf(session, Liveness) < GameData.Int(r, "_iScore") ? ErrorCodes.CurrencyShort
+            : 0;
 
     private List<(int Entry, int Count, int Bind)> StageAward(GameSession session, int group)
     {

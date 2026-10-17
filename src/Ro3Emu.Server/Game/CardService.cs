@@ -12,7 +12,7 @@ namespace Ro3Emu.Server.Game;
 /// it moves into a socket of an equipment grid (5009 storagePack, an InvItem with a negative Grid, see
 /// CharacterService.CardGrid). Persisted selections are 5026 DBStorageHoleInfo, the card collection
 /// ("library") 5057 DBLibraryInfo.cards. Messages: 31406-31408 sockets, 31411-31412 plans, 31461-31463 progression,
-/// 82404 collection unlock.
+/// 82404 collection unlock; the Codex monsters (5057 monsters, 82407) are CardService.Monsters.cs.
 /// Sockets open by EquipGridConfig._kSocketOpen1..4 conditions (base level); main/off hand need a worn item there.
 /// </summary>
 public sealed partial class CardService
@@ -81,7 +81,8 @@ public sealed partial class CardService
         session.CardPlans = plans != null ? DBStorageHoleInfo.Parser.ParseFrom(plans) : NewPlans(session);
         if (!session.CardPlans.StoragePlans.ContainsKey(session.CardPlans.CurrentPlan)) session.CardPlans.CurrentPlan = 1;
         await SyncPlans(session);
-        if (session.Library.Cards.Count > 0) await CharacterService.SyncAsync(session, LibrarySync, session.Library.Clone());
+        if (session.Library.Cards.Count > 0 || session.Library.Monsters.Count > 0)
+            await CharacterService.SyncAsync(session, LibrarySync, session.Library.Clone());
     }
 
     private static DBStorageHoleInfo NewPlans(GameSession session)
@@ -691,11 +692,11 @@ public sealed partial class CardService
                 ? Task.CompletedTask : CharacterService.SyncAsync(session, LibrarySync, session.Library.Clone()));
     }
 
-    private CharacterService.FirstCardSightPlan? StageFirstCardSight(GameSession session, IReadOnlyList<int> entries)
+    private CharacterService.FirstCardSightPlan? StageFirstCardSight(GameSession session, IReadOnlyList<int> entries, int monster)
     {
         if (session.Library == null) return null;
         var next = session.Library.Clone();
-        bool changed = false;
+        bool changed = CountMonsterKill(next, monster);
         foreach (int entry in entries.Distinct())
             if (character.IsCard(entry) && !next.Cards.ContainsKey(entry))
             {
@@ -709,6 +710,7 @@ public sealed partial class CardService
         long epoch = session.Owner?.LifecycleEpoch ?? 0;
         return new(builder =>
             {
+                if (newCards.Length == 0) { builder.RoleBlob(role, "library", next.ToByteArray()); return; } // a Codex kill only
                 byte[]? old = roles.ReadTaskFollowup(builder, role);
                 var pending = old is { Length: > 0 }
                     ? JsonSerializer.Deserialize<HashSet<string>>(old) ?? [] : new HashSet<string>();

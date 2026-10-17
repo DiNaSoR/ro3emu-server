@@ -36,7 +36,16 @@ public static partial class EconomySnapshotReader
     // Monster Hunt: role.area_concur is DBAreaConcurInfo (kill counters per monster and map, claimed stage markers,
     // the area's claimed-stage count). No balance: kill counters ride the monster-kill receipt, and a claim's goods are
     // granted by its own cd13e/monsterhunt-award receipt whose claimed marker is only that receipt's once-only source.
-    public const string ExpectedFormatManifestHash = "6F3AD57ECA3574DA6EA6ED8ABC95F87229A7C06938F446D0E6DD9ACEE9A86307";
+    // Growth Classroom: role.growth_class is DBGrowthClassInfo (only rankReward, the claimed rank markers; the rest of
+    // 5045 is derived from the quests). No balance: a rank's goods are granted by its own cd13e/growthclass-award receipt.
+    // Codex monsters: role.library monsters (kill count, unlock flag) ride the monster-kill receipt; the unlock's
+    // Collection Points are granted by its own cd13e/library-award receipt whose unlock flag is that receipt's marker.
+    // Seven-Day Goal: role.first_heart is DBFirstHeartTaskActivityData (task progress and status, score bar, claimed score
+    // rewards). No balance: a task or score claim's goods come with its own cd13e/firstheart-award receipt, whose claimed
+    // marker is only that receipt's once-only source.
+    // Profile: role.personal is DBPersonalInfo (card presets, current preset, upvote times). No balance and no asset:
+    // stickers placed on a card are counted against the owned currency, never spent.
+    public const string ExpectedFormatManifestHash = "710021A9385654635AA57A097BAC0C0EC66B91F7869C513C5DCEE1E923701CA4";
     public static string FormatManifestHash => State.FormatManifestHash;
 
     private sealed partial class State

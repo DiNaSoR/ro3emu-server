@@ -349,6 +349,21 @@ public sealed partial class TimedBattleService : IGameTicker
                 new CancelMatchNotify { MatchEntryId = match.Entry, ManualCancel = manual }));
     }
 
+    /// <summary>
+    /// 82643, as DungeonMatchService.FailReadyAsync: the refusing or late player is the penalty member. (inferred) No lockout
+    /// (unlock time 0): PublicParamConfig PenaltyTimeChicken [5,10,30,60] and DragonIslandPenaltyTime 90 name no unit and
+    /// MatchRefuseConfig no durations, so the Survivor and Dragon panels show no countdown.
+    /// </summary>
+    private async Task FailReadyAsync(Match match, GameSession failed)
+    {
+        if (!match.Players.Any(preparing.ContainsKey)) return;
+        foreach (var player in match.Players) preparing.Remove(player);
+        long failedId = match.Participants[failed].Id;
+        var notify = new FailMatchNtf { Result = ErrorCodes.DungeonDeclined, MatchEntryId = match.Entry,
+            PenaltyMemberGuid = failedId, FailPlayer = failedId, MatchStartTime = match.Open };
+        await RoleFanout.EachAsync(match.Players, player => player.SendGameAsync(DungeonMatchService.FailNotify, notify));
+    }
+
     private async Task BroadcastReadyAsync(Match match)
     {
         var notify = new MatchReadyNotify { MatchEntryId = match.Entry };
@@ -375,7 +390,7 @@ public sealed partial class TimedBattleService : IGameTicker
         if (match == null || result == ErrorCodes.Parameter) return;
         if (result != 0)
         {
-            await CancelReadyAsync(match, true);
+            await FailReadyAsync(match, session);
             return;
         }
         match.Ready.Add(session);
@@ -747,10 +762,13 @@ public sealed partial class TimedBattleService : IGameTicker
         if (now == lastSecond) return;
         lastSecond = now;
         foreach (var match in preparing.Values.Distinct().ToArray())
-            if (now >= match.Open + 30 || !schedule.IsOpen(match.Entry == ChickenEntry ? 114 : 126)
-                || match.Players.Any(p => p.Role == null))
+            if (!schedule.IsOpen(match.Entry == ChickenEntry ? 114 : 126) || match.Players.Any(p => p.Role == null))
                 loop.PostRuntime(() => RunMatchTransitionAsync(match, "timed match ready timeout",
                     () => CancelReadyAsync(match, false)));
+            else if (now >= match.Open + 30)
+                loop.PostRuntime(() => RunMatchTransitionAsync(match, "timed match ready timeout",
+                    () => match.Players.FirstOrDefault(p => !match.Ready.Contains(p)) is { } late
+                        ? FailReadyAsync(match, late) : CancelReadyAsync(match, false)));
         foreach (int entry in queue.Keys.ToArray())
             loop.PostRuntime(async () =>
             {

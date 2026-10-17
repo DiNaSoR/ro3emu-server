@@ -19,7 +19,8 @@ namespace Ro3Emu.Server.Game;
 /// </summary>
 public sealed class TrainingService : IGameTicker
 {
-    public const uint Sync = 5069;
+    public const uint Sync = 5069, ChallengeMode = 84061, AimAward = 84062, ExitChallengeMode = 84063, UpdateWoodNpc = 84064,
+        Reconnect = 84065, ChallengeReconnect = 84066, ChallengeReset = 84067;
     private readonly GameData data;
     private readonly RoleStore roles;
     private readonly CharacterService character;
@@ -186,8 +187,8 @@ public sealed class TrainingService : IGameTicker
             ? await owners.EnterAsync("training/mode", ReservationKey.Role(s.Role.Id)) : null;
         int result = Gate(s);
         if (result == 0 && (!attempts.ContainsKey(s) || s.SceneLoading || s.Dead)) result = ErrorCodes.SceneMissing;
-        if (challenge) await s.SendGameAsync(84061, new TrainingChallengeModeResp { Result = result });
-        else await s.SendGameAsync(84063, new TrainingExitChallengeModeResp { Result = result });
+        if (challenge) await s.SendGameAsync(ChallengeMode, new TrainingChallengeModeResp { Result = result });
+        else await s.SendGameAsync(ExitChallengeMode, new TrainingExitChallengeModeResp { Result = result });
         if (result == 0) await EnterAsync(s, challenge ? 2100011 : 2100009);
     }
 
@@ -203,15 +204,15 @@ public sealed class TrainingService : IGameTicker
             var attempt = attempts[s]; attempt.Race = req.Race; attempt.Element = req.Element; attempt.Size = req.BodyType;
             await SpawnAsync(s, attempt);
         }
-        await s.SendGameAsync(84064, new TrainingUpdateWoodNpcAttrResp { Result = result });
+        await s.SendGameAsync(UpdateWoodNpc, new TrainingUpdateWoodNpcAttrResp { Result = result });
     }
 
     public async Task ReconnectAsync(GameSession s, bool challenge)
     {
         var a = attempts.GetValueOrDefault(s);
-        if (challenge) await s.SendGameAsync(84066, new TrainingChallengeReconnectRes
+        if (challenge) await s.SendGameAsync(ChallengeReconnect, new TrainingChallengeReconnectRes
         { EndTime = a is { Running: true } ? a.End : 0, TotalDamage = a?.Damage ?? 0 });
-        else await s.SendGameAsync(84065, new TrainingReconnectRes
+        else await s.SendGameAsync(Reconnect, new TrainingReconnectRes
         { Race = a?.Race ?? 2, Ele = a?.Element ?? 1, Body = a?.Size ?? 2, IsChallenge = a is { Challenge: true } ? 1 : 0 });
     }
 
@@ -222,7 +223,7 @@ public sealed class TrainingService : IGameTicker
         if (result == 0 && (!attempts.TryGetValue(s, out var a) || !a.Challenge || s.SceneLoading)) result = ErrorCodes.SceneMissing;
         if (result == 0)
             await ResetAttemptAsync(s, attempts[s]);
-        await s.SendGameAsync(84067, new TrainingChallengeResetRes { Result = result });
+        await s.SendGameAsync(ChallengeReset, new TrainingChallengeResetRes { Result = result });
     }
 
     private async Task ResetAttemptAsync(GameSession s, Attempt a)
@@ -266,7 +267,7 @@ public sealed class TrainingService : IGameTicker
                 result = ErrorCodes.BagFull;
             else await CharacterService.SyncAsync(s, Sync, next.Clone());
         }
-        await s.SendGameAsync(84062, new TrainingAimAwardResp { Result = result });
+        await s.SendGameAsync(AimAward, new TrainingAimAwardResp { Result = result });
     }
 
     internal static long RootJob(GameData data, long job)

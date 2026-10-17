@@ -439,6 +439,12 @@ public static class EconomyLedgerReader
                             "cd13e/monsterhunt-award" when leg.Kind == EconomyLegKind.Sink => EconomyReason.OwnedAwardCost,
                             "cd13e/guild-award" when leg.Kind == EconomyLegKind.Source => EconomyReason.GuildReward,
                             "cd13e/guild-award" when leg.Kind == EconomyLegKind.Sink => EconomyReason.OwnedAwardCost,
+                            "cd13e/growthclass-award" when leg.Kind == EconomyLegKind.Source => EconomyReason.GrowthClassReward,
+                            "cd13e/growthclass-award" when leg.Kind == EconomyLegKind.Sink => EconomyReason.OwnedAwardCost,
+                            "cd13e/library-award" when leg.Kind == EconomyLegKind.Source => EconomyReason.LibraryReward,
+                            "cd13e/library-award" when leg.Kind == EconomyLegKind.Sink => EconomyReason.OwnedAwardCost,
+                            "cd13e/firstheart-award" when leg.Kind == EconomyLegKind.Source => EconomyReason.FirstHeartReward,
+                            "cd13e/firstheart-award" when leg.Kind == EconomyLegKind.Sink => EconomyReason.OwnedAwardCost,
                             "cd13e/daily-stage" when leg.Kind == EconomyLegKind.Source => EconomyReason.DailyReward,
                             "cd13e/daily-stage" when leg.Kind == EconomyLegKind.Sink => EconomyReason.OwnedAwardCost,
                             "cd13e/journey-victory" when leg.Kind == EconomyLegKind.Source => EconomyReason.ActivityReward,
@@ -903,6 +909,9 @@ public static class EconomyLedgerReader
             "cd13e/advguild-award" => ["inventory", "progress", "adventure_group"],
             "cd13e/monsterhunt-award" => ["inventory", "progress", "area_concur"],
             "cd13e/guild-award" => ["inventory", "progress", "guild_info"],
+            "cd13e/growthclass-award" => ["inventory", "progress", "growth_class"],
+            "cd13e/library-award" => ["inventory", "progress", "library"],
+            "cd13e/firstheart-award" => ["inventory", "progress", "first_heart"],
             "cd13e/daily-stage" => ["inventory", "progress", "daily"],
             "cd13e/daily-reset" => ["progress", "daily", "tasks"],
             "cd13e/journey-victory" => ["inventory", "progress", "new_activities", "dungeons"],
@@ -915,7 +924,7 @@ public static class EconomyLedgerReader
             "cd13e/daily-reset" => [..required, "wild_afk"],
             "gather-yield" => [..required, "library", "task_followup"],
             "dungeon-reward" => [..required, "auction_order", "library", "task_followup"],
-            "cd13e/tower-milestone" or "cd13e/quest-award" or "cd13e/achievement-award" or "cd13e/advguild-award" or "cd13e/monsterhunt-award" or "cd13e/guild-award" or "cd13e/daily-stage" or
+            "cd13e/tower-milestone" or "cd13e/quest-award" or "cd13e/achievement-award" or "cd13e/advguild-award" or "cd13e/monsterhunt-award" or "cd13e/guild-award" or "cd13e/growthclass-award" or "cd13e/library-award" or "cd13e/firstheart-award" or "cd13e/daily-stage" or
             "cd13e/grant" or "cd13e/gm-grant" or "cd13e/character-exp" or
                 "cd13e/journey-victory" => [..required, "daily", "library", "task_followup", "activity_runtime", "mounts"],
             _ => required

@@ -354,6 +354,53 @@ public sealed class DailyTests : IAsyncLifetime
     }
 
     [ClientDataFact]
+    public async Task BatchStageClaimPaysEveryListedStageOnceInOneCommit()
+    {
+        var bot = await InWorld("Alice");
+        await Gm("alice", "!lvl 34");
+        await Gm("alice", "!quest done 10105090");
+        await Gm("alice", "!item 5 40");
+        Assert.Equal(40, await State(s => s.Progress!.Currency.GetValueOrDefault(5)));
+        async Task<StageRewardBatchGainResp> Batch(BotClient client, params int[] ids)
+        {
+            var req = new StageRewardBatchGainReq();
+            req.StageIds.Add(ids);
+            await client.SendGameAsync(DailyActivityService.StageBatchGain, req);
+            return await Next(client, DailyActivityService.StageBatchGain, StageRewardBatchGainResp.Parser);
+        }
+
+        // 7003 needs 60 liveness: the whole batch is refused and nothing is claimed or paid.
+        long coins = await State(s => s.Progress!.Currency.GetValueOrDefault(2));
+        Assert.Equal(ErrorCodes.CurrencyShort, (await Batch(bot, 7001, 7002, 7003)).Result);
+        Assert.Empty(await State(s => s.Daily!.Claims.ToArray()));
+        Assert.Equal(coins, await State(s => s.Progress!.Currency.GetValueOrDefault(2)));
+        Assert.Equal(ErrorCodes.RewardMissing, (await Batch(bot, 7001, 9999)).Result);
+        Assert.Equal(ErrorCodes.Parameter, (await Batch(bot)).Result);
+
+        var paid = await Batch(bot, 7001, 7002, 7001);
+        Assert.Equal(0, paid.Result);
+        Assert.Equal(new[] { 7001, 7002, 7001 }, paid.Req.StageIds.ToArray());
+        Assert.Equal(new[] { 7001, 7002 }, (await State(s => s.Daily!.Claims.Order().ToArray())));
+        Assert.True(await State(s => s.Progress!.Currency.GetValueOrDefault(2)) >= coins + 40000); // 7001 alone pays 40,000
+        Assert.Equal(40, await State(s => s.Progress!.Currency.GetValueOrDefault(5))); // threshold, not spend
+        var synced = await Next(bot, DailyActivityService.StageSync, DBStageRewardInfoIncrement.Parser,
+            m => m.AllStageRewardsFinished?.All?.Value.Count == 2);
+        Assert.Equal(new[] { 7001, 7002 }, synced.AllStageRewardsFinished.All.Value.Order().ToArray());
+        string source = await State(s => $"daily-stage/{s.Role!.Id}/{s.Daily!.DailyEpoch}/7001,7002");
+        Assert.Equal(1, OwnedSourceCount(source, "cd13e/daily-stage"));
+
+        Assert.Equal(ErrorCodes.RewardClaimed, (await Batch(bot, 7002)).Result);
+        await bot.SendGameAsync(DailyActivityService.StageGain, new StageRewardGainReq { StageId = 7001 });
+        Assert.Equal(ErrorCodes.RewardClaimed, (await Next(bot, DailyActivityService.StageGain, StageRewardGainResp.Parser)).Result);
+        await bot.DisposeAsync();
+
+        await using var again = await InWorld("Alice", create: false);
+        Assert.Equal(new[] { 7001, 7002 }, (await State(s => s.Daily!.Claims.Order().ToArray())));
+        Assert.Equal(ErrorCodes.RewardClaimed, (await Batch(again, 7001, 7002)).Result);
+        Assert.Equal(1, OwnedSourceCount(source, "cd13e/daily-stage"));
+    }
+
+    [ClientDataFact]
     public async Task RingTerminalSqlAbortKeepsQuestRewardAndRowRetryableAfterReconnect()
     {
         var bot = await InWorld("Alice");

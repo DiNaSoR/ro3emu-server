@@ -298,7 +298,8 @@ public sealed partial class CharacterService
             builder.Progress(session.Role.Id, stagedProgress);
             persist?.Invoke(builder);
             lifeUse?.Persist(builder);
-            cardSight = StageFirstCardSight?.Invoke(session, postCommitHooks.Select(g => g.Entry).ToList());
+            cardSight = StageFirstCardSight?.Invoke(session, postCommitHooks.Select(g => g.Entry).ToList(),
+                rewardSettlement?.LibraryMonster ?? 0);
             cardSight?.Persist(builder);
             if (builder.HasCharacterFamilyEconomy && (prunedPlans = PrunedEquipmentPlans(session, stagedItems)) != null)
                 builder.RoleBlob(session.Role.Id, "equip_plans", prunedPlans.ToByteArray());

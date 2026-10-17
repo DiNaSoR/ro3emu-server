@@ -514,6 +514,13 @@ public sealed class AchievementService : IGameTicker
         return true;
     }
 
+    /// <summary>101011 cumulative login days as counted here: every login-day row counts in parallel (up to 365), so the
+    /// highest slot is the role's count.</summary>
+    internal long LoginDays(GameSession s) => s.Achievements is { } state
+        ? Rows().Rows.Values.SelectMany(row => row.Targets.Select((t, i) => t[0] == CLoginDays
+            ? Slot(state.Infos.GetValueOrDefault(row.Id), i) : 0)).DefaultIfEmpty(0).Max()
+        : 0;
+
     private long DayBoundary()
     {
         var now = clock.GetLocalNow().DateTime;

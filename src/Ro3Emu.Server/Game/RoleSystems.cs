@@ -8,7 +8,7 @@ namespace Ro3Emu.Server.Game;
 /// selection check), when it moves and when it leaves. RoleSessionService runs the selection around these; the order
 /// here is the client's, see the comments on each step.
 /// </summary>
-public sealed class RoleSystems(Maps.World world, ChatService chat, CharacterService character, SkillService skills, FunctionService functions, CombatService combat, BuffService buffs, SceneService scene, TaskService tasks, DailyActivityService daily, GuideService guides, EmojiService emoji, AchievementService achievements, Micro.FriendService friends, MvpService mvps, CardService cards, ShopService shops, EmblemService emblems, SeasonService seasons, SeasonPageService seasonPage, SeasonRefineService seasonRefine, SeasonTalentService talents, PetService pets, TowerService tower, ValhallaService valhalla, MonsterHuntService monsterHunt, MailService mail, AuctionService auctions, GuildService guilds, AdventureGroupService adventureGroups, GuildCaravanService caravan, GuildChallengeService guildChallenge, DungeonService dungeons, DungeonMatchService dungeonMatches, InstanceService instances, TradeService trade, StallsService stalls, LifeJobService life, GatheringService gathering, WildAfkService afk, WorldCoreService worldCore, WorldInteractionService interaction, NewActivityService activities, TimedEventService timedEvents, PronteraDefenseService defense, TimedBattleService timedBattles, FestivalService festival, TrainingService training, LotteryService lottery, MountService mounts, CareerSpecialService careerSpecial, WardrobeService wardrobe, TotemService totems, GenreService genre, TerritoryWarsService territory, TerritoryEscortService escort, Persistence.SettingsPersistence settings, ILogger<RoleSystems> log)
+public sealed class RoleSystems(Maps.World world, ChatService chat, CharacterService character, SkillService skills, FunctionService functions, CombatService combat, BuffService buffs, SceneService scene, TaskService tasks, DailyActivityService daily, GuideService guides, EmojiService emoji, PersonalService personal, SocialOutfitService socialOutfit, AchievementService achievements, Micro.FriendService friends, MvpService mvps, CardService cards, ShopService shops, EmblemService emblems, SeasonService seasons, SeasonPageService seasonPage, SeasonRefineService seasonRefine, SeasonTalentService talents, PetService pets, TowerService tower, ValhallaService valhalla, MonsterHuntService monsterHunt, GrowthClassService growthClass, FirstHeartService firstHeart, MailService mail, AuctionService auctions, GuildService guilds, AdventureGroupService adventureGroups, GuildCaravanService caravan, GuildChallengeService guildChallenge, DungeonService dungeons, DungeonMatchService dungeonMatches, InstanceService instances, TradeService trade, StallsService stalls, LifeJobService life, GatheringService gathering, WildAfkService afk, WorldCoreService worldCore, WorldInteractionService interaction, NewActivityService activities, TimedEventService timedEvents, PronteraDefenseService defense, TimedBattleService timedBattles, FestivalService festival, TrainingService training, LotteryService lottery, MountService mounts, CareerSpecialService careerSpecial, WardrobeService wardrobe, TotemService totems, GenreService genre, TerritoryWarsService territory, TerritoryEscortService escort, Persistence.SettingsPersistence settings, ILogger<RoleSystems> log)
 {
     internal async Task LoadAsync(GameSession session)
     {
@@ -17,6 +17,8 @@ public sealed class RoleSystems(Maps.World world, ChatService chat, CharacterSer
         careerSpecial.Load(session); // before mounts: a leased mount entitles the battle slot
         valhalla.Load(session);
         monsterHunt.Load(session);
+        growthClass.Load(session);
+        firstHeart.Load(session);
         mounts.Load(session);
         totems.Load(session);
         await life.LoadAsync(session);
@@ -71,6 +73,9 @@ public sealed class RoleSystems(Maps.World world, ChatService chat, CharacterSer
         checkpoint();
         await emoji.LoginAsync(session); // 5006: the emote panel enables only unlocked emotes
         checkpoint();
+        await personal.LoginAsync(session); // 5016 before 5056 opens Profile (function 63)
+        await socialOutfit.LoginAsync(session); // 5044: the own profile card reads the worn title and honor
+        checkpoint();
         await cards.LoginAsync(session); // after 5009: inserted cards are its storagePack
         checkpoint();
         await tower.LoginAsync(session); // 5065 before tower-dependent functions and shop conditions
@@ -121,8 +126,11 @@ public sealed class RoleSystems(Maps.World world, ChatService chat, CharacterSer
         session.DeferTaskSync = false;
         checkpoint();
         await tasks.RefreshAsync(session); // all owner snapshots are now available for passive objectives; settles with the login's one full 5027
+        await growthClass.LoginAsync(session); // 5045 after the login's quest settlement: it reads the delivered growth quests
         checkpoint();
         await achievements.LoginAsync(session); // one full 5019 after every owner snapshot its conditions read; function 21 opens at level 1
+        checkpoint();
+        await firstHeart.LoginAsync(session); // 5049 after 5019: its login-day tasks read the achievement count
         checkpoint();
         session.DeferFunctionSync = false;
         await functions.SyncAsync(session);

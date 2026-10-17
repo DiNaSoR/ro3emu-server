@@ -140,6 +140,12 @@ internal sealed class RoleSchemaPlan : DbPlan
         SchemaSql.AddColumn(db, tx, "role", "heroic_spirit", "BLOB");
         // Serialized romsg.DBAreaConcurInfo (Monster Hunt kill counters and claimed stages; AUTO_SYNC 5053).
         SchemaSql.AddColumn(db, tx, "role", "area_concur", "BLOB");
+        // Serialized romsg.DBGrowthClassInfo (Growth Classroom claimed rank rewards; AUTO_SYNC 5045, GrowthClassService).
+        SchemaSql.AddColumn(db, tx, "role", "growth_class", "BLOB");
+        // Serialized romsg.DBFirstHeartTaskActivityData (Seven-Day Goal tasks, score and claims; AUTO_SYNC 5049).
+        SchemaSql.AddColumn(db, tx, "role", "first_heart", "BLOB");
+        // Serialized romsg.DBPersonalInfo (profile card presets and the current one; AUTO_SYNC 5016, PersonalService).
+        SchemaSql.AddColumn(db, tx, "role", "personal", "BLOB");
         // Unix seconds of a deletion; deleted roles are kept (items, progress) but no longer listed or selectable.
         SchemaSql.AddColumn(db, tx, "role", "deleted_time", "INTEGER NOT NULL DEFAULT 0");
         SchemaSql.Execute(db, tx, """

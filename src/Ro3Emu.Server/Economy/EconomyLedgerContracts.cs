@@ -30,6 +30,9 @@ public enum EconomyReason
     AdventureGroupReward = 124, // Adventure Group level reward claims (cd13e/advguild-award)
     MonsterHuntReward = 125, // Monster Hunt monster and area stage claims (cd13e/monsterhunt-award)
     GuildReward = 126, // guild weekly activity chests and activity dividends (cd13e/guild-award)
+    GrowthClassReward = 127, // Growth Classroom rank rewards (cd13e/growthclass-award)
+    LibraryReward = 128, // Codex monster unlock Collection Points (cd13e/library-award)
+    FirstHeartReward = 129, // Seven-Day Goal task and score reward claims (cd13e/firstheart-award)
     // C/D 13d used 41-45 on its branch; renumbered at merge (the values are persisted).
     FriendGiftCost = 55, CaravanPendingDelivery = 56, GuildActivityCost = 57,
     GuildServiceCost = 58, ChallengePendingDelivery = 59,
@@ -44,7 +47,7 @@ public enum EconomyReason
 
 public static class EconomyReasonCatalog
 {
-    public const string Version = "economy-reasons-v12"; // each merge of a branch's reasons gets a new version
+    public const string Version = "economy-reasons-v13"; // each merge of a branch's reasons gets a new version
 
     public static bool Allows(EconomyReason reason, EconomyLegKind kind) => reason switch
     {
@@ -57,6 +60,7 @@ public static class EconomyReasonCatalog
         EconomyReason.GenreGoods or EconomyReason.PetGoods or EconomyReason.TotemRefund or
         EconomyReason.EnchantRefund or EconomyReason.CardOutput or EconomyReason.ShopGoods or
         EconomyReason.OwnedGrant or EconomyReason.AchievementReward or EconomyReason.AdventureGroupReward or EconomyReason.MonsterHuntReward or EconomyReason.GuildReward or
+        EconomyReason.GrowthClassReward or EconomyReason.LibraryReward or EconomyReason.FirstHeartReward or
         EconomyReason.LifeGoods or EconomyReason.SeasonGoods or EconomyReason.SeasonRefund or
         EconomyReason.SkillPlanRefund or EconomyReason.CastAdmissionRefund => kind == EconomyLegKind.Source,
         EconomyReason.GmRemove or EconomyReason.NpcShopPayment or EconomyReason.CraftInput or

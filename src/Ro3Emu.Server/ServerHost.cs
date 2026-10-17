@@ -83,6 +83,8 @@ public static class ServerHost
         builder.Services.AddSingleton<GatheringService>();
         builder.Services.AddSingleton<GuideService>();
         builder.Services.AddSingleton<EmojiService>();
+        builder.Services.AddSingleton<PersonalService>();
+        builder.Services.AddSingleton<SocialOutfitService>();
         builder.Services.AddSingleton<AchievementService>();
         builder.Services.AddSingleton<TeamService>();
         builder.Services.AddSingleton<MvpService>();
@@ -122,6 +124,8 @@ public static class ServerHost
         builder.Services.AddSingleton<TowerService>();
         builder.Services.AddSingleton<ValhallaService>();
         builder.Services.AddSingleton<MonsterHuntService>();
+        builder.Services.AddSingleton<GrowthClassService>();
+        builder.Services.AddSingleton<FirstHeartService>();
         builder.Services.AddSingleton<AppraisalService>();
         builder.Services.AddSingleton<EnchantService>();
         builder.Services.AddSingleton<PetFollowerService>();
@@ -435,6 +439,7 @@ internal sealed class GameLoopTickers(IServiceProvider services) : IHostedServic
         Add<WorldCoreService>();
         Add<EmojiService>();
         Add<AchievementService>();
+        Add<FirstHeartService>();
         Add<DungeonMatchService>();
         Add<GatheringService>();
         Add<TotemEffects>();
