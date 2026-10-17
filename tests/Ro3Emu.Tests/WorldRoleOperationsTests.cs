@@ -219,7 +219,23 @@ public sealed class WorldRoleOperationsTests : IAsyncLifetime
     {
         await using (var alice = await InWorld("Alice"))
         {
-            await Next(alice, CharacterService.ItemsSync, DBItemsInfoIncrement.Parser);
+            var fresh = await Next(alice, CharacterService.ItemsSync, DBItemsInfoIncrement.Parser);
+            // A new role still gets both configs with every window slot, or the client's Add buttons hit a nil config.
+            Assert.Equal([0, 0, 0], fresh.MedicinesAutoUse.All.HpConfig.ItemEntrys);
+            Assert.Equal([0, 0, 0], fresh.MedicinesAutoUse.All.SpConfig.ItemEntrys);
+
+            // Add All and Add send every slot, with 0 for the empty ones.
+            var addAll = new MedicinesAutoUseSetReq
+            {
+                Type = MedicineAutoUseType.Hp, OpType = MedicineAutoUseOpType.Medicine,
+                SetData = new MedicinesAutoUse { Condition = 60 },
+            };
+            addAll.SetData.ItemEntrys.Add([1000000, 0, 0]);
+            await alice.SendGameAsync(CharacterService.MedicinesAutoUseSet, addAll);
+            var added = await Next(alice, CharacterService.MedicinesAutoUseSet, MedicinesAutoUseSetResp.Parser);
+            Assert.Equal(0, added.Result);
+            Assert.Equal([1000000, 0, 0], added.SetData.ItemEntrys);
+
             var medicine = new MedicinesAutoUseSetReq
             {
                 Type = MedicineAutoUseType.Hp, OpType = MedicineAutoUseOpType.Switch,
@@ -230,6 +246,7 @@ public sealed class WorldRoleOperationsTests : IAsyncLifetime
             var saved = await Next(alice, CharacterService.MedicinesAutoUseSet, MedicinesAutoUseSetResp.Parser);
             Assert.Equal(0, saved.Result);
             Assert.Equal(50, saved.SetData.Condition);
+            Assert.Equal([1000000, 0, 0], saved.SetData.ItemEntrys);
 
             await alice.SendGameAsync(CharacterService.ArrowSwitch, new ItemArrowSwitchReq { ItemId = 1002011 });
             Assert.Equal(ErrorCodes.ItemMissing, (await Next(alice, CharacterService.ArrowSwitch, ItemArrowSwitchResp.Parser)).Result);

@@ -292,13 +292,23 @@ public sealed partial class CombatService : IGameTicker
         log.LogDebug("{Name} locks {Target}", s.Role?.Name, req.EnemyId);
     }
 
-    /// <summary>The template's damage EffectData (hit fx + flinch): the first with m_kDamage in [show*100, show*100+99].</summary>
+    /// <summary>
+    /// The template's hit EffectData (hit fx, audio, flinch): the first in [show*100, show*100+99] whose m_kDamage has an
+    /// m_kActionDamge, since LC_DamageHelper.CalcDamageHitPoint plays the hit from it. A bullet effect has none (Lightning
+    /// Bolt's 1200503 comes before its hit 1200504), so it only stands in when the block has no action hit.
+    /// </summary>
     private int HitEffect(long scriptShow)
     {
         var effects = data.SkillTemplateTable("Lua_Config_EffectData");
+        int first = 0;
         for (long id = scriptShow * 100; id < scriptShow * 100 + 100; id++)
-            if (effects.TryGetValue(id.ToString(), out var e) && e.TryGetProperty("m_kDamage", out _)) return (int)id;
-        return 1000002;
+        {
+            if (!effects.TryGetValue(id.ToString(), out var e) || !e.TryGetProperty("m_kDamage", out var damage)) continue;
+            if (damage.ValueKind == JsonValueKind.Object && damage.TryGetProperty("m_kActionDamge", out var action)
+                && action.ValueKind == JsonValueKind.Object) return (int)id;
+            if (first == 0) first = (int)id;
+        }
+        return first != 0 ? first : 1000002;
     }
 
     // ---- monsters hitting players ----

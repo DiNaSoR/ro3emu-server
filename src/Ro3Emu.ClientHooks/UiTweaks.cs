@@ -28,6 +28,7 @@ namespace Ro3Emu.ClientHooks
             Diagnostics.AutoDump();
             AudioDiagnostics.Tick();
             AnimationSounds.Tick();
+            CutsceneAudio.Tick();
             TextFit.Tick();
             if (++_frame % 10 != 0) return;
             try
@@ -45,6 +46,7 @@ namespace Ro3Emu.ClientHooks
                 if (Done.Count > 64) Done.Clear();
                 QuitButton.Tick();
                 LuaPatches.Tick();
+                BgmOnWindowFocus.Tick();
                 PassChallenges.Tick();
                 PassButton.Tick();
             }

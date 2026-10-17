@@ -26,6 +26,8 @@ public sealed class ActiveSkillCast
     public bool Resolved { get; set; }
     /// <summary>HP/SP and buff-pile costs still owed by a chanted cast; paid once when the chant completes.</summary>
     internal Func<Task<bool>>? ChantCost { get; set; }
+    /// <summary>A server bullet is in flight (CombatService.ServerBullet): cancelling the cast no longer stops it landing.</summary>
+    public bool Launched { get; set; }
     public SkillObject? Operator { get; init; }
     public long SourceId => Operator?.Uid ?? OwnerId;
 }
@@ -491,7 +493,7 @@ public sealed partial class CombatService
         await ToPlayerAndViewersAsync(s, SkillEnd, new SkillEndNotify
         {
             SrcID = action.SourceId, SessionId = action.Id, Type = SkillEndNotify.Types.SkillEndType.Interrupted,
-            ClearEffect = true, InterruptedInfo = new SkillInterruptedInfo { Type = cause }, Result = result,
+            ClearEffect = !action.Launched, InterruptedInfo = new SkillInterruptedInfo { Type = cause }, Result = result,
             Params = { parameter == 0 ? [] : new[] { parameter } },
         });
     }

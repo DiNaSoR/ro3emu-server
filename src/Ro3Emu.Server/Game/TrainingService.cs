@@ -55,7 +55,7 @@ public sealed class TrainingService : IGameTicker
         foreach (long map in new long[] { 2100009, 2100010, 2100011 })
             if (data.Row("DungeonConfig", map) is { } config && config.TryGetProperty("_kResSceneEditorName", out var editor))
             {
-                string path = Path.Combine(options.Value.GameDataDir ?? options.Value.DataDir, "sceneeditor", editor.GetString() + ".json");
+                string path = DataFile.Resolve(options.Value.GameDataDir ?? options.Value.DataDir, "sceneeditor", editor.GetString() + ".json");
                 if (!File.Exists(path)) continue;
                 using var doc = JsonDocument.Parse(File.ReadAllBytes(path));
                 if (!doc.RootElement.TryGetProperty("m_kMonsterSpawnPoints", out var spawns)) continue;
