@@ -215,10 +215,13 @@ public sealed partial class CombatService
         await viewer.SendGameAsync(SkillSelectionChange, new SkillWhiteListChangeNotify { DirtyInfo = { info } });
     }
 
-    /// <summary>Called only after a boss actually starts a configured skill cooldown.</summary>
+    /// <summary>
+    /// Called only after a boss actually starts a configured skill cooldown. The boss panel (LC_Skill_BossShow) lists
+    /// the boss's skills with their names, icons and cooldowns; its normal attack is never one of them.
+    /// </summary>
     public async Task BossCooldownStartedAsync(MonsterUnit boss, int skillId, long endMs)
     {
-        if (boss.Dead || endMs <= Now || data.Row("SkillConfig", skillId) == null
+        if (boss.Dead || endMs <= Now || skillId == boss.Template.NormalSkill || data.Row("SkillConfig", skillId) == null
             || data.Row("NPCConfig", boss.Template.NpcId) is not { } npc || GameData.Int(npc, "_iImportantSkill") != 1) return;
         boss.BossSkillCds[skillId] = endMs;
         await world.ToUnitViewersAsync(boss, BossSkillCd,

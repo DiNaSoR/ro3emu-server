@@ -233,8 +233,15 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
     /// <summary>Emote favourites, unlocks and idle emote (5006, role blob "emoji_play"); EmojiService.</summary>
     public Romsg.DBEmojiPlayInfo? EmojiPlay { get; set; }
 
-    /// <summary>Profile card presets (5016, role blob "personal"; unlockInfos are derived); PersonalService.</summary>
+    /// <summary>Chat emoticons unlocked by items (5041, role blob "emoji_info"); EmojiService.</summary>
+    public Romsg.DBEmojiInfo? EmojiInfo { get; set; }
+
+    /// <summary>Profile card presets and 620 item unlocks (5016, role blob "personal"; other unlockInfos are derived); PersonalService.</summary>
     public Romsg.DBPersonalInfo? Personal { get; set; }
+
+    /// <summary>Chat cosmetics unlocked by items and the worn choices (role blob "social_outfit"; 5044 lays them over the
+    /// configuration's defaults); SocialOutfitService.</summary>
+    public Romsg.DBSocialOutfit? SocialOutfit { get; set; }
 
     /// <summary>The emote or sitting in progress (state 17 Prepare or 14 Play); runtime only, gone at logout.</summary>
     public EmojiService.Emote? Emote { get; set; }

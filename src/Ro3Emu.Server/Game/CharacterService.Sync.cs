@@ -102,6 +102,7 @@ public sealed partial class CharacterService
         info.CurrentArrowID = preferences.CurrentArrowID;
         info.ItemCds = preferences.ItemCds?.Clone();
         info.ShareCds = preferences.ShareCds?.Clone();
+        foreach (var (entry, used) in CurrentUseTimes(preferences)) info.UseTimes[entry] = used;
         var bag = session.Items.Where(i => i.Grid == 0).ToList();
         var packs = bag.Select(i => i.Pack).ToHashSet();
         if (session.Synced.GetValueOrDefault(ItemsSync) is DBItemsInfo sent) packs.UnionWith(sent.PackInfo.Keys);

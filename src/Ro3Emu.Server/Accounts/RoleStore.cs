@@ -389,6 +389,8 @@ public sealed class RoleStore
     public byte[]? LoadFirstHeart(long id) => LoadBlob(id, "first_heart");
     public void SaveFirstHeart(long id, byte[] value, RoleItemPlanBuilder? transaction = null) => SaveBlob(id, "first_heart", value, transaction);
     public byte[]? LoadPersonal(long id) => LoadBlob(id, "personal");
+    public byte[]? LoadSocialOutfit(long id) => LoadBlob(id, "social_outfit");
+    public byte[]? LoadEmojiInfo(long id) => LoadBlob(id, "emoji_info");
     public byte[]? LoadPersonalUpvotes(long id, RoleItemPlanBuilder? transaction = null) => LoadBlob(id, "personal_upvote", transaction);
     public void SavePersonalUpvotes(long id, byte[] value, RoleItemPlanBuilder transaction) => SaveBlob(id, "personal_upvote", value, transaction);
     public byte[]? LoadPopularity(long id, RoleItemPlanBuilder? transaction = null) => LoadBlob(id, "popularity", transaction);

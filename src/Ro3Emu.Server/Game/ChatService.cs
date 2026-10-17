@@ -3,7 +3,9 @@ using System.Text.Json;
 using Google.Protobuf;
 using Romsg;
 using Tencent.IM;
+using Microsoft.Extensions.Options;
 using Ro3Emu.Server.Accounts;
+using Ro3Emu.Server.Data;
 
 namespace Ro3Emu.Server.Game;
 
@@ -14,8 +16,26 @@ namespace Ro3Emu.Server.Game;
 /// ("4_&lt;sceneId&gt;" map chat, "@TGS#_1_&lt;cluster&gt;" world, ...), joined through romsg 77002; whispers address
 /// a role id.
 /// </summary>
-public sealed class ChatService(GmCommands gm, FeedbackService feedback, GuildStore guilds, FriendStore friends, ILogger<ChatService> log)
+public sealed partial class ChatService
 {
+    private readonly GmCommands gm;
+    private readonly FeedbackService feedback;
+    private readonly GuildStore guilds;
+    private readonly FriendStore friends;
+    private readonly CharacterService character;
+    private readonly GameData data;
+    private readonly SessionRegistry sessions;
+    private readonly IOptions<ServerOptions> options;
+    private readonly ILogger<ChatService> log;
+
+    public ChatService(GmCommands gm, FeedbackService feedback, GuildStore guilds, FriendStore friends, CharacterService character,
+        GameData data, SessionRegistry sessions, IOptions<ServerOptions> options, ILogger<ChatService> log)
+    {
+        this.gm = gm; this.feedback = feedback; this.guilds = guilds; this.friends = friends; this.character = character; this.data = data;
+        this.sessions = sessions; this.options = options; this.log = log;
+        character.RegisterItemAction(SoundTransmissionAction, UseHornAsync, takesParam: true);
+    }
+
     /// <summary>Bug reports: "/bug" lines here and the client hook's message (GameMessageHandler routes it through this).</summary>
     public FeedbackService Feedback => feedback;
 

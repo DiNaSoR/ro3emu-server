@@ -17,7 +17,9 @@ internal static class EconomyChildIntent
         "guild/save", "guild/role-view", "guild/recover-delete", "guild/delete", "guild/market-save",
         "guild/escort-materials", "guild/caravan-reward", "guild_campfire/save", "guild-campfire/save",
         "guild-caravan/member", "guild-caravan/version", "guild-challenge/state", "guild/event-append",
-        "guild_challenge/clear", "mail/financial-append", "auction/source-claim", "auction/item"
+        "guild_challenge/clear", "mail/financial-append", "auction/source-claim", "auction/item",
+        // AdventureGroupSavePlan: id, name, the state's JSON and the member ids (an item-unlocked card background, 118).
+        "advguild/save"
     };
 
     internal static byte[] Capture(IReadOnlyList<DbPlan> guards, IReadOnlyList<DbPlan> parts)

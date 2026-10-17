@@ -98,6 +98,7 @@ public sealed partial class WorldCoreService : IGameTicker
         combat.ReviveCheck = dungeons.ExternalReviveError;
         combat.ReviveItemSkill = ReviveItemSkillAsync;
         character.WingJump = WingJumpAsync;
+        character.RegisterItemAction(TaskJumpMapAction, UseQuestWingAsync);
         scene.QueuePublicAdmission = QueueAdmissionAsync;
         scene.PreferredLine = PreferredLine;
         lines.HasPendingWork.Add(monsters.HasPendingWork);

@@ -7,8 +7,8 @@ namespace Ro3Emu.Server.Game;
 /// Reconstructed story dungeon encounters (docs/systems/dungeon-inventory.md): the
 /// original server's encounter scripts and its 2000xxxx monster templates are not in the client. The embedded
 /// Reconstructed/dungeon-monsters.json places monsters the client knows (NPCConfig) at authored scene-editor points,
-/// one wave per quest stage, with a reason and a confidence for every decision, and names the monster whose normal
-/// attack a story template (530xxxx, no normal attack in the client) borrows. The embedded Reconstructed/scripted-scenes.json
+/// one wave per quest stage, with a reason and a confidence for every decision, and can name the monster whose normal
+/// attack a template without one of its own borrows. The embedded Reconstructed/scripted-scenes.json
 /// rebuilds the scripted story scenes without a fight (ReconstructedDungeons.Scripted.cs). Switch: Ro3Emu:ReconstructedDungeons.
 /// </summary>
 public sealed partial class ReconstructedDungeons
@@ -52,7 +52,7 @@ public sealed partial class ReconstructedDungeons
     /// <summary>The reconstruction of a scene, when the switch is on.</summary>
     public Dungeon? For(long scene) => Enabled && _dungeons.TryGetValue(scene, out var d) ? d : null;
 
-    /// <summary>The monster whose normal attack a story template borrows (applies whenever the template is used).</summary>
+    /// <summary>The monster whose normal attack a template without its own borrows (applies whenever the template is used).</summary>
     public int? AttackSource(int npcId) => Enabled && _attackSources.TryGetValue(npcId, out int from) ? from : null;
 
     /// <summary>A story boss's solo scaling (basis points of HP and of attack); its allied companions are not reproduced.</summary>

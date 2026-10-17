@@ -94,6 +94,7 @@ public static class ServerHost
         builder.Services.AddSingleton<SeasonRefineService>();
         builder.Services.AddSingleton<SeasonTalentService>();
         builder.Services.AddSingleton<ShopService>();
+        builder.Services.AddSingleton<ItemBoxService>();
         builder.Services.AddSingleton<MountService>();
         builder.Services.AddSingleton<CareerSpecialService>();
         builder.Services.AddSingleton<WardrobeService>();
@@ -447,6 +448,7 @@ internal sealed class GameLoopTickers(IServiceProvider services) : IHostedServic
         Add<Game.Persistence.PositionPersistence>();
         Add<Game.Persistence.SettingsPersistence>();
         Add<ShopService>(); // 05:00 purchase-limit rollover
+        Add<ItemBoxService>(); // award boxes; 05:00 item use-time rollover
         return Task.CompletedTask;
     }
 

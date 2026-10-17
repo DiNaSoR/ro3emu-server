@@ -22,7 +22,7 @@ namespace Ro3Emu.Server.Game;
 public sealed partial class GuildService(GameData data, GuildStore store, RoleStore roles, SessionRegistry sessions,
     CharacterService character, FunctionService functions, ChatService chat, IOptions<ServerOptions> options,
     TimeProvider clock, Ownership.OwnerRegistry ownerRegistry, AwardService awards, GameLoop loop, SceneService scene,
-    TeamService teams)
+    TeamService teams, MailService mail, ILogger<GuildService> log)
 {
     public const uint GuildSync = 5047, Create = 32210, Recommend = 32211, HelperList = 32212, Full = 32213, MemberChange = 32214;
     public const uint CheckSensitive = 10003;
@@ -51,6 +51,7 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
     private async Task LoginCoreAsync(GameSession session)
     {
         HookDeposits();
+        HookItemActions();
         // Authoritative membership index wins over any stale role blob after reconnect/role switch.
         var guild = Own(session);
         var personal = Personal(session.Role!.Id);
@@ -220,6 +221,8 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
                 .Select(a => HelperInfo(a.RoleId, a.Name, a.Level, a.Career, a.ApplyTime)));
         full.ApplyInfo.AddRange(g.Applications.Values.Select(ApplyInfo));
         full.Building.AddRange(g.Buildings.Select(k => BuildingInfo(g, k.Key)));
+        full.UnLockHeadIconData.AddRange(UnlockedIcons(g));
+        full.ShopCommodityData.AddRange(StoreCounts(g));
         return full;
     }
 
@@ -330,14 +333,16 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
         return GameData.Number(value) is { } n ? [(long)n] : fallback;
     }
 
-    private int CheckIcon(GuildHeadIcon? icon)
+    /// <summary>A frame (type 1) and a design (type 2) the create widget shows (_iCreateShow), unlocked by default or, for an
+    /// existing guild, by a 113 item (GuildService.ItemActions).</summary>
+    private int CheckIcon(GuildHeadIcon? icon, GuildStore.State? guild = null)
     {
         if (icon == null) return ErrorCodes.Parameter;
         var frame = data.Row("GuildIconConfig", icon.BackgroundType);
         var design = data.Row("GuildIconConfig", icon.IconType);
         // The create widget sends frame data first (type 1, 100xxx), icon data second (type 2, 200xxx).
-        if (frame is not { } f || GameData.Int(f, "_iType") != 1 || GameData.Int(f, "_iDefaultUnlock") == 0 || GameData.Int(f, "_iCreateShow") == 0) return ErrorCodes.GuildFrameLocked;
-        if (design is not { } d || GameData.Int(d, "_iType") != 2 || GameData.Int(d, "_iDefaultUnlock") == 0 || GameData.Int(d, "_iCreateShow") == 0) return ErrorCodes.GuildIconLocked;
+        if (frame is not { } f || GameData.Int(f, "_iType") != 1 || !IconUnlocked(guild, f) || GameData.Int(f, "_iCreateShow") == 0) return ErrorCodes.GuildFrameLocked;
+        if (design is not { } d || GameData.Int(d, "_iType") != 2 || !IconUnlocked(guild, d) || GameData.Int(d, "_iCreateShow") == 0) return ErrorCodes.GuildIconLocked;
         return 0;
     }
 
@@ -833,7 +838,7 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
                         }
                     }
                     break;
-                case 3: code = CheckIcon(req.Icon);
+                case 3: code = CheckIcon(req.Icon, g);
                     if (code == 0 && !req.IsCheck) { g.Background = req.Icon.BackgroundType; g.Icon = req.Icon.IconType; } break;
                 case 4: code = CheckRights(req.Right);
                     if (code == 0 && !req.IsCheck)

@@ -124,6 +124,9 @@ public sealed class StoryBlockerTests : IAsyncLifetime
         // ItemConfig 1002000 [[8,...],[102,0],[104]]; the map panel sends ItemUseParamInfo.butterflyWings.mapId.
         await using var bot = await InWorld();
         await Gm("!item 1002000 2");
+        // Off the starting maps (ItemUseLimitConfig 1001 is not enforced; this only keeps the test map-independent).
+        var point = Service<WorldData>().Map(10220)!.Points.Values.First();
+        await WarpAsync(bot, Gm, 10220, point.X, point.Z);
         long guid = await Read(s => s.Items.Single(i => i.Entry == 1002000).Guid);
         var bare = await Request(bot, CharacterService.ItemUse, new ItemUseReq { ItemGuid = guid, ItemCount = 1 }, ItemUseResp.Parser);
         Assert.NotEqual(0, bare.Result); // no destination picked

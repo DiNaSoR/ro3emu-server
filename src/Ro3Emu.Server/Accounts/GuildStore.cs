@@ -53,6 +53,13 @@ public sealed class GuildStore
         /// 32302 saves against (GuildService.LeagueElite).</summary>
         public Dictionary<int, long> LeagueElites { get; set; } = new();
         public int LeagueEliteVersion { get; set; }
+        /// <summary>Badge frames and designs unlocked by 113 items: GuildIconConfig id to removetime (unix s, 0 permanent);
+        /// DBGuildData unLockHeadIconData (GuildService.ItemActions).</summary>
+        public Dictionary<long, long> UnlockedHeadIcons { get; set; } = new();
+        /// <summary>Guild Store (ShopConfig 2702) purchases of the week ShopCommodityWeek (Monday 05:00, unix s), guild-wide:
+        /// commodity to count; DBGuildData shopCommodityData.</summary>
+        public Dictionary<int, int> ShopCommodityBuys { get; set; } = new();
+        public long ShopCommodityWeek { get; set; }
         /// <summary>32228 journal rows (GuildEventData bytes) to append with this state's next save; not part of the state.</summary>
         internal List<byte[]> PendingEvents { get; } = new();
     }

@@ -17,16 +17,16 @@ namespace Ro3Emu.Server.Game;
 /// (UI_Sys_PersonalPanelModel.ApplyEditChange, the sticker panel, the friend window's signature and mood) sends the whole
 /// preset back in 82553. Other players read the current preset as UserDataService's "Personal" field
 /// (LC_DAL_RolePublic.lua:874-900) and its avatar, frame and title through Base.
-/// <para>Stored: presets, current preset and upvote times (role blob "personal"). unlockInfos are derived each time from
-/// the unlock conditions of the tables the editor checks (theme, background, action). The likes a card received are the
-/// role blob "personal_upvote" (PersonalUpvoteList), its popularity the role blob "popularity" (DBPopularityStar).</para>
+/// <para>Stored: presets, current preset, upvote times and the 620 item unlocks (role blob "personal"). The rest of
+/// unlockInfos is derived each time from the unlock conditions of the tables the editor checks (theme, background,
+/// action). The likes a card received are the role blob "personal_upvote" (PersonalUpvoteList), its popularity the role blob "popularity" (DBPopularityStar).</para>
 /// </summary>
 public sealed class PersonalService
 {
     public const uint Sync = 5016, UpdateAppearance = 82553, Upvote = 82554, UpdateCurPlan = 82559, UpdatePlanName = 82560;
     // ErrorCodeConfig 3351-3367, the profile family.
     public const int ErrConfig = 3351, ErrParameter = 3352, ErrFunction = 3354, ErrLocked = 3357, ErrStickers = 3358,
-        ErrUpvoted = 3359, ErrUpvoteSelf = 3361, ErrUpvoteCooldown = 3362,
+        ErrUnlocked = 3356, ErrUpvoted = 3359, ErrUpvoteSelf = 3361, ErrUpvoteCooldown = 3362,
         ErrPreset = 3363, ErrSignLength = 3364, ErrSignSensitive = 3365, ErrNameLength = 3366, ErrNameSensitive = 3367;
     // The gift panel's effect ids (UI_Sys_Friend_GiftToFriendsPanelCtrl: Intimacy 107, TotalPopularity 108, Charity 109).
     private const int EffectPopularity = 108, EffectCharity = 109;
@@ -60,6 +60,7 @@ public sealed class PersonalService
         this.clock = clock;
         // Action 1002 unlocks at base level 50 (PersonalPerformanceConfig, condition 18000001).
         character.ProgressHandlers.Add(RefreshAsync);
+        character.RegisterItemAction(UnlockDecorationAction, UseDecorationItemAsync);
     }
 
     // ------------------------------------------------------------------ load / 5016
@@ -117,15 +118,18 @@ public sealed class PersonalService
     /// <summary>
     /// The unlocked theme, background and action ids. A row with an _iUnlockCondition is unlocked when the condition holds
     /// (all are base level conditions: [1002,1] for the default theme, background and idle action, [1002,50] for walk).
-    /// A row without one (0) is obtained elsewhere (_kImageObtain: the Fashion Shop, Growth Support rewards), which this
-    /// server does not sell yet, so it stays locked (inferred).
+    /// A row without one (0) is obtained elsewhere (_kImageObtain: the Fashion Shop, Growth Support rewards): a 620 item
+    /// unlocks it for good (UseDecorationItemAsync), the shops do not sell it yet (inferred).
     /// </summary>
     private IEnumerable<(int Type, List<int> Ids)> Unlocks(GameSession s)
     {
         var images = data.Table("PersonalHomepageImageConfig").Values;
-        yield return (UnlockTheme, images.Where(r => GameData.Int(r, "_iImageType") == ImageTheme && Unlocked(s, r)).Select(Id).ToList());
-        yield return (UnlockBackground, images.Where(r => GameData.Int(r, "_iImageType") == ImageBackground && Unlocked(s, r)).Select(Id).ToList());
-        yield return (UnlockAction, data.Table("PersonalPerformanceConfig").Values.Where(r => Unlocked(s, r)).Select(Id).ToList());
+        yield return (UnlockTheme, images.Where(r => GameData.Int(r, "_iImageType") == ImageTheme
+            && (Unlocked(s, r) || ItemUnlocked(s, UnlockTheme, Id(r)))).Select(Id).ToList());
+        yield return (UnlockBackground, images.Where(r => GameData.Int(r, "_iImageType") == ImageBackground
+            && (Unlocked(s, r) || ItemUnlocked(s, UnlockBackground, Id(r)))).Select(Id).ToList());
+        yield return (UnlockAction, data.Table("PersonalPerformanceConfig").Values
+            .Where(r => Unlocked(s, r) || ItemUnlocked(s, UnlockAction, Id(r))).Select(Id).ToList());
     }
 
     private static int Id(JsonElement row) => (int)GameData.Int(row, "_iID");
@@ -256,6 +260,53 @@ public sealed class PersonalService
         }
         await s.SendGameAsync(UpdatePlanName, new UpdatePersonalPlanNameResp { Result = result, Req = req });
         if (result == 0) await SyncAsync(s);
+    }
+
+    // ------------------------------------------------------------------ 620 item unlocks
+
+    internal const int UnlockDecorationAction = 620;
+
+    /// <summary>A theme, background or action a 620 item unlocked: stored in DBPersonalInfo.unlockInfos.</summary>
+    private static bool ItemUnlocked(GameSession s, int type, int id) =>
+        s.Personal?.UnlockInfos.TryGetValue(type, out var unlocks) == true && unlocks.UnlockMap.GetValueOrDefault(id);
+
+    /// <summary>
+    /// 620 UnlockPersonalDecoration [620, enum_PersonalUnlockType, id]: 2120001..2120003 [620,4,1003..1005] a card theme,
+    /// 2110001/2110002 [620,5,2003/2004] a background, the test card 1960003 [620,6,50004] an action. The themes and
+    /// backgrounds they name are the PersonalHomepageImageConfig rows without an _iUnlockCondition (_kImageObtain [3001,
+    /// 3004]), which nothing else unlocks. The unlock is kept in unlockInfos (5016, LC_DAL_Personal PersonalUnlockInfo, the
+    /// editor's lock via LC_PersonalHelper.CheckItemIsOpen) and the item goes in the same commit. An id without its
+    /// config row (50004) is ErrConfig and an id already open is ErrUnlocked "Item unlocked." (inferred: the profile
+    /// family's own code), both keeping the item.
+    /// </summary>
+    private async Task<int> UseDecorationItemAsync(ItemActionUse use)
+    {
+        var s = use.Session;
+        if (s.Personal == null || s.Progress == null) return ErrorCodes.FeatureUnavailable;
+        var picks = use.Effects.Select(e => (Type: e.Length > 1 ? (int)e[1] : 0, Id: e.Length > 2 ? (int)e[2] : 0)).ToList();
+        foreach (var (type, id) in picks)
+        {
+            var row = type switch
+            {
+                UnlockTheme or UnlockBackground => data.Row("PersonalHomepageImageConfig", id) is { } image
+                    && GameData.Int(image, "_iImageType") == (type == UnlockTheme ? ImageTheme : ImageBackground) ? image : (JsonElement?)null,
+                UnlockAction => data.Row("PersonalPerformanceConfig", id),
+                _ => null,
+            };
+            if (row == null) return ErrConfig;
+        }
+        if (picks.All(p => IsUnlocked(s, p.Type, p.Id))) return ErrUnlocked;
+        var next = s.Personal.Clone();
+        foreach (var (type, id) in picks)
+        {
+            if (!next.UnlockInfos.TryGetValue(type, out var unlocks)) next.UnlockInfos[type] = unlocks = new DBPersonalUnlockInfo();
+            unlocks.UnlockMap[id] = true;
+        }
+        byte[] saved = next.ToByteArray();
+        if (!await character.CommitItemActionAsync(use, tx => tx.RoleBlob(s.Role!.Id, "personal", saved), () => s.Personal = next,
+            new { Personal = picks.Select(p => new[] { p.Type, p.Id }).ToArray() })) return ErrorCodes.ItemsShort;
+        await SyncAsync(s);
+        return 0;
     }
 
     // ------------------------------------------------------------------ 82554 likes

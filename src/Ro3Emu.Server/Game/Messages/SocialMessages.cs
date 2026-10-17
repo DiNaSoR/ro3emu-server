@@ -5,7 +5,7 @@ using Romsg;
 namespace Ro3Emu.Server.Game;
 
 /// <summary>Chat, teams, friends, guilds and their caravan, challenge, campfire and home, emblems.</summary>
-public sealed class SocialMessages(ChatService chat, TeamService teams, EmblemService emblems, GuildService guilds, GuildCaravanService caravan, GuildChallengeService guildChallenge, FriendExtraService friendExtra, GuildCampfireService campfire, GuildHomeService guildHome, GuildHuntingService hunting, PersonalService personal) : Messaging.IMessageModule
+public sealed class SocialMessages(ChatService chat, TeamService teams, EmblemService emblems, GuildService guilds, GuildCaravanService caravan, GuildChallengeService guildChallenge, FriendExtraService friendExtra, GuildCampfireService campfire, GuildHomeService guildHome, GuildHuntingService hunting, PersonalService personal, SocialOutfitService socialOutfit) : Messaging.IMessageModule
 {
     private const uint SetFriendSystemMetadata = 82208, GetGuildLeagueMgrData = GuildLeagueService.MgrData;
 
@@ -26,6 +26,8 @@ public sealed class SocialMessages(ChatService chat, TeamService teams, EmblemSe
         routes.AdmitRole(id => id is GuildHuntingService.History);
         // Profile card edits change the sender's own presets; readers see them through UserDataService.
         routes.AdmitRole(id => id is PersonalService.UpdateAppearance or PersonalService.UpdateCurPlan or PersonalService.UpdatePlanName);
+        // Wearing a chat cosmetic changes the sender's own 5044; readers see it through UserDataService.
+        routes.AdmitRole(id => id is SocialOutfitService.Equip or SocialOutfitService.Refresh);
 
         routes.Map(PersonalService.UpdateAppearance, "personal", async (session, msgId, body) =>
         {
@@ -43,6 +45,19 @@ public sealed class SocialMessages(ChatService chat, TeamService teams, EmblemSe
         routes.Map(PersonalService.UpdatePlanName, "personal", async (session, msgId, body) =>
         {
             await personal.UpdatePlanNameAsync(session, UpdatePersonalPlanNameReq.Parser.ParseFrom(body.Span));
+        });
+        // Guild Store: the guild-social owner admits the buyer's own guild keys (RunGuildAsync).
+        routes.Map(GuildService.BuyCommodity, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.BuyCommodityAsync(session, BuyGuildCommodityReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(SocialOutfitService.Equip, "socialOutfit", async (session, msgId, body) =>
+        {
+            await socialOutfit.EquipAsync(session, EquipSocialOutfitReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(SocialOutfitService.Refresh, "socialOutfit", async (session, msgId, body) =>
+        {
+            await socialOutfit.RefreshAsync(session);
         });
 
         // Not a guild-social owner: the default Realm reservation serializes the first entries of one guild, as 30400.

@@ -52,7 +52,10 @@ public static partial class EconomySnapshotReader
     // awards (RestrictConfig 1020) and OnePieceWeek/OnePieceWeekItems the week's capped extra items. No balance: the goods
     // come with the timed_battle_obligation the same settlement writes; these are only its limits. The legacy per-day
     // OnePieceGains/OnePieceItemGains are read and dropped on the next Rift payment.
-    public const string ExpectedFormatManifestHash = "75E88A1384446D170F3CB8F35AA5167ADE2360C2C419AF476EC2CBE836F208EC";
+    // Item actions: role.social_outfit is DBSocialOutfit (chat cosmetics unlocked by 349 items, with unlock and expiry
+    // times, and the worn choices) and role.emoji_info is DBEmojiInfo (chat emoticon ids unlocked by 212 items). Unlocks,
+    // no balance and no asset: the item is spent by the cd13a/character-item-action receipt that writes them.
+    public const string ExpectedFormatManifestHash = "ED3CD071B4BA3D2ABCDDD34A81B9B598F4CC28C9202B9999A2B638596504714C";
     public static string FormatManifestHash => State.FormatManifestHash;
 
     private sealed partial class State

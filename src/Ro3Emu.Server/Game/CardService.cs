@@ -58,6 +58,7 @@ public sealed partial class CardService
         this.loop = loop;
         character.ItemGained.Add(OnItemGained);
         character.StageFirstCardSight = StageFirstCardSight;
+        character.RegisterItemAction(GainLibraryPageAction, UseLibraryPageItemAsync);
     }
 
     // ---- login ----
@@ -82,7 +83,7 @@ public sealed partial class CardService
         session.CardPlans = plans != null ? DBStorageHoleInfo.Parser.ParseFrom(plans) : NewPlans(session);
         if (!session.CardPlans.StoragePlans.ContainsKey(session.CardPlans.CurrentPlan)) session.CardPlans.CurrentPlan = 1;
         await SyncPlans(session);
-        if (session.Library.Cards.Count > 0 || session.Library.Monsters.Count > 0)
+        if (session.Library.Cards.Count > 0 || session.Library.Monsters.Count > 0 || session.Library.Pages.Count > 0)
             await CharacterService.SyncAsync(session, LibrarySync, session.Library.Clone());
     }
 

@@ -130,6 +130,11 @@ public sealed class UserDataService(SocialOwnerCache cache, OwnerRegistry owners
             additional.AvatarId = card.AvatarId; additional.AvatarFrameId = card.AvatarFrameId;
             additional.PersonalTitleId = card.PersonalTitleId;
         }
+        // The worn chat cosmetics (slot type to outfit): other players' chat bubble, honor, overhead title and profile card
+        // index them unguarded (UI_Sys_Chat_BgWidgetCtrl, UI_Sys_Personal_InfoWidgetCtrl), so the defaults are sent too.
+        additional.SocialOutfitData = SocialOutfitService.Worn(data, role.Sex, live?.Career ?? role.Career, session?.SocialOutfit
+            ?? (profile.SocialOutfit is { Length: > 0 } outfits ? DBSocialOutfit.Parser.ParseFrom(outfits) : null),
+            clock.GetUtcNow().ToUnixTimeSeconds());
         var fields = new Dictionary<string, object?>
         {
             ["Base"] = additional.ToByteArray(),

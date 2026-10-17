@@ -24,6 +24,7 @@ public enum EconomyReason
     // E05a reserved persisted values; do not renumber or reuse sibling branch ranges.
     EquipmentCost = 140, AppraisalCost = 141, EnchantCost = 142, EnchantRefund = 143,
     CardInput = 144, CardOutput = 145, ShopPayment = 146, ShopGoods = 147,
+    ItemBoxGoods = 148, // award box contents (cd13a/character-box)
     // C/D 13e + E02 reserved range 120-139.
     OwnedGrant = 120, OwnedAwardCost = 121, DailyReset = 122,
     AchievementReward = 123, // achievement / Trophy tier claims (cd13e/achievement-award)
@@ -47,7 +48,7 @@ public enum EconomyReason
 
 public static class EconomyReasonCatalog
 {
-    public const string Version = "economy-reasons-v13"; // each merge of a branch's reasons gets a new version
+    public const string Version = "economy-reasons-v14"; // each merge of a branch's reasons gets a new version
 
     public static bool Allows(EconomyReason reason, EconomyLegKind kind) => reason switch
     {
@@ -58,7 +59,7 @@ public static class EconomyReasonCatalog
         EconomyReason.GuildResourceGrant or EconomyReason.SystemRestock or EconomyReason.MountGoods or
         EconomyReason.WardrobeGoods or EconomyReason.TotemGoods or EconomyReason.EmblemGoods or
         EconomyReason.GenreGoods or EconomyReason.PetGoods or EconomyReason.TotemRefund or
-        EconomyReason.EnchantRefund or EconomyReason.CardOutput or EconomyReason.ShopGoods or
+        EconomyReason.EnchantRefund or EconomyReason.CardOutput or EconomyReason.ShopGoods or EconomyReason.ItemBoxGoods or
         EconomyReason.OwnedGrant or EconomyReason.AchievementReward or EconomyReason.AdventureGroupReward or EconomyReason.MonsterHuntReward or EconomyReason.GuildReward or
         EconomyReason.GrowthClassReward or EconomyReason.LibraryReward or EconomyReason.FirstHeartReward or
         EconomyReason.LifeGoods or EconomyReason.SeasonGoods or EconomyReason.SeasonRefund or
