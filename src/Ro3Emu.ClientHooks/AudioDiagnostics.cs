@@ -49,6 +49,8 @@ namespace Ro3Emu.ClientHooks
                     HappyEngine.GS_Debug.ShowLog = parts.Length < 2 || parts[1] != "off";
                     Step("game debug log " + (HappyEngine.GS_Debug.ShowLog ? "on" : "off"));
                     TraceSound3D(HappyEngine.GS_Debug.ShowLog);
+                    _watch = HappyEngine.GS_Debug.ShowLog;
+                    _lastState = null;
                     break;
                 case "stopall":
                     AD_WwiseManager.Instance.StopAll();
@@ -172,48 +174,52 @@ namespace Ro3Emu.ClientHooks
         private static void Anim()
         {
             var player = AD_WwisePlayer.globalPlayer;
-            Transform playerRoot = player != null ? player.transform.root : null;
-            if (playerRoot != null)
-                foreach (var v in playerRoot.GetComponentsInChildren<RD_Visible_Animator>(true))
-                    DescribeAnimator("player", v);
+            if (player != null)
+                foreach (var v in player.GetComponentsInChildren<RD_Visible_Animator>(true))
+                    DescribeAnimator("player", v, true);
             else Step("anim: no local player");
-            int others = 0;
+            // One line per distinct model that has sound cues (monsters), with the cue details, as a template.
+            var seen = new System.Collections.Generic.HashSet<string>();
             foreach (var v in UnityEngine.Object.FindObjectsOfType<RD_Visible_Animator>())
             {
-                if (playerRoot != null && v.transform.root == playerRoot) continue;
-                if (++others > 2) break;
-                DescribeAnimator("other", v);
+                if (player != null && v.transform.IsChildOf(player.transform)) continue;
+                var path = Field(v, "m_kAnimationStateAdditionalDataPath") as string ?? "";
+                if (!seen.Add(path) || seen.Count > 12) continue;
+                DescribeAnimator("other", v, false);
             }
         }
 
-        private static void DescribeAnimator(string who, RD_Visible_Animator v)
+        private static void DescribeAnimator(string who, RD_Visible_Animator v, bool states)
         {
             var sb = new System.Text.StringBuilder();
-            sb.Append("anim ").Append(who).Append(' ').Append(Diagnostics.PathOf(v.transform))
+            sb.Append("anim ").Append(who).Append(' ').Append(v.gameObject.name)
               .Append(" type=").Append(v.GetType().Name)
-              .Append(" active=").Append(v.gameObject.activeInHierarchy)
-              .Append(" clipPlayable=").Append(Field(v, "m_bUseClipPlayable"))
-              .Append(" dots=").Append(v.m_bUseDOTS)
               .Append(" controller=").Append(Field(v, "m_kControllerDataPath"))
               .Append(" additional=").Append(Field(v, "m_kAnimationStateAdditionalDataPath"))
               .Append(" playing=").Append(Field(v, "m_sCurrentPlayingState"));
+            if (states && Field(v, "m_kControllerData") is System.Collections.IDictionary controller)
+            {
+                sb.Append("\n    states:");
+                foreach (var key in controller.Keys) sb.Append(' ').Append(key);
+            }
             var map = Field(v, "m_kAnimationStateAdditionalData") as System.Collections.Generic.Dictionary<string, RD_AnimationStateAdditionalData>;
             if (map == null) sb.Append(" additionalData=NULL");
             else
             {
                 sb.Append(" additionalData states=").Append(map.Count);
-                int withAudio = 0;
                 foreach (var kv in map)
                 {
                     var list = kv.Value?.m_kAudioEventList;
                     if (list == null || list.Count == 0) continue;
-                    if (++withAudio > 25) continue;
                     sb.Append("\n    ").Append(kv.Key).Append(':');
                     foreach (var e in list)
-                        sb.Append(' ').Append(e.m_kAudioResNameList.Count > 0 ? e.m_kAudioResNameList[0] : "-")
-                          .Append('@').Append(e.m_fTriggerStartTime.ToString("F2"));
+                        sb.Append(' ').Append(string.Join("|", e.m_kAudioResNameList))
+                          .Append(" start=").Append(e.m_fTriggerStartTime.ToString("F2"))
+                          .Append(" len=").Append(e.m_fTriggerLength.ToString("F2"))
+                          .Append(" bind=").Append(e.m_bBind).Append(" bindModel=").Append(e.m_bBindModel)
+                          .Append(" loop=").Append(e.m_bLoopTrigger).Append(" max=").Append(e.m_iMaxPlayingCount)
+                          .Append(" vol=").Append(e.m_fVolume.ToString("F2")).Append(';');
                 }
-                sb.Append("\n    states with sounds: ").Append(withAudio);
             }
             Step(sb.ToString());
         }
@@ -245,6 +251,25 @@ namespace Ro3Emu.ClientHooks
         private static readonly Sound3DMethod Sound3DWrapper = Sound3D;
         private static Obf_R.Obf_ff _wwiseTable;
         private static Obf_R.Obf_Ef _sound3DOriginal;
+
+        private static string _lastState;
+        private static bool _watch;
+
+        /// <summary>Every frame (UiTweaks.Tick): while the debug log is on, logs each animation the player's model starts.</summary>
+        public static void Tick()
+        {
+            if (!_watch) return;
+            try
+            {
+                var player = AD_WwisePlayer.globalPlayer;
+                var v = player != null ? player.GetComponentInChildren<RD_Visible_Animator>() : null;
+                var state = v != null ? Field(v, "m_sCurrentPlayingState") as string : null;
+                if (state == _lastState) return;
+                _lastState = state;
+                Step("player animation " + (state ?? "-"));
+            }
+            catch (Exception e) { Step("animation watch failed: " + e.Message); _watch = false; }
+        }
 
         private static void TraceSound3D(bool on)
         {
