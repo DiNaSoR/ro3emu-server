@@ -235,6 +235,42 @@ public sealed partial class SkillCombatTests : IAsyncLifetime
         Assert.Equal(ErrorCodes.SkillPassive, (await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
     }
 
+    private sealed class FixedRolls(int proc) : CombatRolls
+    {
+        public override double Hit() => 0;
+        public override double DamageFloat() => 0.5;
+        public override double Crit() => 0.999999;
+        public override int Proc(int max) => Math.Min(proc, max - 1);
+    }
+
+    [ClientDataFact]
+    public async Task ThiefDaggerBasicAttackProcsDoubleAttack()
+    {
+        await using var alice = await InWorld("Alice");
+        var bag = await Next(alice, CharacterService.ItemsSync, DBItemsInfoIncrement.Parser);
+        long dagger = bag.PackInfo[2].All.Items.Values.Single(i => i.ItemEntry == 2010121).ItemGuid;
+        await Gm("alice", "!job 5100");
+        await Teach("alice", 15002); // Double Attack 1: 1% chance, 1 extra hit of PATK x 50%
+        await alice.SendGameAsync(CharacterService.EquipItemOpr, new EquipItemOprReq { Opr = 0, Pos = (EquipGridType)1, ItemGUID = dagger });
+        await Next(alice, SkillService.SkillDataSync, DBSkillDataIncrement.Parser, m => !m.SyncAllMark && m.CurrentAtkSkillId == 1005001);
+        var combat = app.Services.GetRequiredService<CombatService>();
+
+        combat.Rolls = new FixedRolls(99); // no proc
+        var target = await Target("alice", stationary: true);
+        await Loop.InvokeAsync(() => { target.Hp = 1_000_000; return Task.CompletedTask; });
+        await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1005001, TargetId = target.Uid });
+        var reply = await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser);
+        Assert.Equal(0, reply.Result);
+        var first = await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser, h => h.SessionId == reply.SessionId);
+        long plain = Assert.Single(first.Dsts, d => d.DstID == target.Uid).Damage;
+        // The normal attack repeats on its own (AttackLoop); the next swing rolls a proc.
+        combat.Rolls = new FixedRolls(0);
+        var next = await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser,
+            h => h.SessionId != reply.SessionId && h.Dsts.Any(d => d.DstID == target.Uid));
+        long doubled = Assert.Single(next.Dsts, d => d.DstID == target.Uid).Damage;
+        Assert.True(doubled > plain, $"Double Attack added nothing: {plain} then {doubled}");
+    }
+
     [ClientDataFact]
     public async Task InterruptInvalidatesDelayedHitAndEchoesAutoCast()
     {

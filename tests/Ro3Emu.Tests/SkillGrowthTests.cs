@@ -102,8 +102,9 @@ public sealed class SkillGrowthTests : IAsyncLifetime
         await again.SendGameAsync(1023, new PlayerAssetReq { AssetType = { 5 } });
         var swordman = await Next(again, SkillService.SkillDataSync, DBSkillDataIncrement.Parser,
             m => m.SyncAllMark && m.CurrentAtkSkillId == 1100001);
-        Assert.DoesNotContain(swordman.SkillWheel.All.WhellSkills.Values,
-            slot => slot.SkillConfigId == 1100001);
+        // The Novice's Normal Attack slot now casts the job's attack (the skill window shows that cell as it too).
+        Assert.Equal(1100001, swordman.SkillWheel.All.WhellSkills[1].SkillConfigId);
+        Assert.DoesNotContain(swordman.SkillWheel.All.WhellSkills.Values, slot => slot.SkillConfigId == 1000001);
     }
 
     [ClientDataFact]

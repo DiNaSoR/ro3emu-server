@@ -144,6 +144,9 @@ public sealed partial class CharacterService(RoleStore roles, ItemStore itemStor
     /// <summary>Runs after level / job level / job changes (SkillService resends skill points and the normal attack).</summary>
     public List<Func<GameSession, Task>> ProgressHandlers { get; } = new();
 
+    /// <summary>Runs under the state lock after worn gear changed (equip, unequip, plan switch): the weapon picks the normal attack.</summary>
+    public List<Func<GameSession, Task>> EquipmentChanged { get; } = new();
+
 }
 
 /// <summary>Per equipment grid (1..7) levels, kept with the role: strengthen, refine and refine luck (1/10000).</summary>
