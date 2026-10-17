@@ -65,6 +65,7 @@ public sealed class TotemFamilyEconomyTests : IAsyncLifetime
 
     private static async Task<T> Next<T>(BotClient bot, uint id, MessageParser<T> parser) where T : IMessage<T> =>
         parser.ParseFrom((await bot.Inbox.WaitAsync(e => e.IsGame(id), TimeSpan.FromSeconds(10))).Body);
+    private const string QuestAward = "cd13e/quest-award";
     private EconomySnapshot Cut() => S3EconomyReader.Read(directory, EconomyCatalog.Load(Path.Combine(RepoRoot(), "data")));
     private EconomyLedgerWindow Window(EconomySnapshot a, EconomySnapshot b) =>
         S3EconomyReader.ReadLedger(directory, EconomyCatalog.Load(Path.Combine(RepoRoot(), "data")), a, b)!;
@@ -80,7 +81,8 @@ public sealed class TotemFamilyEconomyTests : IAsyncLifetime
         Assert.Equal(guid, Session.Totems!.TotemPlans[0].SetUpTotem[1]);
         Assert.Equal(1, Session.Items.Single(i => i.Guid == guid).Attrs![10001]);
         var up = Cut();
-        var first = Assert.Single(Window(opening, up).Receipts);
+        // Growth Classroom quests (1700500 deploy, 1700518 combine) deliver their zero-leg awards beside these.
+        var first = Assert.Single(Window(opening, up).Receipts, r => r.CommandKind != QuestAward);
         Assert.Equal(1, first.LegCount);
         var upLeg = Assert.Single(Window(opening, up).Legs);
         Assert.Equal(EconomyLegKind.Metadata, upLeg.Kind);
@@ -95,7 +97,7 @@ public sealed class TotemFamilyEconomyTests : IAsyncLifetime
         await bot.SendGameAsync(82362, new SetUpTotemReq { TotemPos = 1, TotemGuid = 0 });
         Assert.Equal(0, (await Next(bot, 82362, SetUpTotemResp.Parser)).Result);
         var down = Cut();
-        var second = Assert.Single(Window(up, down).Receipts);
+        var second = Assert.Single(Window(up, down).Receipts, r => r.CommandKind != QuestAward);
         Assert.Equal(1, second.LegCount);
         var downLeg = Assert.Single(Window(up, down).Legs);
         Assert.Equal(EconomyLegKind.Metadata, downLeg.Kind);
@@ -133,7 +135,7 @@ public sealed class TotemFamilyEconomyTests : IAsyncLifetime
         Assert.DoesNotContain(durable, i => i.Guid == leftGuid || i.Guid == rightGuid);
         Assert.Equal((1, 0L), (durable.Single(i => i.Guid == item.Guid).BindType, durable.Single(i => i.Guid == item.Guid).BindExpire));
         var window = Window(opening, Cut());
-        var receipt = Assert.Single(window.Receipts);
+        var receipt = Assert.Single(window.Receipts, r => r.CommandKind != QuestAward);
         Assert.Equal(3, receipt.LegCount);
         var source = Assert.Single(window.Legs, leg => leg.Kind == EconomyLegKind.Source);
         Assert.Equal((17400001L, 1L, item.Guid.ToString()),

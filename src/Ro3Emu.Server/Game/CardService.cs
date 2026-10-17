@@ -725,7 +725,11 @@ public sealed partial class CardService
                             ? Task.CompletedTask : CharacterService.SyncAsync(session, LibrarySync, session.Library!.Clone())); });
     }
 
-    /// <summary>82404: activate a collected card's entry (the request carries the card item id).</summary>
+    /// <summary>
+    /// 82404: activate a collected card's entry (the request carries the card item id). A normal unlock pays its
+    /// Collection Points (CardUnlockPoints) in the same commit as the entry and its quest follow-up, an owned
+    /// cd13e/library-award like the Codex monster unlock's; a failed commit changes nothing and answers Unknown.
+    /// </summary>
     public async Task UnlockAsync(GameSession session, LibraryCardUnlockReq req)
     {
         using var owner = await session.Owners!.EnterAsync("card/unlock", ReservationKey.Role(session.Role!.Id));
@@ -733,7 +737,7 @@ public sealed partial class CardService
         context.AssertRole(session.Role.Id);
         context.BindPresentation(session);
         var attachment = session.Attachment;
-        bool ok;
+        bool ok, failed = false;
         int error;
         using (await CharacterService.Lock(session, context))
         {
@@ -744,13 +748,36 @@ public sealed partial class CardService
                 var e = next.Cards[req.CardId];
                 if (req.IsTreasure) e.TreasureUnlock = true;
                 else e.Unlock = true;
-                await roles.CommitCardUnlockAsync(session.Role.Id, session.Owner!.LifecycleEpoch,
-                    req.CardId, req.IsTreasure, next.ToByteArray(), session.Items,
-                    character.FamilyEconomy(session, "cd13a/card-unlock", [], [],
-                        new { req.CardId, req.IsTreasure }),
-                    () => session.Library = next);
+                long role = session.Role.Id, epoch = session.Owner!.LifecycleEpoch;
+                byte[] bytes = next.ToByteArray();
+                int points = req.IsTreasure ? 0 : CardUnlockPoints(req.CardId), item = Param("LibraryOverviewPointID");
+                if (points > 0 && item > 0)
+                {
+                    try
+                    {
+                        ok = await character.ApplyAwardAsync(session, new AwardPlan(0, 0, [new AwardGrant(item, points)]),
+                            persist: tx => roles.StageCardUnlock(tx, role, epoch, req.CardId, false, bytes),
+                            stateLockHeld: true, committed: () => session.Library = next,
+                            ownedAward: new CharacterService.OwnedAwardSource("cd13e/library-award",
+                                $"library-card/{role}/{req.CardId}",
+                                new { Version = 1, Card = req.CardId, Item = item, Points = points }));
+                    }
+                    catch (Exception fault) when (fault is not OperationCanceledException)
+                    {
+                        log.LogError(fault, "Card {Card} unlock failed for {Role}", req.CardId, role);
+                        ok = false;
+                    }
+                    failed = !ok;
+                    if (ok) log.LogInformation("{Name} unlocks card {Card} (treasure {Treasure}): {Points} x {Item}",
+                        session.Role.Name, req.CardId, req.IsTreasure, points, item);
+                }
+                else
+                    await roles.CommitCardUnlockAsync(role, epoch, req.CardId, req.IsTreasure, bytes, session.Items,
+                        character.FamilyEconomy(session, "cd13a/card-unlock", [], [],
+                            new { req.CardId, req.IsTreasure }),
+                        () => session.Library = next);
             }
-            error = session.Library == null ? ErrorCodes.Unknown : !session.Library.Cards.ContainsKey(req.CardId) ? ErrorCodes.ItemMissing : ErrorCodes.AlreadyUnlocked;
+            error = session.Library == null || failed ? ErrorCodes.Unknown : !session.Library.Cards.ContainsKey(req.CardId) ? ErrorCodes.ItemMissing : ErrorCodes.AlreadyUnlocked;
         }
         if (ok && attachment?.Cancelled != true && ReferenceEquals(session.Attachment, attachment))
             await CharacterService.SyncAsync(session, LibrarySync, session.Library!.Clone());
@@ -765,6 +792,25 @@ public sealed partial class CardService
                 catch (Exception e) { log.LogError(e, "Card collection callback failed for role {Role} card {Card}", session.Role!.Id, req.CardId); }
         if (attachment?.Cancelled != true && ReferenceEquals(session.Attachment, attachment))
             await session.SendGameAsync(LibraryCardUnlock, new LibraryCardUnlockResp { Result = ok ? 0 : error, CardId = req.CardId });
+    }
+
+    /// <summary>
+    /// PublicParamConfig.LibraryCardUnlockReward[ItemConfig._iQuality].PointValue["0"]: the Collection Points a card's
+    /// collection entry shows (UI_Sys_LibraryList_CardWidgetCtrl, m_kTTXT_Point; "0" is the card's base star level).
+    /// The points are item LibraryOverviewPointID, as for monsters. (inferred) Only the normal unlock pays: the entry shows
+    /// one value, and no client lookup reaches the 104..106 rows (no ItemConfig._iQuality above 6), so a treasure unlock
+    /// pays nothing and keeps its plain commit.
+    /// </summary>
+    private int CardUnlockPoints(int card)
+    {
+        if (data.Row("ItemConfig", card) is not { } row
+            || !data.Table("PublicParamConfig").TryGetValue("LibraryCardUnlockReward", out var table)
+            || table.ValueKind != JsonValueKind.Object) return 0;
+        long quality = GameData.Int(row, "_iQuality");
+        return table.TryGetProperty(quality.ToString(), out var reward)
+            && reward.ValueKind == JsonValueKind.Object && reward.TryGetProperty("PointValue", out var values)
+            && values.ValueKind == JsonValueKind.Object && values.TryGetProperty("0", out var value)
+            && value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out int points) ? points : 0;
     }
 
     private void SaveLibrary(GameSession session) => roles.SaveLibrary(session.Role!.Id, session.Library!.ToByteArray());

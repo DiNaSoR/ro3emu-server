@@ -84,6 +84,15 @@ public static class ErrorCodes
     public const int DungeonTeamSize = 3507;    // "Not enough party Members."
     public const int DungeonDataMissing = 3720; // "Dungeon data not found."
     public const int DungeonBusy = 7107;        // "Already in an instance"
+    public const int NotPartyLeader = 274;      // "The Party Leader must open the party instance." (ERR_EnterDungeonNotLeader)
+    // Rift Crisis / Hidden Vault: ErrorCodeConfig 6751-6759 (Localization_en 10630001101-10630001109).
+    public const int RiftMemberIneligible = 6751; // "Player is not eligible to Enter Dungeon: Hidden Vault"
+    public const int RiftStoneTaken = 6753;       // "The Hidden Vault Dungeon is under attack by another player..."
+    public const int RiftPartyTooLarge = 6754;    // "Too many party Members"
+    public const int RiftPartyTooSmall = 6755;    // "The party does not meet the required number of players."
+    public const int RiftNoParty = 6757;          // "You must be in a party to enter this mode." (ERR_EnterOnepieceNoTeam)
+    public const int RiftMemberLocked = 6758;     // "A party Member does not meet the Hidden Vault Unlock Requirement"
+    public const int RiftMemberInVault = 6759;    // "A party Member is already in the Hidden Treasure Dungeon..."
 
     // Quests (texts carry the quest name as ${1})
     public const int TaskMissing = 100;         // "Quest [${1}] does not exist"

@@ -31,6 +31,11 @@ public sealed class SocialMessages(ChatService chat, TeamService teams, EmblemSe
         {
             await personal.UpdateAppearanceAsync(session, UpdatePersonalAppearanceReq.Parser.ParseFrom(body.Span));
         });
+        // A like also writes the liked role's received likes: the default Realm reservation covers both roles.
+        routes.Map(PersonalService.Upvote, "personal", async (session, msgId, body) =>
+        {
+            await personal.UpvoteAsync(session, UpvotePersonalReq.Parser.ParseFrom(body.Span));
+        });
         routes.Map(PersonalService.UpdateCurPlan, "personal", async (session, msgId, body) =>
         {
             await personal.UpdateCurPlanAsync(session, UpdateCurPersonalPlanReq.Parser.ParseFrom(body.Span));

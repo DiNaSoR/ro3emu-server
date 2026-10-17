@@ -75,6 +75,139 @@ public sealed class PersonalTests : IAsyncLifetime
         return (Dictionary<object, object?>)entry["Data"]!;
     }
 
+    private static async Task<UpvotePersonalResp> Like(BotClient b, long role)
+    {
+        await b.SendGameAsync(PersonalService.Upvote, new UpvotePersonalReq { RoleId = role });
+        var resp = await Next(b, PersonalService.Upvote, UpvotePersonalResp.Parser);
+        Assert.Equal(role, resp.Req.RoleId);
+        Assert.False(resp.IsCancle);
+        return resp;
+    }
+
+    private static async Task<(int Count, PersonalUpvoteList? List)> Likes(BotClient reader, long role)
+    {
+        var seen = await Card(reader, role, "Base", "PersonalUpvoteCount", "PersonalUpvoteList");
+        int count = PersonalUpvoteCount.Parser.ParseFrom((byte[])seen["PersonalUpvoteCount"]!).UpvoteCount;
+        return (count, seen.TryGetValue("PersonalUpvoteList", out var list) ? PersonalUpvoteList.Parser.ParseFrom((byte[])list!) : null);
+    }
+
+    private static async Task<PopularityStarData> Popularity(BotClient reader, long role)
+    {
+        var bytes = (byte[])(await Card(reader, role, "Base", "PopularityStar"))["PopularityStar"]!;
+        Assert.Equal(new[] { 8, 16, 24, 32, 40 }, ReadTags(bytes)); // every field present, the gift panel needs updateTime
+        return PopularityStarData.Parser.ParseFrom(bytes);
+    }
+
+    private static int[] ReadTags(byte[] bytes)
+    {
+        var input = new CodedInputStream(bytes);
+        var tags = new List<int>();
+        for (uint tag; (tag = input.ReadTag()) != 0; input.SkipLastField()) tags.Add((int)tag);
+        return tags.ToArray();
+    }
+
+    [ClientDataFact]
+    public async Task LikesAreKeptOncePerCardCountedListedAndPersisted()
+    {
+        await using var bob = await InWorld("Bob");
+        await using var carol = await InWorld("Carol");
+        var alice = await InWorld("Alice");
+        long aliceId = (long)alice.Self!.Uuid, bobId = (long)bob.Self!.Uuid, carolId = (long)carol.Self!.Uuid;
+        await Next(alice, PersonalService.Sync, DBPersonalInfoIncrement.Parser, i => i.SyncAllMark);
+
+        Assert.Equal(PersonalService.ErrFunction, (await Like(alice, bobId)).Result); // Profile opens at base level 20
+        foreach (string account in new[] { "alice", "carol" }) await Gm(account, "!lvl 20");
+        await WaitUntil(() => Session("alice").Progress!.Level == 20 && Session("carol").Progress!.Level == 20, "level 20 not applied");
+
+        Assert.Equal(PersonalService.ErrUpvoteSelf, (await Like(alice, aliceId)).Result);
+        Assert.Equal(PersonalService.ErrParameter, (await Like(alice, 987654321)).Result);
+        Assert.Equal((0, null), await Likes(carol, bobId));
+
+        var liked = await Like(alice, bobId);
+        Assert.Equal(0, liked.Result);
+        // The 5016 increment after the reply carries the like's time, which lights the heart.
+        long at = (await Next(alice, PersonalService.Sync, DBPersonalInfoIncrement.Parser, i => i.UpvoteTimes.ContainsKey(bobId)))
+            .UpvoteTimes[bobId].All;
+        Assert.True(at > 0);
+        Assert.Equal(PersonalService.ErrUpvoted, (await Like(alice, bobId)).Result); // a like is kept, never toggled
+        // PersonalLikeCD (1000 ms) between two likes, then the next card can be liked.
+        Assert.Equal(PersonalService.ErrUpvoteCooldown, (await Like(alice, carolId)).Result);
+        await Task.Delay(1100);
+        Assert.Equal(0, (await Like(alice, carolId)).Result);
+
+        var (count, list) = await Likes(carol, bobId);
+        Assert.Equal(1, count);
+        Assert.Equal(at, list!.Infos[aliceId]); // Like History: liker -> unix ms
+        Assert.Equal(0, (await Like(carol, bobId)).Result);
+        (count, list) = await Likes(alice, bobId);
+        Assert.Equal(2, count);
+        Assert.Equal(new[] { aliceId, carolId }.Order(), list!.Infos.Keys.Order());
+        Assert.Equal(1, (await Likes(bob, carolId)).Count);
+        Assert.Equal((0, null), await Likes(bob, aliceId));
+
+        // Persisted on both sides: the liked card offline, the liker's own likes after a relogin.
+        await bob.DisposeAsync();
+        await WaitUntil(() => !app.Services.GetRequiredService<SessionRegistry>().All().Any(s => s.Account == "bob" && s.Role != null), "bob still online");
+        Assert.Equal(2, (await Likes(carol, bobId)).Count);
+        await alice.DisposeAsync();
+        await WaitUntil(() => !app.Services.GetRequiredService<SessionRegistry>().All().Any(s => s.Account == "alice" && s.Role != null), "alice still online");
+        await using var again = await InWorld("Alice", create: false);
+        var reloaded = await Next(again, PersonalService.Sync, DBPersonalInfoIncrement.Parser, i => i.SyncAllMark);
+        Assert.Equal(at, reloaded.UpvoteTimes[bobId].All);
+        Assert.True(reloaded.UpvoteTimes[carolId].All > at);
+        Assert.False(reloaded.UpvoteTimes.ContainsKey(0)); // no seed once the role has liked someone
+        await Task.Delay(1100);
+        Assert.Equal(PersonalService.ErrUpvoted, (await Like(again, bobId)).Result);
+    }
+
+    [ClientDataFact]
+    public async Task FriendGiftsFeedPopularityAndTheCardShowsTheFashionScore()
+    {
+        await using var bob = await InWorld("Bob");
+        await using var alice = await InWorld("Alice");
+        long a = (long)alice.Self!.Uuid, b = (long)bob.Self!.Uuid;
+        Assert.Equal(0, (await Popularity(alice, b)).Popularity);
+        await alice.MicroAsync("FriendService", "apply", new() { ["Uid"] = a.ToString(), ["Target"] = b.ToString() });
+        await bob.MicroAsync("FriendService", "accept", new() { ["Uid"] = b.ToString(), ["Applicant"] = a.ToString() });
+        await WaitUntil(() => app.Services.GetRequiredService<Ro3Emu.Server.Accounts.FriendStore>().AreFriends(a, b), "not friends");
+
+        // 1004000: _iUseEffect [107,10] intimacy, [108,10] popularity, [109,10] charity, per unit.
+        await Gm("alice", "!item 1004000 3");
+        await alice.SendGameAsync(FriendExtraService.GiveGift, new GiveFriendGiftReq { RoleId = b, ItemId = 1004000, Count = 3 });
+        var gift = await Next(alice, FriendExtraService.GiveGift, GiveFriendGiftResp.Parser);
+        Assert.Equal(0, gift.Result);
+        Assert.Equal((30, 30), (gift.FriendGiftRecord.Popularity, gift.FriendGiftRecord.Affection));
+
+        var received = await Popularity(alice, b);
+        Assert.Equal((30, 30, 0), (received.Popularity, received.PopularityWeekly, received.Affection));
+        Assert.True(received.UpdateTime > 0);
+        var sent = await Popularity(bob, a);
+        Assert.Equal((0, 30), (sent.Popularity, sent.Affection));
+
+        // Weekly popularity counts from Monday 05:00; an older update leaves only the total.
+        var star = new DBPopularityStar { Popularity = 30, PopularityWeekly = 30, UpdateTime = 1000 };
+        var stale = PersonalService.Popularity(star.ToByteArray(), PersonalService.WeekStartMs(TimeProvider.System));
+        Assert.Equal((30, 0), (stale.Popularity, stale.PopularityWeekly));
+
+        // Fashion: permanently lit appearances' _iFashionScore (WardRobeConfig 10030417 scores 10).
+        var data = app.Services.GetRequiredService<GameData>();
+        int Fashion(Dictionary<object, object?> seen) => RoleAdditionBaseInfo.Parser.ParseFrom((byte[])seen["Base"]!).FashionScore;
+        long before = WardrobeService.FashionScore(data, Session("bob").Wardrobe);
+        Assert.Equal(before, Fashion(await Card(alice, b, "Base")));
+        await WaitUntil(() =>
+        {
+            Session("bob").Wardrobe!.AllLightUpAppearances[10030417] = new DBAppearanceInfo { AppearanceId = 10030417 };
+            Session("bob").Wardrobe!.AllLightUpAppearances[10030419] = new DBAppearanceInfo { AppearanceId = 10030419, OverdueTimeMs = 1 };
+            return true;
+        }, "wardrobe not changed");
+        Assert.Equal(before + 10, Fashion(await Card(alice, b, "Base"))); // the leased one does not count
+
+        // Persisted: bob offline still shows his popularity.
+        await bob.DisposeAsync();
+        await WaitUntil(() => !app.Services.GetRequiredService<SessionRegistry>().All().Any(s => s.Account == "bob" && s.Role != null), "bob still online");
+        Assert.Equal(30, (await Popularity(alice, b)).Popularity);
+    }
+
     [ClientDataFact]
     public async Task LoginSendsThreePresetsUnlocksAndASeededUpvoteMap()
     {

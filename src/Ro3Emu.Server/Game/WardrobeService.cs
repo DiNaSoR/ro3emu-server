@@ -46,6 +46,15 @@ public sealed partial class WardrobeService
         ApplyPlan = 31186, SetLike = 31187, Redeem = 31188, UnlockNotice = 31189;
     private const int HairSlot = 7, MountSlot = 6, MaxSlot = 9, PlanCount = 5; // FashionMatchNum = 5.
 
+    /// <summary>
+    /// Fashion score, as LC_FashionHelper.UpdateFashionScore (:496-530) sums it: the _iFashionScore of every lit
+    /// appearance owned for good (overdueTimeMs 0). The profile card shows it from Base.fashionScore; the Fashion
+    /// Rating board ranks it.
+    /// </summary>
+    public static long FashionScore(GameData data, DBWardRobeInfo? info) => info == null ? 0
+        : info.AllLightUpAppearances.Values.Where(a => a.OverdueTimeMs == 0)
+            .Sum(a => data.Row("WardRobeConfig", a.AppearanceId) is { } row ? GameData.Int(row, "_iFashionScore") : 0);
+
     /// <summary>Load durable ownership before ENTITYSELF/AOI; a new role receives every sex-matching default hair.</summary>
     public async Task LoginAsync(GameSession session)
     {

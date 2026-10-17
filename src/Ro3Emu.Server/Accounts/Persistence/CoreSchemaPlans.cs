@@ -146,6 +146,10 @@ internal sealed class RoleSchemaPlan : DbPlan
         SchemaSql.AddColumn(db, tx, "role", "first_heart", "BLOB");
         // Serialized romsg.DBPersonalInfo (profile card presets and the current one; AUTO_SYNC 5016, PersonalService).
         SchemaSql.AddColumn(db, tx, "role", "personal", "BLOB");
+        // Serialized romsg.PersonalUpvoteList (who liked this role's profile card and when; PersonalService).
+        SchemaSql.AddColumn(db, tx, "role", "personal_upvote", "BLOB");
+        // Serialized romsg.DBPopularityStar (popularity from received friend gifts, affection from sent ones).
+        SchemaSql.AddColumn(db, tx, "role", "popularity", "BLOB");
         // Unix seconds of a deletion; deleted roles are kept (items, progress) but no longer listed or selectable.
         SchemaSql.AddColumn(db, tx, "role", "deleted_time", "INTEGER NOT NULL DEFAULT 0");
         SchemaSql.Execute(db, tx, """

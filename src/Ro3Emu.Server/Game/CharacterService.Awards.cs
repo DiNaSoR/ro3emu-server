@@ -51,7 +51,7 @@ public sealed partial class CharacterService
     }
 
     /// <summary>
-    /// A type-7 stage grant is staged in copies and committed with its claim blob on one SQLite connection. No
+    /// A stage reward grant (31178/31175, any type) is staged in copies and committed with its claim blob on one SQLite connection. No
     /// session mutation or success packet precedes commit; a failed transaction leaves the old state intact.
     /// </summary>
     public async Task<bool> GrantDailyStageAsync(GameSession session, IReadOnlyList<(int Entry, int Count, int Bind)> goods,

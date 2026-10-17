@@ -40,12 +40,19 @@ public static partial class EconomySnapshotReader
     // 5045 is derived from the quests). No balance: a rank's goods are granted by its own cd13e/growthclass-award receipt.
     // Codex monsters: role.library monsters (kill count, unlock flag) ride the monster-kill receipt; the unlock's
     // Collection Points are granted by its own cd13e/library-award receipt whose unlock flag is that receipt's marker.
+    // A card collection unlock (82404) with points is a cd13e/library-award receipt the same way.
     // Seven-Day Goal: role.first_heart is DBFirstHeartTaskActivityData (task progress and status, score bar, claimed score
     // rewards). No balance: a task or score claim's goods come with its own cd13e/firstheart-award receipt, whose claimed
     // marker is only that receipt's once-only source.
     // Profile: role.personal is DBPersonalInfo (card presets, current preset, upvote times). No balance and no asset:
-    // stickers placed on a card are counted against the owned currency, never spent.
-    public const string ExpectedFormatManifestHash = "710021A9385654635AA57A097BAC0C0EC66B91F7869C513C5DCEE1E923701CA4";
+    // stickers placed on a card are counted against the owned currency, never spent. role.personal_upvote is
+    // PersonalUpvoteList (who liked the card, when) and role.popularity is DBPopularityStar (popularity and affection
+    // credited by friend gifts): counters, no balance and no asset; the gift item is spent by the friend-gift receipt.
+    // Rift Crisis: role.timed_battle (TimedBattleService.State) OnePieceExtraDay/OnePieceExtraUsed count the day's extra
+    // awards (RestrictConfig 1020) and OnePieceWeek/OnePieceWeekItems the week's capped extra items. No balance: the goods
+    // come with the timed_battle_obligation the same settlement writes; these are only its limits. The legacy per-day
+    // OnePieceGains/OnePieceItemGains are read and dropped on the next Rift payment.
+    public const string ExpectedFormatManifestHash = "75E88A1384446D170F3CB8F35AA5167ADE2360C2C419AF476EC2CBE836F208EC";
     public static string FormatManifestHash => State.FormatManifestHash;
 
     private sealed partial class State

@@ -2,6 +2,7 @@ using Google.Protobuf;
 using Microsoft.Extensions.Options;
 using Romsg;
 using Ro3Emu.Server.Accounts;
+using Ro3Emu.Server.Data;
 using Ro3Emu.Server.Game;
 using Ro3Emu.Server.Game.Ownership;
 
@@ -13,7 +14,7 @@ namespace Ro3Emu.Server.Micro;
 /// including itself.
 /// </summary>
 public sealed class UserDataService(SocialOwnerCache cache, OwnerRegistry owners, GameLoop loop, SessionRegistry sessions, GuildService guilds,
-    GuildStore guildStore, IOptions<ServerOptions> options, ILogger<UserDataService> log) : IMicroService
+    GuildStore guildStore, GameData data, TimeProvider clock, IOptions<ServerOptions> options, ILogger<UserDataService> log) : IMicroService
 {
     // (inferred) Full profile replies use increasing versions, so a previous guild/online snapshot is replaceable.
     // The original per-field version allocation is not exported; this service already returns all requested roles.
@@ -57,12 +58,21 @@ public sealed class UserDataService(SocialOwnerCache cache, OwnerRegistry owners
         return new Dictionary<string, object?> { ["Ret"] = MicroServiceRouter.Ret(true), ["Results"] = results.ToArray() };
     }
 
-    /// <summary>A message whose int fields 1..n are all present and 0 (PopularityStarData, PersonalUpvoteCount).</summary>
-    private static byte[] ExplicitZeros(int fields)
+    /// <summary>
+    /// A message whose varint fields 1..n are all present, zeros too (PopularityStarData, PersonalUpvoteCount): the client
+    /// decodes an absent field as nil, and the gift panel shows popularity only when updateTime is not nil.
+    /// </summary>
+    private static byte[] Explicit(params long[] values)
     {
-        var bytes = new byte[fields * 2];
-        for (int field = 1; field <= fields; field++) bytes[(field - 1) * 2] = (byte)(field << 3);
-        return bytes;
+        using var stream = new MemoryStream();
+        var output = new CodedOutputStream(stream);
+        for (int i = 0; i < values.Length; i++)
+        {
+            output.WriteTag(i + 1, WireFormat.WireType.Varint);
+            output.WriteInt64(values[i]);
+        }
+        output.Flush();
+        return stream.ToArray();
     }
 
     /// <summary>
@@ -109,6 +119,9 @@ public sealed class UserDataService(SocialOwnerCache cache, OwnerRegistry owners
         };
         additional.Appearances.Add(session?.Wardrobe?.CurUseAppearances.ToDictionary(p => p.Key, p => p.Value)
             ?? RoleProto.Appearances(role, profile.Wardrobe));
+        // The card's "Fashion" (UI_Sys_Personal_InfoWidgetCtrl._refreshPlayerBaseInfoShow reads Base.fashionScore).
+        additional.FashionScore = (int)Math.Min(int.MaxValue, WardrobeService.FashionScore(data, session?.Wardrobe
+            ?? (profile.Wardrobe is { Length: > 0 } wardrobe ? DBWardRobeInfo.Parser.ParseFrom(wardrobe) : null)));
         // The profile card's current preset: Base carries its avatar, frame and title (inferred mirror of PersonalInfo).
         var card = PersonalService.Current(session?.Personal
             ?? (profile.Personal is { Length: > 0 } stored ? DBPersonalInfo.Parser.ParseFrom(stored) : null));
@@ -131,10 +144,17 @@ public sealed class UserDataService(SocialOwnerCache cache, OwnerRegistry owners
         if (asked.Contains("Personal") && card != null && PersonalService.Parseable(card)) fields["Personal"] = card.ToByteArray();
         // The profile card asks for PopularityStar with resend-until-present (UI_Sys_Personal_InfoWidgetCtrl.GetPopularity:
         // BindPersonalDataChangeByUIDAndTypeDoOnce), and every reply bumps the versions here, so without it the card
-        // refreshes and asks again about five times a second. (inferred) No popularity or likes are kept yet: zeros,
-        // written explicitly so the decoded fields are 0, not nil (_refreshPopularity, the like counter).
-        if (asked.Contains("PopularityStar")) fields["PopularityStar"] = ExplicitZeros(5);
-        if (asked.Contains("PersonalUpvoteCount")) fields["PersonalUpvoteCount"] = ExplicitZeros(1);
+        // refreshes and asks again about five times a second. Zeros are written too (_refreshPopularity, the like counter).
+        if (asked.Contains("PopularityStar"))
+        {
+            var star = PersonalService.Popularity(profile.Popularity, PersonalService.WeekStartMs(clock));
+            fields["PopularityStar"] = Explicit(star.Affection, star.Popularity, star.PopularityWeekly, star.UpdateTime, 0);
+        }
+        // Likes received: the count (the card's heart number) and who liked when (Like History, and whether the reader's
+        // own heart is lit). The list's parsers walk it with pairs() unguarded, so an empty list is left out.
+        var upvotes = PersonalService.Upvotes(profile.PersonalUpvotes);
+        if (asked.Contains("PersonalUpvoteCount")) fields["PersonalUpvoteCount"] = Explicit(upvotes?.Infos.Count ?? 0);
+        if (asked.Contains("PersonalUpvoteList") && upvotes != null) fields["PersonalUpvoteList"] = upvotes.ToByteArray();
         long snapshotVersion = Interlocked.Increment(ref version);
         return new()
         {

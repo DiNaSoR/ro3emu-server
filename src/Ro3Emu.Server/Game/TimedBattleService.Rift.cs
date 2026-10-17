@@ -44,8 +44,16 @@ public sealed partial class TimedBattleService
     private readonly Dictionary<long, RiftStone> riftStones = new();
     private readonly Dictionary<long, int> riftMapTotals = new();
     private long riftRound = -1, riftSeq;
+    /// <summary>The round's 9002 went out: its last stone was cleared.</summary>
+    private bool riftResolved;
 
     internal IReadOnlyCollection<RiftStone> RiftStones => riftStones.Values;
+
+    /// <summary>Tests: the running round keeps only the stones <paramref name="keep"/> accepts.</summary>
+    internal void KeepRiftStonesForTest(Func<RiftStone, bool> keep)
+    {
+        foreach (var stone in riftStones.Values.Where(s => !keep(s)).ToArray()) riftStones.Remove(stone.Uid);
+    }
 
     internal static bool IsRiftUid(long uid) => uid >= RiftUidBase && uid < 1L << 47;
 
@@ -69,19 +77,24 @@ public sealed partial class TimedBattleService
     {
         long round = CurrentRiftRound();
         if (round == riftRound) return;
-        bool wasOpen = riftRound >= 0;
         riftRound = round;
+        riftResolved = false;
         var removed = riftStones.Values.ToArray();
         riftStones.Clear();
         riftMapTotals.Clear();
         if (round >= 0) PlaceRiftRound(Random.Shared);
         var added = riftStones.Values.ToArray();
+        // A round change also refreshes RestrictInfo1020 once the restriction day has turned.
         foreach (var session in sessions.All().Where(s => s.Role != null))
-            loop.PostOwned(session, async () => { await RiftViewAsync(session, removed, added); await SendOnePieceMapAsync(session); });
+            loop.PostOwned(session, async () =>
+            {
+                await RiftViewAsync(session, removed, added);
+                await SendOnePieceMapAsync(session);
+                await SyncRiftRestrictAsync(session);
+            });
         if (added.Length > 0)
             foreach (long map in added.Select(s => s.Map).Distinct())
                 loop.PostRuntime(() => RiftChatAsync(RiftOpenChat, data.MapName(map), "1"));
-        else if (round < 0 && wasOpen) loop.PostRuntime(() => RiftChatAsync(RiftClosedChat));
     }
 
     private void PlaceRiftRound(Random rng)
@@ -214,14 +227,22 @@ public sealed partial class TimedBattleService
     private void PostRiftState(RiftStone stone) => PostRiftMap(stone.Map, s => s.SendGameAsync(WorldCoreService.CustomChange,
         new CustomDataChange { EntityId = stone.Uid, CustomDatas = { RiftInfo(stone) } }));
 
-    /// <summary>A party's 30400 claims the stone; a win removes it, anything else frees it for the next party.</summary>
+    /// <summary>
+    /// A party's 30400 claims the stone; a win removes it, anything else frees it for the next party. ChatConfig 9002
+    /// "Congratulations to all Adventurers for successfully resolving this Rift Crisis." goes out once, when the round's
+    /// last stone is cleared; a window that closes with stones left says nothing.
+    /// </summary>
     private void ReleaseRiftStone(Treasure a, bool cleared)
     {
-        if (a.Stone is not { } stone || riftStones.GetValueOrDefault(stone.Uid) != stone || stone.Challenger != a.Player) return;
+        if (a.Stone is not { } stone || riftStones.GetValueOrDefault(stone.Uid) != stone || stone.Challenger != a.Leader) return;
         if (!cleared) { stone.Challenger = null; PostRiftState(stone); return; }
         riftStones.Remove(stone.Uid);
         PostRiftMap(stone.Map, async s => { await RiftViewAsync(s, [stone], []); await SendOnePieceMapAsync(s); });
-        if (riftStones.Count == 0 && riftRound >= 0) loop.PostRuntime(() => RiftChatAsync(RiftClosedChat));
+        if (riftStones.Count == 0 && riftRound >= 0 && !riftResolved)
+        {
+            riftResolved = true;
+            loop.PostRuntime(() => RiftChatAsync(RiftClosedChat));
+        }
     }
 
     /// <summary>1022 marquee to everyone online, parameters encoded as MvpService does (inferred).</summary>
@@ -246,6 +267,14 @@ public sealed partial class TimedBattleService
                 : $"Rift round until {DateTimeOffset.FromUnixTimeSeconds(RiftRoundEnd()).ToLocalTime():HH:mm}: {maps}");
             return;
         }
+        if (args[0].Equals("party", StringComparison.OrdinalIgnoreCase))
+        {
+            RiftTestMinParty = args.Length > 1 && int.TryParse(args[1], out int floor) && floor >= 1 ? floor : null;
+            var (min, max) = RiftPartySize();
+            await GmCommands.ReplyAsync(s, $"A Rift stone now admits a party of {min}-{max} (OnePieceMapMembersNum is "
+                + $"{(RiftTestMinParty == null ? "in force" : "overridden; !rift party resets it")}).");
+            return;
+        }
         if (riftRound < 0) { await GmCommands.ReplyAsync(s, "Rift Crisis is closed (open 10:00-22:00): stones cannot be fought now."); return; }
         if (args[0].Equals("new", StringComparison.OrdinalIgnoreCase))
         {
@@ -254,7 +283,7 @@ public sealed partial class TimedBattleService
             return;
         }
         if (!int.TryParse(args[0], out int star) || StarRow(star) == null || s.Role == null || s.InstanceId != 0)
-        { await GmCommands.ReplyAsync(s, "Usage: !rift | !rift new | !rift <star 1-6> [boss name] (on a field map)"); return; }
+        { await GmCommands.ReplyAsync(s, "Usage: !rift | !rift new | !rift party [min] | !rift <star 1-6> [boss name] (on a field map)"); return; }
         long? scene = null;
         if (args.Length > 1)
         {
@@ -273,7 +302,8 @@ public sealed partial class TimedBattleService
         if (AddRiftStone(s.SceneEntry, here, star, scene, Random.Shared) is not { } stone)
         { await GmCommands.ReplyAsync(s, "No Rift stone could be made for that star."); return; }
         PostRiftMap(stone.Map, async p => { await RiftViewAsync(p, [], [stone]); await SendOnePieceMapAsync(p); });
+        var (least, most) = RiftPartySize();
         await GmCommands.ReplyAsync(s, $"Placed a {star}-star Rift Stone next to you: {NpcName(stone.Boss)} (scene {stone.Scene}). "
-            + "Challenge needs a party with you as leader.");
+            + $"Challenge needs a party of {least}-{most} on this map with you as leader.");
     }
 }

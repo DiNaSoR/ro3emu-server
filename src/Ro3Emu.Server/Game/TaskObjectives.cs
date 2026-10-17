@@ -51,6 +51,41 @@ public sealed partial class TaskService
     // TaskTargetConfig row is not exported; counting a successful rescue, not an entry, is (inferred).
     private const int TDraculaWedding = 210010;
 
+    // Growth Classroom modules Pet 1004, Divine Totem 1005, Soul Echo 1006 and Equip 1002 (also side quests, the growth
+    // manual and type 13 echo quests). R per LC_ConditionDefine.m_kGetDesFunctionGroup (LC_InteractCondition.lua):
+    // 103009 GetPetQualityCntDes, 103035/103036 GetSetUpQuality*CountDes, 103010 GetPetLvCntDes, 302003/315002/315003/
+    // 315004/316001/316002 their *CountDes: R = p3; 306001 PetSetUpQualityStarCountDes: R = p4. 306002 and 306003 are
+    // not registered, so GetDefaultDes: R = p2.
+    // - 103009 CheckPetQualityCnt [quality, n] "Have ${1} Pets of the specified Rarity": owned pets of PetBaseConfig
+    //   quality >= p2, as AchievementService (quest 100012 [103009,4,2]: "Own @{1} pets of Grade A or higher").
+    // - 103010 CheckPetLvCnt [level, n]: owned pets at level >= p2, the client's own evaluator over PetInfo.m_kPetList
+    //   (LC_InteractCondition.lua:1255-1291) and quest 100013's "Own @{1} pets at Lv. @{2} or higher", although the
+    //   Growth Classroom text says "Deploy".
+    // - 306001 PetSetUpQualityStarCount [quality, star, n] "Deploy ${1} pets of ${2} quality or higher": fight-deployed
+    //   pets (current plan setUpPets) of quality >= p2 and PetData.star >= p3; the pet panel lights star - 1 stars
+    //   (UI_Sys_Pet_DetailsWidgetCtrl.lua:589-600), so 1700317's p3 = 3 reads "2 stars" as its text says.
+    // - 306002 [0] "Activate ${1} Faction effects with deployed pets": the current plan's fight pets activate a faction
+    //   when three share PetBaseConfig._iCamp (Lua_CFG_PetBaseConfig.GetActivateCampByData, LC_PetHelper.GetActivateCamp).
+    //   R = p2 = 0 would never complete; the Growth panel shows such a row as 0/1 (LC_BecomeStrongerHelper.lua:765-790)
+    //   and its text passes "1", so R = 1 (inferred).
+    // - 306003 [n] "Deploy ${1} Support Pets": occupied supportPets slots of the current plan.
+    // - 103035 CheckSetUpQualityTotemCount [quality, n]: deployed totems (active plan) of ItemConfig quality >= p2.
+    // - 315002 SetUpQualityTotemSkillCount [quality, n]: skills (itemInfos 240+) of the deployed totems whose
+    //   TotemSkillConfig quality >= p2, every entry counted (inferred).
+    // - 315003 SetUpQualityTotemFullPropertyCount [quality, n] "Deploy a Totem with ${1} maxed attributes": maxed attribute
+    //   lines over the deployed totems of quality >= p2 (three lines a totem, three slots, n up to 6).
+    // - 315004 TotemComposeCount [quality, n] "Combine ${1} Purple Totems" (合成过): one per committed combine whose made
+    //   totem has quality >= p2, counted since acceptance (inferred, like the other event counters).
+    // - 103036 CheckSetUpQualityEmblemCount [quality, n] / 316001 CheckSetUpLevelEmblemCount [level, n]: worn Soul Echoes
+    //   of quality >= p2 / at level (itemInfos 1001) >= p2.
+    // - 316002 CheckSoulEmblemResonanceCount [stage, n] "Activate ${1} Lv. ${2} Echo Resonances": mark ids whose
+    //   resonance stage is >= p2 (EmblemService.Resonances).
+    // - 302003 EquipEnchantQualityCount [quality, n]: enchantments on worn gear of quality >= p2. The texts disagree
+    //   between enchanted pieces (condition, 件) and enchants (the quests, 个附魔); enchants are counted (inferred).
+    private const int TPetQuality = 103009, TPetLevel = 103010, TPetQualityStar = 306001, TPetCamp = 306002,
+        TPetSupport = 306003, TTotemQuality = 103035, TTotemSkills = 315002, TTotemMaxed = 315003, TTotemCombine = 315004,
+        TEchoQuality = 103036, TEchoLevel = 316001, TEchoResonance = 316002, TEnchants = 302003;
+
     private readonly ConditionalWeakTable<MonsterUnit, HashSet<long>> _participants = new();
     private readonly HashSet<GameSession> _refreshQueued = new();
 
@@ -68,10 +103,13 @@ public sealed partial class TaskService
     private long Required(GameSession? session, long[] t) => t switch
     {
         [TDialog, _, _, _] or [TArea, _, _] or [TJobChange, _] or [TTaskDone, _] or [TJobRank, _] or [TAreaAction, _, _, _]
-            or [TGuide, _] or [TPydDownload, 1] or [TRentCareerSpecial, _] or [TValhallaLayer, _] => 1,
+            or [TGuide, _] or [TPydDownload, 1] or [TRentCareerSpecial, _] or [TValhallaLayer, _] or [TPetCamp, 0] => 1,
         [TPlot or TBaseLevel or TSkillPoints or TStatPoints or TResonance or TTotalRefine or TRefineSlots
             or TRefineCount or TMvp or TMvpOnce or TCargo or TAfkSeconds or TTimedBattle or TCaravan
-            or TTalentLevels or TPetsDeployed or TTowerFloor or TGuildHunt or TDraculaWedding, var n] => n,
+            or TTalentLevels or TPetsDeployed or TTowerFloor or TGuildHunt or TDraculaWedding or TPetSupport, var n] => n,
+        [TPetQualityStar, _, _, var n] => n,
+        [TPetQuality or TPetLevel or TTotemQuality or TTotemSkills or TTotemMaxed or TTotemCombine or TEchoQuality
+            or TEchoLevel or TEchoResonance or TEnchants, _, var n] => n,
         [TOnePieceCount, _, _, var limit] => data.Row("RestrictConfig", limit) is { } restrict
             ? GameData.Int(restrict, "_iMaxRestrictNum") : -1,
         [TKillOnMap, var n, _] => n,
@@ -179,9 +217,35 @@ public sealed partial class TaskService
             TRentCareerSpecial => CareerSpecialService.HoldsSubType(s, data, t[1]) ? 1 : 0,
             TValhallaLayer => DungeonService.ValhallaCleared(s.Dungeons).Contains(t[1]) ? 1 : 0,
             TMonsterHunt => MonsterHuntService.AreaProgress(s, t[1]),
+            // Pets load after the quests at login (RoleSystems): keep the stored value until the post-login refresh.
+            TPetQuality => s.Pets?.ListPet.Values.LongCount(pet => PetQuality(pet.PetId) >= t[1]) ?? -1,
+            TPetLevel => s.Pets?.ListPet.Values.LongCount(pet => pet.Level >= t[1]) ?? -1,
+            TPetQualityStar => s.Pets == null ? -1
+                : FightPets(s).LongCount(pet => PetQuality(pet.PetId) >= t[1] && pet.Star >= t[2]),
+            TPetCamp => s.Pets == null ? -1 : FightPets(s).Select(pet => data.Row("PetBaseConfig", pet.PetId) is { } row
+                ? GameData.Int(row, "_iCamp") : 0).Where(camp => camp > 0).GroupBy(camp => camp).Any(g => g.Count() >= 3) ? 1 : 0,
+            TPetSupport => s.Pets == null ? -1
+                : s.Pets.SetupPlans.GetValueOrDefault(s.Pets.CurrentPlan)?.SupportPets.Values.LongCount(id => id != 0) ?? 0,
+            TTotemQuality => TotemService.Deployed(s, data).LongCount(i => ItemQuality(i.Entry) >= t[1]),
+            TTotemSkills => TotemService.Deployed(s, data).SelectMany(TotemService.Skills).LongCount(skill =>
+                data.Row("TotemSkillConfig", skill) is { } row && GameData.Int(row, "_iQuality") >= t[1]),
+            TTotemMaxed => TotemService.Deployed(s, data).Where(i => ItemQuality(i.Entry) >= t[1])
+                .Sum(i => (long)TotemService.MaxedAttributes(data, i)),
+            TEchoQuality => EmblemService.Worn(s).LongCount(i => ItemQuality(i.Entry) >= t[1]),
+            TEchoLevel => EmblemService.Worn(s).LongCount(i => (i.Attrs?.GetValueOrDefault(1001) ?? 0) >= t[1]),
+            TEchoResonance => EmblemService.Resonances(s, data).Values.LongCount(stage => stage >= t[1]),
+            TEnchants => s.Items.Where(i => i.Grid > 0 && ItemQuality(i.Entry) >= t[1]
+                && data.Row("ItemConfig", i.Entry) is { } row && GameData.Int(row, "_iType") == 5).Sum(i => (long)i.Enchantments.Count),
             _ => -1,
         };
     }
+
+    private long PetQuality(int pet) => data.Row("PetBaseConfig", pet) is { } row ? GameData.Int(row, "_iQuality") : -1;
+
+    /// <summary>The current plan's fight (出战) pets that are owned.</summary>
+    private static IEnumerable<PetData> FightPets(GameSession s) =>
+        s.Pets?.SetupPlans.GetValueOrDefault(s.Pets.CurrentPlan)?.SetUpPets.Values
+            .Select(id => s.Pets.ListPet.GetValueOrDefault(id)).OfType<PetData>() ?? [];
 
     private long ItemQuality(int entry) => data.Row("ItemConfig", entry) is { } row ? GameData.Int(row, "_iQuality") : -1;
 
@@ -351,6 +415,10 @@ public sealed partial class TaskService
         TCraftQuality when t.Length == 3 && ItemQuality(entry) >= t[1] => 1,
         _ => 0,
     });
+
+    /// <summary>TotemService.Combined fires inside the character lock: the progress runs on the owner loop after it.</summary>
+    public void OnTotemCombined(GameSession session, int entry) => loop.PostOwned(session, () =>
+        ProgressAsync(session, TTotemCombine, t => t.Length == 3 && ItemQuality(entry) >= t[1] ? 1 : 0));
 
     /// <summary>31210 is completion. 84000 arbitrary guide records do not satisfy this objective (§4 C5).</summary>
     public async Task OnGuideCompleteAsync(GameSession session, long guide)

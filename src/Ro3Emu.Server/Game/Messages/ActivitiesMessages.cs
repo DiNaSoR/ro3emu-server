@@ -288,7 +288,8 @@ public sealed class ActivitiesMessages(DailyActivityService daily, TowerService 
         });
         routes.Map(42047, "dungeons", async (session, msgId, body) =>
         {
-            await dungeons.RemindAsync(session, TeamConfirmRemindersReq.Parser.ParseFrom(body.Span));
+            var remind = TeamConfirmRemindersReq.Parser.ParseFrom(body.Span);
+            if (!await timedBattles.TryRemindRiftAsync(session, remind)) await dungeons.RemindAsync(session, remind);
         });
         routes.Map(DailyActivityService.RingAccept, "festival", async (session, msgId, body) =>
         {
@@ -332,7 +333,8 @@ public sealed class ActivitiesMessages(DailyActivityService daily, TowerService 
         });
         routes.Map(DungeonService.Confirm, "dungeons", async (session, msgId, body) =>
         {
-            await dungeons.ConfirmAsync(session, ConfirmTeamDungeonReq.Parser.ParseFrom(body.Span));
+            var confirm = ConfirmTeamDungeonReq.Parser.ParseFrom(body.Span);
+            if (!await timedBattles.TryConfirmRiftAsync(session, confirm)) await dungeons.ConfirmAsync(session, confirm);
         });
         routes.Map(DungeonService.ClientEvent, "training", async (session, msgId, body) =>
         {

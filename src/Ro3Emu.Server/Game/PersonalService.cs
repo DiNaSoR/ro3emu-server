@@ -18,14 +18,18 @@ namespace Ro3Emu.Server.Game;
 /// preset back in 82553. Other players read the current preset as UserDataService's "Personal" field
 /// (LC_DAL_RolePublic.lua:874-900) and its avatar, frame and title through Base.
 /// <para>Stored: presets, current preset and upvote times (role blob "personal"). unlockInfos are derived each time from
-/// the unlock conditions of the tables the editor checks (theme, background, action).</para>
+/// the unlock conditions of the tables the editor checks (theme, background, action). The likes a card received are the
+/// role blob "personal_upvote" (PersonalUpvoteList), its popularity the role blob "popularity" (DBPopularityStar).</para>
 /// </summary>
 public sealed class PersonalService
 {
-    public const uint Sync = 5016, UpdateAppearance = 82553, UpdateCurPlan = 82559, UpdatePlanName = 82560;
+    public const uint Sync = 5016, UpdateAppearance = 82553, Upvote = 82554, UpdateCurPlan = 82559, UpdatePlanName = 82560;
     // ErrorCodeConfig 3351-3367, the profile family.
     public const int ErrConfig = 3351, ErrParameter = 3352, ErrFunction = 3354, ErrLocked = 3357, ErrStickers = 3358,
+        ErrUpvoted = 3359, ErrUpvoteSelf = 3361, ErrUpvoteCooldown = 3362,
         ErrPreset = 3363, ErrSignLength = 3364, ErrSignSensitive = 3365, ErrNameLength = 3366, ErrNameSensitive = 3367;
+    // The gift panel's effect ids (UI_Sys_Friend_GiftToFriendsPanelCtrl: Intimacy 107, TotalPopularity 108, Charity 109).
+    private const int EffectPopularity = 108, EffectCharity = 109;
     private const int Function = 63;
     // enum_PersonalUnlockType (Lua_GameDefine.lua:13645-13660); the editor's lists check Theme, BackGround and Action
     // (UI_Sys_Personal_EditTheme/EditBg/EditRoleAction_ListWidgetCtrl via LC_PersonalHelper.CheckItemIsOpen).
@@ -47,11 +51,13 @@ public sealed class PersonalService
     private readonly FunctionService functions;
     private readonly CharacterService character;
     private readonly IOptions<ServerOptions> options;
+    private readonly TimeProvider clock;
 
     public PersonalService(GameData data, RoleStore roles, FunctionService functions, CharacterService character,
-        IOptions<ServerOptions> options)
+        IOptions<ServerOptions> options, TimeProvider clock)
     {
         this.data = data; this.roles = roles; this.functions = functions; this.character = character; this.options = options;
+        this.clock = clock;
         // Action 1002 unlocks at base level 50 (PersonalPerformanceConfig, condition 18000001).
         character.ProgressHandlers.Add(RefreshAsync);
     }
@@ -250,6 +256,110 @@ public sealed class PersonalService
         }
         await s.SendGameAsync(UpdatePlanName, new UpdatePersonalPlanNameResp { Result = result, Req = req });
         if (result == 0) await SyncAsync(s);
+    }
+
+    // ------------------------------------------------------------------ 82554 likes
+
+    /// <summary>
+    /// 82554: like another role's card (the heart, UI_Sys_PersonalPanelCtrl._onLickBtnClick). LC_DAL_Personal.SendPersonalUpvote
+    /// sends only roleId, at most once per PersonalLikeCD (1000 ms, else UIWords 62038). The reply handler stores
+    /// PersonalUpvote[req.roleId] = isCancle and raises PersonalUpvoteInfoChange, which asks again for the target's
+    /// PersonalUpvoteCount (LC_System_PlayerInfo._onUpvoteValChange). The heart is lit from PersonalUpvote[target]
+    /// (UI_Sys_PersonalPanelModel.GetDataFormAsset), which neither 5016 nor the reply ever clears, so the client cannot
+    /// show a like taken back: (inferred) a like is kept for good, a second one is ErrUpvoted ("Liked.") and isCancle
+    /// is false; the 5016 increment after the reply turns that false into the like's time. ErrUpvoteCooldown is the
+    /// client's PersonalLikeCD between two likes, checked again here (inferred). No daily reset: nothing in the client
+    /// re-arms a like. The liked role gets no notice; its card shows the count and Like History (UserDataService).
+    /// </summary>
+    public async Task UpvoteAsync(GameSession s, UpvotePersonalReq req)
+    {
+        using var held = await CharacterService.Lock(s);
+        long target = req.RoleId, now = clock.GetUtcNow().ToUnixTimeMilliseconds();
+        int result = Gate(s);
+        if (result == 0 && target == s.Role!.Id) result = ErrUpvoteSelf;
+        if (result == 0 && (target <= 0 || await roles.GetAsync(target) == null
+            || (await roles.ReadRevisionVectorAsync(target)).Deleted)) result = ErrParameter;
+        if (result == 0 && s.Personal!.UpvoteTimes.ContainsKey(target)) result = ErrUpvoted;
+        if (result == 0 && s.Personal!.UpvoteTimes.Count > 0
+            && now - s.Personal.UpvoteTimes.Values.Max() < Param("PersonalLikeCD", 1000)) result = ErrUpvoteCooldown;
+        if (result == 0)
+        {
+            var next = s.Personal!.Clone();
+            next.UpvoteTimes[target] = now;
+            var transaction = roles.NewTransaction();
+            var liked = roles.LoadPersonalUpvotes(target, transaction) is { Length: > 0 } stored
+                ? PersonalUpvoteList.Parser.ParseFrom(stored) : new PersonalUpvoteList();
+            liked.Infos[s.Role!.Id] = now;
+            transaction.RoleBlob(s.Role.Id, "personal", next.ToByteArray());
+            roles.SavePersonalUpvotes(target, liked.ToByteArray(), transaction);
+            await roles.CommitAsync(transaction, "personal/upvote", _ => s.Personal = next);
+        }
+        await s.SendGameAsync(Upvote, new UpvotePersonalResp { Result = result, Req = req });
+        if (result == 0) await SyncAsync(s);
+    }
+
+    /// <summary>The likes a card received (liker id to unix ms), as stored; null when none.</summary>
+    public static PersonalUpvoteList? Upvotes(byte[]? stored) =>
+        stored is { Length: > 0 } && PersonalUpvoteList.Parser.ParseFrom(stored) is { Infos.Count: > 0 } list ? list : null;
+
+    // ------------------------------------------------------------------ popularity
+
+    /// <summary>
+    /// Popularity comes from friend gifts. The gift panel (UI_Sys_Friend_GiftToFriendsPanelCtrl._changeGiftShowInfo) adds the
+    /// item's _iUseEffect 108 (TotalPopularity) times the count to the receiver's weekly and total popularity, read from
+    /// PopularityStar; a received record shows "Popularity: +n" (record.popularity), a sent one "Affection: +n" from 109
+    /// (Charity, record.affection; UI_Sys_Friend_GiftRecordListWidgetCtrl._initView). Likes add none: the client links them
+    /// nowhere to popularity.
+    /// </summary>
+    public (int Popularity, int Affection) GiftValues(long item, int count)
+    {
+        if (data.Row("ItemConfig", item) is not { } row) return (0, 0);
+        var effects = GameData.Pairs(row, "_iUseEffect").ToList();
+        int Total(int effect) => (int)Math.Min(int.MaxValue, effects.Where(e => e.Id == effect).Sum(e => (long)e.Value * count));
+        return (Total(EffectPopularity), Total(EffectCharity));
+    }
+
+    /// <summary>Credits a committed gift: the receiver's popularity, the sender's affection.</summary>
+    public async Task CreditGiftAsync(long sender, long receiver, int popularity, int affection)
+    {
+        if (popularity <= 0 && affection <= 0) return;
+        long now = clock.GetUtcNow().ToUnixTimeMilliseconds(), week = WeekStartMs(clock);
+        var transaction = roles.NewTransaction();
+        if (popularity > 0)
+        {
+            var star = Popularity(roles.LoadPopularity(receiver, transaction), week);
+            star.Popularity = Add(star.Popularity, popularity);
+            star.PopularityWeekly = Add(star.PopularityWeekly, popularity);
+            star.UpdateTime = now;
+            roles.SavePopularity(receiver, star.ToByteArray(), transaction);
+        }
+        if (affection > 0)
+        {
+            var star = Popularity(roles.LoadPopularity(sender, transaction), week);
+            star.Affection = Add(star.Affection, affection);
+            star.UpdateTime = now;
+            roles.SavePopularity(sender, star.ToByteArray(), transaction);
+        }
+        await roles.CommitAsync(transaction, "personal/popularity");
+    }
+
+    private static int Add(int value, int delta) => (int)Math.Min(int.MaxValue, (long)value + delta);
+
+    /// <summary>A stored DBPopularityStar, its weekly popularity zero when last changed before this week.</summary>
+    public static DBPopularityStar Popularity(byte[]? stored, long weekStartMs)
+    {
+        var star = stored is { Length: > 0 } ? DBPopularityStar.Parser.ParseFrom(stored) : new DBPopularityStar();
+        if (star.UpdateTime < weekStartMs) star.PopularityWeekly = 0;
+        return star;
+    }
+
+    /// <summary>(inferred) The popularity week starts on Monday 05:00 realm time, as the guild activity week.</summary>
+    public static long WeekStartMs(TimeProvider clock)
+    {
+        var local = clock.GetLocalNow();
+        var day = local.AddHours(-5).Date;
+        int sinceMonday = ((int)day.DayOfWeek + 6) % 7;
+        return new DateTimeOffset(day.AddDays(-sinceMonday).AddHours(5), local.Offset).ToUnixTimeMilliseconds();
     }
 
     private int Gate(GameSession s) => s.Personal == null || s.Progress == null ? ErrorCodes.FeatureUnavailable

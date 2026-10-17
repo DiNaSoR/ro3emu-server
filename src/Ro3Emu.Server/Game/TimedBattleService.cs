@@ -63,6 +63,8 @@ public sealed partial class TimedBattleService : IGameTicker
     private readonly World world;
     private readonly ServerOptions options;
     private readonly SessionRegistry sessions;
+    private readonly TeamService teams;
+    private readonly LifeJobService life;
     private readonly GameLoop loop;
     private readonly ILogger<TimedBattleService> log;
     private readonly Dictionary<int, List<GameSession>> queue = new();
@@ -74,8 +76,17 @@ public sealed partial class TimedBattleService : IGameTicker
 
     public sealed class State
     {
-        public Dictionary<long, int> OnePieceGains { get; set; } = new();
-        public Dictionary<long, Dictionary<int, int>> OnePieceItemGains { get; set; } = new();
+        /// <summary>RestrictConfig 1020 (daily): the extra awards taken on <see cref="OnePieceExtraDay"/>.</summary>
+        public long OnePieceExtraDay { get; set; }
+        public int OnePieceExtraUsed { get; set; }
+        /// <summary>The week's extra-award items (AwardRestricConfig caps are weekly) for <see cref="OnePieceWeek"/>.</summary>
+        public long OnePieceWeek { get; set; }
+        public Dictionary<int, int> OnePieceWeekItems { get; set; } = new();
+        /// <summary>Legacy per-day clear and item counters (before the 1020 / weekly limits): read, dropped on the next Rift pay.</summary>
+        [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+        public Dictionary<long, int>? OnePieceGains { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+        public Dictionary<long, Dictionary<int, int>>? OnePieceItemGains { get; set; }
         public HashSet<long> ChickenSettled { get; set; } = new();
         public int ChickenRank { get; set; } = 1;
         public long ChickenScore { get; set; }
@@ -136,11 +147,14 @@ public sealed partial class TimedBattleService : IGameTicker
 
     public TimedBattleService(GameData data, TimedTodoSchedule schedule, TimeProvider time, RoleStore roles, AccountStore accounts,
         CharacterService character, FunctionService functions, AwardService awards, TaskService tasks, InstanceService instances, SceneService scene, WorldData worldData,
-        MonsterService monsters, CombatService combat, SessionRegistry sessions, GameLoop loop,
+        MonsterService monsters, CombatService combat, SessionRegistry sessions, TeamService teams, LifeJobService life, GameLoop loop,
         BuffService buffs, SkillService skills, World world, IOptions<ServerOptions> options, ILogger<TimedBattleService> log,
         GmCommands gm)
     {
-        gm.Register("rift", "| new | <star 1-6> [boss name] (Rift Crisis test aid: status, new round, or a stone next to you)", RiftGmAsync);
+        gm.Register("rift", "| new | party [min] | <star 1-6> [boss name] (Rift Crisis test aid: status, new round, "
+            + "smallest party, or a stone next to you)", RiftGmAsync);
+        this.teams = teams; this.life = life;
+        life.ProjectedRestrictions.Add(RiftRestriction);
         this.data = data; this.schedule = schedule; this.time = time; this.roles = roles; this.accounts = accounts;
         this.character = character;
         this.functions = functions; this.awards = awards; this.tasks = tasks; this.instances = instances; this.scene = scene; this.worldData = worldData; this.monsters = monsters;
@@ -216,6 +230,7 @@ public sealed partial class TimedBattleService : IGameTicker
             await CharacterService.SyncAsync(session, 5071, dragon);
             await CharacterService.SyncAsync(session, 5038, onePiece);
         }
+        await SyncRiftRestrictAsync(session);
     }
 
     private (int Players, int TeamSize) MatchShape(int entry)
