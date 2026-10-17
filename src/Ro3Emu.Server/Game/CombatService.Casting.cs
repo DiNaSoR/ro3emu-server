@@ -24,6 +24,8 @@ public sealed class ActiveSkillCast
     public required int ActionMs { get; init; }
     public bool Cancelled { get; set; }
     public bool Resolved { get; set; }
+    /// <summary>HP/SP and buff-pile costs still owed by a chanted cast; paid once when the chant completes.</summary>
+    internal Func<Task<bool>>? ChantCost { get; set; }
     public SkillObject? Operator { get; init; }
     public long SourceId => Operator?.Uid ?? OwnerId;
 }
@@ -111,7 +113,10 @@ public sealed partial class CombatService
             s.SceneGeneration != scene || s.WorldScene != worldScene || s.SceneLoading) return;
         await CancelCastAsync(s, SkillInterruptedInfo.Types.SkillInterruptType.Skill);
         eventAttacks.Remove(s);
-        await PayCostsAsync(s, costs);
+        // Classic RO rule (rAthena skill_castend): a chanted skill spends HP/SP only when its chant completes,
+        // so an interrupted chant costs nothing. Instant skills pay now. Items and energy stay paid on accept.
+        bool chanted = GameData.Int(row!.Value, "_iChantFix") + GameData.Int(row.Value, "_iChantVar") > 0;
+        if (!chanted) await PayCostsAsync(s, costs);
         await buffs.SpendEnergyAsync(s, row!.Value);
         await s.SendGameAsync(UseSkill, new CastSkillRsp { SessionId = id, IsAutoCast = req.IsAutoCast });
         var target = FindMonster(s.WorldScene, req.TargetId);
@@ -128,7 +133,7 @@ public sealed partial class CombatService
                 Now + SkillMs(s, row.Value) + Math.Max(0, GameData.Int(row.Value, "_iChantFix") + GameData.Int(row.Value, "_iChantVar")) + 1,
                 s.Position.X, s.Position.Z);
         await StartCooldownAsync(s, row.Value);
-        await StartCastAsync(s, row.Value, req, id, owned);
+        await StartCastAsync(s, row.Value, req, id, owned, chanted ? costs : null);
     }
 
     /// <summary>Cast item cost and frozen intent share one owner receipt; HP/SP/buffs remain runtime resources.
@@ -323,6 +328,21 @@ public sealed partial class CombatService
             await buffs.ConsumeBuffPilesAsync(s, group, (int)count);
     }
 
+    /// <summary>Spends a chanted cast's deferred costs once. If the caster no longer has them, the cast fails
+    /// like a refusal (31104 Interrupted with the cost error) and nothing is spent.</summary>
+    private async Task<bool> PayChantCostAsync(GameSession s, ActiveSkillCast action, CastCosts costs)
+    {
+        action.ChantCost = null;
+        var (error, parameter) = ValidateCosts(s, costs);
+        if (error == 0)
+        {
+            await PayCostsAsync(s, costs);
+            return true;
+        }
+        await CancelCastAsync(s, SkillInterruptedInfo.Types.SkillInterruptType.Skill, error, parameter);
+        return false;
+    }
+
     private async Task StartCooldownAsync(GameSession s, JsonElement row)
     {
         int group = (int)GameData.Int(row, "_iSkillID"), mode = (int)GameData.Int(row, "_iMode");
@@ -378,7 +398,7 @@ public sealed partial class CombatService
         return Current();
     }
 
-    private async Task StartCastAsync(GameSession s, JsonElement row, CastSkillReq req, long id, SkillObject? actor = null)
+    private async Task StartCastAsync(GameSession s, JsonElement row, CastSkillReq req, long id, SkillObject? actor = null, CastCosts? chantCosts = null)
     {
         var origin = actor?.Pos ?? s.Position.Clone();
         var target = FindMonster(s.WorldScene, req.TargetId);
@@ -389,6 +409,7 @@ public sealed partial class CombatService
             Attachment = s.Attachment, Request = req, Row = row, Origin = origin, StartedWalking = actor == null && s.Walking,
             StartMs = Now, ChantMs = (int)Math.Max(0, GameData.Int(row, "_iChantFix") + GameData.Int(row, "_iChantVar")), ActionMs = SkillMs(s, row), Operator = actor,
         };
+        if (chantCosts is { } owed) action.ChantCost = () => PayChantCostAsync(s, action, owed);
         s.SkillCast = action;
         s.WorldState.ResurrectionCastId = Script(row) == "Resurrection" ? id : 0;
         s.Face = face;
@@ -402,9 +423,16 @@ public sealed partial class CombatService
         var points = template is { } t ? Numbers(t, "m_kAtkPoints") : [];
         double point = points.FirstOrDefault(0.2);
         int at = Script(row) == "Resurrection" ? action.ChantMs : ImpactOffset(template, point, action.ChantMs, action.ActionMs);
+        if (action.ChantCost != null)
+            ScheduleRuntime(action.WorldScene, TimeSpan.FromMilliseconds(Math.Min(at, action.ChantMs)), async () =>
+            {
+                if (Live(s, action) && action.ChantCost is { } pay) await pay();
+            });
         ScheduleRuntime(action.WorldScene, TimeSpan.FromMilliseconds(at), async () =>
         {
             if (!Live(s, action)) return;
+            // An impact on the chant boundary can run before the chant-end callback: settle the cost first.
+            if (action.ChantCost is { } pay && !await pay()) return;
             action.Resolved = true;
             await ResolveCastAsync(s, action);
         });
@@ -454,7 +482,7 @@ public sealed partial class CombatService
         if (interrupted && req?.NxtSkill is { } next) await CastAsync(s, next);
     }
 
-    private async Task CancelCastAsync(GameSession s, SkillInterruptedInfo.Types.SkillInterruptType cause)
+    private async Task CancelCastAsync(GameSession s, SkillInterruptedInfo.Types.SkillInterruptType cause, int result = 0, long parameter = 0)
     {
         s.WorldState.ResurrectionCastId = 0;
         if (s.SkillCast is not { } action) return;
@@ -463,7 +491,8 @@ public sealed partial class CombatService
         await ToPlayerAndViewersAsync(s, SkillEnd, new SkillEndNotify
         {
             SrcID = action.SourceId, SessionId = action.Id, Type = SkillEndNotify.Types.SkillEndType.Interrupted,
-            ClearEffect = true, InterruptedInfo = new SkillInterruptedInfo { Type = cause },
+            ClearEffect = true, InterruptedInfo = new SkillInterruptedInfo { Type = cause }, Result = result,
+            Params = { parameter == 0 ? [] : new[] { parameter } },
         });
     }
 

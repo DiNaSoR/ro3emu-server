@@ -271,6 +271,49 @@ public sealed partial class SkillCombatTests : IAsyncLifetime
     }
 
     [ClientDataFact]
+    public async Task ChantedSkillSpendsSpOnlyWhenTheChantCompletes()
+    {
+        await using var alice = await InWorld("Alice");
+        await Gm("alice", "!job 2100"); await Teach("alice", 12010); // 1201001: 20 SP, 840 ms chant
+        var player = Session("alice");
+        long Sp() => Character.Stats(player)[2001];
+        async Task<CastSkillRsp> Cast()
+        {
+            await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1201001, TargetPos = player.Position.Clone() });
+            return await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser);
+        }
+        // Hold the caster in combat so out-of-combat SP regeneration cannot move the numbers under test.
+        long full = await Loop.InvokeAsync(() =>
+        {
+            player.StatusBits |= 1L << 15; player.LastCombatMs = long.MaxValue / 2;
+            return Task.FromResult(Sp());
+        });
+
+        var first = await Cast();
+        Assert.Equal(0, first.Result);
+        Assert.Equal(full, await Loop.InvokeAsync(() => Task.FromResult(Sp())));
+        await alice.SendGameAsync(CombatService.SkillInterrupt, new SkillInterruptReq { InterruptSkillId = 1201001 });
+        Assert.True((await Next(alice, CombatService.SkillInterrupt, SkillInterruptResp.Parser)).IsInterruptSucc);
+        await Task.Delay(1000);
+        Assert.Equal(full, await Loop.InvokeAsync(() => Task.FromResult(Sp())));
+
+        await Loop.InvokeAsync(() => { player.SkillCds.Clear(); player.SkillModeCds.Clear(); return Task.CompletedTask; });
+        var second = await Cast();
+        Assert.Equal(0, second.Result);
+        await Task.Delay(1500); // chant 840 + action 420
+        Assert.Equal(full - 20, await Loop.InvokeAsync(() => Task.FromResult(Sp())));
+
+        // SP spent elsewhere during the chant: the cast fails at chant end and takes nothing.
+        await Loop.InvokeAsync(async () => { player.SkillCds.Clear(); player.SkillModeCds.Clear(); await Character.SetHpSpAsync(player, null, full); });
+        var third = await Cast();
+        Assert.Equal(0, third.Result);
+        await Loop.InvokeAsync(() => Character.SetHpSpAsync(player, null, 5));
+        var end = await Next(alice, CombatService.SkillEnd, SkillEndNotify.Parser, x => x.SessionId == third.SessionId);
+        Assert.Equal(ErrorCodes.SkillCostShort, end.Result);
+        Assert.Equal(5, await Loop.InvokeAsync(() => Task.FromResult(Sp())));
+    }
+
+    [ClientDataFact]
     public async Task HealSelectsAllyAndInsufficientSpDoesNotStartCooldown()
     {
         await using var alice = await InWorld("Alice"); await using var bob = await InWorld("Bob");
