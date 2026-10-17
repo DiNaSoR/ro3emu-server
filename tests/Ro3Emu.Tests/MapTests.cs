@@ -301,7 +301,8 @@ public sealed partial class MapTests : IAsyncLifetime
         float dx = bolt.TargetPosition.X - bolt.SourcePosition.X, dz = bolt.TargetPosition.Z - bolt.SourcePosition.Z;
         Assert.InRange(bolt.FixedTime, MathF.Sqrt(dx * dx + dz * dz) * 100 - 2, MathF.Sqrt(dx * dx + dz * dz) * 100 + 2); // ms = m / 10 per s
         var flight = System.Diagnostics.Stopwatch.StartNew();
-        await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser, h => h.SrcID == self);
+        var hit = await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser, h => h.SrcID == self);
+        Assert.Equal(1200804, hit.ShowPoint); // the action hit, not the bullet 1200803 before it (no hit gfx or sound)
         Assert.True(flight.ElapsedMilliseconds >= bolt.FixedTime - 100, $"the hit came {flight.ElapsedMilliseconds} ms after launch, the bolt flies {bolt.FixedTime} ms");
     }
 
