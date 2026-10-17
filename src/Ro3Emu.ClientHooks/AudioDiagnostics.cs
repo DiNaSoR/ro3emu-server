@@ -15,6 +15,7 @@ namespace Ro3Emu.ClientHooks
     ///   audio listen [m]        moves the listener m metres (default 1.5) above the player; "listen 0" undoes it
     ///   audio anim              the animation sound events (footsteps, swings) of the player's and two other models
     ///   audio rawdata [file...] copies the named animation data files (as the game loads them) to ro3emu/dump
+    ///   audio cutscene [id]     plays a story cutscene again (default 130011, the job change); CutsceneAudio logs its sound tracks
     /// The game puts the Wwise listener exactly on the local player, so the player's own sounds play at distance 0;
     /// "near" and "listen" tell whether that is what silences them.
     /// </summary>
@@ -64,6 +65,9 @@ namespace Ro3Emu.ClientHooks
                     break;
                 case "rawdata":
                     RawData(parts);
+                    break;
+                case "cutscene":
+                    CutsceneAudio.Play(parts.Length > 1 ? parts[1] : "");
                     break;
                 default:
                     Debug.Log("[Ro3Emu.Diag] audio: unknown subcommand " + sub + " (audio | audio play [event] | audio near [event] [m] | audio listen [m])");
