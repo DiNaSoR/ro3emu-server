@@ -35,9 +35,8 @@ namespace Ro3Emu.ClientHooks
         private static int _depth;
         private static bool _on;
 
-        // The quest update event, alternately run with the Lua GC stopped, to see how much of it is garbage collection.
+        // The quest update event (Common.UpdateTaskInfoEvent, each kill): its time and the Lua heap before and after.
         private static Obf_R.Obf_Ef _collect;
-        private static int _questUpdates;
         private static bool _inQuestUpdate;
         private static readonly List<string> QuestNotes = new List<string>();
 
@@ -161,7 +160,7 @@ namespace Ro3Emu.ClientHooks
             _on = true;
             Debug.Log("[Ro3Emu.Hitch] timing on: " + (_dispatch != null ? "events" : "no events (DispatchEvent not found)")
                 + ", " + Wrapped.Count + " LC_TaskHelper function(s), " + _eventNames.Count + " event names"
-            + ", " + _methods + " method(s)" + ", stack trace test");
+            + ", " + _methods + " method(s)" );
         }
 
         private static void Disable()
@@ -230,11 +229,7 @@ namespace Ro3Emu.ClientHooks
                     () => original.Obf_HuA(self, module, notify, param), key);
                 return;
             }
-            // Every other quest update runs with Unity's stack trace for Log messages off (the A/B test of the log cost).
-            bool traceOff = (_questUpdates++ & 1) == 1;
-            var savedTrace = UnityEngine.Application.GetStackTraceLogType(UnityEngine.LogType.Log);
             double before = Kb();
-            if (traceOff) UnityEngine.Application.SetStackTraceLogType(UnityEngine.LogType.Log, UnityEngine.StackTraceLogType.None);
             var watch = Stopwatch.StartNew();
             _inQuestUpdate = true;
             try { Timed(null, () => original.Obf_HuA(self, module, notify, param), key); }
@@ -243,8 +238,7 @@ namespace Ro3Emu.ClientHooks
                 _inQuestUpdate = false;
                 double ms = watch.Elapsed.TotalMilliseconds;
                 double after = Kb();
-                if (traceOff) UnityEngine.Application.SetStackTraceLogType(UnityEngine.LogType.Log, savedTrace);
-                QuestNotes.Add("quest update " + ms.ToString("F1") + " ms with Unity's Log stack trace " + (traceOff ? "None" : savedTrace.ToString())
+                QuestNotes.Add("quest update " + ms.ToString("F1") + " ms"
                     + ", Lua heap " + before.ToString("F0") + " -> " + after.ToString("F0") + " KB");
             }
         }
