@@ -194,7 +194,15 @@ public sealed partial class CharacterService
     /// <summary>Set by BuffService: puts a buff on the player (item use action 203).</summary>
     public Func<GameSession, int, int, Task>? GiveBuff { get; set; }
 
-    private async Task SendStatsAsync(GameSession session)
+    /// <summary>
+    /// EAttrModType.EAttrModTypeBase in 31008 attrModTypes: the client (LC_DAL_PlayerInfo._changeProperty) then floats
+    /// each changed attribute ("HP 37" with an up arrow, UI_Sys_Main_PowerChangeWidget). It shows the popups only for
+    /// types listed in PublicParamConfig.AttrChangeCoverdType, which includes 0.
+    /// </summary>
+    private const int AttrModTypeBase = 0;
+
+    /// <param name="showChange">Base level up or committed stat points: the client floats the attribute changes.</param>
+    private async Task SendStatsAsync(GameSession session, bool showChange = false)
     {
         var oldIds = session.EntityProperties.Select(p => (int)p.Id).ToHashSet();
         Refresh(session);
@@ -206,7 +214,9 @@ public sealed partial class CharacterService
             all.Propertys.Add(new Property { PropertyId = id, Data = value, BaseData = stats.Base.GetValueOrDefault(id, value), Vd64 = value });
             session.SentPropertyIds.Add(id);
         }
-        await session.SendGameAsync(OnePropertyChange, new Romsg.OnePropertyChange { Property = all });
+        var change = new Romsg.OnePropertyChange { Property = all };
+        if (showChange) change.AttrModTypes.Add(AttrModTypeBase);
+        await session.SendGameAsync(OnePropertyChange, change);
 
         var aoi = new AOIAttrChange { EntityUuid = (ulong)session.Role.Id };
         foreach (var id in AoiProperties) aoi.Property.Add(new AoIProperty { Idx = id, Data = stats[id], BaseData = stats[id] });

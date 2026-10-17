@@ -332,7 +332,7 @@ public sealed partial class CharacterService
             if (staged.Level != oldLevel || staged.JobLevel != oldJob)
             {
                 await SendStatPlanAsync(session);
-                await SendStatsAsync(session);
+                await SendStatsAsync(session, showChange: staged.Level > oldLevel);
                 foreach (var handler in ProgressHandlers) await handler(session);
             }
         }

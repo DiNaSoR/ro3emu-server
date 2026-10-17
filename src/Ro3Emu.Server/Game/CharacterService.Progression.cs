@@ -54,6 +54,7 @@ public sealed partial class CharacterService
     {
         using var _ = await LockAsync(session);
         var p = CloneProgress(session.Progress!);
+        int oldLevel = p.Level;
         p.Level = Math.Clamp(level, 1, MaxLevel);
         p.Exp = 0;
         if (jobLevel is { } jl)
@@ -63,7 +64,7 @@ public sealed partial class CharacterService
         }
         SkipFreeJobLevels(p);
         await CommitCharacterAsync(session, "gm-level", progress: p);
-        await AfterLevelChangeAsync(session, persist: false);
+        await AfterLevelChangeAsync(session, persist: false, levelUp: p.Level > oldLevel);
         return $"Base level {p.Level}, job level {p.JobLevel}.";
     }
 
@@ -98,7 +99,7 @@ public sealed partial class CharacterService
 
         if (p.Level != oldLevel || p.JobLevel != oldJob)
         {
-            await AfterLevelChangeAsync(session, stillOwner, persist: false);
+            await AfterLevelChangeAsync(session, stillOwner, persist: false, levelUp: p.Level > oldLevel);
         }
         else
         {
@@ -119,7 +120,8 @@ public sealed partial class CharacterService
         while (p.JobLevel < maxJob && JobLvRow(p.Career, p.JobLevel) is { } row && GameData.Int(row, "_iJobeExp") == 0) p.JobLevel++;
     }
 
-    private async Task AfterLevelChangeAsync(GameSession session, Func<bool>? stillOwner = null, bool persist = true)
+    /// <param name="levelUp">The base level rose: the client floats the attribute gains.</param>
+    private async Task AfterLevelChangeAsync(GameSession session, Func<bool>? stillOwner = null, bool persist = true, bool levelUp = false)
     {
         var p = session.Progress!;
         if (persist) Save(session);
@@ -127,7 +129,7 @@ public sealed partial class CharacterService
         if (stillOwner?.Invoke() == false) return;
         await SendStatPlanAsync(session);
         if (stillOwner?.Invoke() == false) return;
-        await SendStatsAsync(session);
+        await SendStatsAsync(session, showChange: levelUp);
         if (stillOwner?.Invoke() == false) return;
         foreach (var handler in ProgressHandlers)
         {
@@ -182,7 +184,7 @@ public sealed partial class CharacterService
         await session.SendGameAsync(AllocateAttrPoints, new AllocateAttrPointRsp { Result = code, PlanIndex = req.PlanIndex, PlanBaseProperty = selected.Clone() });
         if (!ok) return;
         await SendStatPlanAsync(session);
-        if (req.PlanIndex == plans.CurPlanIndex) await SendStatsAsync(session);
+        if (req.PlanIndex == plans.CurPlanIndex) await SendStatsAsync(session, showChange: true);
         foreach (var handler in ProgressHandlers) await handler(session);
         foreach (var handler in StateChanged) handler(session);
     }
