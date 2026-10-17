@@ -120,9 +120,9 @@
         <article><span class="system-number">01</span><h3>World &amp; combat</h3><p>Maps, NPCs, visibility, monsters, skills, buffs and character progression.</p><a href="https://github.com/aethai/ro3emu-server/blob/main/docs/research/world-core-evidence.md">Trace the world protocol <span aria-hidden="true">↗</span></a></article>
         <article><span class="system-number">02</span><h3>People &amp; economies</h3><p>Parties, chat, mail, trade, stalls, auctions and guild systems.</p><a href="https://github.com/aethai/ro3emu-server/blob/main/docs/systems/trade-stalls.md">Explore trade and stalls <span aria-hidden="true">↗</span></a></article>
         <article><span class="system-number">03</span><h3>Instances &amp; territory</h3><p>Dungeons, scripted scenes, activities, territory wars and castle siege systems.</p><a href="https://github.com/aethai/ro3emu-server/blob/main/docs/systems/territory-wars.md">Read the territory design <span aria-hidden="true">↗</span></a></article>
-        <article><span class="system-number">04</span><h3>Tools for the work</h3><p>Protocol bots, load scenarios, data exporters, client patch tools and a launcher.</p><a href="https://github.com/aethai/ro3emu-server#development">Find your starting point <span aria-hidden="true">↗</span></a></article>
+        <article><span class="system-number">04</span><h3>Tools for the work</h3><p>Protocol bots, load scenarios, data exporters, client patch tools and a launcher.</p><a href="https://github.com/aethai/ro3emu-server#for-developers">Find your starting point <span aria-hidden="true">↗</span></a></article>
       </div>
-      <aside class="scope-note"><strong>An emulator under development.</strong> Story encounters and bosses are reconstructions where original server scripts are unavailable. Tavern, guild voice, the chicken minigame, payments and some panels are not implemented. See the <a href="https://github.com/aethai/ro3emu-server#what-works">current scope in the README</a>.</aside>
+      <aside class="scope-note"><strong>An emulator under development.</strong> Story encounters are reconstructions where original server scripts are unavailable, and bosses do not use their special skills yet. War of Emperium extras, the tavern and a few group modes are still missing. See the <a href="https://github.com/aethai/ro3emu-server#what-works">current scope in the README</a>.</aside>
     </section>
 
     <section class="start-section" id="start" aria-labelledby="start-title">
@@ -131,8 +131,8 @@
           <p class="eyebrow">FROM READING TO BUILDING</p>
           <h2 id="start-title">Start with the code.</h2>
           <p>With the <a href="https://dotnet.microsoft.com/download/dotnet/10.0">.NET 10 SDK</a>, you can clone and build the server without a game client.</p>
-          <p>For a playable world, bring your own <strong>RO3 PC client</strong> and export its data. The setup guide covers the additional tools, data export and client configuration.</p>
-          <a class="text-link" href="https://github.com/aethai/ro3emu-server#getting-started">Follow the complete setup guide <span aria-hidden="true">↗</span></a>
+          <p>To play, download <strong>RO3Emu.exe</strong> from the <a href="https://github.com/aethai/ro3emu-server/releases/latest">latest release</a> and run it: it finds your Ragnarok 3: Genesis game (or downloads it from the official servers), prepares the data and starts the server and the game. Nothing else to install.</p>
+          <a class="text-link" href="https://github.com/aethai/ro3emu-server#play-on-your-own-pc">How to play and host <span aria-hidden="true">↗</span></a>
         </div>
         <div class="terminal">
           <div class="terminal-header"><span>BUILD THE SERVER</span><button id="copy-build" type="button" hidden>Copy commands</button></div>
@@ -161,7 +161,7 @@ dotnet build src/Ro3Emu.Server -c Release</code></pre>
 
     <section class="details-section shell" aria-labelledby="details-title">
       <h2 id="details-title">Before you begin</h2>
-      <details><summary>Which game and client does RO3Emu target?</summary><p>The Ragnarok Online 3 PC client, also called RO3 and <code>ROO_PC</code> in the setup instructions. This project targets that client's protocol. For supported setup details, start with the <a href="https://github.com/aethai/ro3emu-server#getting-started">README</a>.</p></details>
+      <details><summary>Which game and client does RO3Emu target?</summary><p>The Ragnarok Online 3 PC client, also called RO3 and <code>ROO_PC</code> in the setup instructions. This project targets that client's protocol. For supported setup details, start with the <a href="https://github.com/aethai/ro3emu-server#play-on-your-own-pc">README</a>.</p></details>
       <details><summary>What is included in the repository?</summary><p>Server and tool source code, protocol definitions, documentation and tests. The game client, exported game data and game artwork are not included. A playable setup requires your own client and the data export described in the guide.</p></details>
       <details><summary>Can I contribute without the game client?</summary><p>Yes. Start with documentation, the server build or client-independent tooling. Some end-to-end tests and all in-game validation require exported client data. The <a href="https://github.com/aethai/ro3emu-server/blob/main/CONTRIBUTING.md">contribution guide</a> explains the distinction.</p></details>
       <details><summary>Is this an official Ragnarok project?</summary><p>No. RO3Emu is an independent research and interoperability project, unaffiliated with Gravity or any Ragnarok publisher. Ragnarok Online is a trademark of Gravity Co., Ltd.</p></details>
