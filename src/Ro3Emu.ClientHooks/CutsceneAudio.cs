@@ -25,6 +25,8 @@ namespace Ro3Emu.ClientHooks
     /// A cutscene with no sound of its own (no Wwise, audio or video track, clip, marker or component; 130011 is one)
     /// would be silent from start to end under that mute, so its mute is lifted (Ctrl_UnMute_InGame, as the game
     /// posts at the end) and the map's music and sounds go on playing. That choice is ours, not the original's.
+    /// Added cues (also ours): the job-change cutscene gets UI_zhuanzhi02 (UI_zhuanzhi.bnk, routed to SFX_UI; no
+    /// Lua posts it, while UI_zhuanzhi01 plays when the new job's model appears) as its glow starts.
     /// </summary>
     internal static class CutsceneAudio
     {
@@ -32,6 +34,14 @@ namespace Ro3Emu.ClientHooks
         private const BindingFlags Fields = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
 
         private static readonly HashSet<int> Seen = new HashSet<int>();
+
+        // Timeline asset name -> (time in seconds, Wwise event) cues we add.
+        private static readonly Dictionary<string, KeyValuePair<double, string>[]> AddedCues =
+            new Dictionary<string, KeyValuePair<double, string>[]>(StringComparer.OrdinalIgnoreCase)
+            {
+                // 4.83 s: Fx1point/Fx4point glow and the background glow switch on.
+                { "Cutscene_Xinshou_PlayerJobchange", new[] { new KeyValuePair<double, string>(4.83, "UI_zhuanzhi02") } },
+            };
 
         // TL_SignalWwise markers nothing would post, per playing director.
         private sealed class Pending
@@ -130,11 +140,17 @@ namespace Ro3Emu.ClientHooks
             }
             if (n == 0) sb.Append(" none");
             Banks(sb);
+            if (director.playableAsset != null && AddedCues.TryGetValue(director.playableAsset.name, out var cues))
+                foreach (var cue in cues)
+                {
+                    pending.Markers.Add(cue);
+                    sb.Append("\n  added cue ").Append(cue.Key.ToString("F2")).Append(' ').Append(cue.Value).Append(' ').Append(EventBank(cue.Value));
+                }
             if (pending.Markers.Count > 0)
             {
                 pending.Markers.Sort((a, b) => a.Key.CompareTo(b.Key));
                 Watching.Add(pending);
-                sb.Append("\n  ").Append(pending.Markers.Count).Append(" Wwise marker(s) have no receiver that posts them; posting them here");
+                sb.Append("\n  posting ").Append(pending.Markers.Count).Append(" cue(s) here (unreceived markers and added cues)");
             }
             if (!pending.HasSound && timeline != null)
             {
@@ -199,7 +215,7 @@ namespace Ro3Emu.ClientHooks
                 {
                     if (m.Key <= p.LastTime || m.Key > now) continue;
                     uint id = HappyEngine.Base.Singleton<AudioManager>.Instance.PostEvent(m.Value);
-                    Debug.Log("[Ro3Emu.CutsceneAudio] " + p.Director.name + " " + now.ToString("F2") + "s: posted marker " + m.Value + " -> playingId=" + id);
+                    Debug.Log("[Ro3Emu.CutsceneAudio] " + p.Director.name + " " + now.ToString("F2") + "s: posted cue " + m.Value + " -> playingId=" + id);
                 }
                 p.LastTime = now;
             }
