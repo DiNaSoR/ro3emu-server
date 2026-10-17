@@ -8,10 +8,11 @@ namespace Ro3Emu.Server.Game;
 /// selection check), when it moves and when it leaves. RoleSessionService runs the selection around these; the order
 /// here is the client's, see the comments on each step.
 /// </summary>
-public sealed class RoleSystems(Maps.World world, ChatService chat, CharacterService character, SkillService skills, FunctionService functions, CombatService combat, BuffService buffs, SceneService scene, TaskService tasks, DailyActivityService daily, GuideService guides, EmojiService emoji, PersonalService personal, SocialOutfitService socialOutfit, AchievementService achievements, Micro.FriendService friends, MvpService mvps, CardService cards, ShopService shops, EmblemService emblems, SeasonService seasons, SeasonPageService seasonPage, SeasonRefineService seasonRefine, SeasonTalentService talents, PetService pets, TowerService tower, ValhallaService valhalla, MonsterHuntService monsterHunt, GrowthClassService growthClass, FirstHeartService firstHeart, MailService mail, AuctionService auctions, GuildService guilds, AdventureGroupService adventureGroups, GuildCaravanService caravan, GuildChallengeService guildChallenge, DungeonService dungeons, DungeonMatchService dungeonMatches, InstanceService instances, TradeService trade, StallsService stalls, LifeJobService life, GatheringService gathering, WildAfkService afk, WorldCoreService worldCore, WorldInteractionService interaction, NewActivityService activities, TimedEventService timedEvents, PronteraDefenseService defense, TimedBattleService timedBattles, FestivalService festival, TrainingService training, LotteryService lottery, MountService mounts, CareerSpecialService careerSpecial, WardrobeService wardrobe, TotemService totems, GenreService genre, TerritoryWarsService territory, TerritoryEscortService escort, Persistence.SettingsPersistence settings, ILogger<RoleSystems> log)
+public sealed class RoleSystems(Maps.World world, ChatService chat, CharacterService character, SkillService skills, FunctionService functions, CombatService combat, BuffService buffs, SceneService scene, TaskService tasks, DailyActivityService daily, GuideService guides, EmojiService emoji, PersonalService personal, SocialOutfitService socialOutfit, AchievementService achievements, Micro.FriendService friends, MvpService mvps, CardService cards, ShopService shops, EmblemService emblems, SeasonService seasons, SeasonPageService seasonPage, SeasonRefineService seasonRefine, SeasonTalentService talents, PetService pets, TowerService tower, ValhallaService valhalla, MonsterHuntService monsterHunt, GrowthClassService growthClass, FirstHeartService firstHeart, MailService mail, AuctionService auctions, GuildService guilds, AdventureGroupService adventureGroups, GuildCaravanService caravan, GuildChallengeService guildChallenge, DungeonService dungeons, DungeonMatchService dungeonMatches, InstanceService instances, TradeService trade, StallsService stalls, LifeJobService life, GatheringService gathering, WildAfkService afk, WorldCoreService worldCore, WorldInteractionService interaction, NewActivityService activities, TimedEventService timedEvents, PronteraDefenseService defense, TimedBattleService timedBattles, FestivalService festival, TrainingService training, LotteryService lottery, MountService mounts, CareerSpecialService careerSpecial, WardrobeService wardrobe, TotemService totems, GenreService genre, PowerService power, TerritoryWarsService territory, TerritoryEscortService escort, Persistence.SettingsPersistence settings, ILogger<RoleSystems> log)
 {
     internal async Task LoadAsync(GameSession session)
     {
+        power.Load(session); // before the first plan dataset: 5007/5025/5026/5067 carry plan power
         character.Load(session);
         await character.FinishLoadAsync(session);
         careerSpecial.Load(session); // before mounts: a leased mount entitles the battle slot
@@ -31,6 +32,7 @@ public sealed class RoleSystems(Maps.World world, ChatService chat, CharacterSer
         await emblems.LoadAsync(session);
         talents.Load(session);
         seasonRefine.Load(session);
+        power.Prime(session); // the login 5066 carries the computed power (pets join at the login publish)
         character.Refresh(session); // first entity/stats use this role's saved active talent plan
     }
 
@@ -123,6 +125,7 @@ public sealed class RoleSystems(Maps.World world, ChatService chat, CharacterSer
         await pets.LoginAsync(session); // 5017 before 5056: opening a function must not expose an uninitialized pet DAL.
         checkpoint();
         await genre.LoginAsync(session);
+        await power.LoginAsync(session); // 31502/31503/5066 once every power owner (pets, Build) is loaded
         session.DeferTaskSync = false;
         checkpoint();
         await tasks.RefreshAsync(session); // all owner snapshots are now available for passive objectives; settles with the login's one full 5027

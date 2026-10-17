@@ -45,6 +45,10 @@ public sealed partial class GuildLeagueService : IGameTicker
     private readonly TimeProvider clock;
     private readonly GameLoop loop;
     private readonly ILogger<GuildLeagueService> log;
+
+    /// <summary>A newly committed match outcome: its round (1-3) and each fighter's personal points (quest targets
+    /// 106603 and 106019). Runs inside the Realm settlement; listeners post their work.</summary>
+    public List<Action<int, IReadOnlyDictionary<long, long>>> MatchCommitted { get; } = new();
     private readonly SemaphoreSlim gate = new(1, 1);
     private LeagueState state;
 

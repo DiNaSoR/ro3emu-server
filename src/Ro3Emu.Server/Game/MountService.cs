@@ -106,7 +106,7 @@ public sealed class MountService : IGameTicker
         return (0, new WardrobeService.LinkedMountGrant(granted, Convert.ToHexString(SHA256.HashData(saved)),
             tx => tx.RoleBlob(s.Role!.Id, "mounts", saved),
             () => { s.Mounts = next; ArmExpiry(s); },
-            () => LoginAsync(s)));
+            () => PublishOwnedAsync(s)));
     }
 
     public Task LoginAsync(GameSession s) => CharacterService.SyncAsync(s, Sync, s.Mounts!.Clone());
@@ -248,10 +248,20 @@ public sealed class MountService : IGameTicker
         if (look != null) await wardrobe.PublishCommittedAsync(s, before!);
     }
 
+    /// <summary>After a committed 5012 change (ownership, riding): BuffService adds or drops mount energy meters.</summary>
+    public List<Func<GameSession, Task>> Changed { get; } = new();
+
+    /// <summary>5012 after a committed change, then the <see cref="Changed"/> listeners.</summary>
+    private async Task PublishOwnedAsync(GameSession s)
+    {
+        await LoginAsync(s);
+        foreach (var handler in Changed) await handler(s);
+    }
+
     private async Task ChangedAsync(GameSession s)
     {
         ArmExpiry(s);
-        await LoginAsync(s);
+        await PublishOwnedAsync(s);
         await character.RefreshStatsAsync(s);
         var entity = RoleSessionService.PlayerEntity(s);
         entity.NotifyType = EntityBase.Types.NotifyType.Rider;
@@ -342,7 +352,7 @@ public sealed class MountService : IGameTicker
                 }, asyncCommit: true) == null) error = ErrorCodes.ItemsShort;
             else
             {
-                await LoginAsync(s);
+                await PublishOwnedAsync(s);
                 // 5034 only: 32747 already pops the unlock tip; 31189 would show a second reward tip (LC_DAL_Fashion:253-265).
                 if (look != null) await CharacterService.SyncAsync(s, WardrobeService.WardrobeSync, s.Wardrobe!.Clone());
                 await s.SendGameAsync(Unlock, new PlayerMountUnLockNtf { RiderId = id, EndTime = expiry });

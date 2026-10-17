@@ -781,6 +781,27 @@ public sealed class World(IAoiSink sink, GameLoop loop, ILogger<World> log)
     }
 
     /// <summary>Players of the scene in the 3x3 cells around a point (a superset of everyone within the leave radius).</summary>
+    /// <summary>Appends the players of a world scene within <paramref name="radius"/> of (x, z) to <paramref name="into"/>,
+    /// from the AOI grid and without allocating (aura ticks run several times a second).</summary>
+    public void CollectPlayers(long scene, float x, float z, float radius, List<GameSession> into)
+    {
+        float r2 = radius * radius;
+        lock (_sync)
+        {
+            if (!_grids.TryGetValue(scene, out var grid)) return;
+            var (x0, z0) = Cell(x - radius, z - radius);
+            var (x1, z1) = Cell(x + radius, z + radius);
+            for (int cx = x0; cx <= x1; cx++)
+                for (int cz = z0; cz <= z1; cz++)
+                    if (grid.TryGetValue((cx, cz), out var list))
+                        foreach (var p in list)
+                        {
+                            float dx = p.Position.X - x, dz = p.Position.Z - z;
+                            if (dx * dx + dz * dz <= r2) into.Add(p);
+                        }
+        }
+    }
+
     private IEnumerable<GameSession> NearLocked(long scene, float x, float z)
     {
         if (!_grids.TryGetValue(scene, out var grid)) yield break;

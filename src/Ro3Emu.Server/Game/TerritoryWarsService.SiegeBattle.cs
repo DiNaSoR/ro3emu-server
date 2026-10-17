@@ -13,6 +13,10 @@ public sealed partial class TerritoryWarsService
     private const int SiegeCrystal = 4900009, SiegeCrystalPoint = 44;
     private bool siegeDirty;
 
+    /// <summary>After a committed siege settlement, per loaded participant: role, personal score, whether its guild
+    /// won (quest target 106611). Listeners post their work.</summary>
+    public List<Action<long, long, bool>> SiegeSettled { get; } = new();
+
     public sealed class SiegeRunState
     {
         public int City { get; set; }
@@ -357,6 +361,10 @@ public sealed partial class TerritoryWarsService
             await roles.CommitAsync(transaction, "territory/siege-settle");
         }
         PublishCommitted(next);
+        foreach (var p in recipients)
+            foreach (var handler in SiegeSettled)
+                try { handler(p.Id, p.Score, p.Guild == winner); }
+                catch (Exception e) { log.LogError(e, "Siege settlement hook failed for role {Role}", p.Id); }
         foreach (var p in recipients)
             try { await mail.NotifyRecipientAsync(p.Id); }
             catch (Exception e) { log.LogWarning(e, "Siege mail notification deferred for role {Role}", p.Id); }

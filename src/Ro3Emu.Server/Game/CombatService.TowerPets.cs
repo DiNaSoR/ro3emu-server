@@ -7,6 +7,12 @@ namespace Ro3Emu.Server.Game;
 
 public sealed partial class CombatService
 {
+    /// <summary>
+    /// Synchronous monster damage modifiers (TowerService.PowerSuppress): a pet's hit on a monster (false), a monster's hit
+    /// on a pet or a player (true), after the monster's DamageRatio. A player's hit on a monster uses DamageAdjusters.
+    /// </summary>
+    internal List<Func<MonsterUnit, long, bool, long>> MonsterDamageAdjusters { get; } = new();
+
     /// <summary>(inferred) Use the existing attribute-group calculator for a pet's configured stats and live buffs.</summary>
     internal StatSheet TowerPetStats(TowerPetUnit pet)
     {

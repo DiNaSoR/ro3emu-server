@@ -89,6 +89,7 @@ public static class ServerHost
         builder.Services.AddSingleton<TeamService>();
         builder.Services.AddSingleton<MvpService>();
         builder.Services.AddSingleton<CardService>();
+        builder.Services.AddSingleton<CardEffects>();
         builder.Services.AddSingleton<SeasonService>();
         builder.Services.AddSingleton<SeasonPageService>();
         builder.Services.AddSingleton<SeasonRefineService>();
@@ -101,6 +102,7 @@ public static class ServerHost
         builder.Services.AddSingleton<TotemEffects>();
         builder.Services.AddSingleton<TotemService>();
         builder.Services.AddSingleton<GenreService>();
+        builder.Services.AddSingleton<PowerService>();
         builder.Services.AddSingleton<Game.MailService>();
         builder.Services.AddSingleton<AuctionService>();
         builder.Services.AddHostedService(sp => sp.GetRequiredService<AuctionService>());
@@ -193,6 +195,8 @@ public static class ServerHost
             .Configure(session => app.Services.GetRequiredService<RoleSessionService>().CleanupRoleAsync(session),
                 session => app.Services.GetRequiredService<RoleSessionService>().CleanupReservation(session));
         app.Services.GetRequiredService<Diagnostics.ServerMetrics>().Owners = app.Services.GetRequiredService<Game.Ownership.OwnerRegistry>();
+        // Mount energy meters (EnergyConfig._iBelongMount): BuffService cannot take MountService (MountService -> SceneService -> BuffService).
+        app.Services.GetRequiredService<MountService>().Changed.Add(app.Services.GetRequiredService<BuffService>().MountsChangedAsync);
         app.Use(async (context, next) =>
         {
             if (HttpMethods.IsPost(context.Request.Method) && app.Services.GetRequiredService<GameLoop>().Phase != GameLoopPhase.Accepting)
@@ -338,7 +342,22 @@ public static class ServerHost
         var questTasks = app.Services.GetRequiredService<TaskService>();
         app.Services.GetRequiredService<DungeonService>().Completed.Add((s, scene, _) => questTasks.OnDungeonClearedAsync(s, scene));
         app.Services.GetRequiredService<TotemService>().Combined.Add(questTasks.OnTotemCombined); // target 315004
+        // Participation and state targets (TaskService.ParticipationTargets.cs).
+        app.Services.GetRequiredService<DungeonService>().MultiBossCleared.Add(questTasks.OnTenBossClearedAsync); // 106602
+        app.Services.GetRequiredService<GuildChallengeService>().Participated.Add(questTasks.OnGveJoined); // 103014
+        league.MatchCommitted.Add(questTasks.OnGuildLeagueMatch); // 106603, 106019
+        territory.SiegeSettled.Add(questTasks.OnSiegeSettled); // 106611, 106605, 106606
+        app.Services.GetRequiredService<EmblemService>().Upgraded.Add(questTasks.OnEchoUpgraded); // 317002
+        app.Services.GetRequiredService<TowerService>().Settled.Add(questTasks.OnTowerSettled); // 101007, 101010
+        app.Services.GetRequiredService<PersonalService>().Upvoted.Add(questTasks.OnProfileLiked); // 106902
+        app.Services.GetRequiredService<GuildCampfireService>().Joined.Add(questTasks.OnCampfireJoined); // 106018
+        app.Services.GetRequiredService<GuildService>().MembershipChanged.Add(questTasks.OnStateChanged); // 104007
+        var social = app.Services.GetRequiredService<Micro.SocialOwnerCache>();
+        questTasks.LoadFriendCount = async s => s.Role is { } role
+            ? (await social.LoadSocialAsync([role.Id])).GetValueOrDefault(role.Id)?.Friends.LongLength : null; // 103019
+        app.Services.GetRequiredService<Micro.FriendService>().RelationChanged.Add(questTasks.OnRelationChanged);
         app.Services.GetRequiredService<ReconnectService>(); // hooks the handover and registers !netdrop
+        app.Services.GetRequiredService<CardEffects>(); // socketed-card passives and procs (sockets, scene loads, hits)
         // Create the key before the first client connects, so ClientPatch can read the public half.
         app.Services.GetRequiredService<GateCrypto>();
         app.Logger.LogInformation("Data dir {DataDir}", options.DataDir);
@@ -449,6 +468,7 @@ internal sealed class GameLoopTickers(IServiceProvider services) : IHostedServic
         Add<Game.Persistence.SettingsPersistence>();
         Add<ShopService>(); // 05:00 purchase-limit rollover
         Add<ItemBoxService>(); // award boxes; 05:00 item use-time rollover
+        Add<PowerService>(); // throttled 31502/31503 republish of changed power
         return Task.CompletedTask;
     }
 

@@ -580,4 +580,23 @@ public sealed partial class GuildTests : IAsyncLifetime
         throw new DirectoryNotFoundException("repository root");
     }
 
+    /// <summary>104007 CheckJoinGuild reads the membership: "Join a guild" (10200080, automatic) and 100026 complete
+    /// when the role founds a guild, and stay complete after a relogin.</summary>
+    [ClientDataFact]
+    public async Task FoundingAGuildCompletesTheJoinAGuildQuests()
+    {
+        var alice = await InWorld("Alice");
+        await Level("alice");
+        await QuestProbe.AcceptAsync(app, http, "alice", 100026); // [104007,1], claimed in the panel
+        await QuestProbe.AtAsync(app, "alice", 100026, 0);
+        await QuestProbe.AcceptAsync(app, http, "alice", 10200080); // [104007,1], delivered automatically
+        await CreateGuild(alice, "Joiners");
+        await QuestProbe.DoneAsync(app, "alice", 100026);
+        await QuestProbe.WaitAsync(app, "alice", 10200080, i => i.Status == TaskState.Delivery, "delivered");
+
+        await alice.DisposeAsync();
+        await QuestProbe.OfflineAsync(app, "alice");
+        await using var again = await InWorld("Alice", create: false);
+        Assert.Equal(1, (await QuestProbe.DoneAsync(app, "alice", 100026)).CompleteNum[0]);
+    }
 }

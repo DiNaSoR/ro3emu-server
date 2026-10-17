@@ -339,4 +339,39 @@ public sealed class PersonalTests : IAsyncLifetime
         Assert.Equal("Hello there", reloaded.PlanInfos[1].All.Sign);
         Assert.Equal("Mine", reloaded.PlanInfos[2].All.PlanName);
     }
+
+    /// <summary>
+    /// 106902 CheckPersonalHomepageLike counts committed likes; 103019 CheckFriend reads the friend list (after login
+    /// and on every relation change). Both are re-read after a relogin.
+    /// </summary>
+    [ClientDataFact]
+    public async Task LikesAndFriendsMoveTheirQuests()
+    {
+        await using var bob = await InWorld("Bob");
+        await using var carol = await InWorld("Carol");
+        var alice = await InWorld("Alice");
+        long a = (long)alice.Self!.Uuid, b = (long)bob.Self!.Uuid, c = (long)carol.Self!.Uuid;
+        await Gm("alice", "!lvl 20");
+        await WaitUntil(() => Session("alice").Progress!.Level == 20, "level 20 not applied");
+        await QuestProbe.AcceptAsync(app, http, "alice", 500201); // [106902,1] "Like Temporary Activity Quests"
+        await QuestProbe.AcceptAsync(app, http, "alice", 100022); // [103019,3] "Have 3 friends"
+        await QuestProbe.AtAsync(app, "alice", 100022, 0);
+        await QuestProbe.AtAsync(app, "alice", 500201, 0);
+
+        Assert.Equal(0, (await Like(alice, b)).Result);
+        await QuestProbe.DoneAsync(app, "alice", 500201);
+
+        foreach (var (bot, id) in new[] { (bob, b), (carol, c) })
+        {
+            await alice.MicroAsync("FriendService", "apply", new() { ["Uid"] = a.ToString(), ["Target"] = id.ToString() });
+            await bot.MicroAsync("FriendService", "accept", new() { ["Uid"] = id.ToString(), ["Applicant"] = a.ToString() });
+        }
+        await QuestProbe.AtAsync(app, "alice", 100022, 2);
+
+        await alice.DisposeAsync();
+        await QuestProbe.OfflineAsync(app, "alice");
+        await using var again = await InWorld("Alice", create: false);
+        await QuestProbe.AtAsync(app, "alice", 100022, 2);
+        await QuestProbe.DoneAsync(app, "alice", 500201);
+    }
 }

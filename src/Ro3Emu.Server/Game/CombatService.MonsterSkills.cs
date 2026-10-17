@@ -35,6 +35,7 @@ public sealed partial class CombatService
             var defender = new Fighter(0, 0, 0, 0, p.Progress.Level, 1) { Def = stats[105], Mdef = stats[106], Flee = stats[110], ResCri = stats[112] };
             var (damage, result) = Damage(attacker, defender, row);
             damage = ScaleMonsterDamage(damage, caster.DamageRatio);
+            foreach (var adjust in MonsterDamageAdjusters) damage = adjust(caster, damage, true);
             if (damage > 0) foreach (var modifier in IncomingDamageAdjusters) damage = Math.Max(0, await modifier(caster, p, result, damage));
             var committed = await CommitPlayerDamageAsync(p, damage, row, Current, sourceElement: element);
             if (committed == null) continue;
@@ -59,7 +60,7 @@ public sealed partial class CombatService
                     continue;
                 }
                 foreach (var tuple in Tuples(row, "_kBuff2"))
-                    if (Current() && RollBuff(tuple, out int buff, out int ms)) await buffs.AddAsync(p, buff, ms, caster.Uid);
+                    if (Current() && RollHostileBuff(tuple, null, caster, p, null, out int buff, out int ms)) await buffs.AddAsync(p, buff, ms, caster.Uid);
             }
             finally { if (hp == 0) ReleaseDeathPublication(p); }
         }
