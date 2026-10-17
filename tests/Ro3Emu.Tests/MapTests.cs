@@ -229,6 +229,27 @@ public sealed partial class MapTests : IAsyncLifetime
     }
 
     [ClientDataFact]
+    public void NormalAttackCannotRecastItselfButOtherSkillsBreakIt()
+    {
+        var combat = _app.Services.GetRequiredService<CombatService>();
+        var data = _app.Services.GetRequiredService<Ro3Emu.Server.Data.GameData>();
+        System.Text.Json.JsonElement Row(long id) => data.Row("SkillConfig", id)!.Value;
+        ActiveSkillCast Live(long id, long agoMs) => new()
+        {
+            Id = 1, OwnerId = 1, WorldScene = 1, Request = new CastSkillReq { SkillId = (int)id }, Row = Row(id),
+            Origin = new Vec3(), StartMs = MonsterService.NowMs - agoMs, ChantMs = 0, ActionMs = 1000,
+        };
+        // Normal Attack (_iInterruptedType 1) never yields to itself, so a spammed or held press cannot restart the
+        // swing, but any other skill (Smite) breaks it at once.
+        Assert.False(combat.CastYieldsTo(Live(1000001, 0), Row(1000001)));
+        Assert.True(combat.CastYieldsTo(Live(1000001, 0), Row(1000201)));
+        // Smite (_iInterruptedType 2, m_fInterruptTime 0.2833 of a 1 s timeline) holds until 283 ms, after its 200 ms hit.
+        Assert.False(combat.CastYieldsTo(Live(1000201, 0), Row(1000001)));
+        Assert.False(combat.CastYieldsTo(Live(1000201, 250), Row(1000001)));
+        Assert.True(combat.CastYieldsTo(Live(1000201, 300), Row(1000001)));
+    }
+
+    [ClientDataFact]
     public async Task PotionHealsWithCooldownAndSwordmanSkillsWork()
     {
         await using var alice = await InWorld("Alice");
