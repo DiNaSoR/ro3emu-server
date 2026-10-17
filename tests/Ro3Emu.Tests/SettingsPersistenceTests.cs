@@ -1,3 +1,4 @@
+using Google.Protobuf;
 using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
@@ -94,6 +95,33 @@ public sealed class SettingsPersistenceTests : IAsyncLifetime
         var stored = Stored(s.Role!.Id);
         Assert.Equal(new byte[] { 0x10, 0x01, 0x08, 0x01 }, stored.ClientSetting[10].ToByteArray());
         Assert.Equal(new byte[] { 0x08, 0x02 }, stored.ClientSetting[11].ToByteArray());
+    }
+
+    /// <summary>
+    /// Picking Old School turns click-to-attack (403001) on and any other mode turns it off, on every pick: the client
+    /// sets it only on the first pick and hides it in the settings menu. The 5061 resync carries it to the client.
+    /// </summary>
+    [Fact]
+    public async Task EveryGameModePickSetsClickToAttack()
+    {
+        var (bot, s) = await InWorld("Clicker");
+        await using var _ = bot;
+        long role = s.Role!.Id;
+        foreach (var (mode, expected) in new[] { (1, 1), (2, 2), (1, 1), (3, 2) })
+        {
+            var mine = new Romsg.CommonIntSetting { Value = expected }.ToByteArray();
+            using var sync = bot.Inbox.Expect(e => e.IsGame(MsgId.AutoSyncSettings)
+                && Romsg.DBSettingInfoIncrement.Parser.ParseFrom(e.Body).ClientSetting.TryGetValue(RoleSessionService.ClickToAttackSetting, out var v)
+                && v.All.ToByteArray().SequenceEqual(mine));
+            var pick = new Romsg.GameModeSetting { GameMode = mode, PcPlatformRecord = true }.ToByteArray();
+            await bot.SaveClientSettingAsync((int)Romsg.SettingType.GameMode, pick);
+            await sync.WaitAsync(Wait);
+            Assert.Equal(mine, (await OnLoop(() => s.Settings!.ClientSetting[RoleSessionService.ClickToAttackSetting])).ToByteArray());
+        }
+        // Re-picking the same mode changes nothing, so no resync is sent.
+        await bot.SaveClientSettingAsync((int)Romsg.SettingType.GameMode, new Romsg.GameModeSetting { GameMode = 3, PcPlatformRecord = true }.ToByteArray());
+        Assert.Equal(new Romsg.CommonIntSetting { Value = 2 }.ToByteArray(),
+            (await OnLoop(() => s.Settings!.ClientSetting[RoleSessionService.ClickToAttackSetting])).ToByteArray());
     }
 
     [Fact]
