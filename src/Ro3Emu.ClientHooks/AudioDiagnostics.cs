@@ -1,5 +1,4 @@
 using System;
-using System.Text;
 using UnityEngine;
 
 namespace Ro3Emu.ClientHooks
@@ -47,90 +46,43 @@ namespace Ro3Emu.ClientHooks
         private static float Float(string s, float fallback) =>
             float.TryParse(s, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : fallback;
 
+        // One line per step, written before the next native call, so a crash inside Wwise still shows how far it got.
+        private static void Step(string text) => Debug.Log("[Ro3Emu.Diag] audio: " + text);
+
         private static void Info()
         {
-            var sb = new StringBuilder("[Ro3Emu.Diag] audio:");
-            sb.Append("\n  wwise initialized=").Append(AkUnitySoundEngine.IsInitialized());
-            try
-            {
-                var speakers = AkUnitySoundEngine.GetSpeakerConfiguration();
-                sb.Append("\n  main output: channels=").Append(speakers.uNumChannels)
-                  .Append(" configType=").Append(speakers.eConfigType)
-                  .Append(" mask=0x").Append(speakers.uChannelMask.ToString("X"));
-                var cfg = new AkChannelConfig();
-                var caps = new Ak3DAudioSinkCapabilities();
-                var r = AkUnitySoundEngine.GetOutputDeviceConfiguration(0, cfg, caps);
-                sb.Append("\n  device config (").Append(r).Append("): channels=").Append(cfg.uNumChannels)
-                  .Append(" configType=").Append(cfg.eConfigType).Append(" mask=0x").Append(cfg.uChannelMask.ToString("X"))
-                  .Append(" 3D-sink: maxObjects=").Append(caps.uMaxSystemAudioObjects)
-                  .Append(" availableObjects=").Append(caps.uAvailableSystemAudioObjects)
-                  .Append(" passthrough=").Append(caps.bPassthrough)
-                  .Append(" multiChannelObjects=").Append(caps.bMultiChannelObjects)
-                  .Append(" sinkChannels=").Append(caps.channelConfig.uNumChannels)
-                  .Append(" sinkConfigType=").Append(caps.channelConfig.eConfigType);
-                AkUnitySoundEngine.GetPanningRule(out int panning);
-                sb.Append("\n  panning rule=").Append(panning == 0 ? "speakers" : panning == 1 ? "headphones" : panning.ToString());
-            }
-            catch (Exception e) { sb.Append("\n  output query failed: ").Append(e.Message); }
-
+            Step("wwise initialized=" + AkUnitySoundEngine.IsInitialized());
             var global = AD_WwiseManager.Instance != null ? AD_WwiseManager.Instance.GetGlobalObj() : null;
             if (global != null)
             {
                 var listener = global.GetComponent<AD_WwiseListener>();
-                sb.Append("\n  listener object ").Append(global.name).Append(" transform=").Append(global.transform.position.ToString("F2"));
-                if (listener != null)
-                    sb.Append(" reported=").Append(listener.GetPosition().ToString("F2"))
-                      .Append(" fwd=").Append(listener.GetForward().ToString("F2"))
-                      .Append(" up=").Append(listener.GetUpward().ToString("F2"))
-                      .Append(" follows=").Append(listener.GetPlayer() != null ? listener.GetPlayer().name : "-");
-                else sb.Append(" (no AD_WwiseListener yet)");
-                sb.Append(" akListener=").Append(global.GetComponent<AkAudioListener>() != null);
-                AppendEngineTransform(sb, global);
+                Step("listener object " + global.name + " transform=" + global.transform.position.ToString("F2")
+                     + (listener != null
+                         ? " reported=" + listener.GetPosition().ToString("F2") + " fwd=" + listener.GetForward().ToString("F2")
+                           + " up=" + listener.GetUpward().ToString("F2") + " follows=" + (listener.GetPlayer() != null ? listener.GetPlayer().name : "-")
+                         : " (no AD_WwiseListener yet)")
+                     + " akListener=" + (global.GetComponent<AkAudioListener>() != null));
             }
-            else sb.Append("\n  no Wwise global object");
+            else Step("no Wwise global object");
 
             var player = AD_WwisePlayer.globalPlayer;
             if (player != null)
             {
                 var ak = player.GetComponent<AkGameObj>();
-                sb.Append("\n  player ").Append(player.name).Append(" active=").Append(player.activeInHierarchy)
-                  .Append(" pos=").Append(player.transform.position.ToString("F2"))
-                  .Append(" fwd=").Append(player.transform.forward.ToString("F2"))
-                  .Append(" scale=").Append(player.transform.lossyScale.ToString("F3"));
-                if (ak != null)
-                    sb.Append(" akGameObj enabled=").Append(ak.enabled).Append(" registered=").Append(ak.GameObjIsRegistered())
-                      .Append(" reported=").Append(ak.GetPosition().ToString("F2"))
-                      .Append(" defaultListeners=").Append(ak.IsUsingDefaultListeners);
-                else sb.Append(" (no AkGameObj: the game has not posted a sound on the player yet)");
-                AppendEngineTransform(sb, player);
-                AppendPlaying(sb, player);
+                Step("player " + player.name + " active=" + player.activeInHierarchy + " pos=" + player.transform.position.ToString("F2")
+                     + " fwd=" + player.transform.forward.ToString("F2") + " scale=" + player.transform.lossyScale.ToString("F3")
+                     + (ak != null
+                         ? " akGameObj enabled=" + ak.enabled + " registered=" + ak.GameObjIsRegistered()
+                           + " reported=" + ak.GetPosition().ToString("F2") + " defaultListeners=" + ak.IsUsingDefaultListeners
+                         : " (no AkGameObj yet)"));
             }
-            else sb.Append("\n  no local player registered with the audio manager");
-            Debug.Log(sb.ToString());
-        }
+            else Step("no local player registered with the audio manager");
 
-        private static void AppendEngineTransform(StringBuilder sb, GameObject go)
-        {
-            try
-            {
-                var t = new AkTransform();
-                var r = AkUnitySoundEngine.GetPosition(go, t);
-                sb.Append("\n    wwise position (").Append(r).Append("): ").Append(t.Position().ToString("F2"))
-                  .Append(" fwd=").Append(t.OrientationFront().ToString("F2")).Append(" up=").Append(t.OrientationTop().ToString("F2"));
-            }
-            catch (Exception e) { sb.Append("\n    wwise position query failed: ").Append(e.Message); }
-        }
-
-        private static void AppendPlaying(StringBuilder sb, GameObject go)
-        {
-            try
-            {
-                uint n = 32;
-                var ids = new uint[n];
-                var r = AkUnitySoundEngine.GetPlayingIDsFromGameObject(go, ref n, ids);
-                sb.Append("\n    playing on it (").Append(r).Append("): ").Append(n);
-            }
-            catch (Exception e) { sb.Append("\n    playing query failed: ").Append(e.Message); }
+            Step("querying the output device");
+            var speakers = AkUnitySoundEngine.GetSpeakerConfiguration();
+            Step("main output: channels=" + speakers.uNumChannels + " configType=" + speakers.eConfigType + " mask=0x" + speakers.uChannelMask.ToString("X"));
+            AkUnitySoundEngine.GetPanningRule(out int panning);
+            Step("panning rule=" + (panning == 0 ? "speakers" : panning == 1 ? "headphones" : panning.ToString()));
         }
 
         private static void Play(string evt, float? metres)
