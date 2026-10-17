@@ -7,7 +7,9 @@ namespace Ro3Emu.ClientHooks
     /// GM "!client audio ...": what Wwise is doing for the local player, written to Player.log.
     ///   audio                   output device, listener and player emitter state
     ///   audio play [event]      posts the event on the player (as the game does for its own sounds)
-    ///   audio near [event] [m]  posts it on a temporary emitter m metres (default 2) in front of the player
+    ///   audio near [event] [m] [P1|P2|P3]  posts it on a temporary emitter m metres (default 2) from the player
+    ///   audio rtpc              the volume sliders and side-chain game parameters
+    ///   audio stopall           stops every playing sound
     ///   audio listen [m]        moves the listener m metres (default 1.5) above the player; "listen 0" undoes it
     /// The game puts the Wwise listener exactly on the local player, so the player's own sounds play at distance 0;
     /// "near" and "listen" tell whether that is what silences them.
@@ -29,10 +31,17 @@ namespace Ro3Emu.ClientHooks
                     Info();
                     break;
                 case "play":
-                    Play(parts.Length > 1 ? parts[1] : DefaultEvent, null);
+                    Play(parts.Length > 1 ? parts[1] : DefaultEvent, null, "P1");
                     break;
                 case "near":
-                    Play(parts.Length > 1 ? parts[1] : DefaultEvent, parts.Length > 2 ? Float(parts[2], 2f) : 2f);
+                    Play(parts.Length > 1 ? parts[1] : DefaultEvent, parts.Length > 2 ? Float(parts[2], 2f) : 2f, parts.Length > 3 ? parts[3] : "P1");
+                    break;
+                case "rtpc":
+                    Rtpc();
+                    break;
+                case "stopall":
+                    AD_WwiseManager.Instance.StopAll();
+                    Step("stopped every playing sound");
                     break;
                 case "listen":
                     Listen(parts.Length > 1 ? Float(parts[1], 1.5f) : 1.5f);
@@ -85,7 +94,7 @@ namespace Ro3Emu.ClientHooks
             Step("panning rule=" + (panning == 0 ? "speakers" : panning == 1 ? "headphones" : panning.ToString()));
         }
 
-        private static void Play(string evt, float? metres)
+        private static void Play(string evt, float? metres, string playerSwitch)
         {
             var player = AD_WwisePlayer.globalPlayer;
             if (player == null || AD_WwiseManager.Instance == null) { Debug.Log("[Ro3Emu.Diag] audio play: no local player"); return; }
@@ -100,13 +109,32 @@ namespace Ro3Emu.ClientHooks
                 target.transform.position = player.transform.position + dir.normalized * metres.Value;
                 target.transform.rotation = player.transform.rotation;
                 // Same switch the game sets on the local player, so the P1 variant plays.
-                AD_WwiseManager.Instance.SetSwitch("Player", "P1", target);
+                AD_WwiseManager.Instance.SetSwitch("Player", playerSwitch, target);
                 UnityEngine.Object.Destroy(target, 10f);
             }
             uint id = AD_WwiseManager.Instance.PostEvent(evt, target);
+            if (metres.HasValue) evt += " switch=" + playerSwitch;
             Debug.Log("[Ro3Emu.Diag] audio " + (metres.HasValue ? "near " + metres.Value.ToString("F1") + "m" : "play") + " " + evt
                       + " on " + target.name + " at " + target.transform.position.ToString("F2") + " -> playingId=" + id
                       + (id == 0 ? " (not posted: unknown event or bank not loaded)" : ""));
+        }
+
+        // The game parameters that scale the player buses (side-chain meters) and the volume sliders.
+        private static readonly string[] RtpcNames =
+        {
+            "RPTC_Volume_Master", "RPTC_Volume_SFX", "RPTC_Volume_BGM", "RPTC_Volume_VO",
+            "SC_BusVolume_Boss_skill", "SC_BusVolume_Boss_hit", "SC_BusVolume_MVP_hit", "SC_BusVolume_MVP_skill",
+            "SC_BusVolume_Player_skill_P1", "SC_BusVolume_Player_skill_P3", "SC_BusVolume_Player_hit_P2", "SC_BusVolume_Player_hit_P3",
+            "SC_BusVolume_Monster_skill", "SC_BusVolume_UI_Combat", "SC_BusVolume_VO_2D",
+        };
+
+        private static void Rtpc()
+        {
+            foreach (var name in RtpcNames)
+            {
+                bool ok = AD_WwiseManager.Instance.GetRTPCValue(name, out var value, null);
+                Step("rtpc " + name + " = " + (ok ? value.ToString("F2") : "(query failed)"));
+            }
         }
 
         private static void Listen(float metres)
