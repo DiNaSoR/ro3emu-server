@@ -91,8 +91,7 @@ public sealed class FestivalService : IGameTicker
         if (data.Row("DungeonConfig", Dungeon) is { } config
             && config.TryGetProperty("_kResSceneEditorName", out var editor))
         {
-            var path = Path.Combine(options.Value.GameDataDir ?? options.Value.DataDir, "sceneeditor", editor.GetString() + ".json");
-            if (File.Exists(path))
+            if (DataFiles.Find(Path.Combine(options.Value.GameDataDir ?? options.Value.DataDir, "sceneeditor"), editor.GetString() + ".json") is { } path)
             {
                 using var doc = JsonDocument.Parse(File.ReadAllBytes(path));
                 if (doc.RootElement.TryGetProperty("m_kRegins", out var regions))

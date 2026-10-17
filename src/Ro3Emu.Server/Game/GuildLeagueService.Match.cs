@@ -759,8 +759,7 @@ public sealed partial class GuildLeagueService
         if (data.Row("DungeonConfig", sceneEntry) is { } row && row.TryGetProperty("_kResSceneEditorName", out var name)
             && name.GetString() is { Length: > 0 } file)
         {
-            string path = Path.Combine(options.Value.GameDataDir ?? options.Value.DataDir, "sceneeditor", file.ToLowerInvariant() + ".json");
-            if (File.Exists(path))
+            if (DataFiles.Find(Path.Combine(options.Value.GameDataDir ?? options.Value.DataDir, "sceneeditor"), file + ".json") is { } path)
             {
                 using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllBytes(path));
                 if (doc.RootElement.TryGetProperty("m_kGroups", out var groups)

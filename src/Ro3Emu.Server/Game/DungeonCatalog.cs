@@ -106,8 +106,7 @@ public sealed class DungeonCatalog(GameData data, WorldData worldData, MonsterSe
         if (data.Row("DungeonConfig", scene) is not { } config || GameData.Int(config, "_iGamePlayType") != 19
             || worldData.Map(scene) is not { Born: not null }) return null;
         string editor = config.GetProperty("_kResSceneEditorName").GetString() ?? "";
-        string path = Path.Combine(options.Value.GameDataDir ?? options.Value.DataDir, "sceneeditor", editor.ToLowerInvariant() + ".json");
-        if (!File.Exists(path)) return null;
+        if (SceneEditorFile(editor) is not { } path) return null;
         using var doc = JsonDocument.Parse(File.ReadAllBytes(path));
         if (!doc.RootElement.TryGetProperty("m_kMonsterSpawnPoints", out var points)) return null;
         int difficulty = data.Table("GuildChallengeConfig").Values.Where(r => r.GetProperty("_kDungeonId").EnumerateArray()
@@ -160,8 +159,7 @@ public sealed class DungeonCatalog(GameData data, WorldData worldData, MonsterSe
             || !layer.TryGetProperty("_kMonsterPreview", out var bosses) || bosses.ValueKind != JsonValueKind.Array
             || bosses.GetArrayLength() == 0) return null;
         string editor = config.GetProperty("_kResSceneEditorName").GetString() ?? "";
-        string path = Path.Combine(options.Value.GameDataDir ?? options.Value.DataDir, "sceneeditor", editor.ToLowerInvariant() + ".json");
-        if (!File.Exists(path)) return null;
+        if (SceneEditorFile(editor) is not { } path) return null;
         using var doc = JsonDocument.Parse(File.ReadAllBytes(path));
         if (!doc.RootElement.TryGetProperty("m_kMonsterSpawnPoints", out var points) || points.ValueKind != JsonValueKind.Object) return null;
         var serverPoints = points.EnumerateObject().Select(p => p.Value.Clone())
@@ -198,6 +196,9 @@ public sealed class DungeonCatalog(GameData data, WorldData worldData, MonsterSe
         return spawns.Count > 0 ? [new Wave(1, spawns)] : [];
     }
 
+    private string? SceneEditorFile(string editor) =>
+        DataFiles.Find(Path.Combine(options.Value.GameDataDir ?? options.Value.DataDir, "sceneeditor"), editor + ".json");
+
     /// <summary>
     /// Scene-editor points carry positions, not a recovered server encounter script. The selected multi-boss at
     /// a uniquely named BOSS point, else the first ungrouped server spawn point, and sequential groups of
@@ -211,9 +212,7 @@ public sealed class DungeonCatalog(GameData data, WorldData worldData, MonsterSe
     private IReadOnlyList<Wave> Spawns(JsonElement config, JsonElement? boss, MapWorld map)
     {
         string? editor = config.TryGetProperty("_kResSceneEditorName", out var name) ? name.GetString() : null;
-        if (string.IsNullOrEmpty(editor)) return [];
-        string path = Path.Combine(options.Value.GameDataDir ?? options.Value.DataDir, "sceneeditor", editor.ToLowerInvariant() + ".json");
-        if (!File.Exists(path)) return [];
+        if (string.IsNullOrEmpty(editor) || SceneEditorFile(editor) is not { } path) return [];
         using var doc = JsonDocument.Parse(File.ReadAllBytes(path));
         if (!doc.RootElement.TryGetProperty("m_kMonsterSpawnPoints", out var points) || points.ValueKind != JsonValueKind.Object) return [];
         var serverPoints = points.EnumerateObject().Select(p => p.Value)
