@@ -55,6 +55,15 @@ namespace Ro3Emu.ClientHooks
         private static readonly SelfMethod TopBarStateWrapper = UpdateCountdownState, TopBarRefreshWrapper = RefreshCountdown,
             EvePanelWrapper = RefreshEveTimeText;
 
+        /// <summary>The LuaEnv's global table, once the game's Lua is up (null before).</summary>
+        internal static Obf_R.Obf_ff Global()
+        {
+            var manager = HappyEngine.Base.SingletonMonoBehaviour<LA_LuaManager>.Instance;
+            if (manager == null) return null;
+            var env = EnvOf(manager, out _);
+            return env == null ? null : ((Obf_R.Obf_Cf)env).Obf_A;
+        }
+
         /// <summary>A Lua method called as self:Method().</summary>
         public delegate void SelfMethod(Obf_R.Obf_ff self);
 
