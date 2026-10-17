@@ -249,6 +249,22 @@ public sealed class AwardTests : IAsyncLifetime
     }
 
     [ClientDataFact]
+    public void QuestWeaponPoolGivesEachEligibleRowOnce()
+    {
+        // Quest 10101210 -> award 10031121 -> pool 31121 [121121, 100%, 1 roll, 10 picks]: one weapon row per class.
+        // Ten picks with replacement used to grant ten copies (a Thief got 20 daggers).
+        var awards = new AwardService(_app.Services.GetRequiredService<GameData>());
+        for (int i = 0; i < 20; i++)
+        {
+            var thief = awards.ResolveForProgress(new RoleProgress { Career = 5100, Level = 10 }, 31121);
+            Assert.Equal(new AwardGrant(2010120, 2), Assert.Single(thief.Grants));
+            var archer = awards.ResolveForProgress(new RoleProgress { Career = 2100, Level = 16 }, 31121);
+            Assert.Equal([2090120, 2500120], archer.Grants.Select(g => g.Entry).Order());
+            Assert.All(archer.Grants, g => Assert.Equal(1, g.Count));
+        }
+    }
+
+    [ClientDataFact]
     public async Task NoviceAndSwordsmanPoolGiftKeepsActualPermanentBind()
     {
         var loop = _app.Services.GetRequiredService<GameLoop>();

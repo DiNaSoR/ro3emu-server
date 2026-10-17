@@ -112,29 +112,23 @@ public sealed class AwardService(GameData data)
             if (groupId <= 0 || chance is < 0 or > 1_000_000 || rolls is < 1 or > 1000 || picks is < 1 or > 1000)
                 throw Fail($"DropPoolConfig {poolId} slot {slot} has unsupported range");
             var candidates = EligibleRows(groupId, progress);
-            long weight = candidates.Sum(r => GameData.Int(r, "_iWeights"));
-            if (weight <= 0) continue;
-            // (inferred) RewardService's current [group,chance-per-million,rolls,picks] interpretation.
+            if (candidates.Sum(r => GameData.Int(r, "_iWeights")) <= 0) continue;
+            // [group, chance per million, rolls, picks] (inferred): each successful roll draws "picks" distinct rows
+            // without replacement. Pools set picks to the group's row count to hand out every eligible row once, e.g.
+            // quest 10101210's pool 31121 = [121121, 100%, 1, 10] over one weapon row per class.
             for (int r = 0; r < rolls; r++)
             {
                 if (Random.Shared.NextInt64(1_000_000) >= chance) continue;
-                for (int p = 0; p < picks; p++)
+                foreach (var candidate in DropPicks.Distinct(candidates, picks, Random.Shared))
                 {
-                    long choice = Random.Shared.NextInt64(weight);
-                    foreach (var candidate in candidates)
-                    {
-                        choice -= GameData.Int(candidate, "_iWeights");
-                        if (choice >= 0) continue;
-                        int min = checked((int)GameData.Int(candidate, "_iMinNumber"));
-                        int max = checked((int)GameData.Int(candidate, "_iMaxNumber"));
-                        if (min < 1 || max < min) throw Fail($"DropGroupConfig {groupId} has invalid quantity range");
-                        int count = checked((int)Random.Shared.NextInt64(min, (long)max + 1));
-                        int entry = checked((int)GameData.Int(candidate, "_kDropItem"));
-                        int bind = PoolBindType(candidate, groupId);
-                        ValidateGrant(entry, count, bind, 0);
-                        grants.Add(new AwardGrant(entry, count, bind));
-                        break;
-                    }
+                    int min = checked((int)GameData.Int(candidate, "_iMinNumber"));
+                    int max = checked((int)GameData.Int(candidate, "_iMaxNumber"));
+                    if (min < 1 || max < min) throw Fail($"DropGroupConfig {groupId} has invalid quantity range");
+                    int count = checked((int)Random.Shared.NextInt64(min, (long)max + 1));
+                    int entry = checked((int)GameData.Int(candidate, "_kDropItem"));
+                    int bind = PoolBindType(candidate, groupId);
+                    ValidateGrant(entry, count, bind, 0);
+                    grants.Add(new AwardGrant(entry, count, bind));
                 }
             }
         }
