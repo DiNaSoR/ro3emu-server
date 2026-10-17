@@ -80,7 +80,7 @@ namespace Ro3Emu.ClientHooks
                 if (env == null) { Report(why); return; }
                 var global = ((Obf_R.Obf_Cf)env).Obf_A;
                 MapModules.Install(env, global); // own once-per-LuaEnv guard; needs only package.loaded
-                if (ReferenceEquals(env, _doneEnv)) { ServerDayGates.Probe(); return; }
+                if (ReferenceEquals(env, _doneEnv)) { ServerDayGates.Probe(); ElementWords.Probe(env, global); return; }
                 _topBarClass = _evePanelClass = null;
                 // GlobalRequire sets LC_ItemShowHelper once the game's modules are up; before that, requiring is unsafe.
                 if (global == null || global.Obf_RuA<object>("LC_ItemShowHelper") == null) { Report("game helpers not loaded"); return; }
@@ -241,7 +241,7 @@ namespace Ro3Emu.ClientHooks
         private static void Note(string message) { if (Reported.Add(message)) Debug.Log("[Ro3Emu.LuaPatches] " + message); }
 
         /// <summary>package.loaded[name], or require(name) when not loaded yet.</summary>
-        private static Obf_R.Obf_ff Module(LA_LuaManager manager, Obf_R.Obf_ff global, string name)
+        internal static Obf_R.Obf_ff Module(LA_LuaManager manager, Obf_R.Obf_ff global, string name)
         {
             if (global.Obf_LuA<Obf_R.Obf_ff>("package.loaded." + name) is { } loaded) return loaded;
             var result = manager.Obf_MD(name);
