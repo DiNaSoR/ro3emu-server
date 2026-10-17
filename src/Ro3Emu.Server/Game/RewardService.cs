@@ -61,6 +61,8 @@ public sealed class RewardService
         internal long BaseExp;
         internal long JobExp;
         internal bool Published;
+        /// <summary>The committed bag instances of this kill's goods (per-instance equipment rows in the drop notice).</summary>
+        internal List<InvItem>? Granted;
     }
     private readonly System.Runtime.CompilerServices.ConditionalWeakTable<MonsterUnit, KillOutcome> outcomes = new();
     internal Func<GameSession, MonsterUnit, (List<(int Entry, int Count)> Items, long BaseExp, long JobExp)>? ResolveKillForTest { get; set; }
@@ -110,7 +112,7 @@ public sealed class RewardService
             StageAfkKill?.Invoke(player, monster, settlement, outcome.Items, outcome.BaseExp, outcome.JobExp);
             StageHuntKill?.Invoke(player, monster, settlement);
             settlement.LibraryMonster = monster.Template.NpcId;
-            await character.ExchangeLockedAsync(player, [], outcome.Items, popup: false, sync: outcome.Items.Count > 0,
+            outcome.Granted = await character.ExchangeLockedAsync(player, [], outcome.Items, popup: false, sync: outcome.Items.Count > 0,
                 baseExp: outcome.BaseExp, jobExp: outcome.JobExp, rewardSettlement: settlement,
                 persist: settlement.Enlist, committed: settlement.Applied);
         }
@@ -230,9 +232,11 @@ public sealed class RewardService
             {
                 var notify = new GetRewardNotify { Position = monster.Pos, TargetEntry = monster.Template.NpcId,
                     TargetUid = role.Id, RewardType = { RewardDrop } };
+                var shown = new HashSet<InvItem>(ReferenceEqualityComparer.Instance);
                 foreach (var (entry, count) in outcome.Items)
-                    notify.Rewards.Add(new ItemBaseInfo { ItemEntry = entry, Stack = count,
-                        ItemInfos = { [10001] = new ItemAttrValue { LongVal = 0 } } });
+                    if (character.AddAcquiredEquipmentRows(player, notify.Rewards, entry, count, 0, outcome.Granted, shown) is var left and > 0)
+                        notify.Rewards.Add(new ItemBaseInfo { ItemEntry = entry, Stack = left,
+                            ItemInfos = { [10001] = new ItemAttrValue { LongVal = 0 } } });
                 await player.SendGameAsync(CharacterService.GetRewardNotify, notify);
             }
         }

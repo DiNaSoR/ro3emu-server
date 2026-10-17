@@ -214,6 +214,8 @@ public sealed partial class CharacterService
         var p = session.Progress!;
         var reward = new Romsg.GetRewardNotify { TargetUid = session.Role!.Id };
         var granted = new List<InvItem>();
+        // Equipment goods get their per-instance reward rows once the commit has assigned GUIDs (quick-equip prompt).
+        var equipmentGoods = new List<(int Entry, int Count, int Bind, List<InvItem> Items)>();
         var postCommitHooks = new List<(int Entry, int Count)>();
         var decomposed = new ItemAutoDecomposeTipsNtf();
         // Stage under the checked owner and old StateLock, but restore the published owner before
@@ -242,13 +244,11 @@ public sealed partial class CharacterService
                 stagedItems.Single(item => item.Guid == stagedUpdate.Item.Guid).Attrs = new(stagedUpdate.Attrs);
             foreach (var (entry, count, bind) in goods.Select(g => (g.Entry, g.Count, Bind: 0)).Concat(boundGoods ?? []).Where(g => g.Count > 0))
             {
-                bool currency;
-                foreach (var item in AddItemCore(session, entry, count, out currency, persist: false, notifyItemGained: false, bind: bind))
-                {
-                    granted.Add(item);
-                }
+                var added = AddItemCore(session, entry, count, out bool currency, persist: false, notifyItemGained: false, bind: bind);
+                granted.AddRange(added);
                 if (!currency) postCommitHooks.Add((entry, count));
-                reward.Rewards.Add(ItemInfo(new InvItem { Entry = entry, Stack = count, BindType = bind }));
+                if (!currency && IsEquipment(entry)) equipmentGoods.Add((entry, count, bind, added));
+                else reward.Rewards.Add(ItemInfo(new InvItem { Entry = entry, Stack = count, BindType = bind }));
                 reward.RewardType.Add(1);
             }
             foreach (var grant in attributedGoods ?? [])
@@ -428,6 +428,10 @@ public sealed partial class CharacterService
                 AddVirtualReward(reward, JobExpItem, jobExp);
                 if (reward.RewardType.Count == 0) reward.RewardType.Add(1);
             }
+            var shown = new HashSet<InvItem>(ReferenceEqualityComparer.Instance);
+            foreach (var (entry, count, bind, items) in equipmentGoods)
+                if (AddAcquiredEquipmentRows(session, reward.Rewards, entry, count, bind, items, shown) is var left and > 0)
+                    reward.Rewards.Add(ItemInfo(new InvItem { Entry = entry, Stack = left, BindType = bind }));
             if (popup && reward.Rewards.Count > 0) await session.SendGameAsync(GetRewardNotify, reward);
             // LifeJob publishes its committed life/restriction state after Exchange returns. Its ItemsChangedAsync
             // runs this first notification once those fields agree with the already committed bag and cooldown.

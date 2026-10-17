@@ -121,6 +121,30 @@ public sealed partial class CharacterService
 
     private bool IsEquipment(int entry) => data.Row("ItemConfig", entry) is { } row && GameData.Int(row, "_iType") == ItemTypeEquip;
 
+    /// <summary>
+    /// GetRewardNotify rows for equipment that reached the bag, one per instance. The client's bottom-right quick-equip
+    /// prompt (UI_Com_UseWidget) comes from LC_TipHelper.PopRewardTip -> LC_FastUseManager.AddFastUse ->
+    /// LC_EquipmentHelper.CanFastEquip, which reads only the reward row: itemGuid, appraised (itemInfos[3] == 1) and the
+    /// score (itemInfos[2]) against the worn piece, or an empty slot. A count-only row never qualifies.
+    /// Adds a row for each of up to <paramref name="count"/> live instances of the entry in <paramref name="acquired"/>
+    /// not yet in <paramref name="shown"/>, and returns the count left for the caller's aggregate row (all of it for
+    /// non-equipment, or for gear that left the bag again, e.g. auto-decomposed).
+    /// </summary>
+    internal int AddAcquiredEquipmentRows(GameSession session, ICollection<ItemBaseInfo> rows, int entry, int count, int bind,
+        IEnumerable<InvItem>? acquired, ISet<InvItem> shown)
+    {
+        if (acquired == null || !IsEquipment(entry)) return count;
+        foreach (var item in acquired)
+        {
+            if (count <= 0) break;
+            if (item.Entry != entry || item.BindType != bind || item.Guid <= 0 || item.Grid != 0 || !shown.Add(item)) continue;
+            if (!session.Items.Contains(item)) { shown.Remove(item); continue; }
+            rows.Add(ItemInfo(item));
+            count -= item.Stack;
+        }
+        return Math.Max(0, count);
+    }
+
     /// <summary>LC_ItemProtoParse.ParseEquipInfo: only itemInfos[3] == 1 is appraised.</summary>
     internal static bool IsAppraised(InvItem item) => item.Attrs?.GetValueOrDefault(AttrAppraise) == 1;
 
