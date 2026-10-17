@@ -235,6 +235,7 @@ public sealed class WorldRoleOperationsTests : IAsyncLifetime
             var fresh = await Next(alice, CharacterService.ItemsSync, DBItemsInfoIncrement.Parser);
             // A new role still gets both configs with every window slot, or the client's Add buttons hit a nil config.
             Assert.Equal([0, 0, 0], fresh.MedicinesAutoUse.All.HpConfig.ItemEntrys);
+            Assert.True(fresh.MedicinesAutoUse.All.HpConfig.IsOpen);
             Assert.Equal([0, 0, 0], fresh.MedicinesAutoUse.All.SpConfig.ItemEntrys);
 
             // Add All and Add send every slot, with 0 for the empty ones.

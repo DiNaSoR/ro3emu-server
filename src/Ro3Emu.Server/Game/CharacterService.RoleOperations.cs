@@ -221,7 +221,8 @@ public sealed partial class CharacterService
     internal static MedicinesAutoUseSet WithMedicineDefaults(MedicinesAutoUseSet? saved)
     {
         var set = saved?.Clone() ?? new MedicinesAutoUseSet();
-        set.HpConfig = PadMedicineSlots(set.HpConfig ?? new MedicinesAutoUse { Condition = DefaultMedicineCondition });
+        // HP starts on: the tutorial fills the slots but never points at the toggle (Steven's call, not client data).
+        set.HpConfig = PadMedicineSlots(set.HpConfig ?? new MedicinesAutoUse { IsOpen = true, Condition = DefaultMedicineCondition });
         set.SpConfig = PadMedicineSlots(set.SpConfig ?? new MedicinesAutoUse { Condition = DefaultMedicineCondition });
         return set;
     }
