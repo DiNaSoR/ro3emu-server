@@ -67,7 +67,9 @@ public sealed partial class TimedBattleService
             Result = session.Role == null ? ErrorCodes.Parameter : 0,
             IsOpen = open,
             CurIndex = open ? (int)((riftRound - start) / RiftRoundSeconds) + 1 : 0,
-            NextOpenTime = start > time.GetUtcNow().ToUnixTimeSeconds() ? start * 1000 : 0,
+            // Seconds, like 83350's endTime: UI_Sys_OnepieceWidgetCtrl compares iNextOpenTime with
+            // TimerManager.GetSystemTime (seconds) and hands it to Lua_TimeHelper.GetWeekDayNum (os.date).
+            NextOpenTime = start > time.GetUtcNow().ToUnixTimeSeconds() ? start : 0,
         };
         for (long round = start, index = 1; round < end; round += RiftRoundSeconds, index++)
             response.TimeMap[(int)index] = new HiddenTreasureRoundInfo
@@ -193,7 +195,14 @@ public sealed partial class TimedBattleService
 
     private async Task EnterTreasureAsync(Treasure a)
     {
-        if (await instances.EnterAsync(a.Room, a.Player, 3)) return;
+        if (await instances.EnterAsync(a.Room, a.Player, 3))
+        {
+            // The fight's own 180 s clock starts when the boss spawns on load; a client that never acknowledges the
+            // scene would otherwise hold the shared stone until it disconnects (60 s as DungeonService, inferred).
+            loop.ScheduleRuntime(TimeSpan.FromSeconds(60), async () =>
+            { if (!a.Settled && a.Boss == null && treasure.GetValueOrDefault(a.Player) == a) await SettleTreasureAsync(a, false); });
+            return;
+        }
         treasure.Remove(a.Player);
         ReleaseRiftStone(a, cleared: false);
         await instances.AbandonAsync(a.Room, a.Player);
