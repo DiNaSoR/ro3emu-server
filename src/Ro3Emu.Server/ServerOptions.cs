@@ -93,6 +93,9 @@ public sealed class ServerOptions
     /// <summary>In-game bug reports (FeedbackService, docs/guide/feedback.md).</summary>
     public FeedbackOptions Feedback { get; set; } = new();
 
+    /// <summary>Server rates for monster kill rewards (RewardService, docs/guide/rates.md). 1 keeps the client's tables.</summary>
+    public RatesOptions Rates { get; set; } = new();
+
     /// <summary>(inferred) Locally configured text blocklist; the original service's sensitive-word dictionary is unavailable.</summary>
     public string[] GuildBlockedWords { get; set; } = [];
 
@@ -123,6 +126,28 @@ public sealed class ServerOptions
     /// </summary>
     public int ChickenTestPlayers { get; set; }
     public int ChickenTestTeamSize { get; set; }
+}
+
+/// <summary>
+/// Multipliers on monster kill rewards, like a classic server's exp and drop rates. They apply to ordinary kills
+/// (field, dungeon, AFK) only, not to quests, mail, award chests or other awards. 1 keeps the original values.
+/// </summary>
+public sealed class RatesOptions
+{
+    /// <summary>Base EXP from a kill, after the level-gap and party corrections.</summary>
+    public double BaseExp { get; set; } = 1;
+
+    /// <summary>
+    /// Job EXP from a kill. The client's drop tables carry Base EXP (item 100) only, never Job EXP (101), so a kill's
+    /// Job EXP starts equal to its Base EXP (inferred) and this rate scales that.
+    /// </summary>
+    public double JobExp { get; set; } = 1;
+
+    /// <summary>Chance of each drop roll, capped at 100%. EXP rolls are already at 100%, so they are unaffected.</summary>
+    public double ItemDrop { get; set; } = 1;
+
+    /// <summary>Amount of each currency (Zeny and the like) a kill drops.</summary>
+    public double CurrencyDrop { get; set; } = 1;
 }
 
 /// <summary>In-game bug reports: the menu's Feedback button and "/bug" in chat (FeedbackService).</summary>
