@@ -53,6 +53,18 @@ public sealed class GuildCampfireService : IGameTicker
     private readonly Dictionary<long, (long Day, int Stage)> sentStage = new();
     /// <summary>Room id: the event day whose fruit/boss state the transient maps hold (set after its reset).</summary>
     private readonly Dictionary<long, long> eventDay = new();
+    /// <summary>Roles already counted at an event day's bonfire (in memory: a restart may count a day again).</summary>
+    private readonly HashSet<(long Role, long Day)> joined = new();
+
+    /// <summary>A member in the guild home while the Bonfire Party runs, once per event day (quest target 106018);
+    /// listeners post their work.</summary>
+    public List<Action<GameSession>> Joined { get; } = new();
+
+    private void MarkJoined(GameSession session)
+    {
+        if (session.Role is { } role && joined.Add((role.Id, Today())))
+            foreach (var handler in Joined) handler(session);
+    }
 
     public GuildCampfireService(GameData data, AccountStore accounts, CharacterService character, BuffService buffs,
         FunctionService functions, TimedTodoSchedule schedule, ActivityClock clock, TimeProvider time,
@@ -274,6 +286,7 @@ public sealed class GuildCampfireService : IGameTicker
         if (RoomFor(session) is not { } room || !Open(session) || FirePoint() is not { } fire) return;
         int stage = CurrentStage();
         if (stage is < 1 or > 4) return;
+        MarkJoined(session);
         var view = new AoIViewChangeData();
         AddNpc(view, room, 413, 7020004, fire);
         if (stage == 1) AddSeeds(view, room);
@@ -506,6 +519,7 @@ public sealed class GuildCampfireService : IGameTicker
             if (seeds.Bases.Count > 0 || seeds.LeaveAoi.Count > 0)
                 await session.SendGameAsync(GameAoiSink.SyncAoiView, seeds);
             await session.SendGameAsync(Stage, info);
+            if (stage < 5) MarkJoined(session);
             if (stage == 5) await session.SendGameAsync(Finish, new GuildCampFireFinishNotify());
         }
         if (stage is >= 2 and <= 4) await DrawAsync(guild, room, stage);

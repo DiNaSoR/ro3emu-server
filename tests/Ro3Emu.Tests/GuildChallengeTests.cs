@@ -619,4 +619,34 @@ public sealed class GuildChallengeTests : IAsyncLifetime
             if (File.Exists(Path.Combine(dir.FullName, "Ro3Emu.slnx"))) return dir.FullName;
         throw new DirectoryNotFoundException();
     }
+
+    /// <summary>103014 CheckGVEJoinCnt counts a settled Ilmata stage attempt for each member present: growth title 6's
+    /// 706070 and the guild activity quest 1602090; an absent member gets nothing. The count survives a relogin.</summary>
+    [ClientDataFact]
+    public async Task IlmataAttemptCountsAsGveParticipationForThePresentMembers()
+    {
+        var alice = await InWorld("Alice");
+        await using var bob = await InWorld("Bob");
+        await using var carol = await InWorld("Carol");
+        await Guild(alice, bob, carol);
+        foreach (var (account, task) in new[] { ("alice", 706070L), ("bob", 1602090L), ("carol", 706070L) })
+            await QuestProbe.AcceptAsync(app, http, account, task);
+        await QuestProbe.AtAsync(app, "alice", 706070, 0);
+        await Gm(alice, "!guildchallenge open");
+        Assert.Equal(0, await Open(alice));
+        Assert.Equal(0, await Enter(alice)); long room = await Load(alice);
+        Assert.Equal(0, await Enter(bob)); Assert.Equal(room, await Load(bob));
+        await Command(alice, "DungeonStart");
+        await Kill(alice);
+        foreach (var b in new[] { alice, bob })
+            Assert.Equal(DungeonRes.Success, (await Next(b, DungeonService.Result, DungeonResNotify.Parser)).Res);
+        await QuestProbe.DoneAsync(app, "alice", 706070);
+        await QuestProbe.DoneAsync(app, "bob", 1602090); // delivery waits on its action 115
+        Assert.Equal(0, (await QuestProbe.ReadAsync(app, "carol", 706070))!.CompleteNum[0]);
+
+        await alice.DisposeAsync();
+        await QuestProbe.OfflineAsync(app, "alice");
+        await using var again = await InWorld("Alice", create: false);
+        Assert.Equal(1, (await QuestProbe.DoneAsync(app, "alice", 706070)).CompleteNum[0]);
+    }
 }

@@ -190,6 +190,41 @@ public sealed class TowerTests : IAsyncLifetime
         Assert.Equal(0, (await Next(alice, TowerService.LeaveDungeon, LeaveDungeonRsp.Parser)).Result);
     }
 
+    [ClientDataFact]
+    public async Task ATeamBelowTheRecommendedPowerMeetsASuppressedFloor()
+    {
+        // PowerSuppressConfig: a power under 80% of floor 1's 6000 puts 5000001 (215/216 -10%) on its monsters.
+        await using var alice = await InWorld("Alice");
+        await Eligible(alice);
+        var entered = await EnterFloor(alice, 1);
+        Assert.Equal(2, entered.Monsters.Length);
+        Assert.All(entered.Monsters, m => Assert.Equal(1200, m.Property.Single(p => p.Idx == 101).Data));
+        var tower = Service<TowerService>();
+        var buffs = Service<BuffService>();
+        MonsterUnit[] floor = [];
+        for (var until = DateTime.UtcNow + Wait; ; await Task.Delay(50))
+        {
+            bool ready = false;
+            await OnLoop(() =>
+            {
+                floor = Service<World>().AllUnits().OfType<MonsterUnit>().Where(m => m.InstanceId == entered.Scene.SceneID).ToArray();
+                ready = floor.Length == 2 && floor.All(m => buffs.UnitAttributes(m).Any(a => a.Id == 215));
+                return Task.CompletedTask;
+            });
+            if (ready) break;
+            Assert.True(DateTime.UtcNow < until, "suppression buff not applied");
+        }
+        Assert.Equal(new TowerService.Suppression(5000001, -1000, -1000), Session(alice).TowerAttempt!.Suppressed);
+        Assert.All(floor, m =>
+        {
+            Assert.Equal(10000, m.DamageRatio);
+            Assert.Equal(900, tower.SuppressDealt(m, 1000));
+            Assert.Equal(1100, tower.SuppressTaken(m, 1000));
+        });
+        await alice.SendGameAsync(TowerService.LeaveDungeon, new LeaveDungeonReq());
+        Assert.Equal(0, (await Next(alice, TowerService.LeaveDungeon, LeaveDungeonRsp.Parser)).Result);
+    }
+
     [Fact]
     public async Task FloorsFromAnotherPlayBookCannotBeStartedOrClaimed()
     {
@@ -699,4 +734,35 @@ public sealed class TowerTests : IAsyncLifetime
         throw new DirectoryNotFoundException("repository root");
     }
 
+    /// <summary>
+    /// 101007 CheckFinishPetFloor and 101010 CheckWinPetFloor count settled floor attempts and won ones; 104008
+    /// CheckPetFloor reads the highest cleared floor. The counts survive a relogin.
+    /// </summary>
+    [ClientDataFact]
+    public async Task FloorAttemptsAndWinsMoveTheTowerQuests()
+    {
+        long role;
+        await using (var alice = await InWorld("Alice"))
+        {
+            role = (long)alice.Self!.Uuid;
+            await Eligible(alice);
+            await QuestProbe.AcceptAsync(app, http, "alice", 306040); // [101007,1] "Complete Pet Tower once"
+            await QuestProbe.AcceptAsync(app, http, "alice", 110005); // [101010,10] "Win Pet Tower a total of 10 times"
+            await QuestProbe.AcceptAsync(app, http, "alice", 100025); // [104008,3] "Clear Floor 3 of the Pet Tower"
+            await QuestProbe.AtAsync(app, "alice", 100025, 0);
+            var entered = await EnterFloor(alice, 1);
+            foreach (var monster in entered.Monsters) await Kill(alice, monster.Uuid);
+            Assert.True((await Next(alice, TowerService.End, ClimTowerEndNotify.Parser)).ClimTowerResult);
+            await QuestProbe.DoneAsync(app, "alice", 306040);
+            await QuestProbe.AtAsync(app, "alice", 110005, 1);
+            await QuestProbe.AtAsync(app, "alice", 100025, 1);
+            await alice.SendGameAsync(TowerService.LeaveDungeon, new LeaveDungeonReq());
+            Assert.Equal(0, (await Next(alice, TowerService.LeaveDungeon, LeaveDungeonRsp.Parser)).Result);
+        }
+        await WaitOffline(role);
+        await using var relog = await InWorld("Alice", create: false);
+        await QuestProbe.DoneAsync(app, "alice", 306040);
+        await QuestProbe.AtAsync(app, "alice", 110005, 1);
+        await QuestProbe.AtAsync(app, "alice", 100025, 1);
+    }
 }

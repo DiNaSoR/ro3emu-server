@@ -74,7 +74,11 @@ public sealed partial class PetService
         {
             var (next, cost) = step!.Value;
             if (!await ExchangeAsync(s, "room-level", next, cost)) code = character.ShortageOf(s, cost);
-            else await ChangedAsync(s, items: cost.Count > 0);
+            else
+            {
+                await ChangedAsync(s, items: cost.Count > 0);
+                if (cost.Count == 0) foreach (var handler in character.StateChanged) handler(s); // 306004
+            }
         }
         await s.SendGameAsync(RoomLevelUp, new PetIncubationLvUpRes { Result = code });
     }
@@ -99,6 +103,8 @@ public sealed partial class PetService
     {
         bool levelled = false;
         while (RoomStep(s.Pets!) is { } step && await ExchangeAsync(s, "room-level", step.Next, step.Cost)) levelled = true;
+        // A new room level: quest targets read it (growth-manual 306004).
+        if (levelled) foreach (var handler in character.StateChanged) handler(s);
         return levelled;
     }
 

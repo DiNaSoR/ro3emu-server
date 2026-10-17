@@ -26,6 +26,7 @@ public sealed partial class CharacterService
     {
         var role = session.Role;
         var lease = session.Attachment;
+        session.PlanPowers?.Invoke(id, snapshot);
         var increment = session.Synced.TryGetValue(id, out var before)
             ? AutoSync.Changes(before, snapshot, NextVersion(session, id))
             : AutoSync.Full(snapshot, NextVersion(session, id));

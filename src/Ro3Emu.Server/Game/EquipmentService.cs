@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Google.Protobuf;
 using Romsg;
 using Ro3Emu.Server.Accounts;
 using Ro3Emu.Server.Data;
@@ -32,6 +33,8 @@ public sealed partial class EquipmentService
     private readonly ILogger<EquipmentService> log;
     // A test can fix each ten-thousandth roll without changing the production probability.
     internal Func<int, int> RefineRoll { get; set; } = bound => Random.Shared.Next(bound);
+    // Likewise for the craft quality draw (a roll in [0, total weight)).
+    internal Func<long, long> CraftRoll { get; set; } = bound => Random.Shared.NextInt64(bound);
 
     public EquipmentService(GameData data, CharacterService character, FunctionService functions, ItemStore items, RoleStore roles, ILogger<EquipmentService> log)
     {
@@ -191,10 +194,19 @@ public sealed partial class EquipmentService
 
     // ---- craft ----
 
+    private const int QualityOrange = 5, QualityRed = 6;
+
     /// <summary>
     /// 31409: EquipCraftConfig[rank, subtype] pays _kCost and makes one of _kQualityEquipID, drawn by
-    /// EquipCraftQualityConfig._iWeight of the rank (the orange/red guarantee counters are not applied: their update
-    /// rule is not recovered). World-level availability (_iCondition) is not gated: no world level yet.
+    /// EquipCraftQualityConfig._iWeight of the rank. World-level availability (_iCondition) is not gated: no world level
+    /// yet. Quality pity: every row carries _iOrangeGuarantee (11) and _iRedGuarantee (300), and DBEquipInfo keeps the
+    /// counters (craftInfo: DBEquipCraftInfo rank, equipType, orangeGuarantee, redGuarantee, craftCount; CraftRankCount)
+    /// in 5007; no client Lua reads them. (inferred) craftInfo is keyed by the EquipCraftConfig row id and
+    /// CraftRankCount by rank; a counter counts the crafts since its guarantee last applied, and the craft that
+    /// reaches the threshold is drawn only from the recipe's outputs of at least that quality (orange 5, red 6),
+    /// by their weights, or evenly when they all weigh 0 at the rank. Any result of at least orange resets the orange
+    /// counter and any red result resets the red one, whether drawn naturally or forced (the usual pity semantics; a red
+    /// result is also orange-or-better). A recipe without such an output does not count toward it.
     /// </summary>
     public async Task CraftAsync(GameSession session, EquipCraftReq req)
     {
@@ -209,14 +221,43 @@ public sealed partial class EquipmentService
             made = null;
             if (error == null)
             {
-                var outputs = Pairs(recipe, "_kQualityEquipID")
-                    .Select(o => (Entry: (int)o.Count, Weight: WeightOf(req.Rank, o.Entry))) // [quality, item]
-                    .Where(o => o.Weight > 0).ToList();
-                int entry = Draw(outputs);
+                var outputs = Pairs(recipe, "_kQualityEquipID") // [quality, item]
+                    .Select(o => (Quality: o.Entry, Entry: (int)o.Count, Weight: WeightOf(req.Rank, o.Entry))).ToList();
+                int recipeId = (int)GameData.Int(recipe, "_iID");
+                var counter = session.EquipmentPlans.CraftInfo.TryGetValue(recipeId, out var held) ? held.Clone()
+                    : new DBEquipCraftInfo { Rank = req.Rank, EquipType = req.Subtype };
+                long orangeAt = GameData.Int(recipe, "_iOrangeGuarantee"), redAt = GameData.Int(recipe, "_iRedGuarantee");
+                bool canOrange = orangeAt > 0 && outputs.Any(o => o.Quality >= QualityOrange);
+                bool canRed = redAt > 0 && outputs.Any(o => o.Quality >= QualityRed);
+                bool redDue = canRed && counter.RedGuarantee + 1 >= redAt;
+                bool orangeDue = canOrange && counter.OrangeGuarantee + 1 >= orangeAt;
+                int floor = redDue ? QualityRed : orangeDue ? QualityOrange : 0;
+                var pool = outputs.Where(o => o.Quality >= floor).ToList();
+                var weighted = pool.Where(o => o.Weight > 0).Select(o => (o.Entry, o.Weight)).ToList();
+                if (weighted.Count == 0 && floor > 0) weighted = pool.Select(o => (o.Entry, Weight: 1L)).ToList();
+                int entry = Draw(weighted);
+                long quality = outputs.FirstOrDefault(o => o.Entry == entry).Quality;
+                counter.CraftCount++;
+                if (canRed) counter.RedGuarantee = quality >= QualityRed ? 0 : counter.RedGuarantee + 1;
+                if (canOrange) counter.OrangeGuarantee = quality >= QualityOrange ? 0 : counter.OrangeGuarantee + 1;
+                var next = session.EquipmentPlans.Clone();
+                ApplyCraftCounter(next, recipeId, counter);
                 if (entry == 0) error = new(ErrorCodes.CraftParameter, "no output");
                 else if (await character.ExchangeLockedAsync(session, Pairs(recipe, "_kCost"), [(entry, 1)], popup: false,
-                    persist: tx => tx.WithEconomy(character.FamilyEconomy(session, "cd13a/equipment-craft",
-                        Pairs(recipe, "_kCost"), [(entry, 1)], new { req.Rank, req.Subtype, Entry = entry })))
+                    persist: tx =>
+                    {
+                        tx.RoleBlob(session.Role!.Id, "equip_plans", next.ToByteArray());
+                        tx.WithEconomy(character.FamilyEconomy(session, "cd13a/equipment-craft",
+                            Pairs(recipe, "_kCost"), [(entry, 1)], new { req.Rank, req.Subtype, Entry = entry }));
+                    },
+                    // A same-commit prune of stale plan GUIDs (never caused by craft materials) keeps its plans;
+                    // the counters apply on top of whatever plans the commit published.
+                    committed: () =>
+                    {
+                        var current = session.EquipmentPlans.Clone();
+                        ApplyCraftCounter(current, recipeId, counter);
+                        session.EquipmentPlans = current;
+                    })
                     is not { Count: > 0 } items) error = new(ErrorCodes.CraftMaterialsShort, "payment short");
                 else made = items[0];
             }
@@ -224,19 +265,27 @@ public sealed partial class EquipmentService
             var resp = new EquipCraftResp { Result = error?.Code ?? 0 };
             if (made != null) resp.Item = character.ItemInfoOf(made);
             await session.SendGameAsync(Craft, resp);
+            if (made != null) await character.SyncEquipmentAsync(session);
         }
         if (made != null) foreach (var handler in Crafted) await handler(session, made.Entry, req.Rank, req.Subtype);
+    }
+
+    private static void ApplyCraftCounter(DBEquipInfo info, int recipeId, DBEquipCraftInfo counter)
+    {
+        long previous = info.CraftInfo.TryGetValue(recipeId, out var old) ? old.CraftCount : 0;
+        info.CraftInfo[recipeId] = counter.Clone();
+        info.CraftRankCount[counter.Rank] = info.CraftRankCount.GetValueOrDefault(counter.Rank) + counter.CraftCount - previous;
     }
 
     private long WeightOf(int rank, long quality) =>
         data.Table("EquipCraftQualityConfig").Values.Where(r => GameData.Int(r, "_iRank") == rank && GameData.Int(r, "_iQuality") == quality)
             .Select(r => GameData.Int(r, "_iWeight")).FirstOrDefault();
 
-    private static int Draw(List<(int Entry, long Weight)> outputs)
+    private int Draw(List<(int Entry, long Weight)> outputs)
     {
         long total = outputs.Sum(o => o.Weight);
         if (total <= 0) return 0;
-        long roll = Random.Shared.NextInt64(total);
+        long roll = CraftRoll(total);
         foreach (var (entry, weight) in outputs)
         {
             if (roll < weight) return entry;

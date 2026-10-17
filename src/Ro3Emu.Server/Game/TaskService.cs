@@ -57,6 +57,7 @@ public sealed partial class TaskService
     private readonly SeasonTalentService talents;
     private readonly MountService mounts;
     private readonly SceneService scene;
+    private readonly TimeProvider clock;
     private Dictionary<long, TaskDef>? _defs;
     private Dictionary<long, List<long>>? _children;
 
@@ -68,7 +69,8 @@ public sealed partial class TaskService
 
     public TaskService(GameData data, CharacterService character, SkillService skills, FunctionService functions, CombatService combat,
         RoleStore roles, WorldData worldData, GameLoop loop, AwardService awards, SessionRegistry sessions,
-        EquipmentService equipment, CardService cards, SeasonTalentService talents, SceneService scene, MountService mounts, ILogger<TaskService> log)
+        EquipmentService equipment, CardService cards, SeasonTalentService talents, SceneService scene, MountService mounts, TimeProvider clock,
+        ILogger<TaskService> log)
     {
         this.data = data;
         this.character = character;
@@ -83,6 +85,7 @@ public sealed partial class TaskService
         this.talents = talents;
         this.mounts = mounts;
         this.scene = scene;
+        this.clock = clock;
         combat.Killed.Add(OnKillAsync);
         combat.Dealt.Add((s, m, damage) => { if (damage > 0 && s.Role != null) _participants.GetOrCreateValue(m).Add(s.Role.Id); });
         character.JobChanged.Add(s => { QueueRefresh(s); return Task.CompletedTask; });
@@ -147,6 +150,7 @@ public sealed partial class TaskService
             while (info.CompleteNum.Count < slots) info.CompleteNum.Add(0);
             while (info.CompleteNum.Count > slots) info.CompleteNum.RemoveAt(info.CompleteNum.Count - 1);
         }
+        CountLogin(session); // 106801, before this login's acceptances (they start at 1)
         AcceptReady(session);
         EvaluatePassive(session);
         // The full sync needs non-empty maps (they decode as nil otherwise and AllTaskInfo stays unset).
@@ -155,6 +159,7 @@ public sealed partial class TaskService
         if (!session.DeferTaskSync) await SyncTasksAsync(session);
         // Deliveries found at login (e.g. a level target already met) are handled like any other change.
         await SettleAsync(session);
+        QueueFriendCount(session); // 103019 reads the friend list, which is not loaded here
         if (AfterLoginSettlementForTest is { } afterLogin) await afterLogin(session);
     }
 
@@ -347,7 +352,7 @@ public sealed partial class TaskService
             int result = session.Tasks == null ? ErrorCodes.Unknown
                 : !session.Tasks.Infos.TryGetValue(one.Id, out var info) ? ErrorCodes.TaskMissing
                 : !Defs().TryGetValue(one.Id, out var def) ? ErrorCodes.TaskNoConfig
-                : info.Status != Finished || def.Deliver is not (ReceiveNpc or ReceiveUi) ? ErrorCodes.TaskStatus
+                : info.Status != Finished || def.Deliver is not (ReceiveNpc or ReceiveUi) && !ActivityClaim(session, def) ? ErrorCodes.TaskStatus
                 : ChapterLocked(info) ? ErrorCodes.TaskRequirements
                 : !Complete(session, def, info) ? ErrorCodes.TaskRequirements
                 : def.Deliver == ReceiveNpc ? ValidateNpc(session, def.DeliverArgs, one.NpcId) : 0;
@@ -638,7 +643,7 @@ public sealed partial class TaskService
                 accepted++;
             }
         }
-        return accepted + AcceptGrowthTitle(session) + AcceptGrowthClass(session);
+        return accepted + AcceptGrowthTitle(session) + AcceptGrowthClass(session) + AcceptActivityTasks(session);
     }
 
     private bool Ready(GameSession session, TaskDef def) =>
@@ -648,6 +653,7 @@ public sealed partial class TaskService
     private void Accept(GameSession session, long id)
     {
         session.Tasks!.Infos[id] = NewInfo(id, Running);
+        StartLoginTargets(session, id);
         // Same current-step selection as LC_TaskHelper.DealAcception (inferred for server host).
         // Extra slots are retained, never treated as sequential instructions.
         EvaluatePassive(session);
@@ -660,7 +666,7 @@ public sealed partial class TaskService
 
     private TaskInfo NewInfo(long id, TaskState status)
     {
-        var info = new TaskInfo { TaskId = id, Status = status, Follow = true, StartTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() };
+        var info = new TaskInfo { TaskId = id, Status = status, Follow = true, StartTime = clock.GetUtcNow().ToUnixTimeMilliseconds() };
         // One completeNum per target, zeros at accept (an empty list breaks the client's decode, §1.3); [0] without targets.
         int n = Math.Max(1, Defs()[id].Targets.Length);
         for (int i = 0; i < n; i++) info.CompleteNum.Add(0);
