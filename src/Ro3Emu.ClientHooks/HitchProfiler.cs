@@ -161,7 +161,7 @@ namespace Ro3Emu.ClientHooks
             _on = true;
             Debug.Log("[Ro3Emu.Hitch] timing on: " + (_dispatch != null ? "events" : "no events (DispatchEvent not found)")
                 + ", " + Wrapped.Count + " LC_TaskHelper function(s), " + _eventNames.Count + " event names"
-            + ", " + _methods + " method(s)" + (_collect != null ? ", GC test" : ""));
+            + ", " + _methods + " method(s)" + ", stack trace test");
         }
 
         private static void Disable()
@@ -177,6 +177,25 @@ namespace Ro3Emu.ClientHooks
         // Every wrapper takes four arguments and passes the first result back: xLua fills missing arguments with nil and
         // drops extra ones, so one shape fits all the wrapped functions (none takes more than four or uses varargs).
         public delegate object Four(object a, object b, object c, object d);
+
+        public delegate void Eight(object a, object b, object c, object d, object e, object f, object g, object h);
+
+        private static void WrapLog(Obf_R.Obf_ff table, string label, string name)
+        {
+            var original = table?.Obf_RuA<Obf_R.Obf_Ef>(name);
+            if (original == null) return;
+            Eight wrapper = (a, b, c, d, e, f, g, h) =>
+            {
+                // Pass only the arguments up to the last non-nil one, so the format gets the count it was given.
+                var args = new[] { a, b, c, d, e, f, g, h };
+                int n = args.Length;
+                while (n > 0 && args[n - 1] == null) n--;
+                Array.Resize(ref args, n);
+                Timed(label, () => original.Obf_HuA(args));
+            };
+            Wrapped.Add((table, name, original, wrapper));
+            table.Obf_luA<string, Eight>(name, wrapper);
+        }
 
         private static void WrapOne(Obf_R.Obf_ff table, string label, string name) => Wrap(table, label, name);
         private static void WrapTwo(Obf_R.Obf_ff table, string label, string name) => Wrap(table, label, name);
@@ -211,9 +230,11 @@ namespace Ro3Emu.ClientHooks
                     () => original.Obf_HuA(self, module, notify, param), key);
                 return;
             }
-            bool gcOff = _collect != null && (_questUpdates++ & 1) == 1;
+            // Every other quest update runs with Unity's stack trace for Log messages off (the A/B test of the log cost).
+            bool traceOff = (_questUpdates++ & 1) == 1;
+            var savedTrace = UnityEngine.Application.GetStackTraceLogType(UnityEngine.LogType.Log);
             double before = Kb();
-            if (gcOff) _collect.Obf_HuA("stop");
+            if (traceOff) UnityEngine.Application.SetStackTraceLogType(UnityEngine.LogType.Log, UnityEngine.StackTraceLogType.None);
             var watch = Stopwatch.StartNew();
             _inQuestUpdate = true;
             try { Timed(null, () => original.Obf_HuA(self, module, notify, param), key); }
@@ -222,8 +243,8 @@ namespace Ro3Emu.ClientHooks
                 _inQuestUpdate = false;
                 double ms = watch.Elapsed.TotalMilliseconds;
                 double after = Kb();
-                if (gcOff) _collect.Obf_HuA("restart");
-                QuestNotes.Add("quest update " + ms.ToString("F1") + " ms with the Lua GC " + (gcOff ? "stopped" : "running")
+                if (traceOff) UnityEngine.Application.SetStackTraceLogType(UnityEngine.LogType.Log, savedTrace);
+                QuestNotes.Add("quest update " + ms.ToString("F1") + " ms with Unity's Log stack trace " + (traceOff ? "None" : savedTrace.ToString())
                     + ", Lua heap " + before.ToString("F0") + " -> " + after.ToString("F0") + " KB");
             }
         }
@@ -268,6 +289,12 @@ namespace Ro3Emu.ClientHooks
             var taskConfig = dbi != null && dbi.Length > 0 && dbi[0] is Obf_R.Obf_ff d ? d.Obf_RuA<Obf_R.Obf_ff>("m_kCFG_TaskConfig") : null;
             WrapRet(taskConfig, "TaskConfig:GetTaskProgressTarget", "GetTaskProgressTarget");
             WrapRet(taskConfig, "TaskConfig:GetTaskTrack", "GetTaskTrack");
+            WrapRet(global.Obf_RuA<Obf_R.Obf_ff>("LC_TaskHelper"), "LC_TaskHelper.CheckTaskDeliveryed", "CheckTaskDeliveryed");
+            var debugTable = global.Obf_LuA<Obf_R.Obf_ff>("package.loaded.lua_debug");
+            WrapLog(debugTable, "Debug.LogFormat (Lua)", "LogFormat");
+            WrapLog(debugTable, "Debug.Log (Lua)", "Log");
+            var scenes = global.Obf_RuA<Obf_R.Obf_ff>("LC_SceneManager");
+            WrapRet(scenes, "LC_SceneManager:GetCurScene", "GetCurScene");
             var system = LuaPatches.Module(manager, global, "lc_system_task");
             if (system != null)
             {
