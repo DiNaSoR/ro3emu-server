@@ -228,6 +228,8 @@ namespace Ro3Emu.ClientHooks
             UnityEngine.Object.Destroy(copy);
         }
 
+        internal static string PathOf(Transform t) => Path(t);
+
         private static string Path(Transform t)
         {
             var sb = new StringBuilder(t.name);

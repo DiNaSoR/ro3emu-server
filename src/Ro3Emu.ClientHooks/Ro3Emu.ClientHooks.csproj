@@ -36,6 +36,7 @@
     <Reference Include="Audio.Runtime"><HintPath>$(ClientManaged)\Audio.Runtime.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="AK.Wwise.Unity.API"><HintPath>$(ClientManaged)\AK.Wwise.Unity.API.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="AK.Wwise.Unity.MonoBehaviour"><HintPath>$(ClientManaged)\AK.Wwise.Unity.MonoBehaviour.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Render"><HintPath>$(ClientManaged)\Render.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="UnityEngine.CoreModule"><HintPath>$(ClientManaged)\UnityEngine.CoreModule.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="Unity.TextMeshPro"><HintPath>$(ClientManaged)\Unity.TextMeshPro.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="UnityEngine.UI"><HintPath>$(ClientManaged)\UnityEngine.UI.dll</HintPath><Private>false</Private></Reference>

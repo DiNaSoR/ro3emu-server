@@ -12,6 +12,7 @@ namespace Ro3Emu.ClientHooks
     ///   audio log [off]         turns the game's own debug log on (every sound it posts)
     ///   audio stopall           stops every playing sound
     ///   audio listen [m]        moves the listener m metres (default 1.5) above the player; "listen 0" undoes it
+    ///   audio anim              the animation sound events (footsteps, swings) of the player's and two other models
     /// The game puts the Wwise listener exactly on the local player, so the player's own sounds play at distance 0;
     /// "near" and "listen" tell whether that is what silences them.
     /// </summary>
@@ -52,6 +53,9 @@ namespace Ro3Emu.ClientHooks
                     break;
                 case "listen":
                     Listen(parts.Length > 1 ? Float(parts[1], 1.5f) : 1.5f);
+                    break;
+                case "anim":
+                    Anim();
                     break;
                 default:
                     Debug.Log("[Ro3Emu.Diag] audio: unknown subcommand " + sub + " (audio | audio play [event] | audio near [event] [m] | audio listen [m])");
@@ -142,6 +146,70 @@ namespace Ro3Emu.ClientHooks
                 bool ok = AD_WwiseManager.Instance.GetRTPCValue(name, out var value, null);
                 Step("rtpc " + name + " = " + (ok ? value.ToString("F2") : "(query failed)"));
             }
+        }
+
+        private const System.Reflection.BindingFlags Any =
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic;
+
+        private static object Field(object o, string name)
+        {
+            for (var t = o.GetType(); t != null; t = t.BaseType)
+            {
+                var f = t.GetField(name, Any);
+                if (f != null) return f.GetValue(o);
+            }
+            return "(no field)";
+        }
+
+        // Footstep and swing sounds are animation events: RD_AnimationState posts the m_kAudioEventList of the
+        // state's additional data (loaded from m_kAnimationStateAdditionalDataPath). Shows that data per model.
+        private static void Anim()
+        {
+            var player = AD_WwisePlayer.globalPlayer;
+            Transform playerRoot = player != null ? player.transform.root : null;
+            if (playerRoot != null)
+                foreach (var v in playerRoot.GetComponentsInChildren<RD_Visible_Animator>(true))
+                    DescribeAnimator("player", v);
+            else Step("anim: no local player");
+            int others = 0;
+            foreach (var v in UnityEngine.Object.FindObjectsOfType<RD_Visible_Animator>())
+            {
+                if (playerRoot != null && v.transform.root == playerRoot) continue;
+                if (++others > 2) break;
+                DescribeAnimator("other", v);
+            }
+        }
+
+        private static void DescribeAnimator(string who, RD_Visible_Animator v)
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.Append("anim ").Append(who).Append(' ').Append(Diagnostics.PathOf(v.transform))
+              .Append(" type=").Append(v.GetType().Name)
+              .Append(" active=").Append(v.gameObject.activeInHierarchy)
+              .Append(" clipPlayable=").Append(Field(v, "m_bUseClipPlayable"))
+              .Append(" dots=").Append(v.m_bUseDOTS)
+              .Append(" controller=").Append(Field(v, "m_kControllerDataPath"))
+              .Append(" additional=").Append(Field(v, "m_kAnimationStateAdditionalDataPath"))
+              .Append(" playing=").Append(Field(v, "m_sCurrentPlayingState"));
+            var map = Field(v, "m_kAnimationStateAdditionalData") as System.Collections.Generic.Dictionary<string, RD_AnimationStateAdditionalData>;
+            if (map == null) sb.Append(" additionalData=NULL");
+            else
+            {
+                sb.Append(" additionalData states=").Append(map.Count);
+                int withAudio = 0;
+                foreach (var kv in map)
+                {
+                    var list = kv.Value?.m_kAudioEventList;
+                    if (list == null || list.Count == 0) continue;
+                    if (++withAudio > 25) continue;
+                    sb.Append("\n    ").Append(kv.Key).Append(':');
+                    foreach (var e in list)
+                        sb.Append(' ').Append(e.m_kAudioResNameList.Count > 0 ? e.m_kAudioResNameList[0] : "-")
+                          .Append('@').Append(e.m_fTriggerStartTime.ToString("F2"));
+                }
+                sb.Append("\n    states with sounds: ").Append(withAudio);
+            }
+            Step(sb.ToString());
         }
 
         private static void Listen(float metres)
