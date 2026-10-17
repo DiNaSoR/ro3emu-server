@@ -9,6 +9,7 @@ namespace Ro3Emu.ClientHooks
     ///   audio play [event]      posts the event on the player (as the game does for its own sounds)
     ///   audio near [event] [m] [P1|P2|P3]  posts it on a temporary emitter m metres (default 2) from the player
     ///   audio rtpc              the volume sliders and side-chain game parameters
+    ///   audio log [off]         turns the game's own debug log on (every sound it posts)
     ///   audio stopall           stops every playing sound
     ///   audio listen [m]        moves the listener m metres (default 1.5) above the player; "listen 0" undoes it
     /// The game puts the Wwise listener exactly on the local player, so the player's own sounds play at distance 0;
@@ -38,6 +39,12 @@ namespace Ro3Emu.ClientHooks
                     break;
                 case "rtpc":
                     Rtpc();
+                    break;
+                case "log":
+                    // The game's own debug log (off in release builds): "Post Event : <id>" for every sound it posts,
+                    // and its own reasons for skipping one ("current 3d num", "csGameObject is nil").
+                    HappyEngine.GS_Debug.ShowLog = parts.Length < 2 || parts[1] != "off";
+                    Step("game debug log " + (HappyEngine.GS_Debug.ShowLog ? "on" : "off"));
                     break;
                 case "stopall":
                     AD_WwiseManager.Instance.StopAll();
