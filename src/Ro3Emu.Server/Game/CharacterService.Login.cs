@@ -18,6 +18,8 @@ public sealed partial class CharacterService
     {
         var role = session.Role!;
         session.SeasonTalent = null; // role switching must not leak the previous role's attribute source
+        session.ExtraSkillModifiers = [];
+        session.ExtraSkillModifierVersion++;
         session.SeasonRefine = null;
         session.SeasonPage = null;
         session.SeasonState = null;

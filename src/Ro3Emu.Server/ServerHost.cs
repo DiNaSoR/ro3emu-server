@@ -94,6 +94,7 @@ public static class ServerHost
         builder.Services.AddSingleton<SeasonPageService>();
         builder.Services.AddSingleton<SeasonRefineService>();
         builder.Services.AddSingleton<SeasonTalentService>();
+        builder.Services.AddSingleton<SeasonTalentEffects>();
         builder.Services.AddSingleton<ShopService>();
         builder.Services.AddSingleton<ItemBoxService>();
         builder.Services.AddSingleton<MountService>();
@@ -359,6 +360,7 @@ public static class ServerHost
         app.Services.GetRequiredService<Micro.FriendService>().RelationChanged.Add(questTasks.OnRelationChanged);
         app.Services.GetRequiredService<ReconnectService>(); // hooks the handover and registers !netdrop
         app.Services.GetRequiredService<CardEffects>(); // socketed-card passives and procs (sockets, scene loads, hits)
+        app.Services.GetRequiredService<SeasonTalentEffects>(); // season talent job node buffs and skill modifiers
         // Create the key before the first client connects, so ClientPatch can read the public half.
         app.Services.GetRequiredService<GateCrypto>();
         app.Logger.LogInformation("Data dir {DataDir}", options.DataDir);
