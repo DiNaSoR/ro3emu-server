@@ -138,6 +138,7 @@ public sealed class CharacterTests : IAsyncLifetime
         }
         var stats = await Next(alice, CharacterService.OnePropertyChange, OnePropertyChange.Parser);
         Assert.Equal(atkBefore + 7, stats.Property.Propertys.Single(p => p.PropertyId == 103).Data); // EquipConfig: ATK 7
+        Assert.Empty(stats.AttrModTypes); // no floating stat popups for equipment
 
         // Unequip puts it back in the bag and clears the hand.
         await alice.SendGameAsync(CharacterService.EquipItemOpr, new EquipItemOprReq { Opr = (EquipItemOprType)1, Pos = (EquipGridType)1, ItemGUID = dagger });
@@ -182,6 +183,8 @@ public sealed class CharacterTests : IAsyncLifetime
         Assert.Equal(10, level.Level);
         var points = await Next(alice, CharacterService.BaseAttrSync, BaseAttrInfoIncrement.Parser, m => !m.SyncAllMark);
         Assert.Equal(48 + 8 * 2 + 4, points.AllPlanBaseProperty[0].Inc.AttrPoints); // BaseLvConfig: lv2-9 +2, lv10 +4
+        var levelStats = await Next(alice, CharacterService.OnePropertyChange, OnePropertyChange.Parser, m => m.AttrModTypes.Count > 0);
+        Assert.Equal(new[] { 0 }, levelStats.AttrModTypes); // EAttrModTypeBase: the client floats the gains
 
         // STR 1 -> 5 costs 4 x 2 (BasePointConfig); a value lower than now is refused.
         var req = new AllocateAttrPointReq { PlanIndex = 0 };
@@ -194,6 +197,7 @@ public sealed class CharacterTests : IAsyncLifetime
         Assert.Equal(68 - 8, ok.PlanBaseProperty.AttrPoints);
         var str = await Next(alice, CharacterService.OnePropertyChange, OnePropertyChange.Parser, m => m.Property.Propertys.Any(p => p.PropertyId == 1 && p.Data == 5));
         Assert.Contains(str.Property.Propertys, p => p.PropertyId == 103);
+        Assert.Equal(new[] { 0 }, str.AttrModTypes);
 
         req.Points[1] = 2;
         await alice.SendGameAsync(CharacterService.AllocateAttrPoints, req);
@@ -212,6 +216,8 @@ public sealed class CharacterTests : IAsyncLifetime
         Assert.Equal(3, info.JobLevel);
         var reward = await Next(alice, CharacterService.GetRewardNotify, GetRewardNotify.Parser);
         Assert.Equal(100, reward.Rewards[0].ItemEntry);
+        var stats = await Next(alice, CharacterService.OnePropertyChange, OnePropertyChange.Parser, m => m.AttrModTypes.Count > 0);
+        Assert.Equal(new[] { 0 }, stats.AttrModTypes);
     }
 
     [ClientDataFact]
