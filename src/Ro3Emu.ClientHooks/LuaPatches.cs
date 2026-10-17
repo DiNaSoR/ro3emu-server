@@ -27,7 +27,10 @@ namespace Ro3Emu.ClientHooks
     /// the season's hidden first week (ServerDayGates).</item>
     /// <item>Map config modules this build does not ship (Dracula's Lair, the territory maps) go into package.loaded
     /// before any scene needs them (MapModules).</item>
+    /// <item>The Top Up buttons open the in-game top-up screen instead of the publisher's website (TopUpButton).</item>
     /// <item>Lua log lines skip the Lua stack traceback, which made each one cost 25-30 ms (LuaLogs).</item>
+    /// <item>The client's crystal checks (buy dialog, Fashion cart, exchange) count bound crystals too, which the server
+    /// spends first on crystal prices (BoundCrystals).</item>
     /// <item>Profile cards without stickers parse (LC_DAL_Personal.ParsePersonalInfo walks a nil list; PersonalCards).</item>
     /// </list>
     /// </summary>
@@ -82,7 +85,7 @@ namespace Ro3Emu.ClientHooks
                 if (env == null) { Report(why); return; }
                 var global = ((Obf_R.Obf_Cf)env).Obf_A;
                 MapModules.Install(env, global); // own once-per-LuaEnv guard; needs only package.loaded
-                if (ReferenceEquals(env, _doneEnv)) { ServerDayGates.Probe(); LuaLogs.Probe(env, global); return; }
+                if (ReferenceEquals(env, _doneEnv)) { ServerDayGates.Probe(); LuaLogs.Probe(env, global); TopUpButton.Probe(global); return; }
                 _topBarClass = _evePanelClass = null;
                 // GlobalRequire sets LC_ItemShowHelper once the game's modules are up; before that, requiring is unsafe.
                 if (global == null || global.Obf_RuA<object>("LC_ItemShowHelper") == null) { Report("game helpers not loaded"); return; }
@@ -100,6 +103,7 @@ namespace Ro3Emu.ClientHooks
                 }
                 var param = Module(manager, global, "publicparamconfig");
                 if (param != null) param.Obf_luA<string, object>("StallsNameCharacterLimit", (long)StallNameMaxLength);
+                TopUpButton.Install(global, param);
                 _doneEnv = env;
                 PatchCountdowns(manager, global);
                 var functionHelper = Module(manager, global, "lc_functionhelper");
@@ -109,6 +113,7 @@ namespace Ro3Emu.ClientHooks
                     global.Obf_RuA<Obf_R.Obf_ff>("LC_SeasonHelper") ?? Module(manager, global, "lc_seasonhelper"),
                     global.Obf_RuA<Obf_R.Obf_ff>("LC_SeasonExplorationHelper") ?? Module(manager, global, "lc_seasonexplorationhelper"));
                 PersonalCards.Install((Obf_R.Obf_Cf)env, Module(manager, global, "lc_dal_personal"));
+                BoundCrystals.Install(global.Obf_RuA<Obf_R.Obf_ff>("LC_ItemHelper") ?? Module(manager, global, "lc_itemhelper"));
                 Debug.Log("[Ro3Emu.LuaPatches] lc_itemshowfunc: " + added + " card show-func method(s) added; stall name limit "
                     + (param != null ? StallNameMaxLength.ToString() : "not set (publicparamconfig missing)"));
             }

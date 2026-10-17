@@ -18,11 +18,11 @@
 1036	runtime dispatcher/owned continuation	runtime dispatcher/owned continuation
 1037	runtime dispatcher/owned continuation	runtime dispatcher/owned continuation
 1038	session role:WholeRole dispatcher/1038	session Realm:legacy: dispatcher/1038
-2001	session Realm:legacy: dispatcher/2001	session Realm:legacy: dispatcher/2001
-2002	session Realm:legacy: dispatcher/2002	session Realm:legacy: dispatcher/2002
-2003	session Realm:legacy: dispatcher/2003	session Realm:legacy: dispatcher/2003
-2004	session Realm:legacy: dispatcher/2004	session Realm:legacy: dispatcher/2004
-2005	session Realm:legacy: dispatcher/2005	session Realm:legacy: dispatcher/2005
+2001	session role:WholeRole dispatcher/2001	session Realm:legacy: dispatcher/2001
+2002	session role:WholeRole dispatcher/2002	session Realm:legacy: dispatcher/2002
+2003	session role:WholeRole dispatcher/2003	session Realm:legacy: dispatcher/2003
+2004	session role:WholeRole dispatcher/2004	session Realm:legacy: dispatcher/2004
+2005	session role:WholeRole dispatcher/2005	session Realm:legacy: dispatcher/2005
 5001	session Realm:legacy: dispatcher/unrouted	session Realm:legacy: dispatcher/unrouted
 5002	session Realm:legacy: dispatcher/unrouted	session Realm:legacy: dispatcher/unrouted
 5003	session Realm:legacy: dispatcher/unrouted	session Realm:legacy: dispatcher/unrouted

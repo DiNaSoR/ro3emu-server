@@ -15,6 +15,7 @@ public sealed class EconomyMessages(ShopService shops, MailService mail, Auction
         routes.AdmitEconomic(id => id is >= 82000 and <= 82020); // auctions
         routes.AdmitEconomic(id => id is MailService.ClaimMail);
         routes.AdmitRole(id => id is >= 82332 and <= 82340); // ordinary shops
+        routes.AdmitRole(id => id is >= ShopService.CreateOrder and <= ShopService.ItemExchange); // Top Up, exchange
         routes.Intercept("trade", id => id is >= 32601 and <= 32630, (session, msgId, body) =>
             session.Role != null && session.Progress != null ? trade.HandleAsync(session, msgId, body) : Task.FromResult(false));
         routes.Intercept("stalls", id => id is >= StallsService.Start and <= StallsService.Share, (session, msgId, body) =>
@@ -39,6 +40,26 @@ public sealed class EconomyMessages(ShopService shops, MailService mail, Auction
         routes.Map(ShopService.CommodityGetInfo, "shops", async (session, msgId, body) =>
         {
             await shops.CommodityInfoAsync(session, CommodityGetInfoReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(ShopService.CreateOrder, "shops", async (session, msgId, body) =>
+        {
+            await shops.CreateOrderAsync(session, CreateOrderReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(ShopService.PayResult, "shops", async (session, msgId, body) =>
+        {
+            await shops.PayResultAsync(session, PayResultReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(ShopService.FirstRechargeAward, "shops", async (session, msgId, body) =>
+        {
+            await shops.FirstRechargeAwardAsync(session);
+        });
+        routes.Map(ShopService.FirstRechargeAwardUpdate, "shops", async (session, msgId, body) =>
+        {
+            // A server push; the client never sends it.
+        });
+        routes.Map(ShopService.ItemExchange, "shops", async (session, msgId, body) =>
+        {
+            await shops.ExchangeAsync(session, ItemExchangeReq.Parser.ParseFrom(body.Span));
         });
         routes.Map(MailService.ClaimMail, "mail", async (session, msgId, body) =>
         {

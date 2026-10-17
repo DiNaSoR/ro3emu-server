@@ -180,7 +180,7 @@ internal static class Flows
                 if (gm.Length > 0) gms.Add(gm);
             }
             env["ASPNETCORE_ENVIRONMENT"] = "Production";
-            args.AddRange([$"--Ro3Emu:PublicHost={publicHost}", "--Ro3Emu:OpenContent:Enabled=true", "--Ro3Emu:Pass:Play=true", "--Ro3Emu:Pass:FreePremium=true"]);
+            args.AddRange([$"--Ro3Emu:PublicHost={publicHost}", "--Ro3Emu:OpenContent:Enabled=true", "--Ro3Emu:Pass:Play=true", "--Ro3Emu:Pass:FreePremium=true", "--Ro3Emu:TopUp:Free=true"]);
             for (int i = 0; i < gms.Count; i++) args.Add($"--Ro3Emu:GmAccounts:{i}={gms[i]}");
         }
         else

@@ -58,7 +58,10 @@ public static partial class EconomySnapshotReader
     // Power: role.emblems EmblemState.Power (PowerService.Record) holds the role's last published power total and its
     // best total (maxHistoryPower), as normal/season parts. Rating counters, no balance and no asset: they only gate
     // Become Stronger stage claims (whose goods come with their own daily-stage receipt) and rank the Hero Registry.
-    public const string ExpectedFormatManifestHash = "3E3E6357A1BEBDB6D354F71F6F7D95E1AD08D7C53619297182B38363E5599FB4";
+    // Top Up: role.shop ShopState.Recharged counts the Top Up tiers bought (RechargeConfig id -> times), only to know
+    // which tier still pays its first-purchase double. A counter, no balance and no asset: the crystals come with the
+    // cd13a/shop-topup receipt that also saves it.
+    public const string ExpectedFormatManifestHash = "54A463DB8491CCCD0BBB853B2D66217214A7C3FC2AD4A6A41FE94BE1A7B5F084";
     public static string FormatManifestHash => State.FormatManifestHash;
 
     private sealed partial class State
