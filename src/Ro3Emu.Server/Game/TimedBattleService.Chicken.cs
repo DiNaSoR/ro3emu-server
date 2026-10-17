@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Google.Protobuf;
 using Romsg;
 using Ro3Emu.Server.Data;
@@ -481,5 +482,21 @@ public sealed partial class TimedBattleService
         if (run.Stage >= StageStartGame) return "The battle stage runs until the match ends.";
         await RunMatchTransitionAsync(match, "chicken skip", () => AdvanceStageAsync(match, run, NowMs()));
         return $"Stage {run.Stage} (test aid).";
+    }
+
+    /// <summary>
+    /// GM "!chicken rank &lt;n&gt;" (test aid, not original behaviour): the Survivor Battle rank, its total points at the
+    /// rank's floor; the item-7 wallet is left to the next settlement. Then 5003 tells the client.
+    /// </summary>
+    internal async Task<string> SetChickenRankAsync(GameSession session, int rank)
+    {
+        if (session.TimedBattle is not { } state) return "No Survivor Battle state.";
+        if (data.Row("EatChickenLevelConfig", rank) == null) return $"No Survivor Battle rank {rank}.";
+        var next = JsonSerializer.Deserialize<State>(JsonSerializer.SerializeToUtf8Bytes(state))!;
+        next.ChickenRank = rank;
+        next.ChickenScore = ChickenRankFloor(rank);
+        await SaveAsync(session, next);
+        await SyncBattleStateAsync(session);
+        return $"Survivor Battle rank {rank} (test aid).";
     }
 }

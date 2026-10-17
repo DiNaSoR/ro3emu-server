@@ -41,11 +41,7 @@ public sealed partial class TimedBattleService : IGameTicker
         if (message == DungeonService.Enter)
             return data.Row("OnePieceRewardConfig", EnterDungeonReq.Parser.ParseFrom(body.Span).SceneEntry) != null;
         if (message == SceneService.NpcInteraction)
-        {
-            var request = NpcInteractionReq.Parser.ParseFrom(body.Span);
-            return request.NpcUid == TreasureNpcUid
-                && request.InteractionId is TreasureInteraction or 161000071;
-        }
+            return IsRiftUid(NpcInteractionReq.Parser.ParseFrom(body.Span).NpcUid);
         return false;
     }
     private readonly GameData data;
@@ -67,6 +63,8 @@ public sealed partial class TimedBattleService : IGameTicker
     private readonly World world;
     private readonly ServerOptions options;
     private readonly SessionRegistry sessions;
+    private readonly TeamService teams;
+    private readonly LifeJobService life;
     private readonly GameLoop loop;
     private readonly ILogger<TimedBattleService> log;
     private readonly Dictionary<int, List<GameSession>> queue = new();
@@ -78,8 +76,17 @@ public sealed partial class TimedBattleService : IGameTicker
 
     public sealed class State
     {
-        public Dictionary<long, int> OnePieceGains { get; set; } = new();
-        public Dictionary<long, Dictionary<int, int>> OnePieceItemGains { get; set; } = new();
+        /// <summary>RestrictConfig 1020 (daily): the extra awards taken on <see cref="OnePieceExtraDay"/>.</summary>
+        public long OnePieceExtraDay { get; set; }
+        public int OnePieceExtraUsed { get; set; }
+        /// <summary>The week's extra-award items (AwardRestricConfig caps are weekly) for <see cref="OnePieceWeek"/>.</summary>
+        public long OnePieceWeek { get; set; }
+        public Dictionary<int, int> OnePieceWeekItems { get; set; } = new();
+        /// <summary>Legacy per-day clear and item counters (before the 1020 / weekly limits): read, dropped on the next Rift pay.</summary>
+        [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+        public Dictionary<long, int>? OnePieceGains { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+        public Dictionary<long, Dictionary<int, int>>? OnePieceItemGains { get; set; }
         public HashSet<long> ChickenSettled { get; set; } = new();
         public int ChickenRank { get; set; } = 1;
         public long ChickenScore { get; set; }
@@ -140,9 +147,14 @@ public sealed partial class TimedBattleService : IGameTicker
 
     public TimedBattleService(GameData data, TimedTodoSchedule schedule, TimeProvider time, RoleStore roles, AccountStore accounts,
         CharacterService character, FunctionService functions, AwardService awards, TaskService tasks, InstanceService instances, SceneService scene, WorldData worldData,
-        MonsterService monsters, CombatService combat, SessionRegistry sessions, GameLoop loop,
-        BuffService buffs, SkillService skills, World world, IOptions<ServerOptions> options, ILogger<TimedBattleService> log)
+        MonsterService monsters, CombatService combat, SessionRegistry sessions, TeamService teams, LifeJobService life, GameLoop loop,
+        BuffService buffs, SkillService skills, World world, IOptions<ServerOptions> options, ILogger<TimedBattleService> log,
+        GmCommands gm)
     {
+        gm.Register("rift", "| new | party [min] | <star 1-6> [boss name] (Rift Crisis test aid: status, new round, "
+            + "smallest party, or a stone next to you)", RiftGmAsync);
+        this.teams = teams; this.life = life;
+        life.ProjectedRestrictions.Add(RiftRestriction);
         this.data = data; this.schedule = schedule; this.time = time; this.roles = roles; this.accounts = accounts;
         this.character = character;
         this.functions = functions; this.awards = awards; this.tasks = tasks; this.instances = instances; this.scene = scene; this.worldData = worldData; this.monsters = monsters;
@@ -152,6 +164,7 @@ public sealed partial class TimedBattleService : IGameTicker
         scene.Leaving.Add(LeavingAsync);
         combat.Killed.Add(OnePieceKilledAsync);
         combat.PlayerDied.Add(ChickenDiedAsync);
+        combat.PlayerDied.Add(OnePieceDiedAsync);
         combat.ReviveInfoOwners.Add(OwnsRevive);
         combat.PvpDealt.Add(ChickenDealt);
         combat.Healed.Add(ChickenHealed);
@@ -217,6 +230,7 @@ public sealed partial class TimedBattleService : IGameTicker
             await CharacterService.SyncAsync(session, 5071, dragon);
             await CharacterService.SyncAsync(session, 5038, onePiece);
         }
+        await SyncRiftRestrictAsync(session);
     }
 
     private (int Players, int TeamSize) MatchShape(int entry)
@@ -349,6 +363,21 @@ public sealed partial class TimedBattleService : IGameTicker
                 new CancelMatchNotify { MatchEntryId = match.Entry, ManualCancel = manual }));
     }
 
+    /// <summary>
+    /// 82643, as DungeonMatchService.FailReadyAsync: the refusing or late player is the penalty member. (inferred) No lockout
+    /// (unlock time 0): PublicParamConfig PenaltyTimeChicken [5,10,30,60] and DragonIslandPenaltyTime 90 name no unit and
+    /// MatchRefuseConfig no durations, so the Survivor and Dragon panels show no countdown.
+    /// </summary>
+    private async Task FailReadyAsync(Match match, GameSession failed)
+    {
+        if (!match.Players.Any(preparing.ContainsKey)) return;
+        foreach (var player in match.Players) preparing.Remove(player);
+        long failedId = match.Participants[failed].Id;
+        var notify = new FailMatchNtf { Result = ErrorCodes.DungeonDeclined, MatchEntryId = match.Entry,
+            PenaltyMemberGuid = failedId, FailPlayer = failedId, MatchStartTime = match.Open };
+        await RoleFanout.EachAsync(match.Players, player => player.SendGameAsync(DungeonMatchService.FailNotify, notify));
+    }
+
     private async Task BroadcastReadyAsync(Match match)
     {
         var notify = new MatchReadyNotify { MatchEntryId = match.Entry };
@@ -375,7 +404,7 @@ public sealed partial class TimedBattleService : IGameTicker
         if (match == null || result == ErrorCodes.Parameter) return;
         if (result != 0)
         {
-            await CancelReadyAsync(match, true);
+            await FailReadyAsync(match, session);
             return;
         }
         match.Ready.Add(session);
@@ -747,10 +776,13 @@ public sealed partial class TimedBattleService : IGameTicker
         if (now == lastSecond) return;
         lastSecond = now;
         foreach (var match in preparing.Values.Distinct().ToArray())
-            if (now >= match.Open + 30 || !schedule.IsOpen(match.Entry == ChickenEntry ? 114 : 126)
-                || match.Players.Any(p => p.Role == null))
+            if (!schedule.IsOpen(match.Entry == ChickenEntry ? 114 : 126) || match.Players.Any(p => p.Role == null))
                 loop.PostRuntime(() => RunMatchTransitionAsync(match, "timed match ready timeout",
                     () => CancelReadyAsync(match, false)));
+            else if (now >= match.Open + 30)
+                loop.PostRuntime(() => RunMatchTransitionAsync(match, "timed match ready timeout",
+                    () => match.Players.FirstOrDefault(p => !match.Ready.Contains(p)) is { } late
+                        ? FailReadyAsync(match, late) : CancelReadyAsync(match, false)));
         foreach (int entry in queue.Keys.ToArray())
             loop.PostRuntime(async () =>
             {

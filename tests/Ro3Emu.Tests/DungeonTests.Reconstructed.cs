@@ -33,7 +33,7 @@ public sealed partial class DungeonTests
         {
             var template = Service<MonsterService>().Template(npc);
             Assert.NotNull(template); // a client NPCConfig monster: the client can show it
-            // Story templates have no normal attack in the client; each borrows one (except a passive Pupa).
+            // Story templates swing their own normal attacks (MainStory_*NormalAttack, the rows the airship crew list).
             if (npc / 100000 == 53) Assert.NotEqual(0, template.NormalSkill);
         }
     }

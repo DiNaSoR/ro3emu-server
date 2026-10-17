@@ -63,7 +63,8 @@ public sealed partial class CombatService
         }
         if (await CreateSkillObjectAsync(s, action)) return;
         if (!CurrentCastMap(s, action)) return;
-        if (GameData.Int(row, "_bMovement") == 1) await MoveCasterAsync(s, action);
+        // SkillConfig._bMovement is enum_SkillLockMoveType (may the caster walk while casting), not a displacement.
+        await MoveCasterAsync(s, action);
         if (!CurrentCastMap(s, action)) return;
         if (action.Operator == null && ServerBullet(GameData.Int(row, "_iScriptShow")) is { Effect: > 0 } bullet)
         {
@@ -247,7 +248,7 @@ public sealed partial class CombatService
                 foreach (var tuple in Tuples(row, "_kBuff2"))
                     if (CanApplyMoreEffects() && RollBuff(tuple, out int id, out int duration)) await buffs.ShowOnUnitAsync(target, id, duration, castingRole.Id);
             if (CanApplyMoreEffects() && script is ("Provoke" or "Taunt")) monsters.Engage(target, s);
-            if (CanApplyMoreEffects() && script == "ArrowRepel") await RepelAsync(s, action, target, 5); // (inferred) 5m from ArrowRepel description.
+            if (CanApplyMoreEffects() && !target.Dead && target.Hp > 0) await DisplaceTargetAsync(s, action, target);
         }
         // Buff1 is self for hostile selectors, but actual friend recipients for ally selectors (Detoxify, Blessing).
         foreach (var recipient in friendly ? allies : new List<GameSession> { s })
@@ -343,20 +344,68 @@ public sealed partial class CombatService
         return id > 0 && Rolls.Proc(10000) < (GameData.Number(tuple[1]) ?? 0);
     }
 
+    internal enum DisplaceKind { CasterForward, CasterBack, TargetPush, TargetPull }
+
+    /// <summary>
+    /// Skills whose show has a displacement EffectData (m_kPoint.m_bMovement) and whose description names the
+    /// distance: _kDescData index, or -1 for a pull "in front of you". Who moves and which way comes from the
+    /// description and the effect's curve name (击退 knockback, 拉人 pull); the server choice of skills is (inferred).
+    /// ShieldsProtection's 1161341 knockback belongs to its periodic aura, which is not simulated.
+    /// </summary>
+    internal static readonly IReadOnlyDictionary<string, (DisplaceKind Kind, int DescIndex)> Displacements =
+        new Dictionary<string, (DisplaceKind, int)>
+        {
+            ["BackSlide"] = (DisplaceKind.CasterBack, 0),
+            ["RetreatingShadows"] = (DisplaceKind.CasterBack, 0),
+            ["RetreatingShadowsS1"] = (DisplaceKind.CasterBack, 0),
+            ["WolvesDash"] = (DisplaceKind.CasterForward, 0),
+            ["HighspeedSlide"] = (DisplaceKind.CasterForward, 0),
+            ["HighspeedSlideMecha"] = (DisplaceKind.CasterForward, 0),
+            ["PinpointAttack"] = (DisplaceKind.CasterForward, 3),
+            ["ArrowRepel"] = (DisplaceKind.TargetPush, 3),
+            ["PileBunker"] = (DisplaceKind.TargetPush, 5),
+            ["PhantomThrust"] = (DisplaceKind.TargetPull, -1),
+        };
+
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<long, (int Id, int Ms)> _movementEffects = new();
+
+    /// <summary>
+    /// The show's displacement EffectData: the lowest id in [scriptShow*100, scriptShow*100+99] with m_kPoint.m_bMovement
+    /// (BackSlide 15104 -> 1510403, PileBunker 16314 -> 1631405 knockback). The client's SkillStartMove ignores a 31112
+    /// without it (LC_PerformEffect_Agent.lua SkillStartMove returns on effectId nil/0).
+    /// </summary>
+    internal (int Id, int Ms) MovementEffect(long scriptShow) => _movementEffects.GetOrAdd(scriptShow, show =>
+    {
+        var effects = data.SkillTemplateTable("Lua_Config_EffectData");
+        for (long id = show * 100; id < show * 100 + 100; id++)
+            if (effects.TryGetValue(id.ToString(), out var e) && e.TryGetProperty("m_kPoint", out var point)
+                && point.TryGetProperty("m_bMovement", out var moves) && moves.ValueKind == JsonValueKind.True)
+                return ((int)id, point.TryGetProperty("m_iMovementTime", out var ms) && ms.TryGetInt32(out int t) ? t : 0);
+        return (0, 0);
+    });
+
+    private (DisplaceKind Kind, float Distance, int EffectId, int Ms)? Displacement(JsonElement row)
+    {
+        if (!Displacements.TryGetValue(Script(row), out var rule)) return null;
+        var (effect, ms) = MovementEffect(GameData.Int(row, "_iScriptShow"));
+        if (effect == 0) return null;
+        float distance = rule.DescIndex < 0 ? 1 // (inferred) "pulling them in front of you": 1 m ahead of the caster
+            : (float)Numbers(row, "_kDescData").ElementAtOrDefault(rule.DescIndex);
+        return distance > 0 ? (rule.Kind, distance, effect, ms) : null;
+    }
+
     private async Task MoveCasterAsync(GameSession s, ActiveSkillCast action)
     {
-        var row = action.Row;
-        float distance = (float)(Numbers(row, "_kRange").FirstOrDefault(GameData.Int(row, "_iDistanceMax")) / 100);
-        if (distance <= 0) return;
-        float face = action.Request.Face;
-        if (Script(row) == "BackSlide") face += 180;
+        if (Displacement(action.Row) is not { Kind: DisplaceKind.CasterForward or DisplaceKind.CasterBack } move) return;
+        float face = action.Request.Face + (move.Kind == DisplaceKind.CasterBack ? 180 : 0);
         double angle = face * Math.PI / 180;
-        var end = WalkableEnd(s.SceneEntry, s.Position, (float)Math.Sin(angle) * distance, (float)Math.Cos(angle) * distance);
+        var end = WalkableEnd(s.SceneEntry, s.Position, (float)Math.Sin(angle) * move.Distance, (float)Math.Cos(angle) * move.Distance);
         var start = s.Position.Clone();
         await ToPlayerAndViewersAsync(s, SkillMove, new SkillStartMoveNotify
         {
             EntityID = (ulong)s.Role!.Id, StartPos = start, EndPos = end, SkillConfigId = action.Request.SkillId,
-            StartTimestampMs = Now, MoveType = 1, Face = action.Request.Face, MoveTimeMs = action.ActionMs,
+            EffectId = move.EffectId, StartTimestampMs = Now, MoveType = 1, Face = action.Request.Face,
+            MoveTimeMs = move.Ms > 0 ? move.Ms : action.ActionMs,
         });
         // MoveAsync updates persistent position and AOI membership from the same authoritative destination.
         s.PreviousPosition = start;
@@ -364,11 +413,16 @@ public sealed partial class CombatService
         await world.MoveAsync(s, new WalkReq { Pos = end, Dir = s.Face, Face = s.Face, BStop = true }, forceTeleport: true);
     }
 
-    private async Task RepelAsync(GameSession s, ActiveSkillCast action, MonsterUnit target, float distance)
+    private async Task DisplaceTargetAsync(GameSession s, ActiveSkillCast action, MonsterUnit target)
     {
-        float dx = target.X - action.Origin.X, dz = target.Z - action.Origin.Z;
+        if (Displacement(action.Row) is not { Kind: DisplaceKind.TargetPush or DisplaceKind.TargetPull } move) return;
+        var from = s.Position;
+        float dx = target.X - from.X, dz = target.Z - from.Z;
         float length = MathF.Sqrt(dx * dx + dz * dz);
         if (length < 0.001f) return;
+        // A push goes away from the caster; a pull stops the given distance in front of it.
+        float distance = move.Kind == DisplaceKind.TargetPush ? move.Distance : -(length - move.Distance);
+        if (move.Kind == DisplaceKind.TargetPull && length <= move.Distance) return;
         var start = target.Pos;
         var end = WalkableEnd(s.SceneEntry, start, dx / length * distance, dz / length * distance);
         target.Moving = false;
@@ -376,7 +430,8 @@ public sealed partial class CombatService
         await world.ToUnitViewersAsync(target, SkillMove, new SkillStartMoveNotify
         {
             EntityID = (ulong)target.Uid, StartPos = start, EndPos = end, SkillConfigId = action.Request.SkillId,
-            MoveType = 2, StartTimestampMs = Now, Face = target.Face, MoveTimeMs = 300,
+            EffectId = move.EffectId, MoveType = 2, StartTimestampMs = Now, Face = target.Face,
+            MoveTimeMs = move.Ms > 0 ? move.Ms : 300,
         });
         await world.MoveUnitAsync(target, new MovementChangeNtf { Uid = target.Uid, MovementInfo = target.CurrentMovement(Now) });
     }

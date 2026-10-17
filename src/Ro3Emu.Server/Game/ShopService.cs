@@ -16,7 +16,7 @@ namespace Ro3Emu.Server.Game;
 /// and keeps the personal purchase counters and favourites in 5024 DBShopInfo. Fashion-tab commodities (shop type 7)
 /// carry _iAppearanceId instead of _iItemId: WardrobeService.BuyFromShopLockedAsync unlocks the look in the same commit.
 /// </summary>
-public sealed class ShopService
+public sealed class ShopService : IGameTicker
 {
     public const uint ShopSync = 5024;
     public const uint BuyCommodity = 82332, CommodityCollect = 82333, CommodityPresent = 82335, CommodityGetInfo = 82338,
@@ -29,10 +29,14 @@ public sealed class ShopService
     private readonly SeasonService seasons;
     private readonly WardrobeService wardrobe;
     private readonly AwardService awards;
+    private readonly TimeProvider clock;
+    private readonly SessionRegistry sessions;
+    private readonly GameLoop loop;
     private readonly ILogger<ShopService> log;
 
     public ShopService(GameData data, CharacterService character, FunctionService functions, RoleStore roles, SeasonService seasons,
-        WardrobeService wardrobe, AwardService awards, ILogger<ShopService> log)
+        WardrobeService wardrobe, AwardService awards, TimeProvider clock, SessionRegistry sessions, GameLoop loop,
+        ILogger<ShopService> log)
     {
         this.data = data;
         this.character = character;
@@ -41,7 +45,31 @@ public sealed class ShopService
         this.seasons = seasons;
         this.wardrobe = wardrobe;
         this.awards = awards;
+        this.clock = clock;
+        this.sessions = sessions;
+        this.loop = loop;
         this.log = log;
+    }
+
+    private TimeSpan lastTick;
+    private DateTime gameDay;
+
+    /// <summary>
+    /// At the 05:00 game-day rollover the online roles get 5024 again: their daily (and on Monday weekly, on the 1st
+    /// monthly) counters now count as zero, and the client only learns that from the sync (LC_DAL_Shop keeps the map).
+    /// </summary>
+    public void Tick(GameTime time)
+    {
+        if (time.Now - lastTick < TimeSpan.FromSeconds(1)) return;
+        lastTick = time.Now;
+        var day = DailyActivityService.GameDay(clock.GetLocalNow().DateTime);
+        if (day == gameDay) return;
+        bool first = gameDay == default;
+        gameDay = day;
+        if (first) return;
+        foreach (var session in sessions.All())
+            if (session.Role != null && session.Shop is { Bought.Count: > 0 })
+                loop.PostOwned(session, () => session.Shop != null && session.Role != null ? SyncAsync(session) : Task.CompletedTask);
     }
 
     /// <summary>Saved per role: purchase counters with the period they were counted in, and favourites.</summary>
@@ -119,7 +147,7 @@ public sealed class ShopService
         Fail? error = row is not { } c ? new(ErrorCodes.ShopNoConfig, "unknown commodity")
             : count < 1 ? new(ErrorCodes.Parameter, "bad count")
             : Unavailable(session, c);
-        int unit = row is { } r ? UnitPrice(r) : 0;
+        int unit = row is { } r ? UnitPrice(session, r) : 0;
         int bought = row is { } r2 ? Current(session, commodityId, session.Shop!.Bought.GetValueOrDefault(commodityId)) : 0;
         if (error == null && GameData.Int(row!.Value, "_iPurchaseNum") is var limit and > 0 && (long)bought + count > limit) error = new(ErrorCodes.PurchaseLimit, $"limit {bought}/{limit}");
         if (error == null && (long)bought + count > int.MaxValue) error = new(ErrorCodes.Parameter, "counter overflow");
@@ -253,12 +281,38 @@ public sealed class ShopService
         return null;
     }
 
-    /// <summary>Base _kItemPerPrice amount; a positive _iDiscount (basis points) multiplies and rounds up (NpcListWidgetCtrl).</summary>
-    private static int UnitPrice(JsonElement commodity)
+    /// <summary>
+    /// The price the buy dialog quotes (GetCommodityPrice of UI_Sys_Shop_NpcListWidgetCtrl.lua:955-997 and
+    /// UI_Sys_Shop_CommodityListWidgetCtrl.lua:960-997, which feed UI_Com_Shop_BuyTipsPanelCtrl.m_kPrice): the base
+    /// _kItemPerPrice amount times _iDiscount/10000 when positive, times (1 - merchant discount/10000) when the commodity
+    /// has _iMerchantDiscount, rounded up when either applied. Lua's double arithmetic is kept so the quote matches.
+    /// </summary>
+    private int UnitPrice(GameSession session, JsonElement commodity)
     {
         long amount = PricePart(commodity, 1);
         long discount = GameData.Int(commodity, "_iDiscount");
-        return (int)(discount > 0 ? (amount * discount + 9999) / 10000 : amount);
+        long merchant = GameData.Int(commodity, "_iMerchantDiscount") > 0 ? MerchantDiscount(session) : 0;
+        if (discount <= 0 && merchant <= 0) return (int)amount;
+        double price = amount;
+        if (discount > 0) price *= discount / 10000.0;
+        if (merchant > 0) price *= 1 - merchant / 10000.0;
+        return (int)Math.Ceiling(price);
+    }
+
+    /// <summary>
+    /// LC_DAL_Shop.OnGetMerchantDiscount (lua:858-895): the learned level of the BuyLow profession skill
+    /// (PublicParamConfig.DiscountMerchantSkill 16001), and the second _kSpSkillParam of that level's SkillConfig row,
+    /// in basis points (1600101 [2,100] = 1% ... 1600110 [2,1000] = 10%). 0 when not learned.
+    /// </summary>
+    private long MerchantDiscount(GameSession session)
+    {
+        int skill = data.Table("PublicParamConfig").TryGetValue("DiscountMerchantSkill", out var p) ? (int)(GameData.Number(p) ?? 16001) : 16001;
+        int level = session.Progress?.Skills.GetValueOrDefault(skill) ?? 0;
+        if (level <= 0) return 0;
+        var row = data.Table("SkillConfig").Values.FirstOrDefault(r => GameData.Int(r, "_iSkillID") == skill && GameData.Int(r, "_iLevel") == level);
+        if (row.ValueKind != JsonValueKind.Object || !row.TryGetProperty("_kSpSkillParam", out var param)
+            || param.ValueKind != JsonValueKind.Array || param.GetArrayLength() < 2) return 0;
+        return Math.Clamp((long)(GameData.Number(param[1]) ?? 0), 0, 10000);
     }
 
     /// <summary>_kItemPerPrice is one flat [payment item, amount] pair.</summary>
@@ -311,18 +365,19 @@ public sealed class ShopService
     private static long Family(JsonElement commodity) => GameData.Int(commodity, "_iPurchaseTimesLimit");
 
     /// <summary>
-    /// The period a counter belongs to; a counter of an older period counts as zero. Day/week/month boundaries are
-    /// server-local midnight / Monday (inferred); family 5 follows the captured server season ID, as the
-    /// enum_ShopLimitType/LC_ShopHelper seasonal label requires. Explicit rollover takes effect on next login.
+    /// The period a counter belongs to; a counter of an older period counts as zero. The client's only refresh clock is
+    /// the 05:00 game day (Lua_TimeHelper.GetDayRefreshTime) and Monday 05:00, shared with DailyActivityService, in the
+    /// realm zone: the game day's date, its ISO week, and its month (month turning on the 1st at 05:00 is inferred).
+    /// Family 5 follows the captured server season ID, as the enum_ShopLimitType/LC_ShopHelper seasonal label requires.
     /// </summary>
-    private static string Period(long family, GameSession session)
+    private string Period(long family, GameSession session)
     {
-        var now = DateTime.Now;
+        var day = DailyActivityService.GameDay(clock.GetLocalNow().DateTime);
         return family switch
         {
-            1 => now.ToString("yyyyMMdd", CultureInfo.InvariantCulture),
-            2 => $"{ISOWeek.GetYear(now)}W{ISOWeek.GetWeekOfYear(now)}",
-            3 => now.ToString("yyyyMM", CultureInfo.InvariantCulture),
+            1 => day.ToString("yyyyMMdd", CultureInfo.InvariantCulture),
+            2 => $"{ISOWeek.GetYear(day)}W{ISOWeek.GetWeekOfYear(day)}",
+            3 => day.ToString("yyyyMM", CultureInfo.InvariantCulture),
             5 => $"S{session.SeasonState?.SeasonId ?? 1}",
             _ => "",
         };

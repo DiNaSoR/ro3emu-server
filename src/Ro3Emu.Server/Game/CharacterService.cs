@@ -79,8 +79,8 @@ public sealed partial class CharacterService(RoleStore roles, ItemStore itemStor
     /// <summary>Items a committed award put in the bag (quests, drops, boxes), after ItemGained; GM grants are not awards.</summary>
     public List<Action<GameSession, IReadOnlyList<(int Entry, int Count)>>> AwardItemsGained { get; } = new();
     internal sealed record FirstCardSightPlan(Action<RoleItemPlanBuilder> Persist, Action Apply);
-    /// <summary>CardService enlists first sight in owned award/exchange commits.</summary>
-    internal Func<GameSession, IReadOnlyList<int>, FirstCardSightPlan?>? StageFirstCardSight { get; set; }
+    /// <summary>CardService enlists first sight in owned award/exchange commits and, for a kill, the slain monster's Codex kill (NPC id, 0 none).</summary>
+    internal Func<GameSession, IReadOnlyList<int>, int, FirstCardSightPlan?>? StageFirstCardSight { get; set; }
 
     /// <summary>After a successful 31323 consume and its effects; quest engine queues objective evaluation.</summary>
     public List<Action<GameSession, int, int>> ItemUsed { get; } = new();

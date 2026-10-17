@@ -12,13 +12,14 @@ namespace Ro3Emu.Server.Game;
 /// it moves into a socket of an equipment grid (5009 storagePack, an InvItem with a negative Grid, see
 /// CharacterService.CardGrid). Persisted selections are 5026 DBStorageHoleInfo, the card collection
 /// ("library") 5057 DBLibraryInfo.cards. Messages: 31406-31408 sockets, 31411-31412 plans, 31461-31463 progression,
-/// 82404 collection unlock.
+/// 82404 collection unlock; the Codex monsters (5057 monsters, 82407) are CardService.Monsters.cs.
 /// Sockets open by EquipGridConfig._kSocketOpen1..4 conditions (base level); main/off hand need a worn item there.
 /// </summary>
 public sealed partial class CardService
 {
     public const uint StorageHoleSync = 5026, LibrarySync = 5057;
-    public const uint SlotInsert = 31406, SlotRemove = 31407, SlotTransfer = 31408, LibraryCardUnlock = 82404;
+    public const uint SlotInsert = 31406, SlotRemove = 31407, SlotTransfer = 31408, LibraryCardUnlock = 82404,
+        LibrarySwitchTheme = 82405;
     public const uint SwitchPlan = 31411, ChangePlanName = 31412, LevelUp = 31461, StarUp = 31462, Revert = 31463, Treasured = 31469;
 
     private const int PlanCount = 5; // (inferred) PublicParamConfig.SchemeNum; card plans have no separate count field.
@@ -57,6 +58,7 @@ public sealed partial class CardService
         this.loop = loop;
         character.ItemGained.Add(OnItemGained);
         character.StageFirstCardSight = StageFirstCardSight;
+        character.RegisterItemAction(GainLibraryPageAction, UseLibraryPageItemAsync);
     }
 
     // ---- login ----
@@ -81,7 +83,8 @@ public sealed partial class CardService
         session.CardPlans = plans != null ? DBStorageHoleInfo.Parser.ParseFrom(plans) : NewPlans(session);
         if (!session.CardPlans.StoragePlans.ContainsKey(session.CardPlans.CurrentPlan)) session.CardPlans.CurrentPlan = 1;
         await SyncPlans(session);
-        if (session.Library.Cards.Count > 0) await CharacterService.SyncAsync(session, LibrarySync, session.Library.Clone());
+        if (session.Library.Cards.Count > 0 || session.Library.Monsters.Count > 0 || session.Library.Pages.Count > 0)
+            await CharacterService.SyncAsync(session, LibrarySync, session.Library.Clone());
     }
 
     private static DBStorageHoleInfo NewPlans(GameSession session)
@@ -691,11 +694,11 @@ public sealed partial class CardService
                 ? Task.CompletedTask : CharacterService.SyncAsync(session, LibrarySync, session.Library.Clone()));
     }
 
-    private CharacterService.FirstCardSightPlan? StageFirstCardSight(GameSession session, IReadOnlyList<int> entries)
+    private CharacterService.FirstCardSightPlan? StageFirstCardSight(GameSession session, IReadOnlyList<int> entries, int monster)
     {
         if (session.Library == null) return null;
         var next = session.Library.Clone();
-        bool changed = false;
+        bool changed = CountMonsterKill(next, monster);
         foreach (int entry in entries.Distinct())
             if (character.IsCard(entry) && !next.Cards.ContainsKey(entry))
             {
@@ -709,6 +712,7 @@ public sealed partial class CardService
         long epoch = session.Owner?.LifecycleEpoch ?? 0;
         return new(builder =>
             {
+                if (newCards.Length == 0) { builder.RoleBlob(role, "library", next.ToByteArray()); return; } // a Codex kill only
                 byte[]? old = roles.ReadTaskFollowup(builder, role);
                 var pending = old is { Length: > 0 }
                     ? JsonSerializer.Deserialize<HashSet<string>>(old) ?? [] : new HashSet<string>();
@@ -723,7 +727,11 @@ public sealed partial class CardService
                             ? Task.CompletedTask : CharacterService.SyncAsync(session, LibrarySync, session.Library!.Clone())); });
     }
 
-    /// <summary>82404: activate a collected card's entry (the request carries the card item id).</summary>
+    /// <summary>
+    /// 82404: activate a collected card's entry (the request carries the card item id). A normal unlock pays its
+    /// Collection Points (CardUnlockPoints) in the same commit as the entry and its quest follow-up, an owned
+    /// cd13e/library-award like the Codex monster unlock's; a failed commit changes nothing and answers Unknown.
+    /// </summary>
     public async Task UnlockAsync(GameSession session, LibraryCardUnlockReq req)
     {
         using var owner = await session.Owners!.EnterAsync("card/unlock", ReservationKey.Role(session.Role!.Id));
@@ -731,7 +739,7 @@ public sealed partial class CardService
         context.AssertRole(session.Role.Id);
         context.BindPresentation(session);
         var attachment = session.Attachment;
-        bool ok;
+        bool ok, failed = false;
         int error;
         using (await CharacterService.Lock(session, context))
         {
@@ -742,13 +750,36 @@ public sealed partial class CardService
                 var e = next.Cards[req.CardId];
                 if (req.IsTreasure) e.TreasureUnlock = true;
                 else e.Unlock = true;
-                await roles.CommitCardUnlockAsync(session.Role.Id, session.Owner!.LifecycleEpoch,
-                    req.CardId, req.IsTreasure, next.ToByteArray(), session.Items,
-                    character.FamilyEconomy(session, "cd13a/card-unlock", [], [],
-                        new { req.CardId, req.IsTreasure }),
-                    () => session.Library = next);
+                long role = session.Role.Id, epoch = session.Owner!.LifecycleEpoch;
+                byte[] bytes = next.ToByteArray();
+                int points = req.IsTreasure ? 0 : CardUnlockPoints(req.CardId), item = Param("LibraryOverviewPointID");
+                if (points > 0 && item > 0)
+                {
+                    try
+                    {
+                        ok = await character.ApplyAwardAsync(session, new AwardPlan(0, 0, [new AwardGrant(item, points)]),
+                            persist: tx => roles.StageCardUnlock(tx, role, epoch, req.CardId, false, bytes),
+                            stateLockHeld: true, committed: () => session.Library = next,
+                            ownedAward: new CharacterService.OwnedAwardSource("cd13e/library-award",
+                                $"library-card/{role}/{req.CardId}",
+                                new { Version = 1, Card = req.CardId, Item = item, Points = points }));
+                    }
+                    catch (Exception fault) when (fault is not OperationCanceledException)
+                    {
+                        log.LogError(fault, "Card {Card} unlock failed for {Role}", req.CardId, role);
+                        ok = false;
+                    }
+                    failed = !ok;
+                    if (ok) log.LogInformation("{Name} unlocks card {Card} (treasure {Treasure}): {Points} x {Item}",
+                        session.Role.Name, req.CardId, req.IsTreasure, points, item);
+                }
+                else
+                    await roles.CommitCardUnlockAsync(role, epoch, req.CardId, req.IsTreasure, bytes, session.Items,
+                        character.FamilyEconomy(session, "cd13a/card-unlock", [], [],
+                            new { req.CardId, req.IsTreasure }),
+                        () => session.Library = next);
             }
-            error = session.Library == null ? ErrorCodes.Unknown : !session.Library.Cards.ContainsKey(req.CardId) ? ErrorCodes.ItemMissing : ErrorCodes.AlreadyUnlocked;
+            error = session.Library == null || failed ? ErrorCodes.Unknown : !session.Library.Cards.ContainsKey(req.CardId) ? ErrorCodes.ItemMissing : ErrorCodes.AlreadyUnlocked;
         }
         if (ok && attachment?.Cancelled != true && ReferenceEquals(session.Attachment, attachment))
             await CharacterService.SyncAsync(session, LibrarySync, session.Library!.Clone());
@@ -765,5 +796,51 @@ public sealed partial class CardService
             await session.SendGameAsync(LibraryCardUnlock, new LibraryCardUnlockResp { Result = ok ? 0 : error, CardId = req.CardId });
     }
 
+    /// <summary>
+    /// PublicParamConfig.LibraryCardUnlockReward[ItemConfig._iQuality].PointValue["0"]: the Collection Points a card's
+    /// collection entry shows (UI_Sys_LibraryList_CardWidgetCtrl, m_kTTXT_Point; "0" is the card's base star level).
+    /// The points are item LibraryOverviewPointID, as for monsters. (inferred) Only the normal unlock pays: the entry shows
+    /// one value, and no client lookup reaches the 104..106 rows (no ItemConfig._iQuality above 6), so a treasure unlock
+    /// pays nothing and keeps its plain commit.
+    /// </summary>
+    private int CardUnlockPoints(int card)
+    {
+        if (data.Row("ItemConfig", card) is not { } row
+            || !data.Table("PublicParamConfig").TryGetValue("LibraryCardUnlockReward", out var table)
+            || table.ValueKind != JsonValueKind.Object) return 0;
+        long quality = GameData.Int(row, "_iQuality");
+        return table.TryGetProperty(quality.ToString(), out var reward)
+            && reward.ValueKind == JsonValueKind.Object && reward.TryGetProperty("PointValue", out var values)
+            && values.ValueKind == JsonValueKind.Object && values.TryGetProperty("0", out var value)
+            && value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out int points) ? points : 0;
+    }
+
     private void SaveLibrary(GameSession session) => roles.SaveLibrary(session.Role!.Id, session.Library!.ToByteArray());
+
+    /// <summary>
+    /// 82405: the Codex overview theme. LC_DAL_Library._processLibraryChangeUI (lua:372-402) sets the dataset's
+    /// iSelectUI to the reply's themeId, so the reply echoes the theme (the generic empty reply set it to 0, which is
+    /// no LibraryThemeConfig row). The theme must exist and its _iUnlockCondition (theme 2: 15000000, item 118 >= 1000)
+    /// hold; it is kept in DBLibraryInfo.overviewTheme, which the login 5057 maps to iSelectUI (lua:597, 790).
+    /// </summary>
+    public async Task SwitchThemeAsync(GameSession session, LibrarySwitchThemeReq req)
+    {
+        int code;
+        using (await CharacterService.Lock(session))
+        {
+            code = session.Library == null || session.Role == null ? ErrorCodes.FeatureUnavailable
+                : data.Row("LibraryThemeConfig", req.ThemeId) is not { } theme ? ErrorCodes.Parameter
+                : !functions.ConditionMet(session, GameData.Int(theme, "_iUnlockCondition")) ? ErrorCodes.UnlockRequirement
+                : 0;
+            if (code == 0 && session.Library!.OverviewTheme != req.ThemeId)
+            {
+                var next = session.Library.Clone();
+                next.OverviewTheme = req.ThemeId;
+                roles.SaveLibrary(session.Role!.Id, next.ToByteArray());
+                session.Library = next;
+                await CharacterService.SyncAsync(session, LibrarySync, session.Library.Clone());
+            }
+        }
+        await session.SendGameAsync(LibrarySwitchTheme, new LibrarySwitchThemeResp { Result = code, ThemeId = code == 0 ? req.ThemeId : session.Library?.OverviewTheme ?? 0 });
+    }
 }

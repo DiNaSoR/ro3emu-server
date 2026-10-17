@@ -305,11 +305,12 @@ public sealed class AwardTests : IAsyncLifetime
         await loop.InvokeAsync(() => Task.CompletedTask);
         Assert.Equal(19, store.Load(session.Role.Id).Single(i => i.Guid == potion).Stack);
 
-        // 1003100 [[105,1]]: server-hosted 105 Soundtransmission has no implementation (the Fly Wing used to be the
-        // example; its 101 JumpSameMap is implemented now, StoryBlockerTests).
+        // 10051001 [[608,10051001],[206,10051001]]: server-hosted 608 UseTotemSkillBook_Sever has no implementation (the
+        // Fly Wing and the 105 horn used to be the example; both are implemented now, StoryBlockerTests, ItemActionTests).
         Assert.True(await loop.InvokeAsync(() => character.ApplyAwardAsync(session,
-            new AwardPlan(0, 0, [new AwardGrant(1003100, 1)]))));
-        long unsupported = store.Load(session.Role.Id).Single(i => i.Entry == 1003100).Guid;
+            new AwardPlan(0, 0, [new AwardGrant(10051001, 1)]))));
+        long unsupported = store.Load(session.Role.Id).Single(i => i.Entry == 10051001).Guid;
+        await loop.InvokeAsync(() => { session.Progress!.Level = 10; return Task.CompletedTask; }); // its _iLevelNeed
         await bot.SendGameAsync(CharacterService.ItemUse, new ItemUseReq { ItemGuid = unsupported, ItemCount = 1 });
         Assert.Equal(ErrorCodes.FeatureUnavailable, (await Next(bot, CharacterService.ItemUse, ItemUseResp.Parser)).Result);
         Assert.Equal(1, store.Load(session.Role.Id).Single(i => i.Guid == unsupported).Stack);

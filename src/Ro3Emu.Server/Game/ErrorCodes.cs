@@ -84,6 +84,15 @@ public static class ErrorCodes
     public const int DungeonTeamSize = 3507;    // "Not enough party Members."
     public const int DungeonDataMissing = 3720; // "Dungeon data not found."
     public const int DungeonBusy = 7107;        // "Already in an instance"
+    public const int NotPartyLeader = 274;      // "The Party Leader must open the party instance." (ERR_EnterDungeonNotLeader)
+    // Rift Crisis / Hidden Vault: ErrorCodeConfig 6751-6759 (Localization_en 10630001101-10630001109).
+    public const int RiftMemberIneligible = 6751; // "Player is not eligible to Enter Dungeon: Hidden Vault"
+    public const int RiftStoneTaken = 6753;       // "The Hidden Vault Dungeon is under attack by another player..."
+    public const int RiftPartyTooLarge = 6754;    // "Too many party Members"
+    public const int RiftPartyTooSmall = 6755;    // "The party does not meet the required number of players."
+    public const int RiftNoParty = 6757;          // "You must be in a party to enter this mode." (ERR_EnterOnepieceNoTeam)
+    public const int RiftMemberLocked = 6758;     // "A party Member does not meet the Hidden Vault Unlock Requirement"
+    public const int RiftMemberInVault = 6759;    // "A party Member is already in the Hidden Treasure Dungeon..."
 
     // Quests (texts carry the quest name as ${1})
     public const int TaskMissing = 100;         // "Quest [${1}] does not exist"
@@ -206,6 +215,9 @@ public static class ErrorCodes
     public const int GuildApplicationLimit = 468, GuildApplicationListFull = 469;
     // Guild League (ErrorCodeConfig 516-524).
     public const int LeagueClosed = 516, LeagueTemporary = 517, LeagueElite = 518, LeagueMainFull = 523;
+    // Elite roster (ErrorCodeConfig 10046-10048, 10059): not a member, the roster changed meanwhile, position too low,
+    // too few elites for the quick team.
+    public const int EliteNotMember = 10046, EliteChanged = 10047, ElitePosition = 10048, EliteTeamShort = 10059;
     public const int GuildOfficerKick = 10068, GuildInviteRefused = 10069, GuildTextNumbers = 10066;
     public const int GuildMemberMissing = 454, NotInGuild = 462, GuildFull = 453;
     public const int AlreadyInGuildHome = 550;  // NW_ProtobufDefine.ERR_AlreadyInGuildHome "You are already at the guild base."
@@ -243,6 +255,10 @@ public static class ErrorCodes
     public const int SlotEmpty = 1810;          // "There is no card in this slot"
     public const int SlotSealed = 1811;         // "Card slot has not been unsealed"
     public const int AlreadyUnlocked = 1813;    // "Already unlocked"
+    // Codex and Growth Classroom (ErrorCodeConfig; the request mapping is inferred).
+    public const int CodexUnavailable = 3802;   // "Unable to view the Codex."
+    public const int UnlockRequirement = 3355;  // "Unlock Requirement not met." (a locked Codex theme, inferred)
+    public const int NoRankReward = 3900;       // "No Rank Reward available to Claim."
 
     // Pets (ErrorCodeConfig 1848..1880, Localization_en 10630000526..555).
     public const int PetFastRoomLevel = 1848;   // "Hatchery level too low for Quick Hatch"

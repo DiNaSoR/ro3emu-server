@@ -19,7 +19,7 @@ namespace Ro3Emu.Server.Game;
 /// A row is reached (status 1, stamptime in ms) when every slot holds its R, and never reverts. Claims (status 2,
 /// AchievementLevelInfo.curLevelRewardLevel) commit their grant and the new state as one owned-award economy
 /// transaction ("cd13e/achievement-award"). Points and levels are derived from reached rows with the client's algorithm.
-/// Seventeen rows whose source does not exist or whose meaning is unresolved stay at status 0 (§5, "Blocked").
+/// Fifteen rows whose source does not exist or whose meaning is unresolved stay at status 0 (§5, "Blocked").
 /// 76004 (share) has no sender in the client and stays unrouted.
 /// </summary>
 public sealed class AchievementService : IGameTicker
@@ -41,7 +41,7 @@ public sealed class AchievementService : IGameTicker
 
     /// <summary>No source in this server (tavern), no table (fashion level) or an unresolved meaning (§5, §10.5).</summary>
     private static readonly HashSet<long> BlockedConditions =
-        [CTavernQuest, CTavernStar, CFashionLevel, CAppraiseRare, CJobTalent, CResonance];
+        [CTavernQuest, CTavernStar, CFashionLevel, CAppraiseRare, CJobTalent];
 
     /// <summary>Event counters: no history, the slot is the count since the feature exists (spec §5 "E").</summary>
     private static readonly HashSet<long> CounterConditions =
@@ -348,6 +348,8 @@ public sealed class AchievementService : IGameTicker
             case CEmblemQuality: // [quality, n]: Soul Echoes of quality >= p1 in the active plan
                 if (!s.Emblems.Plans.TryGetValue(s.Emblems.CurrentPlan, out var emblems)) return 0;
                 return emblems.Slots.Values.Count(guid => s.Items.FirstOrDefault(i => i.Guid == guid) is { } item && Quality(item.Entry) >= t[1]);
+            case CResonance: // [stage, n]: Echo Resonances at stage >= p1 (EmblemService.Resonances)
+                return EmblemService.Resonances(s, data).Values.Count(stage => stage >= t[1]);
             case CPetQuality: // [quality, n]: owned pets of PetBaseConfig quality >= p1
                 return s.Pets == null ? null : s.Pets.ListPet.Values.Count(p => PetQuality(p.PetId) >= t[1]);
             case CPetRank: // [n, quality]: owned pets of quality >= p2 (5 = S rank)
@@ -513,6 +515,13 @@ public sealed class AchievementService : IGameTicker
         AddCounts(state, t => t[0] == CLoginDays ? 1 : 0, nowMs);
         return true;
     }
+
+    /// <summary>101011 cumulative login days as counted here: every login-day row counts in parallel (up to 365), so the
+    /// highest slot is the role's count.</summary>
+    internal long LoginDays(GameSession s) => s.Achievements is { } state
+        ? Rows().Rows.Values.SelectMany(row => row.Targets.Select((t, i) => t[0] == CLoginDays
+            ? Slot(state.Infos.GetValueOrDefault(row.Id), i) : 0)).DefaultIfEmpty(0).Max()
+        : 0;
 
     private long DayBoundary()
     {

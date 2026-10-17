@@ -140,6 +140,20 @@ internal sealed class RoleSchemaPlan : DbPlan
         SchemaSql.AddColumn(db, tx, "role", "heroic_spirit", "BLOB");
         // Serialized romsg.DBAreaConcurInfo (Monster Hunt kill counters and claimed stages; AUTO_SYNC 5053).
         SchemaSql.AddColumn(db, tx, "role", "area_concur", "BLOB");
+        // Serialized romsg.DBGrowthClassInfo (Growth Classroom claimed rank rewards; AUTO_SYNC 5045, GrowthClassService).
+        SchemaSql.AddColumn(db, tx, "role", "growth_class", "BLOB");
+        // Serialized romsg.DBFirstHeartTaskActivityData (Seven-Day Goal tasks, score and claims; AUTO_SYNC 5049).
+        SchemaSql.AddColumn(db, tx, "role", "first_heart", "BLOB");
+        // Serialized romsg.DBPersonalInfo (profile card presets and the current one; AUTO_SYNC 5016, PersonalService).
+        SchemaSql.AddColumn(db, tx, "role", "personal", "BLOB");
+        // Serialized romsg.PersonalUpvoteList (who liked this role's profile card and when; PersonalService).
+        SchemaSql.AddColumn(db, tx, "role", "personal_upvote", "BLOB");
+        // Serialized romsg.DBPopularityStar (popularity from received friend gifts, affection from sent ones).
+        SchemaSql.AddColumn(db, tx, "role", "popularity", "BLOB");
+        // Serialized romsg.DBSocialOutfit (chat cosmetics unlocked by items and the worn ones; AUTO_SYNC 5044, SocialOutfitService).
+        SchemaSql.AddColumn(db, tx, "role", "social_outfit", "BLOB");
+        // Serialized romsg.DBEmojiInfo (chat emoticons unlocked by items; AUTO_SYNC 5041, EmojiService).
+        SchemaSql.AddColumn(db, tx, "role", "emoji_info", "BLOB");
         // Unix seconds of a deletion; deleted roles are kept (items, progress) but no longer listed or selectable.
         SchemaSql.AddColumn(db, tx, "role", "deleted_time", "INTEGER NOT NULL DEFAULT 0");
         SchemaSql.Execute(db, tx, """

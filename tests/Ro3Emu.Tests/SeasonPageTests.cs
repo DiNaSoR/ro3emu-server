@@ -311,7 +311,7 @@ public sealed class SeasonPageTests : IAsyncLifetime
     public void InferredTypeSevenAlignsToMondayAndTypeEightAddsDuration(string firstDay, string stageTwoEnd)
     {
         var start = DateTime.SpecifyKind(DateTime.Parse(firstDay, System.Globalization.CultureInfo.InvariantCulture), DateTimeKind.Local);
-        var times = new SeasonClock(Service<GameData>(), start, 101).Build();
+        var times = new SeasonClock(Service<GameData>(), start, 101, TimeZoneInfo.Local).Build();
         var end = DateTime.SpecifyKind(DateTime.Parse(stageTwoEnd, System.Globalization.CultureInfo.InvariantCulture), DateTimeKind.Local);
         Assert.Equal(new DateTimeOffset(end).ToUnixTimeSeconds(), times.StageTimeInfo[101002].EndTime);
         Assert.Equal(1209600, times.StageTimeInfo[101003].EndTime - times.StageTimeInfo[101003].StartTime);

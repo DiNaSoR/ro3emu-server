@@ -272,6 +272,7 @@ public sealed class RoleSessionService(RoleStore roles, Data.GameData data, Buff
         session.CurrentSp = null;
         session.Dead = false;
         session.CareerSpecial = null; session.CareerPendants = [];
+        session.Personal = null;
         session.Mounts = null; session.MountState = new(); session.Wardrobe = null; session.Totems = null; session.Genre = null;
         session.TotemSwitchUtc = default;
         session.SceneLoading = true;
@@ -295,7 +296,7 @@ public sealed class RoleSessionService(RoleStore roles, Data.GameData data, Buff
                 ServerTimeMs = NowMs(),
                 ServerInfo = new ServerBasicInfo
                 {
-                    ServerOpenTime = (ulong)new DateTimeOffset(seasons.Start).ToUnixTimeSeconds(),
+                    ServerOpenTime = (ulong)seasons.StartTime,
                     ServerLogicTime = (ulong)clock.GetUtcNow().ToUnixTimeSeconds(),
                 },
             },

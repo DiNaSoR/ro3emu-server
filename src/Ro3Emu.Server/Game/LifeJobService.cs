@@ -135,9 +135,25 @@ public sealed partial class LifeJobService
         runtime.FoodBook = seasons.PlayBook;
     }
 
+    /// <summary>Restrictions another service keeps (the Rift's RestrictConfig 1020): shown in the same 5018 map, never
+    /// saved with or compared against the life restrictions.</summary>
+    public List<Func<GameSession, RestrictInfo?>> ProjectedRestrictions { get; } = new();
+
+    private DBRestrictInfo RestrictView(GameSession s)
+    {
+        var view = s.Restrictions!.Clone();
+        foreach (var project in ProjectedRestrictions)
+            if (project(s) is { } info) view.RestrictCount[info.Id] = info;
+        return view;
+    }
+
+    /// <summary>5018 with the projected restrictions; the sync sends only what changed.</summary>
+    public Task SyncRestrictionsAsync(GameSession s) =>
+        s.Restrictions == null ? Task.CompletedTask : CharacterService.SyncAsync(s, RestrictSync, RestrictView(s));
+
     private async Task SyncAsync(GameSession s)
     {
-        await CharacterService.SyncAsync(s, RestrictSync, s.Restrictions!.Clone());
+        await CharacterService.SyncAsync(s, RestrictSync, RestrictView(s));
         // LC_DAL_LifeJob:800 dereferences the old career asset when a new row arrives incrementally.
         // Rebuild all life assets when learning a previously unrecorded job; no fabricated inactive progress rows.
         if (s.Synced.GetValueOrDefault(LifeSync) is DBLifeJobInfo before

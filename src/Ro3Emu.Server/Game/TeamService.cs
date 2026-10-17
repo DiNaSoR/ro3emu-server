@@ -45,6 +45,8 @@ public sealed partial class TeamService : IGameTicker
         public long PlayBook;
         public readonly Dictionary<int, TeamFlagInfo> Flags = new();
         public readonly Dictionary<long, long> Applicants = new();
+        /// <summary>Guild League elites a quick elite team admits without the leader's approval (TeamService.Elite).</summary>
+        public readonly HashSet<long> Elites = new();
         public readonly HashSet<long> ViceLeaders = new();
         public readonly Dictionary<long, TeamMemberOnlineState> OnlineStates = new();
         public readonly Dictionary<long, TeamMemberChatState> ChatStates = new();

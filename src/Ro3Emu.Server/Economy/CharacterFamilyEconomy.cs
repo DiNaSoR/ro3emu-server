@@ -12,9 +12,17 @@ internal static class CharacterFamilyEconomy
     /// A mount look also writes "mounts": its 5012 system-mount ownership (MountService.PlanShopGrant).</summary>
     internal const string ShopAppearanceKind = "cd13a/shop-appearance";
 
+    /// <summary>A used item and the role state its use action unlocks (CharacterService.ItemActions): the item is the only
+    /// cost and there are no goods. 207 a Codex page (library), 212 a chat emoticon set (emoji_info), 620 a profile
+    /// theme or background (personal), 349 a chat cosmetic (social_outfit), 112 / 105 / 2 nothing but the item;
+    /// bag_state carries the item's cooldown.</summary>
+    internal const string ItemActionKind = "cd13a/character-item-action";
+
     internal static IReadOnlySet<string> AllowedBlobs(string kind)
     {
-        string[] parts = kind == ShopAppearanceKind ? ["shop", "wardrobe", "mounts", "equip_plans"] : kind[6..].Split('-')[0] switch
+        string[] parts = kind == ShopAppearanceKind ? ["shop", "wardrobe", "mounts", "equip_plans"]
+            : kind == ItemActionKind ? ["bag_state", "emoji_info", "personal", "social_outfit"]
+            : kind[6..].Split('-')[0] switch
         {
             "character" => ["bag_state", "equip_plans", "stat_plans", "activity_runtime"],
             "equipment" => ["equip_levels", "equip_plans", "auto_decompose"],
@@ -32,6 +40,7 @@ internal static class CharacterFamilyEconomy
         "cd13a/equipment-craft" or "cd13a/equipment-combine" => (EconomyReason.CraftInput, EconomyReason.CraftOutput),
         "cd13a/equipment-decompose" => (EconomyReason.DecomposeInput, EconomyReason.DecomposeOutput),
         "cd13a/character-use" or "cd13a/character-treasure-use" => (EconomyReason.ItemUse, EconomyReason.CraftOutput),
+        "cd13a/character-box" => (EconomyReason.ItemUse, EconomyReason.ItemBoxGoods),
         "cd13a/character-gm-grant" or "cd13a/character-gm-remove" or "cd13a/character-gm-clear" =>
             (EconomyReason.GmRemove, EconomyReason.GmGrant),
         _ => kind[6..].Split('-')[0] switch

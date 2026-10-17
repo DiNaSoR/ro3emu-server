@@ -64,6 +64,12 @@ public sealed class MonsterUnit : WorldUnit
 
     public MonsterBrain? Brain { get; init; }
 
+    /// <summary>Unit custom data a gameplay attaches (31018 on change; carried in the AOI entity), e.g. Guild League IsFlag.</summary>
+    public List<CustomData> CustomData { get; } = new();
+
+    /// <summary>Extra snapshot state an owner adds to the 31037 base (MVP bosses and minions: their live buffs).</summary>
+    public Action<EntityBase>? EntityExtras { get; set; }
+
     public override void Tick(MapInstance map, GameTime time) => Brain?.Tick(this, map);
 
     /// <summary>Position along the current segment at <paramref name="nowMs"/> (updates X/Y/Z).</summary>
@@ -113,6 +119,8 @@ public sealed class MonsterUnit : WorldUnit
                      (102, Template.MaxSp), (2001, Template.MaxSp),
                  })
             entity.Property.Add(new AoIProperty { Idx = idx, Data = value, BaseData = value });
+        if (CustomData.Count > 0) entity.CustomDatas.Add(CustomData.Select(c => c.Clone()));
+        EntityExtras?.Invoke(entity);
         return entity;
     }
 

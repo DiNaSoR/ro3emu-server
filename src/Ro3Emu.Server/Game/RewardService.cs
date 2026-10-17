@@ -102,6 +102,7 @@ public sealed class RewardService
             settlement.ResetHuntStage?.Invoke();
             StageAfkKill?.Invoke(player, monster, settlement, outcome.Items, outcome.BaseExp, outcome.JobExp);
             StageHuntKill?.Invoke(player, monster, settlement);
+            settlement.LibraryMonster = monster.Template.NpcId;
             await character.ExchangeLockedAsync(player, [], outcome.Items, popup: false, sync: outcome.Items.Count > 0,
                 baseExp: outcome.BaseExp, jobExp: outcome.JobExp, rewardSettlement: settlement,
                 persist: settlement.Enlist, committed: settlement.Applied);

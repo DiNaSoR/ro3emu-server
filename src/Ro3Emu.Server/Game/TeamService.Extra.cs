@@ -93,7 +93,7 @@ public sealed partial class TeamService
             : _byMember.ContainsKey(self) ? ErrorCodes.AlreadyInParty
             : team!.Members.Count >= Capacity(team) ? ErrorCodes.PartyFull
             : !team.AutoAgree && team.Applicants.Count >= 50 && !team.Applicants.ContainsKey(self) ? ErrorCodes.PartyFull : 0;
-        bool admitted = code == 0 && team!.AutoAgree;
+        bool admitted = code == 0 && (team!.AutoAgree || team.Elites.Contains(self));
         if (code == 0)
         {
             if (admitted) await RecordAndJoinAsync(team!, self);

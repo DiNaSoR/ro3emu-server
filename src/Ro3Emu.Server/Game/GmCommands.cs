@@ -221,7 +221,7 @@ public sealed class GmCommands(IOptions<ServerOptions> options, GameData data, S
             await services.GetRequiredService<DungeonService>().EnterAsync(s, new Romsg.EnterDungeonReq { SceneEntry = scene });
             await ReplyAsync(s, $"Dungeon {scene}: entry requested (test aid).");
         }),
-        ["chicken"] = ("shape <players> <team>|shape reset|skip (Survivor Battle test aids)", async (s, a) =>
+        ["chicken"] = ("shape <players> <team>|shape reset|skip|rank <n> (Survivor Battle test aids)", async (s, a) =>
         {
             // Test aids, not original behaviour: a small Survivor Battle lobby, and skipping a pre-battle stage.
             var battles = services.GetRequiredService<TimedBattleService>();
@@ -237,7 +237,9 @@ public sealed class GmCommands(IOptions<ServerOptions> options, GameData data, S
                 await ReplyAsync(s, "Survivor Battle shape from the config again.");
             }
             else if (a.Length == 1 && a[0] == "skip") await ReplyAsync(s, await battles.SkipStageAsync(s));
-            else throw new ArgumentException("shape <players> <team> (players a multiple of team, more than one team) | shape reset | skip");
+            else if (a.Length == 2 && a[0] == "rank" && int.TryParse(a[1], out int rank))
+                await ReplyAsync(s, await battles.SetChickenRankAsync(s, rank));
+            else throw new ArgumentException("shape <players> <team> (players a multiple of team, more than one team) | shape reset | skip | rank <n>");
         }),
         ["online"] = ("", Online),
         ["warp"] = ("<sceneEntry> [x z]", Warp),

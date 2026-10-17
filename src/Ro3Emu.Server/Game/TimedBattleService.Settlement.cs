@@ -110,7 +110,6 @@ public sealed partial class TimedBattleService
                     long walletDelta = next.ChickenScore - character.CountOf(player, 7);
                     if (walletDelta > 0) grants.Add(new AwardGrant(7, checked((int)walletDelta)));
                     if (walletDelta < 0) costs.Add(new SettlementCost(7, checked((int)-walletDelta)));
-                    if (next.ChickenRank > state.ChickenRank) WarnMissingChickenRankAward(next.ChickenRank);
                     result = ChickenSnapshot(match, player, actualVictory, new ChickenScoreChange(next.ChickenScore - oldTotal,
                         oldTotal, state.ChickenRank, next.ChickenRank)).ToByteArray();
                 }
@@ -270,22 +269,6 @@ public sealed partial class TimedBattleService
         });
         if (match.Room != null) matches.Remove(match.Room.Id);
         SettlementCompletedForTest?.Invoke();
-    }
-
-    /// <summary>
-    /// The rank rewards of Survivor Battle point at awards the client's AwardConfig does not have: EatChickenLevelConfig
-    /// _iAward and GenericStageRewardsConfig type 6 (6001..6026 -> 50001..50026); DailyActivityConfig 114 _iPreAward
-    /// 81014 is a preview only. Nothing is granted for them (inferred: skipped with a warning, no substitute data).
-    /// </summary>
-    private void WarnMissingChickenRankAward(int rank)
-    {
-        var ids = new List<long>();
-        if (data.Row("EatChickenLevelConfig", rank) is { } level && GameData.Int(level, "_iAward") is var award and > 0) ids.Add(award);
-        foreach (var row in data.Table("GenericStageRewardsConfig").Values)
-            if (GameData.Int(row, "_iType") == 6 && GameData.Int(row, "_iLevel") == rank && GameData.Int(row, "_iAward") is var stage and > 0)
-                ids.Add(stage);
-        foreach (long id in ids.Distinct().Where(id => data.Row("AwardConfig", id) == null))
-            log.LogWarning("Survivor Battle rank {Rank} award {Award} is missing from AwardConfig; skipped (inferred)", rank, id);
     }
 
     private async Task DeliverPendingAsync(GameSession session)

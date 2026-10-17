@@ -67,6 +67,8 @@ public sealed partial class WorldCoreService : IGameTicker
     private readonly DungeonService dungeons;
     private readonly DailyActivityService daily;
     private readonly SeasonRefineService seasonRefine;
+    private readonly FirstHeartService firstHeart;
+    private readonly PersonalService personal;
     private readonly TimeProvider clock;
     private readonly GameLoop loop;
     private readonly PublicLineManager lines;
@@ -77,7 +79,7 @@ public sealed partial class WorldCoreService : IGameTicker
     public WorldCoreService(World world, WorldData worldData, GameData data, RoleStore roles, SessionRegistry sessions,
         SceneService scene, CharacterService character, CombatService combat, MonsterService monsters, TeamService teams,
         GameLoop loop, TimeProvider clock, GmCommands gm, DungeonService dungeons, SeasonService seasons,
-        DailyActivityService daily, SeasonRefineService seasonRefine, PublicLineManager lines, ChatService chat)
+        DailyActivityService daily, SeasonRefineService seasonRefine, FirstHeartService firstHeart, PersonalService personal, PublicLineManager lines, ChatService chat)
     {
         this.world = world; this.worldData = worldData; this.data = data; this.roles = roles; this.sessions = sessions;
         this.scene = scene; this.character = character; this.combat = combat; this.teams = teams; this.clock = clock;
@@ -86,7 +88,9 @@ public sealed partial class WorldCoreService : IGameTicker
         this.dungeons = dungeons;
         this.daily = daily;
         this.seasonRefine = seasonRefine;
-        serverOpenSeconds = (ulong)new DateTimeOffset(seasons.Start).ToUnixTimeSeconds();
+        this.firstHeart = firstHeart;
+        this.personal = personal;
+        serverOpenSeconds = (ulong)seasons.StartTime;
         scene.AddOwnedAfterLoaded(LoadedAsync);
         scene.Leaving.Add(LeavingAsync);
         monsters.TargetChanged.Add(TargetChangedAsync);
@@ -94,6 +98,7 @@ public sealed partial class WorldCoreService : IGameTicker
         combat.ReviveCheck = dungeons.ExternalReviveError;
         combat.ReviveItemSkill = ReviveItemSkillAsync;
         character.WingJump = WingJumpAsync;
+        character.RegisterItemAction(TaskJumpMapAction, UseQuestWingAsync);
         scene.QueuePublicAdmission = QueueAdmissionAsync;
         scene.PreferredLine = PreferredLine;
         lines.HasPendingWork.Add(monsters.HasPendingWork);
@@ -168,6 +173,8 @@ public sealed partial class WorldCoreService : IGameTicker
                 if(!emitted.Add(id))continue;
                 if(id==DailyActivityService.StageSync) { await daily.ReplayClaimsAsync(s); continue; }
                 if(id==SeasonRefineService.SeasonRefineSync) { await seasonRefine.ReplayAsync(s); continue; }
+                if(id==FirstHeartService.Sync) { await firstHeart.ReplayAsync(s); continue; }
+                if(id==PersonalService.Sync) { await personal.ReplayAsync(s); continue; }
                 s.Synced.Remove(id); // Force the existing AUTO_SYNC encoder's full-state path.
                 await CharacterService.SyncAsync(s,id,snapshot);
             }

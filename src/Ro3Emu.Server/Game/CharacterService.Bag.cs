@@ -60,8 +60,7 @@ public sealed partial class CharacterService
             if (reply && replyErrors) await session.SendGameAsync(ItemUse, new ItemUseResp { Result = ErrorCodes.FeatureUnavailable, ItemGuid = req.ItemGuid });
             return ErrorCodes.FeatureUnavailable;
         }
-        using var ownerScope = session.Owners is { } owners
-            ? await owners.EnterAsync("character item use", Ownership.ReservationKey.Role(session.Role.Id)) : null;
+        using var ownerScope = await EnterItemUseAsync(session, req);
         using var activityGate = await LockTreasureUseAsync(session, req);
         using var _ = await LockAsync(session);
         var item = session.Items.FirstOrDefault(i => i.Guid == req.ItemGuid && i.Grid == 0);
@@ -74,13 +73,16 @@ public sealed partial class CharacterService
             : item == null || EmblemService.IsEmblem(data, item.Entry) || EmblemService.IsReserved(session, item) || TotemService.IsReserved(session, item) ? ErrorCodes.ItemMissing
             : item.Stack < count ? ErrorCodes.ItemsShort : row == null ? ErrorCodes.ItemNoConfig
             : count > 1 && GameData.Int(row.Value, "_iGroupUse") == 0
-                && !(LifeItemUse != null && HandlesLifeItem(row.Value)) ? ErrorCodes.Parameter
-            : req.ItemParam.Count > 0 && WingDestination(row.Value, req) == null ? ErrorCodes.FeatureUnavailable
+                && !(LifeItemUse != null && HandlesLifeItem(row.Value)) && !IsChoiceBox(row.Value) ? ErrorCodes.Parameter
+            : req.ItemParam.Count > 0 && WingDestination(row.Value, req) == null && !CarriesPetChoice(row.Value, req)
+                && !CarriesBoxParam(row.Value, req)
+                && !AcceptsItemActionParam(row.Value, req) ? ErrorCodes.FeatureUnavailable
             : item.BindExpire > 0 && item.BindExpire <= DateTimeOffset.UtcNow.ToUnixTimeSeconds() ? ErrorCodes.ItemMissing
             : session.Dead ? ErrorCodes.UseWhileDead
             : IsItemUseForbidden?.Invoke(session) == true ? ErrorCodes.ItemUseForbidden
             : session.ItemCds.GetValueOrDefault(item.Entry) > now || group > 0 && session.ItemGroupCds.GetValueOrDefault(group) > now ? ErrItemInCd
             : 0;
+        if (result == 0) result = ItemRuleError(session, row!.Value, item!.Entry, count);
         if (result != 0)
         {
             if (reply && replyErrors) await session.SendGameAsync(ItemUse, new ItemUseResp { Result = result, ItemGuid = req.ItemGuid });
@@ -92,6 +94,7 @@ public sealed partial class CharacterService
         long shareCd = group > 0 && row.Value.TryGetProperty("_kCDGroup", out var g2) && g2.GetArrayLength() > 1 && GameData.Number(g2[1]) is { } share and > 0
             ? now + (long)share : 0;
         var stored = session.BagState.Info.Clone();
+        int useTimes = StageUseTimes(stored, row.Value, entry, count);
         if (itemCd > 0 || shareCd > 0)
         {
             stored.ItemCds ??= new CdData();
@@ -146,7 +149,7 @@ public sealed partial class CharacterService
                 blobs: new Dictionary<string, byte[]> { ["bag_state"] = cooldownBytes },
                 apply: PublishCooldown, costs: [(entry, count)]);
         }
-        if (reply) await session.SendGameAsync(ItemUse, new ItemUseResp { Result = 0, ItemGuid = item.Guid, ItemCount = count, ItemId = entry, ItemCd = itemCd, ShareCd = shareCd });
+        if (reply) await session.SendGameAsync(ItemUse, new ItemUseResp { Result = 0, ItemGuid = item.Guid, ItemCount = count, ItemId = entry, ItemCd = itemCd, ShareCd = shareCd, ItemTimes = useTimes });
         await SyncItemsAsync(session);
         if (itemCd > 0 || shareCd > 0)
         {
@@ -155,6 +158,7 @@ public sealed partial class CharacterService
             await session.SendGameAsync(ItemsCdNotify, notify);
         }
         if (specialized == null) await ApplyUseEffectsAsync(session, row.Value, count, req);
+        else await AfterItemActionAsync(session);
         foreach (var handler in ItemUsed) handler(session, entry, count);
         foreach (var handler in StateChanged) handler(session);
         return 0;
@@ -165,8 +169,10 @@ public sealed partial class CharacterService
     /// <summary>Shortcut/quick-use eligibility recognizes each effect owner; actual use rechecks their runtime limits.</summary>
     private bool CanUseItemEffects(JsonElement row) => CanApplyUseEffects(row)
         || SpecialItemUse.Count > 0 && HandlesCollectionItem(row)
+        || HandlesItemAction(row)
         || LifeItemUse != null && HandlesLifeItem(row)
-        || StartTreasureMap != null && IsTreasureMapUse(row);
+        || StartTreasureMap != null && IsTreasureMapUse(row)
+        || SpecialItemUse.Count > 0 && IsAwardBox(row);
 
     private static bool HandlesCollectionItem(JsonElement row)
     {
@@ -202,6 +208,10 @@ public sealed partial class CharacterService
     }
 
     private const int JumpSameMap = 101, JumpOtherMap = 102;
+
+    /// <summary>A 204 SelfChoosePet box sends its pick as selfChoosePet; PetService.TryUseSelfChooseAsync owns the use.</summary>
+    private static bool CarriesPetChoice(JsonElement row, ItemUseReq req) => UseActions(row).Contains(PetService.SelfChoosePetAction)
+        && req.ItemParam.Count == 1 && req.ItemParam[0].VarCase == ItemUseParamInfo.VarOneofCase.SelfChoosePet;
 
     /// <summary>Moves the player for a wing: a destination scene (the current one for a Fly Wing). WorldCoreService.</summary>
     public Func<GameSession, long, Task<bool>>? WingJump { get; set; }

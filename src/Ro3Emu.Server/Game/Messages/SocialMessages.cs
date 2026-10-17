@@ -5,7 +5,7 @@ using Romsg;
 namespace Ro3Emu.Server.Game;
 
 /// <summary>Chat, teams, friends, guilds and their caravan, challenge, campfire and home, emblems.</summary>
-public sealed class SocialMessages(ChatService chat, TeamService teams, EmblemService emblems, GuildService guilds, GuildCaravanService caravan, GuildChallengeService guildChallenge, FriendExtraService friendExtra, GuildCampfireService campfire, GuildHomeService guildHome, GuildHuntingService hunting) : Messaging.IMessageModule
+public sealed class SocialMessages(ChatService chat, TeamService teams, EmblemService emblems, GuildService guilds, GuildCaravanService caravan, GuildChallengeService guildChallenge, FriendExtraService friendExtra, GuildCampfireService campfire, GuildHomeService guildHome, GuildHuntingService hunting, PersonalService personal, SocialOutfitService socialOutfit) : Messaging.IMessageModule
 {
     private const uint SetFriendSystemMetadata = 82208, GetGuildLeagueMgrData = GuildLeagueService.MgrData;
 
@@ -24,6 +24,41 @@ public sealed class SocialMessages(ChatService chat, TeamService teams, EmblemSe
         routes.AdmitRole(id => id is >= 82422 and <= 82426); // emblems
         // Hunting Challenge history reads the settled week and answers its sender only.
         routes.AdmitRole(id => id is GuildHuntingService.History);
+        // Profile card edits change the sender's own presets; readers see them through UserDataService.
+        routes.AdmitRole(id => id is PersonalService.UpdateAppearance or PersonalService.UpdateCurPlan or PersonalService.UpdatePlanName);
+        // Wearing a chat cosmetic changes the sender's own 5044; readers see it through UserDataService.
+        routes.AdmitRole(id => id is SocialOutfitService.Equip or SocialOutfitService.Refresh);
+
+        routes.Map(PersonalService.UpdateAppearance, "personal", async (session, msgId, body) =>
+        {
+            await personal.UpdateAppearanceAsync(session, UpdatePersonalAppearanceReq.Parser.ParseFrom(body.Span));
+        });
+        // A like also writes the liked role's received likes: the default Realm reservation covers both roles.
+        routes.Map(PersonalService.Upvote, "personal", async (session, msgId, body) =>
+        {
+            await personal.UpvoteAsync(session, UpvotePersonalReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(PersonalService.UpdateCurPlan, "personal", async (session, msgId, body) =>
+        {
+            await personal.UpdateCurPlanAsync(session, UpdateCurPersonalPlanReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(PersonalService.UpdatePlanName, "personal", async (session, msgId, body) =>
+        {
+            await personal.UpdatePlanNameAsync(session, UpdatePersonalPlanNameReq.Parser.ParseFrom(body.Span));
+        });
+        // Guild Store: the guild-social owner admits the buyer's own guild keys (RunGuildAsync).
+        routes.Map(GuildService.BuyCommodity, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.BuyCommodityAsync(session, BuyGuildCommodityReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(SocialOutfitService.Equip, "socialOutfit", async (session, msgId, body) =>
+        {
+            await socialOutfit.EquipAsync(session, EquipSocialOutfitReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(SocialOutfitService.Refresh, "socialOutfit", async (session, msgId, body) =>
+        {
+            await socialOutfit.RefreshAsync(session);
+        });
 
         // Not a guild-social owner: the default Realm reservation serializes the first entries of one guild, as 30400.
         routes.Map(GuildHomeService.EnterHome, "guildHome", async (session, msgId, body) =>
@@ -230,6 +265,19 @@ public sealed class SocialMessages(ChatService chat, TeamService teams, EmblemSe
         routes.Map(GuildService.SyncOnce, "guilds", async (session, msgId, body) =>
         {
             await guilds.SyncOnceAsync(session, SyncGuildDataOnceReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(GuildService.EliteQuery, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.EliteQueryAsync(session);
+        });
+        routes.Map(GuildService.EliteSave, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.EliteSaveAsync(session, QuickJoinEliteGroupReq.Parser.ParseFrom(body.Span));
+        });
+        // Reads the committed roster, then the team family reserves the leader and the invited elites itself.
+        routes.Map(GuildService.EliteTeam, "teams", async (session, msgId, body) =>
+        {
+            await guilds.EliteTeamAsync(session);
         });
         routes.Map(GuildService.BuildUpgrade, "guilds", async (session, msgId, body) =>
         {

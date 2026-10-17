@@ -89,30 +89,19 @@ public sealed class MonsterService : MonsterBrain, IGameTicker
 
         int skill = 0, skillMs = 1000, swing = 2000;
         float hitPoint = 0.2f, range = 2f;
-        var candidates = new List<long>();
-        if (npc.TryGetProperty("_kSkills", out var skills) && skills.ValueKind == JsonValueKind.Array)
-            foreach (var s in skills.EnumerateArray()) if (GameData.Number(s) is { } sid) candidates.Add((long)sid);
-        if (BossNormalAttack.TryGetValue(npcId, out var bossAttack)) candidates.Add(bossAttack);
-        // Story templates (530xxxx) have no normal attack in the client: a reconstruction names whose they borrow.
-        if (reconstructed?.AttackSource(npcId) is int from && data.Row("NPCConfig", from) is { } source)
+        long normal = NormalAttack(npcId, npc);
+        // A template without a normal attack of its own: a reconstruction may name whose it borrows.
+        if (normal == 0 && reconstructed?.AttackSource(npcId) is int from && data.Row("NPCConfig", from) is { } source)
+            normal = NormalAttack(from, source);
+        if (normal != 0 && data.Row("SkillConfig", normal) is { } row)
         {
-            if (source.TryGetProperty("_kSkills", out var borrowed) && borrowed.ValueKind == JsonValueKind.Array)
-                foreach (var s in borrowed.EnumerateArray()) if (GameData.Number(s) is { } sid) candidates.Add((long)sid);
-            if (BossNormalAttack.TryGetValue(from, out var borrowedBoss)) candidates.Add(borrowedBoss);
-        }
-        {
-            foreach (var sid in candidates)
-            {
-                if (data.Row("SkillConfig", sid) is not { } row || (GameData.Int(row, "_iIsNormalAtk") != 1 && !BossNormalAttack.ContainsValue(sid))) continue;
-                skill = (int)sid;
-                skillMs = (int)Math.Max(300, GameData.Int(row, "_iActionTime"));
-                swing = (int)Math.Max(skillMs, GameData.Int(row, "_iCD"));
-                range = Math.Max(1f, GameData.Int(row, "_iDistanceMax") / 100f);
-                if (data.SkillTemplate(GameData.Int(row, "_iScriptShow")) is { } tpl && tpl.TryGetProperty("m_kAtkPoints", out var pts)
-                    && pts.ValueKind == JsonValueKind.Array && pts.GetArrayLength() > 0 && GameData.Number(pts[0]) is { } hp)
-                    hitPoint = (float)hp;
-                break;
-            }
+            skill = (int)normal;
+            skillMs = (int)Math.Max(300, GameData.Int(row, "_iActionTime"));
+            swing = (int)Math.Max(skillMs, GameData.Int(row, "_iCD"));
+            range = Math.Max(1f, GameData.Int(row, "_iDistanceMax") / 100f);
+            if (data.SkillTemplate(GameData.Int(row, "_iScriptShow")) is { } tpl && tpl.TryGetProperty("m_kAtkPoints", out var pts)
+                && pts.ValueKind == JsonValueKind.Array && pts.GetArrayLength() > 0 && GameData.Number(pts[0]) is { } hp)
+                hitPoint = (float)hp;
         }
         int speed = (int)(attr.ContainsKey(113) ? A(113) : GameData.Int(npc, "_iSpeed"));
         // A reconstructed story boss fought solo instead of beside its original NPC companions (inferred scaling).
@@ -133,17 +122,27 @@ public sealed class MonsterService : MonsterBrain, IGameTicker
             skill, skillMs, hitPoint, swing, range, (int)Math.Max(500, GameData.Int(npc, "_iBodyRemainTime")));
     }
 
+    private BossNormalAttacks? _bossAttacks;
+    private BossNormalAttacks BossAttacks => _bossAttacks ??= new BossNormalAttacks(data);
+
     /// <summary>
-    /// Field MVPs have no _kSkills (their server AI script picks skills); their normal attacks are the
-    /// SkillConfig 52xxxxx rows named after them ("Orc Hero Normal Attack-Earth"...). Mapping by name = inferred.
+    /// A monster's normal attack (0: none). A boss's own row (<see cref="BossNormalAttacks"/>) comes first, also ahead of a
+    /// generic row its NPCConfig lists (the mini bosses list Poporing's 5003301); then the first listed _kSkills row flagged
+    /// _iIsNormalAtk; then the listed row named as a swing with the shortest cooldown: the airship crew list their own
+    /// MainStory_EvilKnightNormalAttack / EvilHunterNormalAttack unflagged, and 5300088 also lists a 15 s special that
+    /// reuses its swing's script (inferred by name).
     /// </summary>
-    private static readonly Dictionary<int, long> BossNormalAttack = new()
+    private long NormalAttack(int npcId, JsonElement npc)
     {
-        [5020001] = 5204001, [5020002] = 5204101, [5020003] = 5204201, [5020004] = 5204301, [5020005] = 5204401,
-        [5020006] = 5204501, [5020007] = 5204601, [5020008] = 5215401, [5020009] = 5204901, [5020010] = 5204701,
-        [5020011] = 5207001, [5020012] = 5204801, [5020013] = 5209101, [5020014] = 5212101, [5020015] = 5210501,
-        [5020016] = 5210301, [5020017] = 5213301,
-    };
+        if (BossAttacks.For(npcId) is var boss and > 0) return boss;
+        var listed = new List<(long Id, JsonElement Row)>();
+        if (npc.TryGetProperty("_kSkills", out var skills) && skills.ValueKind == JsonValueKind.Array)
+            foreach (var s in skills.EnumerateArray())
+                if (GameData.Number(s) is { } sid && data.Row("SkillConfig", (long)sid) is { } row) listed.Add(((long)sid, row));
+        foreach (var (id, row) in listed) if (GameData.Int(row, "_iIsNormalAtk") == 1) return id;
+        return listed.Where(s => BossNormalAttacks.IsNamedSwing(s.Row)).OrderBy(s => GameData.Int(s.Row, "_iCD"))
+            .Select(s => s.Id).FirstOrDefault();
+    }
 
     // ---- spawning ----
 

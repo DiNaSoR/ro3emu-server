@@ -167,6 +167,48 @@ public sealed partial class NewActivityTests
         Assert.Equal(0, Session(again).InstanceId);
     }
 
+    /// <summary>84067 restarts a running challenge and 84063 returns to practice; both refuse outside their scene.</summary>
+    [ClientDataFact]
+    public async Task TrainingChallengeResetAndExitAnswerTheirReplies()
+    {
+        await using var bot = await InWorld("TrainingExit");
+        await Next(bot, TrainingService.Sync, DBTrainingGroundInfoIncrement.Parser);
+        await bot.SendGameAsync(TrainingService.ExitChallengeMode, new NullArg());
+        Assert.NotEqual(0, (await Next(bot, TrainingService.ExitChallengeMode, TrainingExitChallengeModeResp.Parser)).Result);
+        await Gm(bot, "!lvl 99"); await Gm(bot, "!job 1100");
+        await bot.SendGameAsync(TrainingService.ExitChallengeMode, new NullArg());
+        Assert.Equal(ErrorCodes.SceneMissing, (await Next(bot, TrainingService.ExitChallengeMode, TrainingExitChallengeModeResp.Parser)).Result);
+        await bot.SendGameAsync(TrainingService.ChallengeReset, new NullArg());
+        Assert.Equal(ErrorCodes.SceneMissing, (await Next(bot, TrainingService.ChallengeReset, TrainingChallengeResetRes.Parser)).Result);
+
+        await bot.SendGameAsync(DungeonService.Enter, new EnterDungeonReq { SceneEntry = 2100009 });
+        Assert.Equal(0, (await Next(bot, DungeonService.Enter, EnterDungeonRsp.Parser)).Result);
+        await LoadPrivate(bot, 2100009);
+        // Practice has no challenge to reset.
+        await bot.SendGameAsync(TrainingService.ChallengeReset, new NullArg());
+        Assert.Equal(ErrorCodes.SceneMissing, (await Next(bot, TrainingService.ChallengeReset, TrainingChallengeResetRes.Parser)).Result);
+        await bot.SendGameAsync(TrainingService.ChallengeMode, new NullArg());
+        Assert.Equal(0, (await Next(bot, TrainingService.ChallengeMode, TrainingChallengeModeResp.Parser)).Result);
+        long challenge = await LoadPrivate(bot, 2100011);
+        await bot.SendGameAsync(DungeonService.ClientEvent, new ClientDungeonEvent { StrCmd = "OnPileChallengeStart" });
+        await Next(bot, DungeonService.BaseInfo, DungeonBaseInfoNotify.Parser,
+            r => r.DungeonId == challenge && r.Vars.Any(v => v.VarId == 3500000 && v.Vi64.Any(t => t > 0)));
+        await bot.SendGameAsync(TrainingService.ChallengeReconnect, new NullArg());
+        Assert.True((await Next(bot, TrainingService.ChallengeReconnect, TrainingChallengeReconnectRes.Parser)).EndTime > 0);
+
+        await bot.SendGameAsync(TrainingService.ChallengeReset, new NullArg());
+        Assert.Equal(0, (await Next(bot, TrainingService.ChallengeReset, TrainingChallengeResetRes.Parser)).Result);
+        await bot.SendGameAsync(TrainingService.ChallengeReconnect, new NullArg());
+        var stopped = await Next(bot, TrainingService.ChallengeReconnect, TrainingChallengeReconnectRes.Parser);
+        Assert.Equal(0, stopped.EndTime);
+        Assert.Equal(0, stopped.TotalDamage);
+
+        await bot.SendGameAsync(TrainingService.ExitChallengeMode, new NullArg());
+        Assert.Equal(0, (await Next(bot, TrainingService.ExitChallengeMode, TrainingExitChallengeModeResp.Parser)).Result);
+        long practice = await LoadPrivate(bot, 2100009);
+        Assert.Equal(practice, Session(bot).InstanceId);
+    }
+
     [ClientDataFact]
     public async Task FestivalUsesAuthoredAnswerZonesAndPaysEachEntitlementOnce()
     {

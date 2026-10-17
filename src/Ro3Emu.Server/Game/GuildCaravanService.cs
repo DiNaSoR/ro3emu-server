@@ -292,7 +292,7 @@ public sealed class GuildCaravanService : IGameTicker
         // (inferred) A stable weighted draw with replacement fills late rounds even when realm level 1 has
         // only one type-1 row; the authored S/A/B mix still fixes the number of slots in each category.
         var random = new Random(unchecked((int)(s.Role!.Id * 7919L + day * 104729L + round * 15485863L + salt * 32452843L)));
-        int openDay = (int)Math.Max(0, (clock.GetUtcNow() - new DateTimeOffset(seasons.Start)).TotalDays);
+        int openDay = (int)Math.Max(0, (clock.GetUtcNow() - DateTimeOffset.FromUnixTimeSeconds(seasons.StartTime)).TotalDays);
         for (int type = 1; type <= mix.Length; type++)
         {
             var pool = data.Table("GuildTransportConfig").Values.Where(row =>

@@ -229,6 +229,27 @@ public sealed partial class MapTests : IAsyncLifetime
     }
 
     [ClientDataFact]
+    public void NormalAttackCannotRecastItselfButOtherSkillsBreakIt()
+    {
+        var combat = _app.Services.GetRequiredService<CombatService>();
+        var data = _app.Services.GetRequiredService<Ro3Emu.Server.Data.GameData>();
+        System.Text.Json.JsonElement Row(long id) => data.Row("SkillConfig", id)!.Value;
+        ActiveSkillCast Live(long id, long agoMs) => new()
+        {
+            Id = 1, OwnerId = 1, WorldScene = 1, Request = new CastSkillReq { SkillId = (int)id }, Row = Row(id),
+            Origin = new Vec3(), StartMs = MonsterService.NowMs - agoMs, ChantMs = 0, ActionMs = 1000,
+        };
+        // Normal Attack (_iInterruptedType 1) never yields to itself, so a spammed or held press cannot restart the
+        // swing, but any other skill (Smite) breaks it at once.
+        Assert.False(combat.CastYieldsTo(Live(1000001, 0), Row(1000001)));
+        Assert.True(combat.CastYieldsTo(Live(1000001, 0), Row(1000201)));
+        // Smite (_iInterruptedType 2, m_fInterruptTime 0.2833 of a 1 s timeline) holds until 283 ms, after its 200 ms hit.
+        Assert.False(combat.CastYieldsTo(Live(1000201, 0), Row(1000001)));
+        Assert.False(combat.CastYieldsTo(Live(1000201, 250), Row(1000001)));
+        Assert.True(combat.CastYieldsTo(Live(1000201, 300), Row(1000001)));
+    }
+
+    [ClientDataFact]
     public async Task FireBoltLaunchesItsServerBoltsAndShowsOneHitPerLevel()
     {
         await using var alice = await InWorld("Alice");
@@ -504,6 +525,9 @@ public sealed partial class MapTests : IAsyncLifetime
                     .Single(m => m.Uid == (long)angeling.Uuid);
                 Assert.False(player.Dead);
                 Assert.False(boss.Dead);
+                // Stop the running auto-attack: a swing still in flight would refuse the next press (it never yields to itself).
+                player.Attack = null;
+                if (player.SkillCast is { } swing) { swing.Cancelled = true; player.SkillCast = null; }
                 boss.Advance(MonsterService.NowMs);
                 boss.Moving = false;
                 boss.NextRoamMs = long.MaxValue;
@@ -757,6 +781,24 @@ public sealed partial class MapTests : IAsyncLifetime
         public void Log<TState>(LogLevel level, EventId id, TState state, Exception? error, Func<TState, Exception?, string> formatter)
         { if (level >= LogLevel.Warning) Messages.Enqueue(formatter(state, error) + " " + error); }
         public void Dispose() { }
+    }
+
+    /// <summary>Stops the account's auto-attack and waits until its live swing has ended, so a new press starts fresh.</summary>
+    private async Task StopAttackingAsync(string account)
+    {
+        var loop = _app.Services.GetRequiredService<GameLoop>();
+        var sessions = _app.Services.GetRequiredService<SessionRegistry>();
+        for (int i = 0; i < 100; i++)
+        {
+            if (await loop.InvokeAsync(() =>
+            {
+                var session = sessions.All().Single(s => s.Account == account && s.Role != null);
+                session.Attack = null;
+                return Task.FromResult(session.SkillCast == null);
+            })) return;
+            await Task.Delay(50);
+        }
+        throw new Xunit.Sdk.XunitException($"{account}'s cast did not end");
     }
 
     private async Task<(BotClient Alice, long BossUid)> ReadySoloMvpAsync()

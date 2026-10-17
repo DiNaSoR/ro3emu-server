@@ -95,7 +95,8 @@ internal sealed class GuildStampReadPlan(IEnumerable<long> roles) : DbReadPlan
 }
 
 internal sealed record ProfileSnapshot(Role Role, RoleRevisionVector Vector, byte[]? Wardrobe,
-    byte[]? PersonalGuild, GuildStamp GuildStamp, GuildStore.State? Guild);
+    byte[]? PersonalGuild, GuildStamp GuildStamp, GuildStore.State? Guild, byte[]? Personal,
+    byte[]? PersonalUpvotes, byte[]? Popularity, byte[]? SocialOutfit);
 
 internal sealed class ProfileSnapshotReadPlan(IEnumerable<long> roles) : DbReadPlan
 {
@@ -117,7 +118,11 @@ internal sealed class ProfileSnapshotReadPlan(IEnumerable<long> roles) : DbReadP
                 (GuildStore.State?)new GuildReadPlan(GuildReadKind.Guild, stamp.Id).Execute(db, tx);
             result[id] = new(role, vector,
                 (byte[]?)new RoleBlobReadPlan(id, "wardrobe").Execute(db, tx),
-                (byte[]?)new RoleBlobReadPlan(id, "guild_info").Execute(db, tx), stamp, guild);
+                (byte[]?)new RoleBlobReadPlan(id, "guild_info").Execute(db, tx), stamp, guild,
+                (byte[]?)new RoleBlobReadPlan(id, "personal").Execute(db, tx),
+                (byte[]?)new RoleBlobReadPlan(id, "personal_upvote").Execute(db, tx),
+                (byte[]?)new RoleBlobReadPlan(id, "popularity").Execute(db, tx),
+                (byte[]?)new RoleBlobReadPlan(id, "social_outfit").Execute(db, tx));
         }
         return result;
     }
