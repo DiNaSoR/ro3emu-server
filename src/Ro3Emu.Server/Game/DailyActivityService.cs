@@ -254,7 +254,7 @@ public sealed partial class DailyActivityService : IGameTicker
         if (result == 0)
         {
             // Local-day index rotates over the three configured chain roots, independent of requestId (often zero).
-            int localDay = DateOnly.FromDateTime(DateTimeOffset.FromUnixTimeSeconds(session.Daily!.DailyEpoch).LocalDateTime).DayNumber;
+            int localDay = DateOnly.FromDateTime(SeasonService.Civil(session.Daily!.DailyEpoch, clock.LocalTimeZone)).DayNumber;
             start = RingStarts[localDay % RingStarts.Length];
             var oldTasks = session.Tasks?.Clone();
             var oldDaily = JsonSerializer.SerializeToUtf8Bytes(session.Daily);

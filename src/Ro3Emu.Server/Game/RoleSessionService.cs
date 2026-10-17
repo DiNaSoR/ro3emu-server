@@ -296,7 +296,7 @@ public sealed class RoleSessionService(RoleStore roles, Data.GameData data, Buff
                 ServerTimeMs = NowMs(),
                 ServerInfo = new ServerBasicInfo
                 {
-                    ServerOpenTime = (ulong)new DateTimeOffset(seasons.Start).ToUnixTimeSeconds(),
+                    ServerOpenTime = (ulong)seasons.StartTime,
                     ServerLogicTime = (ulong)clock.GetUtcNow().ToUnixTimeSeconds(),
                 },
             },

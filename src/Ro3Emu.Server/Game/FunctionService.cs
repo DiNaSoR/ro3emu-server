@@ -92,9 +92,9 @@ public sealed class FunctionService
                 // LC_InteractCondition.lua:1957-1979 checks iOpenDayCount. Start is the server's first day.
                 // OpenContent counts every server-day gate as met from the first day.
                 CondServerStage or CondServerStage2 when seasons.OpenContent.ServerDayFree => true,
-                CondServerStage => Math.Floor((clock.GetUtcNow().ToUnixTimeSeconds() - new DateTimeOffset(seasons.Start).ToUnixTimeSeconds()) / 86400d) + 1 >= param,
+                CondServerStage => Math.Floor((clock.GetUtcNow().ToUnixTimeSeconds() - seasons.StartTime) / 86400d) + 1 >= param,
                 // LC_InteractCondition.CheckPlayBook: GetPlayBookOpenTime() + offset <= server system time.
-                CondServerStage2 => clock.GetUtcNow().ToUnixTimeSeconds() >= new DateTimeOffset(seasons.Start).ToUnixTimeSeconds() + param,
+                CondServerStage2 => clock.GetUtcNow().ToUnixTimeSeconds() >= seasons.StartTime + param,
                 CondQuestDone => TaskService.IsDelivered(session, param),
                 // LC_InteractCondition.CheckJourneyAttr / CheckJourneyDialogue: per-role Journey progress.
                 CondJourneyAttr => JourneyAttributeMet(session, d),

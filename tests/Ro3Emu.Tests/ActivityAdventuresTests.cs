@@ -258,7 +258,7 @@ public sealed class ActivityAdventuresTests : IAsyncLifetime
     {
         var season = app.Services.GetRequiredService<SeasonService>();
         var gameData = app.Services.GetRequiredService<Ro3Emu.Server.Data.GameData>();
-        long phaseStart = new SeasonClock(gameData, season.Start, 101).Build().StageTimeInfo[101002].StartTime;
+        long phaseStart = new SeasonClock(gameData, season.Start, 101, season.Zone).Build().StageTimeInfo[101002].StartTime;
         clock.Set(phaseStart + 60);
         var alice = await InWorld("Alice");
         var initial = await Next(alice, NewActivityService.ActivitySync, DBNewActivityInfoIncrement.Parser);

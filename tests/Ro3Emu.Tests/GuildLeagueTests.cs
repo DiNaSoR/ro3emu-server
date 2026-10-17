@@ -63,7 +63,7 @@ public sealed class GuildLeagueTests : IAsyncLifetime
         {
             o.DataDir = dataDir; o.GameDataDir = Path.Combine(ClientData.RepoRoot, "data");
             o.HttpPort = web; o.MicroGatePort = micro; o.GameGatePort = gate;
-            o.SeasonStart = opening.ToString("yyyy-MM-dd"); o.GuildLeagueMinMembers = 2;
+            o.SeasonStart = opening.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture); o.GuildLeagueMinMembers = 2;
         }, clock);
         SureHitRolls.Install(app);
         await app.StartAsync();

@@ -90,7 +90,7 @@ public sealed partial class WorldCoreService : IGameTicker
         this.seasonRefine = seasonRefine;
         this.firstHeart = firstHeart;
         this.personal = personal;
-        serverOpenSeconds = (ulong)new DateTimeOffset(seasons.Start).ToUnixTimeSeconds();
+        serverOpenSeconds = (ulong)seasons.StartTime;
         scene.AddOwnedAfterLoaded(LoadedAsync);
         scene.Leaving.Add(LeavingAsync);
         monsters.TargetChanged.Add(TargetChangedAsync);
