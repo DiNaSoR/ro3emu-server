@@ -28,6 +28,7 @@ public sealed class RewardService
     private readonly IOptions<ServerOptions> options;
     private readonly Random _random = new();
     private Dictionary<int, long>? _expCorrection;
+    private readonly DropAttenuation attenuation;
 
     /// <summary>Field AFK selects the enhanced _iDrop table only for qualified ordinary field kills.
     /// Other kills use environment 0, preserving ordinary rewards (localization 10960000077; mapping inferred).</summary>
@@ -48,6 +49,7 @@ public sealed class RewardService
         this.teams = teams;
         this.data = data;
         this.log = log;
+        attenuation = new DropAttenuation(data);
         combat.BeforeKilled.Add(PrepareKilledAsync);
         combat.Killed.Add(KilledAsync);
     }
@@ -152,7 +154,7 @@ public sealed class RewardService
         // _iNormalDrop remains additive under its own level/map conditions; no numeric multiplier is invented.
         if (Resolve(GameData.Int(npc, "_iDrop")) is var dropId and > 0 && data.Row("NPCDropConfig", dropId) is { } nd
             && nd.ValueKind == JsonValueKind.Object && nd.TryGetProperty(bonus ? "1" : "0", out var env))
-            RollPools(env, player, drops, chanceRate);
+            RollPools(env, player, drops, monster.Template.Level, chanceRate);
         if (npc.TryGetProperty("_iNormalDrop", out var normals) && normals.ValueKind == JsonValueKind.Array)
         {
             foreach (var n in normals.EnumerateArray())
@@ -161,7 +163,7 @@ public sealed class RewardService
                 if (row.TryGetProperty("_iMapId", out var maps) && maps.ValueKind == JsonValueKind.Array && maps.GetArrayLength() > 0
                     && !maps.EnumerateArray().Any(m => GameData.Number(m) == player.SceneEntry))
                     continue;
-                RollPools(row, player, drops, chanceRate);
+                RollPools(row, player, drops, monster.Template.Level, chanceRate);
             }
         }
 
@@ -174,18 +176,21 @@ public sealed class RewardService
             baseExp = baseExp * Correction((int)Math.Clamp(gap, -200, 200)) / 10000;
             baseExp = Math.Max(1, baseExp * teams.ExpBonus(player) / 10000);
         }
-        return ApplyRates(items, baseExp);
+        // BaseExpAddConfig catch-up below the server level raises Base EXP only (CharacterService.LevelRules);
+        // the server rates then scale both.
+        return ApplyRates(items, character.WithPursueBonus(player.Progress!.Level, baseExp), baseExp);
     }
 
-    /// <summary>ServerOptions.Rates on a resolved kill: currency amounts, then Base and Job EXP (Job starts equal to Base).</summary>
-    internal (List<(int Entry, int Count)> Items, long BaseExp, long JobExp) ApplyRates(List<(int Entry, int Count)> items, long baseExp)
+    /// <summary>ServerOptions.Rates on a resolved kill: currency amounts, then Base and Job EXP (Job defaults to Base).</summary>
+    internal (List<(int Entry, int Count)> Items, long BaseExp, long JobExp) ApplyRates(List<(int Entry, int Count)> items, long baseExp,
+        long? jobExp = null)
     {
         var rates = options.Value.Rates;
         double currencyRate = Rate(rates.CurrencyDrop);
         var scaled = items
             .Select(d => IsCurrency(d.Entry) ? (d.Entry, Count: (int)Math.Min(int.MaxValue, Scale(d.Count, currencyRate))) : d)
             .Where(d => d.Count > 0).ToList();
-        return (scaled, Scale(baseExp, Rate(rates.BaseExp)), Scale(baseExp, Rate(rates.JobExp)));
+        return (scaled, Scale(baseExp, Rate(rates.BaseExp)), Scale(jobExp ?? baseExp, Rate(rates.JobExp)));
     }
 
     /// <summary>A drop roll's chance per million under the ItemDrop rate, capped at 100%.</summary>
@@ -241,17 +246,19 @@ public sealed class RewardService
     /// Every _iDropPoolN of a row; each pool slot [group, chance per million, rolls, picks] is rolled "rolls" times
     /// independently (MVP first-strike pool 21001 = [2020, 100%, 30, 1] = 30 x 1000 Minted Coin).
     /// </summary>
-    private void RollPools(JsonElement row, GameSession player, List<(int, int)> drops, double chanceRate = 1)
+    /// <summary>A kill's pools: <paramref name="monsterLevel"/> is the slain monster's level (DropAttenuationConfig);
+    /// <paramref name="chanceRate"/> is the server's ItemDrop rate.</summary>
+    private void RollPools(JsonElement row, GameSession player, List<(int, int)> drops, int monsterLevel, double chanceRate = 1)
     {
         foreach (var p in row.EnumerateObject().Where(p => p.Name.StartsWith("_iDropPool", StringComparison.Ordinal)))
-            if (GameData.Number(p.Value) is { } poolId) RollPool((long)poolId, player.Progress!, drops, chanceRate: chanceRate);
+            if (GameData.Number(p.Value) is { } poolId) RollPool((long)poolId, player.Progress!, drops, null, monsterLevel, chanceRate);
     }
 
     private void RollPool(long poolId, GameSession player, List<(int, int)> drops, List<(int Entry, int Count, int Bind)>? bound = null)
         => RollPool(poolId, player.Progress!, drops, bound);
 
     private void RollPool(long poolId, RoleProgress progress, List<(int, int)> drops, List<(int Entry, int Count, int Bind)>? bound = null,
-        double chanceRate = 1)
+        int monsterLevel = DropAttenuation.NoMonster, double chanceRate = 1)
     {
         if (data.Row("DropPoolConfig", poolId) is not { } pool) return;
         for (int slot = 1; slot <= 16; slot++)
@@ -265,7 +272,7 @@ public sealed class RewardService
             for (int r = 0; r < rolls; r++)
             {
                 if (_random.NextDouble() * 1_000_000 >= chance) continue;
-                for (int i = 0; i < picks; i++) PickFromGroup(group, progress, drops, bound);
+                for (int i = 0; i < picks; i++) PickFromGroup(group, progress, drops, bound, monsterLevel);
             }
         }
     }
@@ -334,7 +341,8 @@ public sealed class RewardService
     private void PickFromGroup(long group, GameSession player, List<(int, int)> drops, List<(int Entry, int Count, int Bind)>? bound = null)
         => PickFromGroup(group, player.Progress!, drops, bound);
 
-    private void PickFromGroup(long group, RoleProgress progress, List<(int, int)> drops, List<(int Entry, int Count, int Bind)>? bound = null)
+    internal void PickFromGroup(long group, RoleProgress progress, List<(int, int)> drops, List<(int Entry, int Count, int Bind)>? bound = null,
+        int monsterLevel = DropAttenuation.NoMonster)
     {
         if (data.Row("DropGroupConfig", group) is not { ValueKind: JsonValueKind.Array } rows) return;
         var p = progress;
@@ -354,7 +362,9 @@ public sealed class RewardService
             roll -= GameData.Int(r, "_iWeights");
             if (roll >= 0) continue;
             int count = _random.Next((int)GameData.Int(r, "_iMinNumber"), (int)Math.Max(GameData.Int(r, "_iMinNumber"), GameData.Int(r, "_iMaxNumber")) + 1);
-            int entry = (int)GameData.Int(r, "_kDropItem"), amount = Math.Max(1, count);
+            int entry = (int)GameData.Int(r, "_kDropItem");
+            int amount = attenuation.Apply(r, Math.Max(1, count), p.Level, monsterLevel, _random);
+            if (amount <= 0) return;
             drops.Add((entry, amount));
             bound?.Add((entry, amount, (int)GameData.Int(r, "_iBind")));
             return;

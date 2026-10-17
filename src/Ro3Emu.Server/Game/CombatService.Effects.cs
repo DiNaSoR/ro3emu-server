@@ -246,7 +246,8 @@ public sealed partial class CombatService
             }
             if (CanApplyMoreEffects())
                 foreach (var tuple in Tuples(row, "_kBuff2"))
-                    if (CanApplyMoreEffects() && RollBuff(tuple, out int id, out int duration)) await buffs.ShowOnUnitAsync(target, id, duration, castingRole.Id);
+                    if (CanApplyMoreEffects() && RollHostileBuff(tuple, s, null, null, target, out int id, out int duration))
+                        await buffs.ShowOnUnitAsync(target, id, duration, castingRole.Id);
             if (CanApplyMoreEffects() && script is ("Provoke" or "Taunt")) monsters.Engage(target, s);
             if (CanApplyMoreEffects() && !target.Dead && target.Hp > 0) await DisplaceTargetAsync(s, action, target);
         }

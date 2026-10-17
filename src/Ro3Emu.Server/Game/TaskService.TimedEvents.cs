@@ -12,8 +12,12 @@ public sealed partial class TaskService
 
     /// <summary>One actual PvP match settlement in Kafra Survivor or Dragon Coffin Island.</summary>
     public Task OnTimedBattleSettlementAsync(GameSession session, int matchEntry) => matchEntry is 2 or 6
-        ? ProgressAsync(session, TTimedBattle, target => target.Length == 2 ? 1 : 0)
+        ? ProgressAsync(session, null, target => TimedBattleTarget(target, matchEntry) ? 1 : 0)
         : Task.CompletedTask;
+
+    /// <summary>106509 and 210012 count both Kafra Survivor (2) and Dragon Coffin Island (6); 210009 only the latter.</summary>
+    private static bool TimedBattleTarget(long[] target, int matchEntry) =>
+        target is [TTimedBattle or TCoffinOrSurvivor, _] || matchEntry == 6 && target is [TDragonCoffin, _];
 
     /// <summary>One Wedding Crashers clear by the guild this member took part in (target 210010).</summary>
     public Task OnDraculaWeddingAsync(GameSession session) =>

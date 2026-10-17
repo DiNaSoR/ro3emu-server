@@ -274,7 +274,11 @@ public sealed class SeasonRefineService
     }
 
     /// <summary>Only selected, unlocked groups contribute; pending choices never affect combat stats.</summary>
-    public IEnumerable<(long Id, double Value)> ActiveAttributes(GameSession session)
+    public IEnumerable<(long Id, double Value)> ActiveAttributes(GameSession session) =>
+        ActiveGroups(session).SelectMany(group => GameData.Pairs(group, "_kAttrs"));
+
+    /// <summary>The RefiningSeasonAttrConfig rows of the selected, unlocked groups (stats and PowerService).</summary>
+    internal IEnumerable<JsonElement> ActiveGroups(GameSession session)
     {
         if (session.SeasonState?.PlayBookId != 101 || session.SeasonRefine == null) yield break;
         foreach (var (part, equip) in session.SeasonRefine.EquipParts)
@@ -284,7 +288,7 @@ public sealed class SeasonRefineService
                 if (slot.ActiveAttr <= 0 || error != 0 || row is not { } configured
                     || !GameData.Pairs(configured, "_kAttrsId").Any(p => p.Id == slot.ActiveAttr)
                     || data.Row("RefiningSeasonAttrConfig", slot.ActiveAttr) is not { } group) continue;
-                foreach (var effect in GameData.Pairs(group, "_kAttrs")) yield return effect;
+                yield return group;
             }
     }
 }

@@ -78,6 +78,7 @@ public sealed partial class BuffService : IGameTicker
         if (p.Role == null || data.Row("BuffConfig", configId) is not { } row || GameData.Int(row, "_iBuffID") <= 0) return;
         if (durationMs <= 0) durationMs = (int)GameData.Int(row, "_iTime");
         if (durationMs <= 0) durationMs = 60000;
+        if (sourceId != p.Role.Id && !ApplyDecay(p.Role.Id, p.SceneEntry, configId, ref durationMs)) return;
         long now = MonsterService.NowMs;
         int group = (int)GameData.Int(row, "_iBuffID");
         bool multiSource = GameData.Int(row, "_iMultiSource") != 0;
@@ -94,6 +95,8 @@ public sealed partial class BuffService : IGameTicker
             ShieldRemaining: Math.Max(0, shieldAmount));
         if (existing != null) p.Buffs.Remove(existing);
         p.Buffs.Add(buff);
+        TrackPeriodic(p, null, buff);
+        TrackHalo(p, buff);
         log.LogInformation("{Name} gets buff {Buff} x{Pile} for {Ms} ms", p.Role.Name, configId, pile, durationMs);
         var info = Wire(buff);
         await ToPlayerAndViewersAsync(p, BuffUpdate, new BuffUpdateNotify { UnitId = p.Role.Id, Buffs = { info } });
@@ -108,14 +111,17 @@ public sealed partial class BuffService : IGameTicker
     }
 
     /// <summary>Source-owned passive configuration. Zero-time totem passives are permanent until that source is removed;
-    /// they are executable server registrations, not a fabricated 60-second icon.</summary>
-    public async Task AddPassiveAsync(GameSession p, int configId, long sourceId)
+    /// they are executable server registrations, not a fabricated 60-second icon. Socketed-card passives
+    /// (<paramref name="totemOwned"/> false, CardEffects) share the lifetime rule under their card GUID.</summary>
+    public async Task AddPassiveAsync(GameSession p, int configId, long sourceId, bool totemOwned = true)
     {
-        if (data.Row("BuffConfig", configId) is not { } row || p.Buffs.Any(b => b.IsTotemOwned && b.IsPassive && b.ConfigId == configId && b.SourceId == sourceId)) return;
+        if (data.Row("BuffConfig", configId) is not { } row
+            || p.Buffs.Any(b => b.IsPassive && b.IsTotemOwned == totemOwned && b.ConfigId == configId && b.SourceId == sourceId)) return;
         var buff = new ActiveBuff(++_guids, configId, long.MaxValue, 0,
-            GameData.Pairs(row, "_kChangeAttri").Where(c => c.Value != 0).ToArray(), sourceId, IsPassive: true, IsTotemOwned: true,
+            GameData.Pairs(row, "_kChangeAttri").Where(c => c.Value != 0).ToArray(), sourceId, IsPassive: true, IsTotemOwned: totemOwned,
             ShowIcon: GameData.Int(row, "_iShowIcon") != 0);
         p.Buffs.Add(buff);
+        TrackHalo(p, buff);
         // SceneService resends visible passives after ENTITYSELF when the client has created the unit.
         if (!p.SceneLoading && GameData.Int(row, "_iShowIcon") != 0)
             await ToPlayerAndViewersAsync(p, BuffUpdate, new BuffUpdateNotify
@@ -180,6 +186,7 @@ public sealed partial class BuffService : IGameTicker
         if (data.Row("BuffConfig", configId) is not { } row || GameData.Int(row, "_iBuffID") <= 0) return;
         if (durationMs <= 0) durationMs = (int)GameData.Int(row, "_iTime");
         if (durationMs <= 0) durationMs = 60000;
+        if (sourceId != unit.Uid && !ApplyDecay(unit.Uid, unit.SceneEntry, configId, ref durationMs)) return;
         if (!_unitBuffs.TryGetValue(unit.Uid, out var list)) _unitBuffs[unit.Uid] = list = new();
         int group = (int)GameData.Int(row, "_iBuffID");
         bool multiSource = GameData.Int(row, "_iMultiSource") != 0;
@@ -196,6 +203,7 @@ public sealed partial class BuffService : IGameTicker
             ShieldRemaining: Math.Max(0, shieldAmount));
         if (existing != null) list.Remove(existing);
         list.Add(buff);
+        TrackPeriodic(null, unit, buff);
         var info = Wire(buff);
         await world.ToUnitViewersAsync(unit, BuffUpdate, new BuffUpdateNotify { UnitId = unit.Uid, Buffs = { info } });
         var changed = new AOIAttrChange { EntityUuid = (ulong)unit.Uid, BuffInfo = new AoIBuffInfo { AddBuffs = { info } } };
@@ -405,6 +413,10 @@ public sealed partial class BuffService : IGameTicker
     public void Tick(GameTime time)
     {
         long now = MonsterService.NowMs;
+        // Ticks first: a periodic tick due at the expiry moment still lands before the expiry removal below.
+        TickPeriodic(now);
+        TickHalos(now);
+        SweepDecay(now);
         foreach (var s in sessions.All())
         {
             foreach (var b in s.Buffs.Where(b => b.ExpireMs <= now).ToList()) loop.TrackLegacyDetached("buff expiration", () => RemoveAsync(s, b));

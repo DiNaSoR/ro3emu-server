@@ -270,6 +270,7 @@ public sealed partial class CombatService : IGameTicker
         scene.Leaving.Add(ClearSkillsAsync);
         scene.Leaving.Add(buffs.ClearOnSceneAsync);
         character.ExtraAttributes.Add(PassiveAttributes);
+        character.ExtraAttributes.Add(ResonanceAttributes); // Job Resonance stats (CombatService.Restraint)
         world.UnitRemoved.Add(unit => { if (unit is MonsterUnit m) _fightingMonsters.Remove(m); return Task.CompletedTask; });
         skills.Learned.Add(RefreshSkillParametersAsync);
         skills.Learned.Add(character.RefreshStatsAsync);
@@ -280,6 +281,7 @@ public sealed partial class CombatService : IGameTicker
         character.ProgressHandlers.Add(buffs.ReconcileEnergyAsync);
         monsters.AttackPet = MonsterAttackPetAsync;
         buffs.UnitChanged.Add(PublishTowerPetStatsAsync);
+        WireBuffRules();
     }
 
     private static long Now => MonsterService.NowMs;
@@ -377,6 +379,7 @@ public sealed partial class CombatService : IGameTicker
                 var defender = new Fighter(0, 0, monster.Template.Flee, 0, monster.Template.Level, monster.Template.Element)
                     { Def = monster.Template.Def, Mdef = monster.Template.Mdef, Flee = monster.Template.Flee };
                 var (damage, result) = Damage(attacker, defender, row);
+                foreach (var adjust in MonsterDamageAdjusters) damage = adjust(monster, damage, false);
                 long previousHp = monster.Hp;
                 monster.Hp = Math.Max(0, monster.Hp - damage);
                 if (monster.Hp == 0) killed.Add(monster); // reserve before awaited callbacks
@@ -455,6 +458,7 @@ public sealed partial class CombatService : IGameTicker
             var (damage, result) = row is { } r ? Damage(attacker, defender, r)
                 : (Math.Max(1, monster.Template.Atk), DamageHitResult.Normal);
             damage = ScaleMonsterDamage(damage, monster.DamageRatio);
+            foreach (var adjust in MonsterDamageAdjusters) damage = adjust(monster, damage, true);
             damage = ApplyPetSupportResistance(damage, buffs.UnitAttributes(pet), row, monster.Template.Element);
             long beforeShield = damage;
             damage = await buffs.AbsorbAsync(pet, damage);
@@ -511,6 +515,7 @@ public sealed partial class CombatService : IGameTicker
             var row = data.Row("SkillConfig", m.Template.NormalSkill);
             var (damage, result) = row is { } r ? Damage(attacker, defender, r) : (Math.Max(1, m.Template.Atk), DamageHitResult.Normal);
             damage = ScaleMonsterDamage(damage, m.DamageRatio);
+            foreach (var adjust in MonsterDamageAdjusters) damage = adjust(m, damage, true);
             if (damage > 0) foreach (var modifier in IncomingDamageAdjusters) damage = Math.Max(0, await modifier(m, p, result, damage));
             var committed = await CommitPlayerDamageAsync(p, damage, row,
                 () => !m.Dead && m.Hp > 0 && ReferenceEquals(p.Role, targetRole)

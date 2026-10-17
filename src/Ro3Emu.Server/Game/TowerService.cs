@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Google.Protobuf;
 using Microsoft.Data.Sqlite;
@@ -14,7 +15,7 @@ namespace Ro3Emu.Server.Game;
 /// 32802 authoritative settlement, 32807 server first passes and 32808 milestone claims. World/Combat own actors
 /// and damage; CharacterService owns the real 5009 rewards. No sweep payout or seasonal progress reset is invented.
 /// </summary>
-public sealed class TowerService
+public sealed partial class TowerService
 {
     public const uint TowerSync = 5065, Start = 32801, End = 32802, SetPets = 32803, Sweep = 32804, Info = 32805;
     public const uint PetDeadState = 32809;
@@ -32,13 +33,15 @@ public sealed class TowerService
     private readonly InstanceService instances;
     private readonly MonsterService monsters;
     private readonly CombatService combat;
+    private readonly BuffService buffs;
     private readonly GameLoop loop;
     private readonly TimeProvider clock;
     private readonly ILogger<TowerService> log;
     public TowerService(GameData data, RoleStore roles, AccountStore accounts, CharacterService character, FunctionService functions,
         SeasonService seasons, SceneService scene, WorldData worldData, World world, InstanceService instances, MonsterService monsters,
-        CombatService combat, GameLoop loop, PetFollowerService followers, TimeProvider clock, ILogger<TowerService> log)
+        CombatService combat, BuffService buffs, GameLoop loop, PetFollowerService followers, TimeProvider clock, ILogger<TowerService> log)
     {
+        this.buffs = buffs;
         this.data = data;
         this.roles = roles;
         this.accounts = accounts;
@@ -58,6 +61,7 @@ public sealed class TowerService
         scene.Leaving.Insert(scene.Leaving.IndexOf(instances.AbandonAsync), AbandonAsync);
         scene.Loaded.Add(followers.RefreshAsync); // suppress the passive projection in tower; restore it on return
         scene.Loaded.Add(LoadedAsync);
+        RegisterSuppression();
         combat.Killed.Add(KilledAsync);
         combat.BeforeKilled.Insert(0, BeforeTerminalKillAsync);
         combat.PlayerDied.Add(PlayerDiedAsync);
@@ -77,6 +81,8 @@ public sealed class TowerService
         public required IReadOnlyList<Spawn> Spawns { get; init; }
         public int HpRatio { get; init; } = 10000;
         public int DamageRatio { get; init; } = 10000;
+        /// <summary>The PowerSuppressConfig buff put on every floor monster and its damage changes (TowerService.PowerSuppress).</summary>
+        internal Suppression Suppressed { get; init; }
         public IReadOnlyList<MonsterUnit> Monsters => Room.Monsters;
         public List<TowerPetUnit> Pets { get; } = new();
         public HashSet<int> DeadPetIds { get; } = new();
@@ -124,6 +130,8 @@ public sealed class TowerService
 
     /// <summary>After a committed floor clear is applied to the session (achievement 101014); listeners post their work.</summary>
     public List<Action<GameSession>> FloorCleared { get; } = new();
+    /// <summary>After a floor attempt's 32802 result, won or lost (quest targets 101007 / 101010); listeners post.</summary>
+    public List<Action<GameSession, bool>> Settled { get; } = new();
     private Task SyncAsync(GameSession s) => CharacterService.SyncAsync(s, TowerSync, s.Tower!.Clone());
     private async Task SaveAsync(GameSession s, DBClimTower next)
     {
@@ -311,11 +319,13 @@ public sealed class TowerService
         bool nextFloor = GameData.Int(floor!.Value, "_iFloor") == Cleared(s) + 1;
         long challengeMs = nextFloor ? s.Tower!.ChallengeTime : 0;
         var now = clock.GetUtcNow();
+        int hpRatio = DifficultyRatio(floor.Value, 1011, challengeMs, now);
         var attempt = new Attempt
         {
             Room = room, Floor = floor.Value, Spawns = spawns!, PlayBook = seasons.PlayBook, SeasonId = seasons.SeasonId,
-            HpRatio = DifficultyRatio(floor.Value, 1011, challengeMs, now),
+            HpRatio = hpRatio,
             DamageRatio = DifficultyRatio(floor.Value, 215, challengeMs, now),
+            Suppressed = Suppress(s, floor.Value, hpRatio),
         };
         if (!await instances.EnterAsync(room, s, reason: 4)) return;
         s.TowerAttempt = attempt;
@@ -381,6 +391,12 @@ public sealed class TowerService
         var monster = await instances.SpawnAsync(a.Room, spawn.NpcId, spawn.Point, a.HpRatio, a.DamageRatio);
         if (monster == null) { await SettleAsync(s, a, false); return; }
         if (!Active(s, a)) return; // A close may finish while the actor's AOI publication awaits a viewer.
+        if (a.Suppressed.Buff > 0)
+        {
+            suppressed.AddOrUpdate(monster, new StrongBox<Suppression>(a.Suppressed));
+            await buffs.AddPermanentAsync(monster, a.Suppressed.Buff, monster.Uid);
+            if (!Active(s, a)) return;
+        }
         // Tower opponents engage the challenger at their scheduled spawn (inferred); shared AI/skills execute combat.
         monsters.Engage(monster, s);
     }
@@ -549,6 +565,10 @@ public sealed class TowerService
             foreach (var handler in character.StateChanged) handler(s);
         }
         log.LogInformation("{Name} tower floor {Floor}: {Won}, {Duration}s", s.Role!.Name, floor, won, duration);
+        if (result == 0)
+            foreach (var handler in Settled)
+                try { handler(s, won); }
+                catch (Exception e) { log.LogError(e, "Tower settlement hook failed for {Role}", s.Role.Id); }
     }
 
     /// <summary>Inclusive bounded range of actual catalog floor numbers, including genuine uncleared records.</summary>

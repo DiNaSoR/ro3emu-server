@@ -9,8 +9,11 @@ using Ro3Emu.Server.Economy;
 namespace Ro3Emu.Server.Game;
 
 /// <summary>
-/// To-Do rows, Dodo's ring and type-7 liveness boxes. Quest progress and its item-5 awards
-/// remain owned by TaskService. This service mirrors accepted deliveries in 5004; it never pays _iPerTaskPoint.
+/// To-Do rows, Dodo's ring and type-7 liveness boxes, plus the permanent wardrobe, Codex and
+/// Survivor Battle, Become Stronger and Season Treasure stage rewards (types 3, 4, 6, 1, 8) the client claims through the
+/// same 31178/31175 and 5059 list (StageError).
+/// Quest progress and its item-5 awards remain owned by TaskService. This service mirrors accepted deliveries in 5004;
+/// it never pays _iPerTaskPoint.
 /// Reset code 5 = server-local daily 05:00, 105 = Monday 05:00 (inferred, aligned with MVP reset).
 /// Inferred integration: an accepted tracking quest delivery advances its row and reissues that quest until
 /// _iCount; a box checks item-5 as a non-spending threshold. No global daily item-5 cap is inferred.
@@ -22,6 +25,7 @@ public sealed partial class DailyActivityService : IGameTicker
     public const uint ActivitySync = 5004, StageSync = 5059, RingAccept = 43504, StageGain = 31178, StageBatchGain = 31175;
     private const int Liveness = 5, RingActivity = 3302, TodoFunction = 25, RingFunction = 5902;
     private const int FashionStage = 3, LibraryStage = 4, ChickenStage = 6, TodoStage = 7, ChickenScore = 7; // GenericStageRewardsConfig._iType; item 7
+    private const int PowerStage = 1, TreasureStage = 8, PowerFunction = 48; // enum_StageRewardType BecomeStronger / SeasonTreasure
     private const int RingRuns = 1; // PublicParamConfig.RunRingTaskRefreshCount (inferred as one accept per reset).
     private static readonly int[] RingStarts = [3001, 3011, 3021];
     private readonly GameData data;
@@ -375,9 +379,14 @@ public sealed partial class DailyActivityService : IGameTicker
     /// 118 is LibraryOverviewPointID, the Collection Points of the overview's 4001..4020).</item>
     /// <item>6 Survivor Battle: DBChickenInfo.rankId at least _iLevel (UI_Sys_ChickenContentWidgetBaseCtrl.OnItemClick),
     /// where rank 1 also needs points in it (its guard on GetCurRankInfo's surplus; at rank 1 that is item 7 itself).</item>
+    /// <item>1 Become Stronger: the role's best power, max(maxHistoryPower, currentPower) of PlayerChangePower, at
+    /// least _iScore (UI_Sys_BecomeStrongerPanelModel.lua:307-350 builds iMaxHistoryPower that way and lights the rows
+    /// it reaches). (inferred) Gated by the panel's function 48 like To-Do's 25: power needs no feature to grow.</item>
+    /// <item>8 Season Treasure: the count of the row's _iItem (130401, enum_CurrencyType.SeasonTreasure) at least
+    /// _iScore (UI_Sys_Season_TreasureRewardListWidgetCtrl.lua:284 claims when iCurrentNum reaches iNum).</item>
     /// </list>
-    /// (inferred) Types 3, 4 and 6 are permanent once-only claims with no function gate: the progress already needs the
-    /// feature. A threshold not reached answers CurrencyShort for every type.
+    /// (inferred) Types 3, 4, 6 and 8 are permanent once-only claims with no function gate: the progress already needs
+    /// the feature. A threshold not reached answers CurrencyShort for every type.
     /// </summary>
     private int StageError(GameSession session, int stageId)
     {
@@ -391,10 +400,13 @@ public sealed partial class DailyActivityService : IGameTicker
             LibraryStage when item > 0 => character.CountOf(session, (int)item) >= score,
             ChickenStage when level > 0 => (session.TimedBattle?.ChickenRank ?? 1) is var rank && rank >= level
                 && (rank > 1 || character.CountOf(session, ChickenScore) > 0),
+            PowerStage => Math.Max(PowerService.Total(PowerService.History(session)), PowerService.Total(PowerService.Current(session))) >= score,
+            TreasureStage when item > 0 => character.CountOf(session, (int)item) >= score,
             _ => null
         };
         return reached == null ? ErrorCodes.RewardMissing
             : type == TodoStage && !functions.IsOpen(session, TodoFunction) ? ErrorCodes.FeatureUnavailable
+            : type == PowerStage && !functions.IsOpen(session, PowerFunction) ? ErrorCodes.FeatureUnavailable
             : session.Daily!.Claims.Contains(stageId) ? ErrorCodes.RewardClaimed
             : reached == true ? 0 : ErrorCodes.CurrencyShort;
     }

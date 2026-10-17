@@ -158,8 +158,10 @@ public sealed class AwardService(GameData data)
                 && !jobs.EnumerateArray().Any(j => GameData.Number(j) == progress.Career)) continue;
             if (row.TryGetProperty("_iJobLimit", out jobs) && jobs.ValueKind == JsonValueKind.Object && jobs.EnumerateObject().Any())
                 throw Fail($"DropGroupConfig {groupId} has unresolved job filter");
+            // DropAttenuationConfig scales by the player/monster level gap; an award has no slain monster, so a row
+            // with _iAttenuationPlanID drops in full (DropAttenuation, inferred).
             if (GameData.Int(row, "_iQuestLimit") != 0 || GameData.Int(row, "_iActivityid") != 0
-                || GameData.Int(row, "_iAttenuationPlanID") != 0 || GameData.Int(row, "_kCoefficient") != 0
+                || GameData.Int(row, "_kCoefficient") != 0
                 || GameData.Int(row, "_iBind") != 0 || HasValues(row, "_kServerLevel"))
                 throw Fail($"DropGroupConfig {groupId} has unresolved eligibility or bind policy");
             int bind = PoolBindType(row, groupId);

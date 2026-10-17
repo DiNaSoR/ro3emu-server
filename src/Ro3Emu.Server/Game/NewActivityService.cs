@@ -77,6 +77,28 @@ public sealed partial class NewActivityService
         character.ProgressHandlers.Add(s => { QueueRefresh(s); return Task.CompletedTask; });
         defense.Changed = s => { InvalidateProjection(s); return Task.CompletedTask; };
         seasons.ScheduleChanged.Add(InvalidateAllSchedules);
+        tasks.OpenActivityTaskGroups = OpenTaskGroups;
+    }
+
+    /// <summary>TimeLimitConfig 18 "refreshTaskDaily" (_iTimeLimitId 1013): a _kTaskRenew group renewed every game day.</summary>
+    private const long DailyTaskRefresh = 1013;
+
+    /// <summary>The (type, sonType) task groups (_kTaskRenew [refresh, type, sonType, ?]) of the session's open activities, whose
+    /// tasks the client lists in their panels, and whether the group renews daily (TaskService.ActivityTasks.cs).</summary>
+    private IReadOnlyDictionary<(int Type, int Son), bool> OpenTaskGroups(GameSession session)
+    {
+        var groups = new Dictionary<(int Type, int Son), bool>();
+        if (!session.ActivitiesReady) return groups;
+        foreach (var row in Definitions)
+        {
+            if (!row.TryGetProperty("_kTaskRenew", out var renew) || renew.ValueKind != JsonValueKind.Array || renew.GetArrayLength() == 0
+                || ActivityError(session, GameData.Int(row, "_iID")) != 0) continue;
+            foreach (var entry in renew.EnumerateArray())
+                if (entry.ValueKind == JsonValueKind.Array && entry.GetArrayLength() >= 3)
+                    groups[((int)(GameData.Number(entry[1]) ?? 0), (int)(GameData.Number(entry[2]) ?? 0))] =
+                        GameData.Number(entry[0]) == DailyTaskRefresh;
+        }
+        return groups;
     }
 
     private IEnumerable<JsonElement> Definitions => data.Table("NewActivityConfig").Values;
@@ -160,6 +182,7 @@ public sealed partial class NewActivityService
             await SyncAsync(session);
             if (!deadlines.IsCurrent(session, lease)) return;
             session.ActivitiesReady = true;
+            tasks.OnStateChanged(session); // the open activities' quests (TaskService.ActivityTasks.cs)
             ScheduleDeadline(session);
             PassEvent(session, []); // the day played, and any daily activity earned while the pass was not watching
         }

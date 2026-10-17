@@ -243,8 +243,9 @@ public sealed class RankService(GameData data, AccountStore accounts, GuildServi
                 }.ToByteArray()));
             }
             // Hero Registry (UI_Sys_RankCopyMainPanel): ranked by the role's displayed power, normalPower +
-            // seasonPower (spec-power-score.md §0); this server's PowerUnit is the Soul Echo season power only.
-            long power = emblems.StoredPower(role.Emblems, items);
+            // seasonPower: the total PowerService last published and saved with the Soul Echo
+            // state. A role that never logged in since has only its Soul Echo plan to rank by.
+            long power = PowerService.StoredTotal(role.Emblems) ?? emblems.StoredPower(role.Emblems, items);
             if (power > 0)
             {
                 Add(HeroAll, new Candidate(role.Id, power, 0, 0, 0, () => []));

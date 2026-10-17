@@ -46,7 +46,8 @@ public sealed partial class CharacterService
         var raw = new Dictionary<int, double>();
         void Add(long id, double v) => raw[(int)id] = raw.GetValueOrDefault((int)id) + v;
 
-        if (MatchAttributes?.Invoke(session) is { } matchAttributes)
+        var matchAttributes = MatchAttributes?.Invoke(session);
+        if (matchAttributes != null)
         {
             // A Survivor Battle career replaces the character's own build for the match (TimedBattleService.Chicken):
             // EatChickenGameCareer._iJobAttr and the worn match equipment, plus the buffs of the match.
@@ -60,6 +61,7 @@ public sealed partial class CharacterService
         if (!raw.ContainsKey(BaseAspd)) raw[BaseAspd] = 100;
 
         var sheet = EquipmentStunts.ApplyConversions(session, raw, data);
+        if (matchAttributes == null) sheet = EmblemService.ApplyResonanceConversions(session, raw, sheet, data);
         long maxHp = sheet[MaxHp], maxSp = sheet[MaxSp];
         sheet[Hp] = Math.Clamp(session.CurrentHp ?? maxHp, 0, maxHp);
         sheet[Sp] = Math.Clamp(session.CurrentSp ?? maxSp, 0, maxSp);

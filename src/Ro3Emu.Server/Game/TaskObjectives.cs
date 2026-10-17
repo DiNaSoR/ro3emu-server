@@ -86,6 +86,60 @@ public sealed partial class TaskService
         TPetSupport = 306003, TTotemQuality = 103035, TTotemSkills = 315002, TTotemMaxed = 315003, TTotemCombine = 315004,
         TEchoQuality = 103036, TEchoLevel = 316001, TEchoResonance = 316002, TEnchants = 302003;
 
+    // Growth emblem titles 3-6 (NewbieTitlesConfig 703990-706990) and the targets of the same owners elsewhere. R per
+    // LC_ConditionDefine.m_kGetDesFunctionGroup (LC_InteractCondition.lua); unregistered ids use GetDefaultDes, R = p2.
+    // - 302005 EquipSpecialSkillCount [p2, p3, p4, n] (705060 [302005,1,0,0,3]): R = p5 (GetEquipSpecialSkillCountDes,
+    //   :5203-5221). ProgressConfig "Equip ${1} pieces of gear with Stunts" (zh 穿戴装备特技数量达到${1}件): worn gear pieces
+    //   carrying at least p2 Stunts (EquipmentAffixes.Specials). p3/p4 have no recovered meaning; only 0 is supported (inferred).
+    // - 306004 [lv] "Reach Pet Hatching Room Lv. ${1}" (zh 炼金房等级达到${1}级): DBPetInfo.incubationLv.
+    // - 106602 CheckTenBOSSWin [n, boss...] "Challenge and win a five-player dungeon ${1} times": R = p2 (:1359-1379); the
+    //   trailing ids are TenGameplayBossConfig._iBoss (the TenGameplay boss of a Phantom Realm / Realm of the Gods run). One
+    //   per committed successful clear of a listed boss (DungeonService.MultiBossCleared). Guild co-op (type 16) and
+    //   Adventure Party (type 23) quests say "with at least @{1} other members": they count only when another member of
+    //   the role's guild / adventure group cleared the same run (inferred).
+    // - 106802 [n] "Participate in Treasure Hunting ${1} times" (zh 参与${1}次挖宝): one per committed dig at the Treasure
+    //   Map's point (NewActivityService.CompleteTreasureHuntAsync); using the map alone is not a dig (inferred).
+    // - 210012 [n] "Participate in Battle of Dragon Coffin Island or Survivor Battle" and 210009 [n] "Participate in Battle
+    //   of Dragon Coffin Island": one per settled match of MatchConfig 2 / 6, like 106509 (TimedBattleService settlement).
+    // - 106603 CheckGuildLeagueJoin [stage, n]: R = p3 (:1315-1335). One per committed Guild League match the role fought
+    //   in; stage 1/2/3 are the preliminaries/semifinals/finals (500040-500042, GuildLeagueCalendar rounds), 0 any (706050).
+    // - 103014 CheckGVEJoinCnt [n] "Participate in the Guild Event: Ilmatar, God of Nature" (706070, 1602090, 1603000): the
+    //   guild GVE this client runs is Ilmata (GuildChallengeService; the client's GuildGVE/GVEWhaleRally, its result panel
+    //   is UI_Sys_GVE_VictoryNewPanelCtrl). The classic GVE (GVEconfig, sc_GVE_MonsterDragon) has no server here. One per
+    //   settled Ilmata stage attempt the member was present for, won or lost (participation, inferred).
+    private const int TStunts = 302005, TPetRoom = 306004, TTenBossWin = 106602, TTreasureDig = 106802,
+        TCoffinOrSurvivor = 210012, TDragonCoffin = 210009, TLeagueJoin = 106603, TGveJoin = 103014;
+
+    // Everyday state and activity targets (default formatter, R = p2, unless said otherwise).
+    // - 104007 CheckJoinGuild [1] (side quest 10200080): in a guild now.
+    // - 103019 CheckFriend [n] "Have ${1} friends" (side quest 10200090): the friend list's size (FriendService relation,
+    //   read through SocialOwnerCache after login and every relation change).
+    // - 317001 CheckEmblemSetUpLv [n] "Raise all equipped Echoes to Lv. @{1}" (zh 全身残响等级达到${1}): the summed level of the
+    //   worn Soul Echoes; five slots of at most Lv. 20 (EmblemLvConfig) make the quests' 100 the full set.
+    // - 317002 CheckEmblemUpgrade [n] "Enhance Echoes by a total of @{1} levels": levels gained by committed 82424 upgrades.
+    // - 101007 CheckFinishPetFloor [n] "Participate in the Tower Climb ${1} times" / 101010 CheckWinPetFloor [n]: one per
+    //   settled Spirit Tower floor attempt / per won one (TowerService.Settled); an abandoned attempt is neither.
+    // - 104008 CheckPetFloor [n] "Clear Floor ${1} of the Tower Challenge": the highest cleared floor, as 101014.
+    // - 106902 CheckPersonalHomepageLike [n]: one per committed 82554 like.
+    // - 101009 CheckActivation [n] "Reach ${1} Activity": today's activity points (currency 5).
+    // - 106018 [n] "Participate in the Guild Bonfire at least ${1} times": one per event day the member is in the guild
+    //   home while the Bonfire Party runs (GuildCampfireService.Joined, inferred).
+    // - 106019 [stage, points, n] "Earn more than ${1} points in the Guild League ${2} times" (1602010-1602030,
+    //   1603040-1603042): stage 0/1/2 = round 1/2/3; one per match whose personal score is above p3. The default formatter
+    //   would make R = p2, the stage (0 for the preliminaries); R = p4, the ${2} of the text (inferred).
+    // - 106611 [points, n] "Reach ${1} personal points in Siege War ${2} times" (1602040): one per settled siege whose
+    //   personal score reaches p2; R = p3, the ${2} of the text (inferred, the default formatter would show p2).
+    private const int TJoinGuild = 104007, TFriends = 103019, TEchoLevelSum = 317001, TEchoUpgrade = 317002,
+        TTowerJoin = 101007, TTowerWin = 101010, TTowerFloorReached = 104008, TLike = 106902, TLiveness = 101009,
+        TCampfire = 106018, TLeagueScore = 106019, TSiegeScore = 106611;
+
+    // Season activity tasks (TaskConfig type 13, TaskService.ActivityTasks.cs), R = p2:
+    // - 106605 CheckGVGJoin [n] "Participate in ${1} War of Emperium matches" / 106606 CheckGVGWin [n] "Win ${1} Siege
+    //   Battles" (LC_InteractCondition.lua:1403-1445): one per settled siege the role was loaded into / its guild won.
+    // - 106801 [n] "Log in ${1} times" (110007, Lost Treasure): one per login while the quest runs; the login that
+    //   accepts it counts as the first (inferred).
+    private const int TGvgJoin = 106605, TGvgWin = 106606, TLogin = 106801;
+
     private readonly ConditionalWeakTable<MonsterUnit, HashSet<long>> _participants = new();
     private readonly HashSet<GameSession> _refreshQueued = new();
 
@@ -103,10 +157,19 @@ public sealed partial class TaskService
     private long Required(GameSession? session, long[] t) => t switch
     {
         [TDialog, _, _, _] or [TArea, _, _] or [TJobChange, _] or [TTaskDone, _] or [TJobRank, _] or [TAreaAction, _, _, _]
-            or [TGuide, _] or [TPydDownload, 1] or [TRentCareerSpecial, _] or [TValhallaLayer, _] or [TPetCamp, 0] => 1,
+            or [TGuide, _] or [TPydDownload, 1] or [TRentCareerSpecial, _] or [TValhallaLayer, _] or [TPetCamp, 0]
+            or [TJoinGuild, 1] => 1,
         [TPlot or TBaseLevel or TSkillPoints or TStatPoints or TResonance or TTotalRefine or TRefineSlots
             or TRefineCount or TMvp or TMvpOnce or TCargo or TAfkSeconds or TTimedBattle or TCaravan
-            or TTalentLevels or TPetsDeployed or TTowerFloor or TGuildHunt or TDraculaWedding or TPetSupport, var n] => n,
+            or TTalentLevels or TPetsDeployed or TTowerFloor or TGuildHunt or TDraculaWedding or TPetSupport
+            or TPetRoom or TTreasureDig or TCoffinOrSurvivor or TDragonCoffin or TGveJoin or TFriends or TEchoLevelSum
+            or TEchoUpgrade or TTowerJoin or TTowerWin or TTowerFloorReached or TLike or TLiveness or TCampfire
+            or TGvgJoin or TGvgWin or TLogin, var n] => n,
+        [TTenBossWin, var n, _, ..] => n,
+        [TLeagueJoin, _, var n] => n,
+        [TLeagueScore, _, _, var n] => n,
+        [TSiegeScore, _, var n] => n,
+        [TStunts, _, _, _, var n] => n,
         [TPetQualityStar, _, _, var n] => n,
         [TPetQuality or TPetLevel or TTotemQuality or TTotemSkills or TTotemMaxed or TTotemCombine or TEchoQuality
             or TEchoLevel or TEchoResonance or TEnchants, _, var n] => n,
@@ -149,14 +212,24 @@ public sealed partial class TaskService
             TJobChange => data.Row("JobConfig", t[1]) != null,
             TTaskDone => Defs().ContainsKey(t[1]),
             TGuide => GuideExists(t[1]),
-            TSlotRefine or TStrength => t[1] is >= 1 and <= 7,
+            TStrength => t[1] is >= 1 and <= 7,
+            TSlotRefine => t[1] is >= 0 and <= 7,
             TEquipment => t[1] >= 0 && t[2] >= 0,
             TCraft => t[1] >= 0 && t[2] > 0 && t[4] is >= 0 and <= 10,
             TValhallaLayer => data.Row("HeroicSpiritLayerConfig", t[1]) != null,
             TMonsterHunt => data.Row("AreaConcurConfig", t[1]) != null,
+            TStunts => t[1] >= 1 && t[2] == 0 && t[3] == 0,
+            TTenBossWin => t[2..].All(boss => data.Row("TenGameplayBossConfig", boss) != null),
+            TLeagueJoin => t[1] is >= 0 and <= 3,
+            TLeagueScore => t[1] is >= 0 and <= 2 && t[2] >= 0,
+            TSiegeScore => t[1] >= 0,
             _ => true, // Only the explicit formatter cases above can reach here.
         };
     }
+
+    /// <summary>Every target of the quest has a supported reader and a positive R (a quest without one never ends).</summary>
+    internal bool TargetsSupported(long taskId) => Defs().TryGetValue(taskId, out var def) && def.Targets.Length > 0
+        && def.Targets.All(t => Supported(t) && Required(null, t) > 0);
 
     private bool ItemExists(long id) => id > 0 && id <= int.MaxValue && data.Row("ItemConfig", id) != null;
 
@@ -205,12 +278,14 @@ public sealed partial class TaskService
             TResonance => character.Resonance(s, "RefiningEffectTable"),
             TTotalRefine => Enumerable.Range(1, 7).Sum(g => (long)s.EquipLevels.Refine.GetValueOrDefault(g)),
             TRefineSlots => Enumerable.Range(1, 7).LongCount(g => s.EquipLevels.Refine.GetValueOrDefault(g) > 0),
-            TSlotRefine => s.EquipLevels.Refine.GetValueOrDefault((int)t[1]),
+            // Slot 0 is "all equipment slots" (growth titles 4/5, 704060 [103021,0,2]): the lowest of grids 1..7 (inferred).
+            TSlotRefine => t[1] == 0 ? Enumerable.Range(1, 7).Min(g => (long)s.EquipLevels.Refine.GetValueOrDefault(g))
+                : s.EquipLevels.Refine.GetValueOrDefault((int)t[1]),
             // The active plan's purchased talent levels (the Battle Oath is its own track).
             TTalentLevels => s.SeasonTalent is { } talent && talent.Plan.TryGetValue(talent.CurPlanId, out var plan)
                 ? plan.TalentNodes.Values.Sum(n => n.CurrentLevel) : 0,
             TPetsDeployed => s.Pets?.SetupPlans.GetValueOrDefault(s.Pets.CurrentPlan)?.SetUpPets.Values.LongCount(id => id != 0) ?? 0,
-            TTowerFloor => s.Tower is { LayerConfID: > 0 } tower && data.Table("PetFloorConfig").Values
+            TTowerFloor or TTowerFloorReached => s.Tower is { LayerConfID: > 0 } tower && data.Table("PetFloorConfig").Values
                 .FirstOrDefault(r => GameData.Int(r, "_iID") == tower.LayerConfID) is { ValueKind: JsonValueKind.Object } floor
                 ? GameData.Int(floor, "_iFloor") : 0,
             TStrength => s.EquipLevels.Strength.GetValueOrDefault((int)t[1]),
@@ -236,6 +311,14 @@ public sealed partial class TaskService
             TEchoResonance => EmblemService.Resonances(s, data).Values.LongCount(stage => stage >= t[1]),
             TEnchants => s.Items.Where(i => i.Grid > 0 && ItemQuality(i.Entry) >= t[1]
                 && data.Row("ItemConfig", i.Entry) is { } row && GameData.Int(row, "_iType") == 5).Sum(i => (long)i.Enchantments.Count),
+            TStunts => s.Items.LongCount(i => i.Grid > 0 && data.Row("ItemConfig", i.Entry) is { } row
+                && GameData.Int(row, "_iType") == 5 && EquipmentAffixes.Specials(i).LongCount() >= t[1]),
+            TPetRoom => s.Pets?.IncubationLv ?? -1,
+            // Guild membership and the friend list load after the quests at login: keep the stored value until then.
+            TJoinGuild => s.Guild == null ? -1 : s.Guild.GuildId != 0 ? 1 : 0,
+            TFriends => FriendCount(s),
+            TEchoLevelSum => EmblemService.Worn(s).Sum(i => i.Attrs?.GetValueOrDefault(1001) ?? 0),
+            TLiveness => character.CountOf(s, 5),
             _ => -1,
         };
     }

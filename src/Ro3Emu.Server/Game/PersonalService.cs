@@ -322,6 +322,9 @@ public sealed class PersonalService
     /// client's PersonalLikeCD between two likes, checked again here (inferred). No daily reset: nothing in the client
     /// re-arms a like. The liked role gets no notice; its card shows the count and Like History (UserDataService).
     /// </summary>
+    /// <summary>After a committed like (quest target 106902); listeners post their work.</summary>
+    public List<Action<GameSession>> Upvoted { get; } = new();
+
     public async Task UpvoteAsync(GameSession s, UpvotePersonalReq req)
     {
         using var held = await CharacterService.Lock(s);
@@ -347,6 +350,7 @@ public sealed class PersonalService
         }
         await s.SendGameAsync(Upvote, new UpvotePersonalResp { Result = result, Req = req });
         if (result == 0) await SyncAsync(s);
+        if (result == 0) foreach (var handler in Upvoted) handler(s);
     }
 
     /// <summary>The likes a card received (liker id to unix ms), as stored; null when none.</summary>
