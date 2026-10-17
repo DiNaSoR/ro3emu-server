@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using UnityEngine;
 
 namespace Ro3Emu.ClientHooks
@@ -13,6 +14,7 @@ namespace Ro3Emu.ClientHooks
     ///   audio stopall           stops every playing sound
     ///   audio listen [m]        moves the listener m metres (default 1.5) above the player; "listen 0" undoes it
     ///   audio anim              the animation sound events (footsteps, swings) of the player's and two other models
+    ///   audio rawdata [file...] copies the named animation data files (as the game loads them) to ro3emu/dump
     /// The game puts the Wwise listener exactly on the local player, so the player's own sounds play at distance 0;
     /// "near" and "listen" tell whether that is what silences them.
     /// </summary>
@@ -56,6 +58,9 @@ namespace Ro3Emu.ClientHooks
                     break;
                 case "anim":
                     Anim();
+                    break;
+                case "rawdata":
+                    RawData(parts);
                     break;
                 default:
                     Debug.Log("[Ro3Emu.Diag] audio: unknown subcommand " + sub + " (audio | audio play [event] | audio near [event] [m] | audio listen [m])");
@@ -210,6 +215,27 @@ namespace Ro3Emu.ClientHooks
                 sb.Append("\n    states with sounds: ").Append(withAudio);
             }
             Step(sb.ToString());
+        }
+
+        private static readonly string[] DefaultRawData =
+        {
+            "model_body_magician_f_stateadditionaldata.bytes", "model_body_novice_m_stateadditionaldata.bytes",
+            "model_monsterjunior_pupalow_stateadditionaldata.bytes",
+        };
+
+        private static void RawData(string[] parts)
+        {
+            var names = parts.Length > 1 ? parts.Skip(1).ToArray() : DefaultRawData;
+            string dir = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(Application.dataPath), "ro3emu", "dump");
+            System.IO.Directory.CreateDirectory(dir);
+            foreach (var name in names)
+            {
+                byte[] bytes = RD_RenderSetting.m_kResourceLoder?.LoadUserData(name);
+                if (bytes == null) { Step("rawdata " + name + ": not found"); continue; }
+                string file = System.IO.Path.Combine(dir, name);
+                System.IO.File.WriteAllBytes(file, bytes);
+                Step("rawdata " + name + ": " + bytes.Length + " bytes -> " + file);
+            }
         }
 
         private static void Listen(float metres)
