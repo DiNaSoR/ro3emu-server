@@ -96,6 +96,12 @@ public sealed class ServerOptions
     /// <summary>Server rates for monster kill rewards (RewardService, docs/guide/rates.md). 1 keeps the client's tables.</summary>
     public RatesOptions Rates { get; set; } = new();
 
+    /// <summary>
+    /// (inferred) A new character starts with the kit's Novice Dagger and Cotton Shirt worn instead of in the bag; the
+    /// client never points a new player at the bag. false keeps both in the bag.
+    /// </summary>
+    public bool WearStarterGear { get; set; } = true;
+
     /// <summary>(inferred) Locally configured text blocklist; the original service's sensitive-word dictionary is unavailable.</summary>
     public string[] GuildBlockedWords { get; set; } = [];
 

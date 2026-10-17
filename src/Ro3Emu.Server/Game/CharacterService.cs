@@ -15,7 +15,7 @@ namespace Ro3Emu.Server.Game;
 /// requests that change them. Numbers come from the client's own tables (AttriBaseLvConfig, AttributeConversionConfig,
 /// BaseLvConfig, JobLvConfig, BasePointConfig, EquipConfig).
 /// </summary>
-public sealed partial class CharacterService(RoleStore roles, ItemStore itemStore, GameData data, World world, ILogger<CharacterService> log)
+public sealed partial class CharacterService(RoleStore roles, ItemStore itemStore, GameData data, World world, Microsoft.Extensions.Options.IOptions<ServerOptions> options, ILogger<CharacterService> log)
 {
     public const uint RoleBaseInfoSync = 5066;
     public const uint BaseAttrSync = 5067;
@@ -67,7 +67,7 @@ public sealed partial class CharacterService(RoleStore roles, ItemStore itemStor
     private static readonly int[] SelfProperties = [1, 2, 3, 4, 5, 6, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, Hp, Sp, Lv];
     private static readonly int[] AoiProperties = [MaxHp, Hp, MaxSp, Sp, Speed, Lv, 2003];
 
-    /// <summary>What a new character finds in the bag: Beginner Potions, a Novice Dagger, a Cotton Shirt, some Zeny.</summary>
+    /// <summary>What a new character starts with: Beginner Potions, a Novice Dagger and a Cotton Shirt (worn), some Zeny.</summary>
     private static readonly (int Entry, int Count)[] StarterKit = [(1000000, 20), (2010121, 1), (2550120, 1), (ZenyId, 1000)];
 
     // ---- helpers ----

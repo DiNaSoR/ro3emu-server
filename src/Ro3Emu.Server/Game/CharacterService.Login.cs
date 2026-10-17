@@ -67,8 +67,9 @@ public sealed partial class CharacterService
             var gained = new List<(int Entry, int Count)>();
             foreach (var (entry, count) in StarterKit)
             {
-                AddItemCore(session, entry, count, out bool currency, persist: false, notifyItemGained: false);
+                var added = AddItemCore(session, entry, count, out bool currency, persist: false, notifyItemGained: false);
                 if (!currency) gained.Add((entry, count));
+                foreach (var item in added) WearStarterGear(session, item);
             }
             progress.StarterKit = true;
             var tx = roles.NewTransaction();
@@ -79,10 +80,25 @@ public sealed partial class CharacterService
             {
                 var guids = (long[])receipts[receipt]!;
                 for (int i = 0; i < items.Count; i++) items[i].Guid = guids[i];
+                RememberEquipment(session);
             });
+            // The plan holds GUIDs, known only now; a lost write is redone by the next login's RememberEquipment.
+            if (items.Any(i => i.Grid > 0)) roles.SaveEquipPlans(role.Id, session.EquipmentPlans.ToByteArray());
             foreach (var (entry, count) in gained) foreach (var handler in ItemGained) handler(session, entry, count);
             Refresh(session);
         }
+    }
+
+    /// <summary>
+    /// (inferred) The kit's weapon and shirt start worn (<see cref="ServerOptions.WearStarterGear"/>): the client never
+    /// points a new player at the bag. A grid already in use (never on a new role) keeps its item.
+    /// </summary>
+    private void WearStarterGear(GameSession session, InvItem item)
+    {
+        if (!options.Value.WearStarterGear || item.Grid != 0 || !IsEquipment(item.Entry) || !IsAppraised(item)) return;
+        var grids = GridsFor(PartOf(item.Entry));
+        if (grids.Length == 0 || session.Items.Any(i => i.Grid == grids[0] && i.Pack == item.Pack)) return;
+        item.Grid = grids[0];
     }
 
     /// <summary>
