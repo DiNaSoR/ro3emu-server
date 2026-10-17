@@ -166,6 +166,8 @@ public sealed class KillEconomyTests : IAsyncLifetime
         Assert.Equal(3, player.Progress.JobLevel); Assert.Equal(2, player.Progress.JobExp); // novice levels 1 and 2 each consume 1 EXP
         Assert.Equal(23, player.Items.Single(i => i.Entry == 1000000).Stack);
         Assert.Single(player.Items, i => i.Entry == 2010121); // starter weapon, generated loot decomposed
+        var decomposedRow = Assert.Single(packet.Rewards, r => r.ItemEntry == 2010121);
+        Assert.Equal(0, decomposedRow.ItemGuid); Assert.Equal(1, decomposedRow.Stack); // gone from the bag: no quick-equip row
         Assert.Equal(1, ReceiptCount());
         var closing = Cut(); var ledger = S3EconomyReader.ReadLedger(directory, Catalog.Value, opening, closing)!;
         var check = EconomyExactnessChecker.Check(opening, closing, ledger);
@@ -174,6 +176,27 @@ public sealed class KillEconomyTests : IAsyncLifetime
         Assert.Equal(monster.RewardSource!.Key, Assert.Single(ledger.Receipts).SourceKeys!.Single());
         var newSpawn = Monster(); await OnLoop(() => Reward(player, newSpawn));
         Assert.NotEqual(monster.RewardSource, newSpawn.RewardSource); Assert.Equal(2, ReceiptCount());
+    }
+
+    [ClientDataFact]
+    public async Task DroppedEquipmentRowCarriesTheBagInstanceForTheQuickEquipPrompt()
+    {
+        await using var bot = await Enter(); var player = Session;
+        await OnLoop(() => { Service<CharacterService>().AutoDecomposeReturns = null; return Task.CompletedTask; });
+        var before = player.Items.Where(i => i.Entry == 2010121).Select(i => i.Guid).ToHashSet();
+        await OnLoop(() => Reward(player, Monster()));
+        var packet = GetRewardNotify.Parser.ParseFrom((await bot.Inbox.WaitAsync(e => e.IsGame(CharacterService.GetRewardNotify)
+            && GetRewardNotify.Parser.ParseFrom(e.Body).RewardType.Contains(8), TimeSpan.FromSeconds(10))).Body);
+        var dropped = Assert.Single(player.Items, i => i.Entry == 2010121 && !before.Contains(i.Guid));
+        var row = Assert.Single(packet.Rewards, r => r.ItemEntry == 2010121);
+        // LC_EquipmentHelper.CanFastEquip reads the row itself: its GUID, appraised flag (3) and score (2).
+        Assert.Equal(dropped.Guid, row.ItemGuid);
+        Assert.Equal(1, row.Stack);
+        Assert.Equal(1, row.ItemInfos[3].LongVal);
+        Assert.True(row.ItemInfos.ContainsKey(2));
+        Assert.Equal(0, row.ItemInfos[10001].LongVal);
+        var other = Assert.Single(packet.Rewards, r => r.ItemEntry == 1000000);
+        Assert.Equal(0, other.ItemGuid); Assert.Equal(3, other.Stack);
     }
 
     [ClientDataFact]
