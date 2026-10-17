@@ -38,6 +38,9 @@ namespace Ro3Emu.ClientHooks
                         foreach (var name in (parts.Length > 1 ? parts[1] : "").Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries))
                             SpritePng(name);
                         break;
+                    case "hitch":
+                        HitchProfiler.Run(parts.Length > 1 ? parts[1] : "");
+                        break;
                     case "audio":
                         AudioDiagnostics.Run(parts.Length > 1 ? parts[1] : "");
                         break;
