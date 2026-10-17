@@ -250,7 +250,16 @@ namespace Ro3Emu.ClientHooks
         public delegate object Sound3DMethod(object self, object id, object go, object a3, object a4, object a5, object a6);
         private static readonly Sound3DMethod Sound3DWrapper = Sound3D;
         private static Obf_R.Obf_ff _wwiseTable;
-        private static Obf_R.Obf_Ef _sound3DOriginal;
+        private static Obf_R.Obf_Ef _sound3DOriginal, _stop3DOriginal;
+        public delegate void Stop3DMethod(object self, object id, object go);
+        private static readonly Stop3DMethod Stop3DWrapper = Stop3D;
+
+        private static void Stop3D(object self, object id, object go)
+        {
+            Transform t = go as Transform ?? (go as GameObject)?.transform ?? (go as Component)?.transform;
+            Step("stop3d " + id + " on " + (t != null ? t.name : go == null ? "nil" : go.GetType().Name));
+            _stop3DOriginal?.Obf_HuA(self, id, go);
+        }
 
         private static string _lastState;
         private static bool _watch;
@@ -282,11 +291,15 @@ namespace Ro3Emu.ClientHooks
                 if (_sound3DOriginal == null) { Step("sound trace: PlaySound3D not found"); return; }
                 _wwiseTable = table;
                 table.Obf_luA<string, Sound3DMethod>("PlaySound3D", Sound3DWrapper);
+                _stop3DOriginal = table.Obf_RuA<Obf_R.Obf_Ef>("StopSound3D");
+                if (_stop3DOriginal != null) table.Obf_luA<string, Stop3DMethod>("StopSound3D", Stop3DWrapper);
                 Step("sound trace on");
             }
             else if (!on && _sound3DOriginal != null)
             {
                 _wwiseTable.Obf_luA<string, Obf_R.Obf_Ef>("PlaySound3D", _sound3DOriginal);
+                if (_stop3DOriginal != null) _wwiseTable.Obf_luA<string, Obf_R.Obf_Ef>("StopSound3D", _stop3DOriginal);
+                _stop3DOriginal = null;
                 _sound3DOriginal = null;
                 Step("sound trace off");
             }
