@@ -35,6 +35,9 @@ public sealed partial class TaskService
 
     private const int ReceiveAuto = 1, ReceiveNpc = 2, ReceiveUi = 3; // enum_TaskReceiveType / enum_TaskRewardType
 
+    // enum_TaskType (Lua_GameDefine): Side quests carry the blue [Side Quest] tag, Guide quests the green [Guide] tag.
+    private const int TypeSide = 2, TypeGuide = 3;
+
     /// <summary>The main story root, accepted when a character is created (no _kPreTask).</summary>
     public const long FirstTask = 10101010;
 
@@ -60,6 +63,7 @@ public sealed partial class TaskService
     private readonly TimeProvider clock;
     private Dictionary<long, TaskDef>? _defs;
     private Dictionary<long, List<long>>? _children;
+    private List<long>? _conditionRoots;
 
     public Func<GameSession, Task>? BeforeProgress { get; set; }
     internal Func<GameSession, Task>? AfterLoginSettlementForTest { get; set; }
@@ -643,6 +647,15 @@ public sealed partial class TaskService
                 accepted++;
             }
         }
+        // Side and Guide quests with no _kPreTask are gated only by _iCondition (e.g. "Join a guild", [1002, 21] =
+        // base level 21). Nothing delivers into them, so they are offered here once the condition holds.
+        foreach (long root in _conditionRoots!)
+        {
+            var def = defs[root];
+            if (Active(session, root) || IsDelivered(session, root) || !Ready(session, def)) continue;
+            Accept(session, root);
+            accepted++;
+        }
         return accepted + AcceptGrowthTitle(session) + AcceptGrowthClass(session) + AcceptActivityTasks(session);
     }
 
@@ -732,6 +745,9 @@ public sealed partial class TaskService
             foreach (var pre in def.Pre)
                 (children.TryGetValue(pre, out var list) ? list : children[pre] = new()).Add(def.Id);
         _children = children;
+        _conditionRoots = defs.Values
+            .Where(d => d.Pre.Length == 0 && d.Condition != 0 && d.Accept == ReceiveAuto && d.Type is TypeSide or TypeGuide)
+            .Select(d => d.Id).OrderBy(id => id).ToList();
         _defs = defs;
         log.LogInformation("Tasks: {Count} TaskConfig rows", defs.Count);
         return defs;
