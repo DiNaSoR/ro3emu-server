@@ -22,9 +22,6 @@ namespace Ro3Emu.ClientHooks
         private const double RecordMs = 2.0;
 
         public delegate void Dispatch(object self, object module, object notify, object param);
-        public delegate void OneArg(object a);
-        public delegate void TwoArgs(object a, object b);
-        public delegate void ThreeArgs(object a, object b, object c);
 
         private static readonly Dispatch DispatchWrapper = TimedDispatch;
         private static Obf_R.Obf_Ef _dispatch;
@@ -50,7 +47,8 @@ namespace Ro3Emu.ClientHooks
             {
                 case "on": Enable(); break;
                 case "off": Disable(); break;
-                default: Debug.Log("[Ro3Emu.Hitch] usage: !client hitch on|off (timing " + (_on ? "on" : "off") + ")"); break;
+                case "logtest": LogTest(); break;
+                default: Debug.Log("[Ro3Emu.Hitch] usage: !client hitch on|off|logtest (timing " + (_on ? "on" : "off") + ")"); break;
             }
         }
 
@@ -80,6 +78,36 @@ namespace Ro3Emu.ClientHooks
             Calls.Clear();
             Totals.Clear();
             QuestNotes.Clear();
+        }
+
+        /// <summary>What one log line costs the main thread: Unity's Debug.Log and the game's Lua_Debug.LogFormat (Lua
+        /// traceback + GS_Debug.LogFormat), each with Unity's stack trace for Log messages as set and with it off.</summary>
+        private static void LogTest()
+        {
+            var global = LuaPatches.Global();
+            var luaDebug = global?.Obf_LuA<Obf_R.Obf_ff>("package.loaded.lua_debug");
+            var logFormat = luaDebug?.Obf_RuA<Obf_R.Obf_Ef>("LogFormat");
+            object logType = global?.Obf_LuA<object>("enum_LogType.Log");
+            var saved = UnityEngine.Application.GetStackTraceLogType(UnityEngine.LogType.Log);
+            var sb = new StringBuilder("[Ro3Emu.Hitch] log test (Unity stack trace for Log: " + saved + "):");
+            foreach (var mode in new[] { saved, UnityEngine.StackTraceLogType.None })
+            {
+                UnityEngine.Application.SetStackTraceLogType(UnityEngine.LogType.Log, mode);
+                var watch = Stopwatch.StartNew();
+                for (int i = 0; i < 5; i++) Debug.Log("[Ro3Emu.Hitch] log test C# " + i);
+                double unity = watch.Elapsed.TotalMilliseconds / 5;
+                double lua = -1;
+                if (logFormat != null && logType != null)
+                {
+                    watch.Restart();
+                    for (int i = 0; i < 5; i++) logFormat.Obf_HuA(logType, true, "[Ro3Emu.Hitch] log test Lua " + i);
+                    lua = watch.Elapsed.TotalMilliseconds / 5;
+                }
+                sb.Append("\n  stack trace ").Append(mode).Append(": Debug.Log ").Append(unity.ToString("F2"))
+                  .Append(" ms, Lua_Debug.LogFormat ").Append(lua.ToString("F2")).Append(" ms per line");
+            }
+            UnityEngine.Application.SetStackTraceLogType(UnityEngine.LogType.Log, saved);
+            Debug.Log(sb.ToString());
         }
 
         /// <summary>How many quests the client holds in AllTaskInfo.TaskInfos, by status (UpdateTaskInfoEvent walks them all).</summary>
@@ -146,31 +174,28 @@ namespace Ro3Emu.ClientHooks
             Debug.Log("[Ro3Emu.Hitch] timing off");
         }
 
-        private static void WrapOne(Obf_R.Obf_ff table, string label, string name)
-        {
-            var original = table.Obf_RuA<Obf_R.Obf_Ef>(name);
-            if (original == null) return;
-            OneArg wrapper = a => Timed(label, () => original.Obf_HuA(a));
-            Wrapped.Add((table, name, original, wrapper));
-            table.Obf_luA<string, OneArg>(name, wrapper);
-        }
+        // Every wrapper takes four arguments and passes the first result back: xLua fills missing arguments with nil and
+        // drops extra ones, so one shape fits all the wrapped functions (none takes more than four or uses varargs).
+        public delegate object Four(object a, object b, object c, object d);
 
-        private static void WrapTwo(Obf_R.Obf_ff table, string label, string name)
-        {
-            var original = table.Obf_RuA<Obf_R.Obf_Ef>(name);
-            if (original == null) return;
-            TwoArgs wrapper = (a, b) => Timed(label, () => original.Obf_HuA(a, b));
-            Wrapped.Add((table, name, original, wrapper));
-            table.Obf_luA<string, TwoArgs>(name, wrapper);
-        }
+        private static void WrapOne(Obf_R.Obf_ff table, string label, string name) => Wrap(table, label, name);
+        private static void WrapTwo(Obf_R.Obf_ff table, string label, string name) => Wrap(table, label, name);
+        private static void WrapThree(Obf_R.Obf_ff table, string label, string name) => Wrap(table, label, name);
+        private static void WrapRet(Obf_R.Obf_ff table, string label, string name) { if (Wrap(table, label, name)) _methods++; }
 
-        private static void WrapThree(Obf_R.Obf_ff table, string label, string name)
+        private static bool Wrap(Obf_R.Obf_ff table, string label, string name)
         {
-            var original = table.Obf_RuA<Obf_R.Obf_Ef>(name);
-            if (original == null) return;
-            ThreeArgs wrapper = (a, b, c) => Timed(label, () => original.Obf_HuA(a, b, c));
+            var original = table?.Obf_RuA<Obf_R.Obf_Ef>(name);
+            if (original == null) return false;
+            Four wrapper = (a, b, c, d) =>
+            {
+                object result = null;
+                Timed(label, () => { var r = original.Obf_HuA(a, b, c, d); result = r != null && r.Length > 0 ? r[0] : null; });
+                return result;
+            };
             Wrapped.Add((table, name, original, wrapper));
-            table.Obf_luA<string, ThreeArgs>(name, wrapper);
+            table.Obf_luA<string, Four>(name, wrapper);
+            return true;
         }
 
         private static void TimedDispatch(object self, object module, object notify, object param)
@@ -232,24 +257,7 @@ namespace Ro3Emu.ClientHooks
             catch { return -1; }
         }
 
-        /// <summary>Methods (self first) that return a value: the wrapper passes the first result back.</summary>
         private static int _methods;
-        public delegate object TwoRet(object a, object b);
-
-        private static void WrapRet(Obf_R.Obf_ff table, string label, string name)
-        {
-            var original = table?.Obf_RuA<Obf_R.Obf_Ef>(name);
-            if (original == null) return;
-            TwoRet wrapper = (a, b) =>
-            {
-                object result = null;
-                Timed(label, () => { var r = original.Obf_HuA(a, b); result = r != null && r.Length > 0 ? r[0] : null; });
-                return result;
-            };
-            Wrapped.Add((table, name, original, wrapper));
-            table.Obf_luA<string, TwoRet>(name, wrapper);
-            _methods++;
-        }
 
         private static void WrapMethods(LA_LuaManager manager, Obf_R.Obf_ff global)
         {
