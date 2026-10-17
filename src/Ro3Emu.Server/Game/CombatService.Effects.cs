@@ -214,8 +214,7 @@ public sealed partial class CombatService
             processed.Add(target);
             if (damage)
             {
-                var defender = new Fighter(0, 0, target.Template.Flee, 0, target.Template.Level, target.Template.Element)
-                { Def = target.Template.Def, Mdef = target.Template.Mdef, Flee = target.Template.Flee };
+                var defender = AsDefender(target.Template);
                 var (amount, result) = Damage(attacker, defender, row, script == "Heal" ? 1 : 0);
                 if (amount > 0)
                 {

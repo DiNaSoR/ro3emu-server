@@ -28,8 +28,7 @@ public sealed partial class CombatService
             ? d.EnumerateArray().Select(v => GameData.Number(v) ?? 0).ToArray() : [];
         if (desc.Length < 3 || desc[0] <= 0 || desc[1] <= 0 || Rolls.Proc(100) >= desc[0]) return 0;
         var stats = character.Stats(s);
-        var defender = new Fighter(0, 0, target.Template.Flee, 0, target.Template.Level, target.Template.Element)
-        { Def = target.Template.Def, Mdef = target.Template.Mdef, Flee = target.Template.Flee };
+        var defender = AsDefender(target.Template);
         double one = Mitigated(defender, stats[103] * desc[2] / 100.0, magic: false, element: 1);
         _doubleAttackHits = (int)desc[1];
         return (long)desc[1] * Math.Max(1, (long)Math.Round(one));

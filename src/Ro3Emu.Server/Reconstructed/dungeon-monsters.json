@@ -6,82 +6,82 @@
   },
   "soloTuning": {
     "5300001": {
-      "hp": 870,
+      "hp": 1450,
       "attack": 1500,
       "why": "Eddga: solo tuning, see about"
     },
     "5300002": {
-      "hp": 580,
+      "hp": 970,
       "attack": 410,
       "why": "Golden Thief Bug: solo tuning, see about"
     },
     "5300003": {
-      "hp": 540,
+      "hp": 900,
       "attack": 360,
       "why": "Baphomet: solo tuning, see about"
     },
     "5300006": {
-      "hp": 2420,
+      "hp": 4030,
       "attack": 1035,
       "why": "Maya: solo tuning, see about"
     },
     "5300010": {
-      "hp": 390,
+      "hp": 660,
       "attack": 420,
       "why": "Pharaoh: solo tuning, see about"
     },
     "5300018": {
-      "hp": 2870,
+      "hp": 4870,
       "attack": 1230,
       "why": "Evil Boss: solo tuning, see about"
     },
     "5300042": {
-      "hp": 10000,
+      "hp": 20000,
       "attack": 1800,
-      "why": "airship boarder: attack scaled so a group of three is a solo fight at L20, see about"
+      "why": "airship boarder: HP and attack scaled so a group of three is a solo fight at L20, see about"
     },
     "5300043": {
-      "hp": 10000,
+      "hp": 20000,
       "attack": 1800,
-      "why": "airship boarder: attack scaled so a group of three is a solo fight at L20, see about"
+      "why": "airship boarder: HP and attack scaled so a group of three is a solo fight at L20, see about"
     },
     "5300044": {
-      "hp": 10000,
+      "hp": 20000,
       "attack": 1800,
-      "why": "airship boarder: attack scaled so a group of three is a solo fight at L20, see about"
+      "why": "airship boarder: HP and attack scaled so a group of three is a solo fight at L20, see about"
     },
     "5300045": {
-      "hp": 10000,
+      "hp": 20000,
       "attack": 1800,
-      "why": "airship boarder: attack scaled so a group of three is a solo fight at L20, see about"
+      "why": "airship boarder: HP and attack scaled so a group of three is a solo fight at L20, see about"
     },
     "5300046": {
-      "hp": 10000,
+      "hp": 20000,
       "attack": 1800,
-      "why": "airship boarder: attack scaled so a group of three is a solo fight at L20, see about"
+      "why": "airship boarder: HP and attack scaled so a group of three is a solo fight at L20, see about"
     },
     "5300047": {
-      "hp": 10000,
+      "hp": 20000,
       "attack": 1800,
-      "why": "airship boarder: attack scaled so a group of three is a solo fight at L20, see about"
+      "why": "airship boarder: HP and attack scaled so a group of three is a solo fight at L20, see about"
     },
     "5300048": {
-      "hp": 10000,
+      "hp": 20000,
       "attack": 1800,
-      "why": "airship boarder: attack scaled so a group of three is a solo fight at L20, see about"
+      "why": "airship boarder: HP and attack scaled so a group of three is a solo fight at L20, see about"
     },
     "5300049": {
-      "hp": 10000,
+      "hp": 20000,
       "attack": 1800,
-      "why": "airship boarder: attack scaled so a group of three is a solo fight at L20, see about"
+      "why": "airship boarder: HP and attack scaled so a group of three is a solo fight at L20, see about"
     },
     "5300050": {
-      "hp": 10000,
+      "hp": 20000,
       "attack": 1800,
-      "why": "airship boarder: attack scaled so a group of three is a solo fight at L20, see about"
+      "why": "airship boarder: HP and attack scaled so a group of three is a solo fight at L20, see about"
     },
     "5300082": {
-      "hp": 5210,
+      "hp": 8850,
       "attack": 2880,
       "why": "Elusive Pecopeco: solo tuning, see about"
     },
