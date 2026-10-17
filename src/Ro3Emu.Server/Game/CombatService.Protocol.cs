@@ -185,6 +185,61 @@ public sealed partial class CombatService
             && data.Row("SkillConfig", effect.SkillId) != null
             ? ToPlayerAndViewersAsync(source, highLevel ? SkillEffectHigh : SkillEffect, effect) : Task.CompletedTask;
 
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<long, (int Effect, int FlightMs)> _serverBullets = new();
+
+    /// <summary>
+    /// The fixed-time bullet a skill's server script launches, e.g. Fire Bolt template 12004 -> effect 1200411.
+    /// The client never spawns these itself: they are bullet effects (m_kDamageType 2) in the template's effect block
+    /// that the template's m_kShows/m_kClientPoints never name, and LC_Scene_Sync._skillFixTimeBullet only creates
+    /// them from 31120/31108. Reading "the one unreferenced bullet in the block" as the script's bullet is (inferred):
+    /// a block with none or several candidates (12337 has four) gets no bullet.
+    /// </summary>
+    internal (int Effect, int FlightMs) ServerBullet(long scriptShow) => scriptShow <= 0 ? default
+        : _serverBullets.GetOrAdd(scriptShow, show =>
+        {
+            if (data.SkillTemplate(show) is not { } template || template.TryGetProperty("m_kClientPoints", out _)) return default;
+            var referenced = new HashSet<long>();
+            CollectNumbers(template, referenced);
+            var effects = data.SkillTemplateTable("Lua_Config_EffectData");
+            (int Effect, int FlightMs) found = default;
+            int count = 0;
+            for (long id = show * 100; id < show * 100 + 100; id++)
+            {
+                if (referenced.Contains(id) || !effects.TryGetValue(id.ToString(), out var effect)
+                    || !effect.TryGetProperty("m_kDamage", out var damage) || damage.ValueKind != JsonValueKind.Object
+                    || GameData.Int(damage, "m_kDamageType") != 2
+                    || !damage.TryGetProperty("m_kBulletData", out var bullet) || bullet.ValueKind != JsonValueKind.Object) continue;
+                // LC_Bullet_Helper: control type 0 (Time) flies m_fBulletLifeTime ms; type 1 (Speed) depends on distance.
+                int flight = GameData.Int(bullet, "m_iBulletControlType") == 0 ? (int)GameData.Int(bullet, "m_fBulletLifeTime") : 0;
+                found = ((int)id, Math.Max(1, flight));
+                count++;
+            }
+            return count == 1 ? found : default;
+        });
+
+    private static void CollectNumbers(JsonElement element, HashSet<long> into)
+    {
+        switch (element.ValueKind)
+        {
+            case JsonValueKind.Number: if (element.TryGetInt64(out long n)) into.Add(n); break;
+            case JsonValueKind.Array: foreach (var item in element.EnumerateArray()) CollectNumbers(item, into); break;
+            case JsonValueKind.Object:
+                foreach (var property in element.EnumerateObject())
+                {
+                    if (long.TryParse(property.Name, out long key)) into.Add(key);
+                    CollectNumbers(property.Value, into);
+                }
+                break;
+        }
+    }
+
+    /// <summary>
+    /// SkillConfig._kShowDmg[0]: how many hits the client shows (Fire Bolt level N shows N). It is both the bullet
+    /// count (LC_BulletEmit_Mgr emits split bullets, m_fBulletHatchInterval apart) and SkillHitInfo.split, which
+    /// LC_DamageHelper.ProcessDamageWord uses to cut one total into that many damage numbers.
+    /// </summary>
+    internal static int ShowHits(JsonElement row) => (int)Math.Clamp(Numbers(row, "_kShowDmg").FirstOrDefault(1), 1, 100);
+
     /// <summary>Server-timed bullet only when a skill script owns projectile travel.</summary>
     public Task SendSkillBulletAsync(GameSession source, SkillFixTimeBulletNotify bullet, bool highLevel = false) =>
         source.Role != null && bullet.SourceId == source.Role.Id && bullet.EffectId > 0 && bullet.FixedTime > 0

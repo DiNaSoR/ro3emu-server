@@ -157,6 +157,8 @@ public sealed partial class CombatService
             RootCtxGuid = action.Id, ComboIndex = action.Request.ComboIndex, ShowPoint = HitEffect(GameData.Int(row, "_iScriptShow")),
             SrcElement = (int)Math.Max(1, GameData.Int(row, "_iEleType")),
         };
+        int shownHits = ShowHits(row);
+        if (shownHits > 1) hit.Split = shownHits;
         var killed = new List<MonsterUnit>();
         var processed = new List<MonsterUnit>();
         bool damage = Numbers(row, "_kDamageParam1").Any(v => v > 0) || Numbers(row, "_kDamageParam2").Any(v => v > 0);
@@ -245,6 +247,19 @@ public sealed partial class CombatService
                 });
             }
             if (CurrentCaster() && hit.Dsts.Any(d => d.HitResult != DamageHitResult.Miss)) await buffs.RecoverEnergyOnHitAsync(s, row);
+            if (field == null && action.Operator == null && CurrentCaster()
+                && ServerBullet(GameData.Int(row, "_iScriptShow")) is { Effect: > 0 } bullet)
+                foreach (var target in processed)
+                {
+                    if (!CurrentCaster()) break;
+                    // The bolt the server script launches; the client has no other source for it (see ServerBullet).
+                    await SendSkillBulletAsync(s, new SkillFixTimeBulletNotify
+                    {
+                        SourceId = s.Role.Id, MasterId = s.Role.Id, TargetId = target.Uid, EffectId = bullet.Effect,
+                        FixedTime = bullet.FlightMs, Split = shownHits, SkillConfigId = action.Request.SkillId,
+                        SourcePosition = s.Position.Clone(), TargetPosition = target.Pos.Clone(), StartTimestampMs = Now,
+                    }, highLevel: GameData.Int(row, "_iSkillEffectLevel") > 0);
+                }
             var sourceViewers = CurrentCaster() ? world.Viewers(s).Append(s) : Enumerable.Empty<GameSession>();
             foreach (var viewer in processed.SelectMany(t => t.Viewers).Concat(sourceViewers).Distinct()) await viewer.SendGameAsync(SkillHit, hit);
             if (CurrentCaster() && field?.Trap == true)

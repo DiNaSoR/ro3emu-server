@@ -229,6 +229,36 @@ public sealed partial class MapTests : IAsyncLifetime
     }
 
     [ClientDataFact]
+    public async Task FireBoltLaunchesItsServerBoltsAndShowsOneHitPerLevel()
+    {
+        await using var alice = await InWorld("Alice");
+        var units = await Next(alice, GameAoiSink.SyncAoiView, AoIViewChangeData.Parser, v => v.Bases.Any(b => b.EntityType == 1));
+        var monster = units.Bases.Where(b => b.EntityType == 1).OrderBy(b => Dist(b, alice.Self!)).First();
+        await Gm("alice", "!job 2100");
+        var learn = new SkillGrowthSkillPlanUpdateReq();
+        learn.LevelUpList[12004] = new SkillData { SkillId = 12004, SkillLevel = 4 };
+        await alice.SendGameAsync(SkillService.PlanUpdate, learn);
+        Assert.Equal(0, (await Next(alice, SkillService.PlanUpdate, SkillGrowthSkillPlanUpdateResp.Parser)).Result);
+        await Gm("alice", $"!jump {monster.MovementInfo.Pos.X:0.0} {monster.MovementInfo.Pos.Z + 3:0.0}".Replace(',', '.'));
+
+        // Fire Bolt level 4 (SkillConfig 1200404, _kShowDmg [4]). Its template 12004 shows only chant/cast effects;
+        // the bolt is effect 1200411, which only a 31120 from the server makes the client fly.
+        await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1200404, TargetId = (long)monster.Uuid });
+        Assert.Equal(0, (await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
+        long self = (long)alice.Self!.Uuid;
+        var bolt = await Next(alice, CombatService.SkillBullet, SkillFixTimeBulletNotify.Parser, b => b.SourceId == self);
+        Assert.Equal(1200411, bolt.EffectId);
+        Assert.Equal(self, bolt.MasterId); // LC_Scene_Sync._skillFixTimeBullet finds the caster by masterId
+        Assert.Equal((long)monster.Uuid, bolt.TargetId);
+        Assert.Equal(4, bolt.Split);
+        Assert.Equal(400, bolt.FixedTime);
+        Assert.Equal(1200404, bolt.SkillConfigId);
+        var hit = await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser, h => h.SrcID == self);
+        Assert.Equal(1200404, hit.ShowPoint); // the fire hit spark, played once per split
+        Assert.Equal(4, hit.Split);
+    }
+
+    [ClientDataFact]
     public async Task PotionHealsWithCooldownAndSwordmanSkillsWork()
     {
         await using var alice = await InWorld("Alice");
