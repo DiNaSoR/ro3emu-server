@@ -82,7 +82,7 @@ namespace Ro3Emu.ClientHooks
                 if (env == null) { Report(why); return; }
                 var global = ((Obf_R.Obf_Cf)env).Obf_A;
                 MapModules.Install(env, global); // own once-per-LuaEnv guard; needs only package.loaded
-                if (ReferenceEquals(env, _doneEnv)) { ServerDayGates.Probe(); ElementWords.Probe(env, global); LuaLogs.Probe(env, global); return; }
+                if (ReferenceEquals(env, _doneEnv)) { ServerDayGates.Probe(); LuaLogs.Probe(env, global); return; }
                 _topBarClass = _evePanelClass = null;
                 // GlobalRequire sets LC_ItemShowHelper once the game's modules are up; before that, requiring is unsafe.
                 if (global == null || global.Obf_RuA<object>("LC_ItemShowHelper") == null) { Report("game helpers not loaded"); return; }
