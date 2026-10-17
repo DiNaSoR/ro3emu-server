@@ -389,6 +389,64 @@ internal static class Flows
         return 0;
     }
 
+    /// <summary>
+    /// Deletes one of the account's characters through the server's /ro3emu/account/delete-role (the client's own delete
+    /// button is hidden). The server refuses a character that is still in the game.
+    /// </summary>
+    public static async Task<int> DeleteCharacterAsync(Options options)
+    {
+        Ui.Title("RO3Emu - delete a character");
+        if (!Ui.Interactive)
+            throw new SetupException("Deleting a character asks for the account, password and character.", "Run RO3Emu.exe delete-character in a terminal window, without --yes.");
+        var address = options.Positional.FirstOrDefault() ?? "127.0.0.1";
+        var serverUrl = ServerUrl(address)
+            ?? throw new SetupException($"'{address}' is not a server address.", "For example RO3Emu.exe delete-character 203.0.113.10, or no address for this PC.");
+        Ui.Info($"Server: {serverUrl}");
+        var account = Ui.Ask("Account:");
+        var password = Ui.AskSecret("Password:");
+        var character = Ui.Ask("Character name:");
+        if (account.Length == 0 || character.Length == 0)
+            throw new SetupException("The account and the character name are needed.", "Run RO3Emu.exe delete-character again.");
+        if (!Ui.Confirm($"Delete {character} for good?", defaultYes: false))
+        {
+            Ui.Info("Nothing was deleted.");
+            return 0;
+        }
+
+        var (code, message) = await PostDeleteRoleAsync(serverUrl, account, password, character);
+        SetupLog.Write($"delete-character {character} on {serverUrl}: {code} {message}");
+        switch (code)
+        {
+            case 0:
+                Ui.Ok(message + ". Its name can be used again.");
+                return 0;
+            case 401: throw new SetupException("Wrong account or password.", "Use the account and password you log in to the game with.");
+            case 404: throw new SetupException($"This account has no character called {character}.", "Check the name as the game's character screen shows it.");
+            case 409: throw new SetupException($"{character} is in the game right now.", "Go back to the character screen or quit the game, then try again.");
+            default: throw new SetupException($"The server did not delete {character}: {message}.", "Check the server's log.");
+        }
+    }
+
+    /// <summary>The server's answer to a delete: code 0 deleted, 401 bad login, 404 no such character, 409 in the game.</summary>
+    public static async Task<(int Code, string Message)> PostDeleteRoleAsync(string serverUrl, string account, string password, string character)
+    {
+        try
+        {
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+            using var response = await http.PostAsync(serverUrl + "/ro3emu/account/delete-role", new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["identity"] = account, ["credential"] = password, ["role"] = character,
+            }));
+            using var json = System.Text.Json.JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            return (json.RootElement.GetProperty("code").GetInt32(), json.RootElement.GetProperty("message").GetString() ?? "");
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException or KeyNotFoundException or InvalidOperationException)
+        {
+            throw new SetupException($"The server at {serverUrl} does not answer ({e.Message}).",
+                "Start the server first (RO3Emu.exe, or your own server), then run RO3Emu.exe delete-character again.");
+        }
+    }
+
     /// <summary>"host", "host:port", "[v6]:port" or "http(s)://host[:port]" as a base URL; the port is 5380 unless written.</summary>
     public static string? ServerUrl(string address)
     {
