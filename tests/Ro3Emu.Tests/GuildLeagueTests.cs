@@ -16,7 +16,7 @@ namespace Ro3Emu.Tests;
 /// Guild League (GuildLeagueService): the server-owned calendar (opening weeks from DailyActivityCustomConfig, then the two-week cycle), registration, 30410-30412, a match on
 /// the Main/Sub battlefields with 30415/30433/30110/30414 and the settlement.
 /// </summary>
-public sealed class GuildLeagueTests : IAsyncLifetime
+public sealed partial class GuildLeagueTests : IAsyncLifetime
 {
     private static readonly TimeSpan Wait = TimeSpan.FromSeconds(15);
     private readonly string dataDir = Path.Combine(Path.GetTempPath(), "ro3emu-league-" + Guid.NewGuid().ToString("N"));

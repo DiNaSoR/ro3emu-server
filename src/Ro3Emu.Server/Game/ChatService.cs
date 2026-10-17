@@ -379,6 +379,32 @@ public sealed class ChatService(GmCommands gm, FeedbackService feedback, GuildSt
         }
     }
 
+    /// <summary>
+    /// The Guild League elite team card in the guild channel "2_&lt;guild&gt;": extra_param templateId 102 GuildTeam with
+    /// commonData guildId/teamId/playerId (LC_ChatMessageHandler.lua:850-870; the client shows text 170138 and the
+    /// LC_LinkHelper GuildTeam link, whose tap sends 42014 for teamId).
+    /// </summary>
+    public async Task PublishGuildTeamAsync(GameSession sender, long guildId, long teamId, string content)
+    {
+        string group = $"2_{guildId}";
+        GameSession[] recipients;
+        lock (_sync) recipients = _groups.TryGetValue(group, out var members) ? members.ToArray() : [];
+        var message = new TextChatMessage
+        {
+            MessageId = Interlocked.Increment(ref _nextMessageId).ToString(), SenderId = sender.Role!.Id.ToString(),
+            ReceiveId = group, SendTime = (ulong)DateTimeOffset.UtcNow.ToUnixTimeSeconds(), Content = content,
+            ExtraParam = JsonSerializer.Serialize(new
+            {
+                templateId = 102,
+                commonData = JsonSerializer.Serialize(new { guildId, teamId = teamId.ToString(), playerId = sender.Role.Id.ToString() }),
+            }),
+        };
+        Remember(message);
+        foreach (var to in recipients.Where(r => GuildAllowed(r, group)))
+            try { await DownAsync(to, Cmd.NotifyNewText, new NotifyNewTextChatMessage { Msg = message }); }
+            catch (Exception e) when (e is IOException or System.Net.Sockets.SocketException or ObjectDisposedException) { }
+    }
+
     private void Join(GameSession session, string group)
     {
         lock (_sync)

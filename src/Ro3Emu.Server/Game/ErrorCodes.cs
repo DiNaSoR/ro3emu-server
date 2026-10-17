@@ -215,6 +215,9 @@ public static class ErrorCodes
     public const int GuildApplicationLimit = 468, GuildApplicationListFull = 469;
     // Guild League (ErrorCodeConfig 516-524).
     public const int LeagueClosed = 516, LeagueTemporary = 517, LeagueElite = 518, LeagueMainFull = 523;
+    // Elite roster (ErrorCodeConfig 10046-10048, 10059): not a member, the roster changed meanwhile, position too low,
+    // too few elites for the quick team.
+    public const int EliteNotMember = 10046, EliteChanged = 10047, ElitePosition = 10048, EliteTeamShort = 10059;
     public const int GuildOfficerKick = 10068, GuildInviteRefused = 10069, GuildTextNumbers = 10066;
     public const int GuildMemberMissing = 454, NotInGuild = 462, GuildFull = 453;
     public const int AlreadyInGuildHome = 550;  // NW_ProtobufDefine.ERR_AlreadyInGuildHome "You are already at the guild base."
@@ -254,6 +257,7 @@ public static class ErrorCodes
     public const int AlreadyUnlocked = 1813;    // "Already unlocked"
     // Codex and Growth Classroom (ErrorCodeConfig; the request mapping is inferred).
     public const int CodexUnavailable = 3802;   // "Unable to view the Codex."
+    public const int UnlockRequirement = 3355;  // "Unlock Requirement not met." (a locked Codex theme, inferred)
     public const int NoRankReward = 3900;       // "No Rank Reward available to Claim."
 
     // Pets (ErrorCodeConfig 1848..1880, Localization_en 10630000526..555).

@@ -21,7 +21,8 @@ namespace Ro3Emu.Server.Game;
 /// </summary>
 public sealed partial class GuildService(GameData data, GuildStore store, RoleStore roles, SessionRegistry sessions,
     CharacterService character, FunctionService functions, ChatService chat, IOptions<ServerOptions> options,
-    TimeProvider clock, Ownership.OwnerRegistry ownerRegistry, AwardService awards, GameLoop loop, SceneService scene)
+    TimeProvider clock, Ownership.OwnerRegistry ownerRegistry, AwardService awards, GameLoop loop, SceneService scene,
+    TeamService teams)
 {
     public const uint GuildSync = 5047, Create = 32210, Recommend = 32211, HelperList = 32212, Full = 32213, MemberChange = 32214;
     public const uint CheckSensitive = 10003;
@@ -232,7 +233,12 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
         PlayerID = a.RoleId, Name = a.Name, Level = a.Level, Career = a.Career, ApplyTime = a.ApplyTime,
     };
 
-    private Task SendFull(GameSession s, GuildStore.State g, bool joined) => s.SendGameAsync(Full, FullInfo(g, joined));
+    private Task SendFull(GameSession s, GuildStore.State g, bool joined)
+    {
+        var full = FullInfo(g, joined);
+        full.IsLeagueElite = s.Role != null && IsLeagueElite(g, s.Role.Id);
+        return s.SendGameAsync(Full, full);
+    }
 
     /// <summary>Publish committed caravan funds/contribution from a freshly loaded guild aggregate.</summary>
     public async Task RefreshCaravanResourcesAsync(long guildId)
@@ -660,11 +666,13 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
         {
             var member = g.Members[s.Role!.Id];
             g.Members.Remove(member.RoleId);
+            bool elite = DropElite(g, member.RoleId);
             if (g.Members.Count == 0) await DeleteGuildAsync(g, [member.RoleId]);
             else
             {
                 Journal(g, EvLeft, [member.RoleId], Str(member.Name));
                 await SaveGuildAsync(g, [member.RoleId]);
+                if (elite) await PushElitesAsync(g, LeagueElites(g).Values.ToHashSet());
             }
             await s.SendGameAsync(Leave, new GuildMemberLeaveResp { Result = 0 });
             await PushMember(g, member, GuildMemberInfoChangeNtf.Types.ChangeType.Leave);
@@ -682,6 +690,7 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
             : HuntingBusy?.Invoke(g.Id) == true ? ErrorCodes.GuildHunting : 0;
         var removed = new List<GuildStore.Member>();
         var targetViews = new List<(GuildStore.Member Member, GameSession? Session, DBRoleGuildInfo Personal)>();
+        bool eliteDropped = false;
         if (code == 0 && g != null)
         {
             foreach (long id in req.TarPlayerIDs.Distinct())
@@ -705,6 +714,7 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
                 foreach (var m in removed)
                 {
                     g.Members.Remove(m.RoleId);
+                    eliteDropped |= DropElite(g, m.RoleId);
                     Journal(g, EvKicked, [kicker.RoleId, m.RoleId], Str(kicker.Name), Str(m.Name));
                 }
                 // The roster index and every personal view share a single commit. No session or chat state
@@ -735,6 +745,7 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
                     await SendMemberClear(view.Session, g);
                 }
             }
+        if (code == 0 && g != null && eliteDropped) await PushElitesAsync(g, LeagueElites(g).Values.ToHashSet());
         await s.SendGameAsync(Kick, resp);
     }
 

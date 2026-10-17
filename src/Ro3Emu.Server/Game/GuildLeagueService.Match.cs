@@ -86,12 +86,21 @@ public sealed partial class GuildLeagueService
         public long Heal { get; set; }
         public long DeadUntil { get; set; }
         public long NextHold { get; set; }
+        /// <summary>The circle unit the fighter stands in, as last sent in dungeon var 10103.</summary>
+        public long InCircle { get; set; }
         public Dictionary<long, long> HitBy { get; } = new();
     }
 
     internal sealed class Point
     {
         public required MapRegion Area { get; init; }
+        /// <summary>The OccupationCircle unit (NPCConfig 4800000) that shows the point; Circle is its CustomData 16.</summary>
+        public long Uid { get; init; }
+        public int Circle { get; init; }
+        public MapPoint At { get; init; }
+        public int Blue { get; set; }
+        public int Red { get; set; }
+        public string Shown { get; set; } = "";
         public long Owner { get; set; }
         public long Challenger { get; set; }
         public long Since { get; set; }
@@ -180,9 +189,9 @@ public sealed partial class GuildLeagueService
     /// <summary>
     /// 30400 for either battlefield (UI_Sys_GuildLeague_BattleWidgetCtrl.lua:750-800). The guild must have an undecided
     /// match in the round whose window is open. Temporary members are refused (ErrorCodeConfig 517, GuildTemporaryRegularTime);
-    /// the Main Battlefield admits positions GuildSettingConfig GuildLeagueMainSceneNeedPosition (518) and 40 per guild
-    /// (PublicParamConfig GuildLeagueMaxPlayerNumber, 523). With no elite roster (32302/32303 are not served) the first 40
-    /// entrants are the guild's elites, the "auto fill" of 10140100124 (inferred).
+    /// the Main Battlefield admits the guild's elite roster (GuildService.LeagueElite) in positions GuildSettingConfig
+    /// GuildLeagueMainSceneNeedPosition (518) and 40 per guild (PublicParamConfig GuildLeagueMaxPlayerNumber, 523). A roster
+    /// short of GuildLeagueEliteNum is filled when the round opens (<see cref="FillElitesAsync"/>).
     /// </summary>
     public async Task<bool> TryEnterAsync(GameSession s, EnterDungeonReq req)
     {
@@ -247,7 +256,8 @@ public sealed partial class GuildLeagueService
         if (sceneEntry == match.Main.Scene)
         {
             long[] positions = SettingArray("GuildLeagueMainSceneNeedPosition");
-            if (positions.Length > 0 && !positions.Contains(member.Official)) return ErrorCodes.LeagueElite;
+            if (!GuildService.IsLeagueElite(guild, s.Role.Id) || positions.Length > 0 && !positions.Contains(member.Official))
+                return ErrorCodes.LeagueElite;
             long[] limits = Param("GuildLeagueMaxPlayerNumber");
             long limit = limits.Length > match.Camp(guild.Id) - 1 && match.Camp(guild.Id) > 0 ? limits[match.Camp(guild.Id) - 1] : 40;
             int inside = match.Main.Room?.ActiveMembers.Count(m => m.Session != s && GuildOf(m.Session) == guild.Id) ?? 0;
@@ -276,7 +286,9 @@ public sealed partial class GuildLeagueService
         foreach (long g in new[] { match.Blue, match.Red }) { match.Points[g] = 0; match.Morale[g] = 0; match.MainKills[g] = 0; }
         if (maps.Map(MainScene) is { } map)
             foreach (int id in CapturePoints)
-                if (map.Regions.TryGetValue(id, out var region)) match.Main.Points[id] = new Point { Area = region };
+                if (map.Regions.TryGetValue(id, out var region))
+                    match.Main.Points[id] = new Point { Area = region, Uid = CircleUidBase | Interlocked.Increment(ref circleSerial),
+                        Circle = CircleId(id), At = map.Grounded(new MapPoint(region.X, region.Y, region.Z, 0)) };
         match.Bosses = 0;
         matches[key] = match;
         return match;
@@ -300,6 +312,7 @@ public sealed partial class GuildLeagueService
         Enlist(field, s, guild);
         await s.SendGameAsync(DungeonService.BaseInfo, BaseInfo(match, field));
         await s.SendGameAsync(SyncNotify, new SyncPlayerGuildLeagueDungeonNtf { Info = MatchInfo(match) });
+        if (field == match.Main) await ShowCirclesAsync(s, match);
         if (CampPoint(match, field, guild) is { } point && field == match.Sub && match.Camp(guild) == 2)
             await scene.TeleportInMapAsync(s, point);
         await MoraleBuffAsync(s, match, guild);
@@ -319,6 +332,7 @@ public sealed partial class GuildLeagueService
         if (Locate(s) is not { } at || s.Role == null) return;
         if (!switching.Contains(s)) s.EventFaction = 0;
         at.Match.Carriers.Remove(s.Role.Id); // (inferred) a carried flag is lost with its carrier
+        s.WorldState.CustomData.Remove(FlagStateKey);
         foreach (var buff in s.Buffs.Where(b => MoraleBuffs.Contains(b.ConfigId)).ToArray()) await buffs.RemoveAsync(s, buff);
     }
 
@@ -493,7 +507,8 @@ public sealed partial class GuildLeagueService
         if (Locate(s) is not { } at || s.Role == null || !at.Field.Fighters.TryGetValue(s.Role.Id, out var f)) return;
         f.Deaths++;
         f.DeadUntil = Now + ReviveSeconds;
-        at.Match.Carriers.Remove(s.Role.Id); // (inferred) the flag is lost when its carrier falls
+        if (at.Match.Carriers.Remove(s.Role.Id)) // (inferred) the flag is lost when its carrier falls
+            PostFlag(s);
         await s.SendGameAsync(CombatService.ReviveInfo, new SyncClientPlayerReviveInfoNtf { BDead = true, ReviveTime = f.DeadUntil,
             SceneEntry = s.SceneEntry });
     }
@@ -549,7 +564,7 @@ public sealed partial class GuildLeagueService
         if (spawned.Kind == Kind.Courtyard)
         {
             m.Boss = null;
-            if (m.Carriers.Add(killer.Role)) { killer.GetFlags++; killer.Score += PersonalFlagTaken; }
+            if (m.Carriers.Add(killer.Role)) { killer.GetFlags++; killer.Score += PersonalFlagTaken; PostFlag(s); }
             await TitleAsync(field, killer, 1041);
             return;
         }
@@ -637,9 +652,13 @@ public sealed partial class GuildLeagueService
         if (!m.Main.Live || now < m.Start) return;
         long stay = Setting("GuildLeagueTriggerStayAreaTime", 6);
         var alive = Present(m.Main).Where(s => !s.Dead && Fights(s, m, m.Main)).ToArray();
+        var where = new Dictionary<long, long>();
         foreach (var (id, p) in m.Main.Points)
         {
             var inside = alive.Where(s => p.Area.Contains(s.Position.X, s.Position.Z)).ToArray();
+            p.Blue = inside.Count(s => GuildOf(s) == m.Blue);
+            p.Red = inside.Count(s => GuildOf(s) == m.Red);
+            foreach (var s in inside) where[s.Role!.Id] = p.Uid;
             var counts = inside.GroupBy(GuildOf).Select(g => (Guild: g.Key, Count: g.Count())).OrderByDescending(g => g.Count).ToArray();
             long leader = counts.Length == 0 || counts.Length > 1 && counts[0].Count == counts[1].Count ? 0 : counts[0].Guild;
             if (now >= p.FortifiedUntil)
@@ -667,11 +686,21 @@ public sealed partial class GuildLeagueService
                 else if (now >= f.NextHold) { f.Score += PersonalHold; f.NextHold = now + PersonalHoldSeconds; }
                 if (m.Carriers.Remove(f.Role))
                 {
+                    PostFlag(s);
                     f.Flags++; f.Score += PersonalFlagDelivered;
                     AddPoints(m, f.Guild, GuildFlag);
                     await EventAsync(m, 1, f.Guild);
                 }
             }
+        }
+        await PublishCirclesAsync(m, now, stay);
+        foreach (var s in Present(m.Main).ToArray())
+        {
+            if (!m.Main.Fighters.TryGetValue(s.Role!.Id, out var f)) continue;
+            long circle = where.GetValueOrDefault(s.Role.Id);
+            if (f.InCircle == circle) continue;
+            f.InCircle = circle;
+            await SendAllAsync([s], DungeonService.Event, OccupyVar(m, circle));
         }
     }
 
@@ -692,7 +721,12 @@ public sealed partial class GuildLeagueService
                     m.Bosses = due;
                     int npc = CourtyardBosses[(due - 1) % CourtyardBosses.Length];
                     if (await instances.SpawnAsync(field.Room!, npc, map.Grounded(at)) is { } boss)
-                    { m.Boss = boss; field.Actors[boss] = (Kind.Courtyard, "boss:" + due); }
+                    {
+                        m.Boss = boss; field.Actors[boss] = (Kind.Courtyard, "boss:" + due);
+                        boss.CustomData.Add(LongData(IsFlagKey, 1));
+                        await SendAllAsync(boss.Viewers.ToArray(), WorldCoreService.CustomChange,
+                            new CustomDataChange { EntityId = boss.Uid, CustomDatas = { boss.CustomData } });
+                    }
                 }
                 return;
             }

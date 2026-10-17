@@ -70,7 +70,7 @@ public sealed partial class CharacterService
             : item.Stack < count ? ErrorCodes.ItemsShort : row == null ? ErrorCodes.ItemNoConfig
             : count > 1 && GameData.Int(row.Value, "_iGroupUse") == 0
                 && !(LifeItemUse != null && HandlesLifeItem(row.Value)) ? ErrorCodes.Parameter
-            : req.ItemParam.Count > 0 && WingDestination(row.Value, req) == null ? ErrorCodes.FeatureUnavailable
+            : req.ItemParam.Count > 0 && WingDestination(row.Value, req) == null && !CarriesPetChoice(row.Value, req) ? ErrorCodes.FeatureUnavailable
             : item.BindExpire > 0 && item.BindExpire <= DateTimeOffset.UtcNow.ToUnixTimeSeconds() ? ErrorCodes.ItemMissing
             : session.Dead ? ErrorCodes.UseWhileDead
             : IsItemUseForbidden?.Invoke(session) == true ? ErrorCodes.ItemUseForbidden
@@ -197,6 +197,10 @@ public sealed partial class CharacterService
     }
 
     private const int JumpSameMap = 101, JumpOtherMap = 102;
+
+    /// <summary>A 204 SelfChoosePet box sends its pick as selfChoosePet; PetService.TryUseSelfChooseAsync owns the use.</summary>
+    private static bool CarriesPetChoice(JsonElement row, ItemUseReq req) => UseActions(row).Contains(PetService.SelfChoosePetAction)
+        && req.ItemParam.Count == 1 && req.ItemParam[0].VarCase == ItemUseParamInfo.VarOneofCase.SelfChoosePet;
 
     /// <summary>Moves the player for a wing: a destination scene (the current one for a Fly Wing). WorldCoreService.</summary>
     public Func<GameSession, long, Task<bool>>? WingJump { get; set; }

@@ -164,4 +164,37 @@ public sealed class LibraryMonsterTests : IAsyncLifetime
         Assert.Equal(ErrorCodes.AlreadyUnlocked, await Unlock(again, Codex));
         Assert.Equal(10, await PointsOf(Session(again)));
     }
+
+    /// <summary>
+    /// 82405: LC_DAL_Library._processLibraryChangeUI sets iSelectUI to the reply's themeId, so the reply echoes it.
+    /// LibraryThemeConfig has themes 1 and 2; theme 2 needs condition 15000000 (item 118 >= 1000).
+    /// </summary>
+    [ClientDataFact]
+    public async Task ThemeSwitchChecksItsUnlockConditionAndPersistsTheTheme()
+    {
+        await using var reader = await InWorld("Reader");
+        async Task<LibrarySwitchThemeResp> Switch(BotClient bot, int theme)
+        {
+            await bot.SendGameAsync(CardService.LibrarySwitchTheme, new LibrarySwitchThemeReq { ThemeId = theme });
+            return await Next(bot, CardService.LibrarySwitchTheme, LibrarySwitchThemeResp.Parser);
+        }
+        var locked = await Switch(reader, 2);
+        Assert.Equal(ErrorCodes.UnlockRequirement, locked.Result);
+        Assert.Equal(0, locked.ThemeId);
+        Assert.Equal(ErrorCodes.Parameter, (await Switch(reader, 3)).Result);
+        Assert.Equal(ErrorCodes.Parameter, (await Switch(reader, 0)).Result);
+
+        await Gm(reader, $"!item {Points} 1000");
+        var chosen = await Switch(reader, 2);
+        Assert.Equal(0, chosen.Result);
+        Assert.Equal(2, chosen.ThemeId);
+        var sync = await Next(reader, CardService.LibrarySync, DBLibraryInfoIncrement.Parser, m => m.HasOverviewTheme);
+        Assert.Equal(2, sync.OverviewTheme);
+        long role = Session(reader).Role!.Id;
+        Assert.Equal(2, DBLibraryInfo.Parser.ParseFrom(Service<RoleStore>().LoadLibrary(role)!).OverviewTheme);
+
+        var back = await Switch(reader, 1);
+        Assert.Equal((0, 1), (back.Result, back.ThemeId));
+        Assert.Equal(1, DBLibraryInfo.Parser.ParseFrom(Service<RoleStore>().LoadLibrary(role)!).OverviewTheme);
+    }
 }

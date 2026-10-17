@@ -292,7 +292,12 @@ public sealed partial class TradeTests : IAsyncLifetime
             });
             Assert.Equal(0, (await Next(bot, TradeService.Preorder, CPreTradeTopResponse.Parser)).Result);
             Assert.Empty(await Mail(bot, (long)bot.Self!.Uuid));
+            // 32622: "You have joined the Lineup... In ${1} seconds" counts down to the end of publicity.
+            var lineup = await Next(bot, TradeService.InQueue, skuQueueNtf.Parser);
+            Assert.Equal((1450100, 2000000, 1, listing.SkuId), (lineup.ItemId, lineup.Price, lineup.Quantity, lineup.SkuId));
+            Assert.InRange(lineup.SaleTime - clock.GetUtcNow().ToUnixTimeSeconds(), 1, 1801); // _kHideTimeMin 1800 s, rounded up
         }
+        Assert.Single(locked.Inbox.Snapshot(), e => e.IsGame(TradeService.InQueue)); // the refused attempt joined nothing
         await first.SendGameAsync(TradeService.QueryPreorders, new CPreTradeTopQueryRequest { PageNo = 1, PageSize = 10 });
         var before = await Next(first, TradeService.QueryPreorders, CPreTradeTopQueryResponse.Parser);
         Assert.Equal(PreTradeStatusEnums.Init, Assert.Single(before.Data.PreTradeOrder).Status);

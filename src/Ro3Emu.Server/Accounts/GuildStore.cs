@@ -49,6 +49,10 @@ public sealed class GuildStore
         public long CurActivity { get; set; }
         public long LastWeekActivity { get; set; }
         public long ActivityWeek { get; set; }
+        /// <summary>Guild League elite roster (MG_Guild EliteGroup, label LeagueLabel): slot index -> role, and the version
+        /// 32302 saves against (GuildService.LeagueElite).</summary>
+        public Dictionary<int, long> LeagueElites { get; set; } = new();
+        public int LeagueEliteVersion { get; set; }
         /// <summary>32228 journal rows (GuildEventData bytes) to append with this state's next save; not part of the state.</summary>
         internal List<byte[]> PendingEvents { get; } = new();
     }

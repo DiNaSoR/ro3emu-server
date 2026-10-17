@@ -18,7 +18,8 @@ namespace Ro3Emu.Server.Game;
 public sealed partial class CardService
 {
     public const uint StorageHoleSync = 5026, LibrarySync = 5057;
-    public const uint SlotInsert = 31406, SlotRemove = 31407, SlotTransfer = 31408, LibraryCardUnlock = 82404;
+    public const uint SlotInsert = 31406, SlotRemove = 31407, SlotTransfer = 31408, LibraryCardUnlock = 82404,
+        LibrarySwitchTheme = 82405;
     public const uint SwitchPlan = 31411, ChangePlanName = 31412, LevelUp = 31461, StarUp = 31462, Revert = 31463, Treasured = 31469;
 
     private const int PlanCount = 5; // (inferred) PublicParamConfig.SchemeNum; card plans have no separate count field.
@@ -814,4 +815,31 @@ public sealed partial class CardService
     }
 
     private void SaveLibrary(GameSession session) => roles.SaveLibrary(session.Role!.Id, session.Library!.ToByteArray());
+
+    /// <summary>
+    /// 82405: the Codex overview theme. LC_DAL_Library._processLibraryChangeUI (lua:372-402) sets the dataset's
+    /// iSelectUI to the reply's themeId, so the reply echoes the theme (the generic empty reply set it to 0, which is
+    /// no LibraryThemeConfig row). The theme must exist and its _iUnlockCondition (theme 2: 15000000, item 118 >= 1000)
+    /// hold; it is kept in DBLibraryInfo.overviewTheme, which the login 5057 maps to iSelectUI (lua:597, 790).
+    /// </summary>
+    public async Task SwitchThemeAsync(GameSession session, LibrarySwitchThemeReq req)
+    {
+        int code;
+        using (await CharacterService.Lock(session))
+        {
+            code = session.Library == null || session.Role == null ? ErrorCodes.FeatureUnavailable
+                : data.Row("LibraryThemeConfig", req.ThemeId) is not { } theme ? ErrorCodes.Parameter
+                : !functions.ConditionMet(session, GameData.Int(theme, "_iUnlockCondition")) ? ErrorCodes.UnlockRequirement
+                : 0;
+            if (code == 0 && session.Library!.OverviewTheme != req.ThemeId)
+            {
+                var next = session.Library.Clone();
+                next.OverviewTheme = req.ThemeId;
+                roles.SaveLibrary(session.Role!.Id, next.ToByteArray());
+                session.Library = next;
+                await CharacterService.SyncAsync(session, LibrarySync, session.Library.Clone());
+            }
+        }
+        await session.SendGameAsync(LibrarySwitchTheme, new LibrarySwitchThemeResp { Result = code, ThemeId = code == 0 ? req.ThemeId : session.Library?.OverviewTheme ?? 0 });
+    }
 }

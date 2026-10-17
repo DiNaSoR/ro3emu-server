@@ -776,6 +776,45 @@ public sealed class PetTests : IAsyncLifetime
         Assert.Equal(Roles.LoadProgress(RoleId(bot)).Currency[1], Session.Progress!.Currency[1]);
     }
 
+    /// <summary>
+    /// The FirstHeartScoreConfig row 6 box 1250715 [[204,4,30004,31005,32001,33004]] (ActionConfig 204 SelfChoosePet):
+    /// UI_Com_RewardSelectWidgetCtrl sends 31323 with selfChoosePet.choosePet {option index: pet}. The pick joins the
+    /// roster with 33313 PetChooseNtf; an owned pick turns into its _kDecompose shards; a pet the box does not offer,
+    /// or no pick, keeps the box.
+    /// </summary>
+    [ClientDataFact]
+    public async Task SelfChoosePetBoxGrantsThePickedPetOrItsShards()
+    {
+        await using var bot = await InWorld();
+        await Gm("!item 1250715 2");
+        long Box() => _app.Services.GetRequiredService<ItemStore>().Load(RoleId(bot)).Single(i => i.Entry == 1250715 && i.Grid == 0).Guid;
+        async Task<int> Use(params (int Index, int Pet)[] picks)
+        {
+            var param = new ItemUseParamInfo { SelfChoosePet = new ItemUseParamInfo.Types.SelfChoosePet() };
+            foreach (var (index, pet) in picks) param.SelfChoosePet.ChoosePet[index] = pet;
+            await bot.SendGameAsync(CharacterService.ItemUse, new ItemUseReq { ItemGuid = Box(), ItemCount = 1, ItemParam = { param } });
+            return (await Next(bot, CharacterService.ItemUse, ItemUseResp.Parser)).Result;
+        }
+
+        Assert.Equal(ErrorCodes.Parameter, await Use((0, 31005)));          // option 0 is 30004
+        Assert.Equal(ErrorCodes.Parameter, await Use());                     // no pick
+        Assert.Equal(ErrorCodes.Parameter, await Use((1, 31005), (2, 32001))); // one box, one pet
+        Assert.Equal(2, Count(bot, 1250715));
+
+        Assert.Equal(0, await Use((1, 31005)));
+        Assert.Equal(31005, (await Next(bot, PetService.SelfChoose, PetChooseNtf.Parser)).PetId);
+        await Next(bot, PetService.PetSync, DBPetInfoIncrement.Parser, m => m.ListPet.ContainsKey(31005));
+        Assert.True(Saved(bot).ListPet.ContainsKey(31005));
+        Assert.Equal(1, Count(bot, 1250715));
+        Assert.Equal(0, Count(bot, 1631005));
+
+        Assert.Equal(0, await Use((1, 31005)));
+        Assert.Equal(31005, (await Next(bot, PetService.SelfChoose, PetChooseNtf.Parser)).PetId);
+        Assert.Equal(0, Count(bot, 1250715));
+        Assert.Equal(50, Count(bot, 1631005)); // PetBaseConfig 31005 _kDecompose [1631005,50]
+        Assert.Equal(Saved(bot), Session.Pets);
+    }
+
     private static string RepoRoot()
     {
         for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir != null; dir = dir.Parent)

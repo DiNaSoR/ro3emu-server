@@ -502,12 +502,17 @@ public sealed partial class DailyActivityService : IGameTicker
     }
 
     private long ToUnix(DateTime local) => new DateTimeOffset(DateTime.SpecifyKind(local, DateTimeKind.Unspecified), clock.LocalTimeZone.GetUtcOffset(local)).ToUnixTimeSeconds();
-    private long Boundary(DateTime now) => ToUnix((now.TimeOfDay >= TimeSpan.FromHours(5) ? now.Date : now.Date.AddDays(-1)).AddHours(5));
-    private long WeekBoundary(DateTime now)
+    private long Boundary(DateTime now) => ToUnix(GameDay(now).AddHours(5));
+    private long WeekBoundary(DateTime now) => ToUnix(GameWeek(now).AddHours(5));
+
+    /// <summary>The game day a realm-local time belongs to: it starts at 05:00 (Lua_TimeHelper.GetDayRefreshTime).</summary>
+    internal static DateTime GameDay(DateTime local) => local.TimeOfDay >= TimeSpan.FromHours(5) ? local.Date : local.Date.AddDays(-1);
+
+    /// <summary>The Monday of the game week (Monday 05:00) a realm-local time belongs to.</summary>
+    internal static DateTime GameWeek(DateTime local)
     {
-        var day = now.TimeOfDay >= TimeSpan.FromHours(5) ? now.Date : now.Date.AddDays(-1);
-        int sinceMonday = ((int)day.DayOfWeek + 6) % 7;
-        return ToUnix(day.AddDays(-sinceMonday).AddHours(5));
+        var day = GameDay(local);
+        return day.AddDays(-(((int)day.DayOfWeek + 6) % 7));
     }
 
     private static int Remaining(DailyState state) => DBDailyActivityInfo.Parser.ParseFrom(state.Rows).ActivityData.TryGetValue(RingActivity, out var row)

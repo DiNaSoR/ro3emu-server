@@ -446,6 +446,7 @@ internal sealed class GameLoopTickers(IServiceProvider services) : IHostedServic
         Add<TotemEffects>();
         Add<Game.Persistence.PositionPersistence>();
         Add<Game.Persistence.SettingsPersistence>();
+        Add<ShopService>(); // 05:00 purchase-limit rollover
         return Task.CompletedTask;
     }
 

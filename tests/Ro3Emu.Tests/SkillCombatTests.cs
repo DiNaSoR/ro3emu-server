@@ -537,7 +537,9 @@ public sealed partial class SkillCombatTests : IAsyncLifetime
         var moved = await Next(alice, CombatService.SkillMove, SkillStartMoveNotify.Parser,
             m => m.EntityID == alice.Self!.Uuid);
         Assert.Equal(start, moved.StartPos);
-        Assert.True(MonsterService.Distance(start.X, start.Z, moved.EndPos.X, moved.EndPos.Z) > 0.1f);
+        Assert.Equal(1510403, moved.EffectId); // the client's SkillStartMove ignores effectId 0
+        Assert.Equal(180, moved.MoveTimeMs);
+        Assert.InRange(MonsterService.Distance(start.X, start.Z, moved.EndPos.X, moved.EndPos.Z), 0.1f, 10.01f); // "${1}=10 meters"
         await Loop.InvokeAsync(() => { Assert.Equal(moved.EndPos, session.Position); return Task.CompletedTask; });
     }
 

@@ -44,6 +44,7 @@ public sealed partial class PetService
         stars = data.Table("PetStarConfig").Values.ToDictionary(r => ((int)GameData.Int(r, "_iPetID"), (int)GameData.Int(r, "_iStar"), (int)GameData.Int(r, "_iStage")));
         levels = data.Table("PetExpConfig").Values.ToDictionary(r => ((int)GameData.Int(r, "_iQuality"), (int)GameData.Int(r, "_iLv")));
         character.ExtraAttributes.Add(Attributes);
+        character.SpecialItemUse.Add(TryUseSelfChooseAsync);
     }
 
     /// <summary>5017 before 5056: empty roster, room 1, and five empty plans 0–4 (inferred initial plans/inited).</summary>
