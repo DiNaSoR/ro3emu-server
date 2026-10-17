@@ -137,13 +137,28 @@ public sealed class MonsterService : MonsterBrain, IGameTicker
     /// Field MVPs have no _kSkills (their server AI script picks skills); their normal attacks are the
     /// SkillConfig 52xxxxx rows named after them ("Orc Hero Normal Attack-Earth"...). Mapping by name = inferred.
     /// </summary>
-    private static readonly Dictionary<int, long> BossNormalAttack = new()
+    private static readonly Dictionary<int, long> BossNormalAttack = new Dictionary<int, long>
     {
         [5020001] = 5204001, [5020002] = 5204101, [5020003] = 5204201, [5020004] = 5204301, [5020005] = 5204401,
         [5020006] = 5204501, [5020007] = 5204601, [5020008] = 5215401, [5020009] = 5204901, [5020010] = 5204701,
         [5020011] = 5207001, [5020012] = 5204801, [5020013] = 5209101, [5020014] = 5212101, [5020015] = 5210501,
         [5020016] = 5210301, [5020017] = 5213301,
-    };
+    }.Concat(RiftBossNormalAttacks()).ToDictionary();
+
+    /// <summary>
+    /// Rift Crisis bosses (NPCConfig 16000001-16000030) have no _kSkills either. Stars 1-5 (the next four ids are the same
+    /// boss) use SkillConfig's own rows named after them: 16000101 "Cat o' Nine-Tail Normal Attack", 16002701 Rocker,
+    /// 16002901 Maya Purple, 16003101 Gryphon, 16003301 Dark Priest. The 6-star MVPs use their MVP attacks above.
+    /// Mapping by name = inferred.
+    /// </summary>
+    private static IEnumerable<KeyValuePair<int, long>> RiftBossNormalAttacks()
+    {
+        (int First, long Skill)[] fives = [(16000001, 16000101), (16000006, 16003101), (16000011, 16003301), (16000016, 16002701), (16000021, 16002901)];
+        foreach (var (first, skill) in fives)
+            for (int star = 0; star < 5; star++) yield return new(first + star, skill);
+        (int Boss, long Skill)[] mvps = [(16000026, 5204301), (16000027, 5204901), (16000028, 5209101), (16000029, 5207001), (16000030, 5210301)];
+        foreach (var (boss, skill) in mvps) yield return new(boss, skill);
+    }
 
     // ---- spawning ----
 

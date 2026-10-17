@@ -41,11 +41,7 @@ public sealed partial class TimedBattleService : IGameTicker
         if (message == DungeonService.Enter)
             return data.Row("OnePieceRewardConfig", EnterDungeonReq.Parser.ParseFrom(body.Span).SceneEntry) != null;
         if (message == SceneService.NpcInteraction)
-        {
-            var request = NpcInteractionReq.Parser.ParseFrom(body.Span);
-            return request.NpcUid == TreasureNpcUid
-                && request.InteractionId is TreasureInteraction or 161000071;
-        }
+            return IsRiftUid(NpcInteractionReq.Parser.ParseFrom(body.Span).NpcUid);
         return false;
     }
     private readonly GameData data;
@@ -141,8 +137,10 @@ public sealed partial class TimedBattleService : IGameTicker
     public TimedBattleService(GameData data, TimedTodoSchedule schedule, TimeProvider time, RoleStore roles, AccountStore accounts,
         CharacterService character, FunctionService functions, AwardService awards, TaskService tasks, InstanceService instances, SceneService scene, WorldData worldData,
         MonsterService monsters, CombatService combat, SessionRegistry sessions, GameLoop loop,
-        BuffService buffs, SkillService skills, World world, IOptions<ServerOptions> options, ILogger<TimedBattleService> log)
+        BuffService buffs, SkillService skills, World world, IOptions<ServerOptions> options, ILogger<TimedBattleService> log,
+        GmCommands gm)
     {
+        gm.Register("rift", "| new | <star 1-6> [boss name] (Rift Crisis test aid: status, new round, or a stone next to you)", RiftGmAsync);
         this.data = data; this.schedule = schedule; this.time = time; this.roles = roles; this.accounts = accounts;
         this.character = character;
         this.functions = functions; this.awards = awards; this.tasks = tasks; this.instances = instances; this.scene = scene; this.worldData = worldData; this.monsters = monsters;
@@ -152,6 +150,7 @@ public sealed partial class TimedBattleService : IGameTicker
         scene.Leaving.Add(LeavingAsync);
         combat.Killed.Add(OnePieceKilledAsync);
         combat.PlayerDied.Add(ChickenDiedAsync);
+        combat.PlayerDied.Add(OnePieceDiedAsync);
         combat.ReviveInfoOwners.Add(OwnsRevive);
         combat.PvpDealt.Add(ChickenDealt);
         combat.Healed.Add(ChickenHealed);

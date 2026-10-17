@@ -790,13 +790,23 @@ public sealed class TimedEventTests : IAsyncLifetime
         await Next(bot, MsgId.SwitchSceneLine, SwitchSceneLineResp.Parser, s => s.SceneEntry == 10110);
         await bot.SendGameAsync(MsgId.SceneLoaded, new SceneLoadedReq { SceneId = 10110 });
         await Next(bot, MsgId.SceneLoaded, SceneLoadedResp.Parser, s => s.SceneId == 10110);
+        async Task<TimedBattleService.RiftStone> PlaceStoneAsync()
+        {
+            // A cleared stone leaves the map, so every clear fights a fresh 1-star Cat o' Nine-Tail stone from the GM aid.
+            await Gm(bot, "!rift 1 Cat");
+            return await Service<GameLoop>().InvokeAsync(() => Task.FromResult(Service<TimedBattleService>().RiftStones
+                .Where(s => s.Map == 10110 && s.Scene == 3200101 && s.Challenger == null)
+                .MinBy(s => Math.Abs(s.Point.X - Session(bot).Position.X) + Math.Abs(s.Point.Z - Session(bot).Position.Z))!));
+        }
         async Task ClearTreasureAsync()
         {
+            var stone = await PlaceStoneAsync();
             await bot.SendGameAsync(SceneService.NpcInteraction, new NpcInteractionReq
-            { NpcUid = TimedBattleService.TreasureNpcUid, InteractionId = 161000011 });
+            { NpcUid = stone.Uid, InteractionId = 161000011 });
             Assert.Equal(0, (await Next(bot, SceneService.NpcInteraction, NpcInteractionRsp.Parser)).Result);
+            // The client names the stone by its unit uid (LC_SceneManagerNew.SendEnterDungeonWithOnePieceData).
             await bot.SendGameAsync(DungeonService.Enter, new EnterDungeonReq { SceneEntry = 3200101,
-                InitData = new DungeonInitData { HiddenTreasureInitData = new HiddenTreasureInitData { NpcId = 161000011 } } });
+                InitData = new DungeonInitData { HiddenTreasureInitData = new HiddenTreasureInitData { NpcId = stone.Uid } } });
             Assert.Equal(0, (await Next(bot, DungeonService.Enter, EnterDungeonRsp.Parser)).Result);
             var sw = await Next(bot, MsgId.SwitchSceneLine, SwitchSceneLineResp.Parser, s => s.SceneEntry == 3200101);
             await bot.SendGameAsync(MsgId.SceneLoaded, new SceneLoadedReq { SceneId = 3200101 });
@@ -816,6 +826,8 @@ public sealed class TimedEventTests : IAsyncLifetime
             Assert.Equal(0, (await Next(bot, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
             await Next(bot, CombatService.SkillHit, SkillHitInfo.Parser, h => h.Dsts.Any(d => d.DstID == actor.Uid && d.IsDead));
             Assert.Equal((DungeonRes)1, (await Next(bot, DungeonService.Result, DungeonResNotify.Parser)).Res);
+            Assert.DoesNotContain(await Service<GameLoop>().InvokeAsync(() =>
+                Task.FromResult(Service<TimedBattleService>().RiftStones.ToArray())), s => s.Uid == stone.Uid);
             var back = await Next(bot, MsgId.SwitchSceneLine, SwitchSceneLineResp.Parser,
                 s => s.SceneEntry != 3200101);
             await bot.SendGameAsync(MsgId.SceneLoaded, new SceneLoadedReq { SceneId = back.SceneEntry });
@@ -864,6 +876,7 @@ public sealed class TimedEventTests : IAsyncLifetime
         await ClearTreasureAsync(); // Twentieth clear remains eligible.
         Assert.Equal(baseBefore + 40000, Service<CharacterService>().CountOf(Session(bot), 2));
         Assert.Equal(20, Session(bot).TimedBattle!.OnePieceGains.Single().Value);
+        await PlaceStoneAsync();
         await bot.SendGameAsync(DungeonService.Enter, new EnterDungeonReq { SceneEntry = 3200101 });
         Assert.Equal(ErrorCodes.TaskRequirements,
             (await Next(bot, DungeonService.Enter, EnterDungeonRsp.Parser)).Result);
@@ -876,6 +889,108 @@ public sealed class TimedEventTests : IAsyncLifetime
         Assert.Equal(2, Service<CharacterService>().CountOf(Session(reconnected), 1302002));
         Assert.True((await Next(reconnected, 5038, DBOnePieceInfoIncrement.Parser,
             s => s.DungeonMinPassTime.ContainsKey(3200101))).DungeonMinPassTime.ContainsKey(3200101));
+    }
+
+    [ClientDataFact]
+    public async Task RiftChallengerWhoDiesLosesTheRunAndReturnsAliveWithTheStoneFree()
+    {
+        await using var bot = await InWorld("Dusk");
+        await Gm(bot, "!lvl 99");
+        var point = Service<WorldData>().Map(10110)!.Points[8080201];
+        await Gm(bot, $"!warp 10110 {point.X.ToString(System.Globalization.CultureInfo.InvariantCulture)} "
+            + point.Z.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        await Next(bot, MsgId.SwitchSceneLine, SwitchSceneLineResp.Parser, s => s.SceneEntry == 10110);
+        await bot.SendGameAsync(MsgId.SceneLoaded, new SceneLoadedReq { SceneId = 10110 });
+        await Next(bot, MsgId.SceneLoaded, SceneLoadedResp.Parser, s => s.SceneId == 10110);
+        await Gm(bot, "!rift 1 Cat");
+        var stone = await Service<GameLoop>().InvokeAsync(() => Task.FromResult(Service<TimedBattleService>().RiftStones
+            .Single(s => s.Map == 10110 && s.Scene == 3200101 && s.Challenger == null
+                && Math.Abs(s.Point.X - Session(bot).Position.X) < 3 && Math.Abs(s.Point.Z - Session(bot).Position.Z) < 3)));
+        await bot.SendGameAsync(DungeonService.Enter, new EnterDungeonReq { SceneEntry = 3200101,
+            InitData = new DungeonInitData { HiddenTreasureInitData = new HiddenTreasureInitData { NpcId = stone.Uid } } });
+        Assert.Equal(0, (await Next(bot, DungeonService.Enter, EnterDungeonRsp.Parser)).Result);
+        var sw = await Next(bot, MsgId.SwitchSceneLine, SwitchSceneLineResp.Parser, s => s.SceneEntry == 3200101);
+        await bot.SendGameAsync(MsgId.SceneLoaded, new SceneLoadedReq { SceneId = 3200101 });
+        await Next(bot, MsgId.SceneLoaded, SceneLoadedResp.Parser, s => s.SceneId == 3200101);
+        await Next(bot, DungeonService.BaseInfo, DungeonBaseInfoNotify.Parser, s => s.DungeonId == sw.SceneID);
+
+        // The fight scene is NoRevive (_iReviveTrigger 2): a solo challenger's death ends the run as a loss.
+        await Service<GameLoop>().InvokeAsync(() => Service<CombatService>().EnvironmentDamageAsync(Session(bot), 10_000_000));
+        Assert.Equal((DungeonRes)2, (await bot.Inbox.WaitAsync(e => e.IsGame(DungeonService.Result), TimeSpan.FromSeconds(10)) is var r
+            ? DungeonResNotify.Parser.ParseFrom(r.Body) : null)!.Res);
+        var back = await Next(bot, MsgId.SwitchSceneLine, SwitchSceneLineResp.Parser, s => s.SceneEntry == 10110);
+        await bot.SendGameAsync(MsgId.SceneLoaded, new SceneLoadedReq { SceneId = back.SceneEntry });
+        await Next(bot, MsgId.SceneLoaded, SceneLoadedResp.Parser, s => s.SceneId == 10110);
+        bool dead = true;
+        for (int i = 0; i < 100 && dead; i++)
+        {
+            dead = await Service<GameLoop>().InvokeAsync(() => Task.FromResult(Session(bot).Dead));
+            if (dead) await Task.Delay(20);
+        }
+        Assert.False(dead);
+        var free = await Service<GameLoop>().InvokeAsync(() => Task.FromResult(
+            Service<TimedBattleService>().RiftStones.Single(s => s.Uid == stone.Uid)));
+        Assert.Null(free.Challenger);
+    }
+
+    [ClientDataFact]
+    public async Task RiftRoundPlacesStarStonesAndAThreeStarClearPaysItsStar()
+    {
+        await using var bot = await InWorld("Rhea");
+        await Gm(bot, "!lvl 99");
+        TimedBattleService.RiftStone[] round = [];
+        for (int i = 0; i < 200 && round.Length == 0; i++)
+        {
+            round = await Service<GameLoop>().InvokeAsync(() =>
+                Task.FromResult(Service<TimedBattleService>().RiftStones.ToArray()));
+            if (round.Length == 0) await Task.Delay(20);
+        }
+        // PublicParamConfig.OnePieceMapRefresh [3,4] maps; the 6-star (MVP) budget is OnePieceMonsterConfig's 5.
+        Assert.InRange(round.Select(s => s.Map).Distinct().Count(), 3, 4);
+        Assert.All(round, s => Assert.InRange(s.Star, 1, 6));
+        Assert.True(round.Count(s => s.Star == 6) <= 5);
+
+        var point = Service<WorldData>().Map(10110)!.Points[8080201];
+        await Gm(bot, $"!warp 10110 {point.X.ToString(System.Globalization.CultureInfo.InvariantCulture)} "
+            + point.Z.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        await Next(bot, MsgId.SwitchSceneLine, SwitchSceneLineResp.Parser, s => s.SceneEntry == 10110);
+        await bot.SendGameAsync(MsgId.SceneLoaded, new SceneLoadedReq { SceneId = 10110 });
+        await Next(bot, MsgId.SceneLoaded, SceneLoadedResp.Parser, s => s.SceneId == 10110);
+        await Gm(bot, "!rift 3 Gryphon");
+        var stone = await Service<GameLoop>().InvokeAsync(() => Task.FromResult(Service<TimedBattleService>().RiftStones
+            .Single(s => s.Map == 10110 && s.Star == 3 && s.Scene == 3200201
+                && Math.Abs(s.Point.X - Session(bot).Position.X) < 3 && Math.Abs(s.Point.Z - Session(bot).Position.Z) < 3)));
+        Assert.Equal(16000008, stone.Boss); // the third Gryphon (stars 1-5 are 16000006-16000010)
+
+        long coinBefore = Service<CharacterService>().CountOf(Session(bot), 2);
+        await bot.SendGameAsync(SceneService.NpcInteraction, new NpcInteractionReq { NpcUid = stone.Uid, InteractionId = 161000031 });
+        Assert.Equal(0, (await Next(bot, SceneService.NpcInteraction, NpcInteractionRsp.Parser)).Result);
+        await bot.SendGameAsync(DungeonService.Enter, new EnterDungeonReq { SceneEntry = 3200201,
+            InitData = new DungeonInitData { HiddenTreasureInitData = new HiddenTreasureInitData { NpcId = stone.Uid } } });
+        Assert.Equal(0, (await Next(bot, DungeonService.Enter, EnterDungeonRsp.Parser)).Result);
+        var sw = await Next(bot, MsgId.SwitchSceneLine, SwitchSceneLineResp.Parser, s => s.SceneEntry == 3200201);
+        await bot.SendGameAsync(MsgId.SceneLoaded, new SceneLoadedReq { SceneId = 3200201 });
+        await Next(bot, MsgId.SceneLoaded, SceneLoadedResp.Parser, s => s.SceneId == 3200201);
+        MonsterUnit? boss = null;
+        for (int i = 0; i < 100 && boss == null; i++)
+        {
+            boss = await Service<GameLoop>().InvokeAsync(() => Task.FromResult(Service<World>().AllUnits()
+                .OfType<MonsterUnit>().SingleOrDefault(m => m.InstanceId == sw.SceneID && m.Template.NpcId == 16000008)));
+            if (boss == null) await Task.Delay(20);
+        }
+        Assert.NotNull(boss);
+        Assert.Equal(16003101, boss!.Template.NormalSkill); // "Gryphon Normal Attack": the boss model plays its own swing
+        await OnLoop(() => { boss.Hp = 1; return Task.CompletedTask; });
+        await bot.SendGameAsync(MsgId.Walk, new WalkReq { Pos = boss.Pos, BStop = true, SpeedRate = 1 });
+        await bot.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1000001, TargetId = boss.Uid });
+        await Next(bot, CombatService.SkillHit, SkillHitInfo.Parser, h => h.Dsts.Any(d => d.DstID == boss.Uid && d.IsDead));
+        var result = await Next(bot, DungeonService.Result, DungeonResNotify.Parser);
+        Assert.Equal((DungeonRes)1, result.Res);
+        Assert.Equal(3, result.Data.OnePieceData.BossLevel);
+        // OnePieceMonsterConfig[16100003]: award 9103 (30000 Minted Coin), extra 9203 (gift box + 3 chests).
+        Assert.Equal(coinBefore + 30000, Service<CharacterService>().CountOf(Session(bot), 2));
+        Assert.Equal(3, Service<CharacterService>().CountOf(Session(bot), 1302000));
+        Assert.Equal(1, Service<CharacterService>().CountOf(Session(bot), 1302002));
     }
 
     private sealed class ManualClock(DateTimeOffset now) : TimeProvider
