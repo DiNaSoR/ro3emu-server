@@ -38,18 +38,11 @@ namespace Ro3Emu.ClientHooks
         private static int _depth;
         private static bool _on;
 
-        // Sampling inside the slow event: a Lua count hook (C# delegate) takes a traceback every SampleMs and charges the
-        // time since the previous sample to that stack. Count hooks only fire on Lua instructions, so time spent in a C#
-        // call is charged to the Lua code right after it returns (its caller), which still names the culprit.
-        private const double SampleMs = 0.5;
-        private const int HookCount = 1000;
-        private static readonly TwoArgs HookWrapper = OnHook;
-        private static Obf_R.Obf_Ef _setHook, _traceback;
-        private static readonly Stopwatch SampleWatch = new Stopwatch();
-        private static double _lastSample;
-        private static bool _sampling;
-        private static readonly Dictionary<string, double> Stacks = new Dictionary<string, double>();
-        private static readonly Dictionary<string, double> Leaves = new Dictionary<string, double>();
+        // The quest update event, alternately run with the Lua GC stopped, to see how much of it is garbage collection.
+        private static Obf_R.Obf_Ef _collect;
+        private static int _questUpdates;
+        private static bool _inQuestUpdate;
+        private static readonly List<string> QuestNotes = new List<string>();
 
         public static void Run(string args)
         {
@@ -80,78 +73,14 @@ namespace Ro3Emu.ClientHooks
                             sb.Append("\n    ").Append(pair.Key).Append(" x").Append(pair.Value.Count).Append(' ')
                               .Append(pair.Value.Ms.ToString("F1")).Append(" ms");
                     sb.Append("\n  ").Append(TaskCounts());
-                    AppendTop(sb, "time by innermost named Lua function (sampled)", Leaves);
-                    AppendTop(sb, "time by stack, innermost first (sampled)", Stacks);
+                    foreach (var note in QuestNotes) sb.Append("\n  ").Append(note);
                 }
                 Debug.Log(sb.ToString());
             }
             Calls.Clear();
             Totals.Clear();
-            Stacks.Clear();
-            Leaves.Clear();
+            QuestNotes.Clear();
         }
-
-        private static void AppendTop(StringBuilder sb, string title, Dictionary<string, double> table)
-        {
-            if (table.Count == 0) return;
-            var rows = new List<KeyValuePair<string, double>>(table);
-            rows.Sort((a, b) => b.Value.CompareTo(a.Value));
-            sb.Append("\n  ").Append(title).Append(':');
-            for (int i = 0; i < rows.Count && i < 15; i++)
-                sb.Append("\n    ").Append(rows[i].Value.ToString("F1")).Append(" ms  ").Append(rows[i].Key);
-        }
-
-        private static void StartSampling()
-        {
-            if (_setHook == null || _sampling) return;
-            _sampling = true;
-            SampleWatch.Restart();
-            _lastSample = 0;
-            try { _setHook.Obf_HuA(HookWrapper, "", HookCount); }
-            catch (Exception e) { _sampling = false; Debug.LogWarning("[Ro3Emu.Hitch] sethook: " + e.Message); _setHook = null; }
-        }
-
-        private static void StopSampling()
-        {
-            if (!_sampling) return;
-            _sampling = false;
-            try { _setHook.Obf_HuA(); } catch (Exception e) { Debug.LogWarning("[Ro3Emu.Hitch] sethook off: " + e.Message); }
-            Sample(); // the tail since the last sample
-        }
-
-        private static void OnHook(object ev, object line)
-        {
-            if (SampleWatch.Elapsed.TotalMilliseconds - _lastSample >= SampleMs) Sample();
-        }
-
-        private static void Sample()
-        {
-            double now = SampleWatch.Elapsed.TotalMilliseconds;
-            double ms = now - _lastSample;
-            _lastSample = now;
-            string trace;
-            try { trace = _traceback?.Obf_HuA()?[0] as string; } catch { return; }
-            if (trace == null) return;
-            var names = new List<string>();
-            foreach (var raw in trace.Split('\n'))
-            {
-                string row = raw.Trim();
-                int at = row.IndexOf(" in ", StringComparison.Ordinal);
-                if (at < 0 || row.StartsWith("[C]", StringComparison.Ordinal)) continue;
-                string name = row.Substring(at + 4);
-                if (name.StartsWith("function <", StringComparison.Ordinal) || name.EndsWith("'?'", StringComparison.Ordinal)) continue;
-                name = name.Replace("function ", "").Replace("method ", ":").Replace("field ", ".")
-                    .Replace("upvalue ", "up ").Replace("'", "");
-                if (names.Count == 0 || names[names.Count - 1] != name) names.Add(name);
-                if (names.Count >= 5) break;
-            }
-            if (names.Count == 0) names.Add("(unnamed)");
-            Add(Leaves, names[0], ms);
-            if (Stacks.Count < 300) Add(Stacks, string.Join(" < ", names), ms);
-        }
-
-        private static void Add(Dictionary<string, double> table, string key, double ms) =>
-            table[key] = table.TryGetValue(key, out double sum) ? sum + ms : ms;
 
         /// <summary>How many quests the client holds in AllTaskInfo.TaskInfos, by status (UpdateTaskInfoEvent walks them all).</summary>
         private static string TaskCounts()
@@ -184,9 +113,7 @@ namespace Ro3Emu.ClientHooks
             if (global == null || manager == null) { Debug.Log("[Ro3Emu.Hitch] Lua is not up yet"); return; }
             if (_on) Disable();
             _eventNames = EventNames(global);
-            var debugLib = global.Obf_RuA<Obf_R.Obf_ff>("debug");
-            _setHook = debugLib?.Obf_RuA<Obf_R.Obf_Ef>("sethook");
-            _traceback = debugLib?.Obf_RuA<Obf_R.Obf_Ef>("traceback");
+            _collect = global.Obf_RuA<Obf_R.Obf_Ef>("collectgarbage");
             _eventClass = LuaPatches.Module(manager, global, "lc_event");
             _dispatch = _eventClass?.Obf_RuA<Obf_R.Obf_Ef>("DispatchEvent");
             if (_dispatch != null) _eventClass.Obf_luA<string, Dispatch>("DispatchEvent", DispatchWrapper);
@@ -201,15 +128,16 @@ namespace Ro3Emu.ClientHooks
                 WrapTwo(helper, "LC_TaskHelper.SetNpcAtMap", "SetNpcAtMap");
                 WrapThree(helper, "LC_TaskHelper.SetClientSingleNPC", "SetClientSingleNPC");
             }
+            try { WrapMethods(manager, global); }
+            catch (Exception e) { Debug.LogWarning("[Ro3Emu.Hitch] methods: " + e.GetType().Name + ": " + e.Message); }
             _on = true;
             Debug.Log("[Ro3Emu.Hitch] timing on: " + (_dispatch != null ? "events" : "no events (DispatchEvent not found)")
                 + ", " + Wrapped.Count + " LC_TaskHelper function(s), " + _eventNames.Count + " event names"
-            + (_setHook != null && _traceback != null ? ", sampling" : ", no sampling (debug.sethook not found)"));
+            + ", " + _methods + " method(s)" + (_collect != null ? ", GC test" : ""));
         }
 
         private static void Disable()
         {
-            StopSampling();
             if (_dispatch != null && _eventClass != null) _eventClass.Obf_luA<string, Obf_R.Obf_Ef>("DispatchEvent", _dispatch);
             foreach (var (table, name, original, _) in Wrapped) table.Obf_luA<string, Obf_R.Obf_Ef>(name, original);
             Wrapped.Clear();
@@ -250,11 +178,29 @@ namespace Ro3Emu.ClientHooks
             var original = _dispatch;
             if (original == null) return;
             long key = LuaPatches.ToLong(module) << 32 | (LuaPatches.ToLong(notify) & 0xFFFFFFFFL);
-            bool sample = _depth == 0 && _eventNames != null && _eventNames.TryGetValue(key, out var name)
+            bool quest = !_inQuestUpdate && _eventNames != null && _eventNames.TryGetValue(key, out var name)
                 && name == "Common.UpdateTaskInfoEvent";
-            if (sample) StartSampling();
+            if (!quest)
+            {
+                Timed(_inQuestUpdate ? "(inside quest update) event " + EventName(key) : null,
+                    () => original.Obf_HuA(self, module, notify, param), key);
+                return;
+            }
+            bool gcOff = _collect != null && (_questUpdates++ & 1) == 1;
+            double before = Kb();
+            if (gcOff) _collect.Obf_HuA("stop");
+            var watch = Stopwatch.StartNew();
+            _inQuestUpdate = true;
             try { Timed(null, () => original.Obf_HuA(self, module, notify, param), key); }
-            finally { if (sample) StopSampling(); }
+            finally
+            {
+                _inQuestUpdate = false;
+                double ms = watch.Elapsed.TotalMilliseconds;
+                double after = Kb();
+                if (gcOff) _collect.Obf_HuA("restart");
+                QuestNotes.Add("quest update " + ms.ToString("F1") + " ms with the Lua GC " + (gcOff ? "stopped" : "running")
+                    + ", Lua heap " + before.ToString("F0") + " -> " + after.ToString("F0") + " KB");
+            }
         }
 
         private static void Timed(string label, Action call, long eventKey = 0)
@@ -267,14 +213,58 @@ namespace Ro3Emu.ClientHooks
             {
                 _depth--;
                 double ms = watch.Elapsed.TotalMilliseconds;
-                string total = label ?? "event " + (_eventNames != null && _eventNames.TryGetValue(eventKey, out var en)
-                    ? en : (eventKey >> 32) + ":" + (eventKey & 0xFFFFFFFFL));
+                string total = label ?? "event " + EventName(eventKey);
                 if (Totals.Count < 200 || Totals.ContainsKey(total))
                     Totals[total] = Totals.TryGetValue(total, out var sum) ? (sum.Count + 1, sum.Ms + ms) : (1, ms);
                 if (ms >= RecordMs && Calls.Count < 400)
                 {
                     Calls.Insert(Math.Min(index, Calls.Count), (depth, total, ms)); // parents before their children
                 }
+            }
+        }
+
+        private static string EventName(long key) => _eventNames != null && _eventNames.TryGetValue(key, out var name)
+            ? name : (key >> 32) + ":" + (key & 0xFFFFFFFFL);
+
+        private static double Kb()
+        {
+            try { return _collect?.Obf_HuA("count")?[0] is object v ? Convert.ToDouble(v) : -1; }
+            catch { return -1; }
+        }
+
+        /// <summary>Methods (self first) that return a value: the wrapper passes the first result back.</summary>
+        private static int _methods;
+        public delegate object TwoRet(object a, object b);
+
+        private static void WrapRet(Obf_R.Obf_ff table, string label, string name)
+        {
+            var original = table?.Obf_RuA<Obf_R.Obf_Ef>(name);
+            if (original == null) return;
+            TwoRet wrapper = (a, b) =>
+            {
+                object result = null;
+                Timed(label, () => { var r = original.Obf_HuA(a, b); result = r != null && r.Length > 0 ? r[0] : null; });
+                return result;
+            };
+            Wrapped.Add((table, name, original, wrapper));
+            table.Obf_luA<string, TwoRet>(name, wrapper);
+            _methods++;
+        }
+
+        private static void WrapMethods(LA_LuaManager manager, Obf_R.Obf_ff global)
+        {
+            _methods = 0;
+            WrapRet(global.Obf_RuA<Obf_R.Obf_ff>("LC_ConditionManager"), "LC_ConditionManager:IsProgressCheckDialogue", "IsProgressCheckDialogue");
+            var db = global.Obf_RuA<Obf_R.Obf_ff>("Lua_DBManager");
+            var dbi = db?.Obf_RuA<Obf_R.Obf_Ef>("GetInstance")?.Obf_HuA(db);
+            var taskConfig = dbi != null && dbi.Length > 0 && dbi[0] is Obf_R.Obf_ff d ? d.Obf_RuA<Obf_R.Obf_ff>("m_kCFG_TaskConfig") : null;
+            WrapRet(taskConfig, "TaskConfig:GetTaskProgressTarget", "GetTaskProgressTarget");
+            WrapRet(taskConfig, "TaskConfig:GetTaskTrack", "GetTaskTrack");
+            var system = LuaPatches.Module(manager, global, "lc_system_task");
+            if (system != null)
+            {
+                WrapTwo(system, "LC_System_Task:SetNpcAtMap", "SetNpcAtMap");
+                WrapOne(system, "LC_System_Task:_onLocalPlayerMove", "_onLocalPlayerMove");
             }
         }
 
