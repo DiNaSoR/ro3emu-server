@@ -27,6 +27,7 @@ namespace Ro3Emu.ClientHooks
     /// the season's hidden first week (ServerDayGates).</item>
     /// <item>Map config modules this build does not ship (Dracula's Lair, the territory maps) go into package.loaded
     /// before any scene needs them (MapModules).</item>
+    /// <item>Lua log lines skip the Lua stack traceback, which made each one cost 25-30 ms (LuaLogs).</item>
     /// <item>Profile cards without stickers parse (LC_DAL_Personal.ParsePersonalInfo walks a nil list; PersonalCards).</item>
     /// </list>
     /// </summary>
@@ -81,7 +82,7 @@ namespace Ro3Emu.ClientHooks
                 if (env == null) { Report(why); return; }
                 var global = ((Obf_R.Obf_Cf)env).Obf_A;
                 MapModules.Install(env, global); // own once-per-LuaEnv guard; needs only package.loaded
-                if (ReferenceEquals(env, _doneEnv)) { ServerDayGates.Probe(); ElementWords.Probe(env, global); return; }
+                if (ReferenceEquals(env, _doneEnv)) { ServerDayGates.Probe(); ElementWords.Probe(env, global); LuaLogs.Probe(env, global); return; }
                 _topBarClass = _evePanelClass = null;
                 // GlobalRequire sets LC_ItemShowHelper once the game's modules are up; before that, requiring is unsafe.
                 if (global == null || global.Obf_RuA<object>("LC_ItemShowHelper") == null) { Report("game helpers not loaded"); return; }
