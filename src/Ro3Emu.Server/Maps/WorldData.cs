@@ -242,6 +242,23 @@ public sealed partial class WorldData(IOptions<ServerOptions> options, GameData 
                     data.TextOf(npcRow, "_kName"), (int)GameData.Int(npcRow, "_iCamp"), WorldNpc.Float(pos, "x"),
                     WorldNpc.Float(pos, "y"), WorldNpc.Float(pos, "z"), WorldNpc.Float(p, "direction"), p));
             }
+        // Custom content NPCs (content/*.json "npcs"): server NPCs like the scene editor's, on the ground unless a y is given.
+        foreach (var custom in data.Custom.Npcs.Where(n => n.Map == sceneEntry))
+        {
+            if (data.Row("NPCConfig", custom.NpcId) is not { } npcRow)
+            {
+                log.LogError("Custom NPC {Npc} on map {Scene} ({File}) has no NPCConfig row", custom.NpcId, sceneEntry, custom.Source);
+                continue;
+            }
+            float y = custom.Y ?? map.Nav?.WalkHeight(custom.X, custom.Z, 0f) ?? 0f;
+            var entry = JsonSerializer.SerializeToElement(new
+            {
+                Id = 0, NpcId = custom.NpcId, NpcTag = (int)WorldNpcKind.Npc, IsServerNpc = true,
+                x = custom.X, y, z = custom.Z, FaceDirection = custom.Face, CustomContent = custom.Source,
+            });
+            npcs.Add(new WorldNpc(NpcUidBase | sceneEntry << 16 | (long)npcs.Count, sceneEntry, WorldNpcKind.Npc, custom.NpcId,
+                data.TextOf(npcRow, "_kName"), (int)GameData.Int(npcRow, "_iCamp"), custom.X, y, custom.Z, custom.Face, entry));
+        }
         var spawnGroups = LoadSpawnGroups(se);
         log.LogInformation("Map {Scene} {Name}: {Npcs} NPC/portal/Kafra, {Groups} spawn groups, born {Born}, nav {W}x{H}",
             sceneEntry, data.MapName(sceneEntry), npcs.Count, spawnGroups.Count, born, map.Nav?.Width, map.Nav?.Height);

@@ -243,6 +243,7 @@ public sealed class GmCommands(IOptions<ServerOptions> options, GameData data, S
         }),
         ["online"] = ("", Online),
         ["warp"] = ("<sceneEntry> [x z]", Warp),
+        ["pos"] = ("", Pos),
         ["jump"] = ("<x> <z>", Jump),
         ["finditem"] = ("<name>", FindItem),
         ["item"] = ("<id|name> [count]", Item),
@@ -381,6 +382,11 @@ public sealed class GmCommands(IOptions<ServerOptions> options, GameData data, S
 
     private Task Online(GameSession s, string[] _) =>
         ReplyAsync(s, "Online: " + string.Join(", ", sessions.All().Select(o => $"{o.Role?.Name ?? o.Account} ({o.SceneEntry})")));
+
+    /// <summary>Where the GM stands, as a custom content "npcs" entry needs it (docs/guide/custom-content.md).</summary>
+    private Task Pos(GameSession s, string[] _) =>
+        ReplyAsync(s, string.Create(System.Globalization.CultureInfo.InvariantCulture,
+            $"Map {s.SceneEntry} {data.MapName(s.SceneEntry)}: \"x\": {s.Position.X:0.##}, \"y\": {s.Position.Y:0.##}, \"z\": {s.Position.Z:0.##}"));
 
     private Task FindItem(GameSession s, string[] args)
     {
