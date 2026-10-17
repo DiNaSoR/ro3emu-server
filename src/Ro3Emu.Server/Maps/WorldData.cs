@@ -156,14 +156,15 @@ public sealed partial class WorldData(IOptions<ServerOptions> options, GameData 
             if (_kafraDestinations == null)
             {
                 _kafraDestinations = new();
-                var path = Path.Combine(Dir("sceneeditor"), "maplinkdata.json");
-                if (File.Exists(path))
+                if (DataFiles.Find(Dir("sceneeditor"), "MapLinkData.json") is { } path)
                 {
                     using var doc = JsonDocument.Parse(File.ReadAllBytes(path));
                     if (doc.RootElement.TryGetProperty("Capra", out var capra) && capra.ValueKind == JsonValueKind.Object)
                         foreach (var p in capra.EnumerateObject())
                             if (long.TryParse(p.Name, out var id)) _kafraDestinations.Add(id);
                 }
+                else log.LogWarning("No scene editor MapLinkData.json in {Dir}: every Kafra teleport is refused; run tools/ConfigExport with Config\\SceneEditor",
+                    Dir("sceneeditor"));
             }
             return _kafraDestinations.Contains(sceneEntry);
         }
@@ -174,10 +175,10 @@ public sealed partial class WorldData(IOptions<ServerOptions> options, GameData 
         if ((data.Row("MapConfig", sceneEntry) ?? data.Row("DungeonConfig", sceneEntry)) is not { } row) return null;
         var map = new MapWorld { SceneEntry = sceneEntry, Nav = LoadNav(row) };
         if (!row.TryGetProperty("_kResSceneEditorName", out var seName) || seName.GetString() is not { Length: > 0 } name) return map;
-        var path = Path.Combine(Dir("sceneeditor"), name.ToLowerInvariant() + ".json");
-        if (!File.Exists(path))
+        if (DataFiles.Find(Dir("sceneeditor"), name + ".json") is not { } path)
         {
-            log.LogWarning("No scene editor {Path} for map {Scene}; run tools/ConfigExport with Config\\SceneEditor", path, sceneEntry);
+            log.LogWarning("No scene editor {Path} for map {Scene}; run tools/ConfigExport with Config\\SceneEditor",
+                Path.Combine(Dir("sceneeditor"), name + ".json"), sceneEntry);
             return map;
         }
         using var doc = JsonDocument.Parse(File.ReadAllBytes(path));
@@ -330,8 +331,7 @@ public sealed partial class WorldData(IOptions<ServerOptions> options, GameData 
         if (data.Row("MapResource", resourceId) is not { } res || !res.TryGetProperty("_kNavDataName", out var n) || n.GetString() is not { Length: > 0 } navName)
             return null;
         var file = navName.Contains("_dynamicmapdata.bytes") ? navName : navName.Replace("data.bytes", "_dynamicmapdata.bytes");
-        var path = Path.Combine(Dir("nav"), file);
-        if (!File.Exists(path)) return null;
+        if (DataFiles.Find(Dir("nav"), file) is not { } path) return null;
         try
         {
             return NavGrid.Load(path);

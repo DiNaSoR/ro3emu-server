@@ -353,9 +353,9 @@ public sealed partial class EmojiService : IGameTicker
         if (regions.TryGetValue(map, out var cached)) return cached;
         var found = new Dictionary<long, Region>();
         if (data.Row("MapConfig", map) is { } row && row.TryGetProperty("_kResSceneEditorName", out var editor)
-            && File.Exists(Path.Combine(sceneEditorDir, editor.GetString() + ".json")))
+            && DataFiles.Find(sceneEditorDir, editor.GetString() + ".json") is { } path)
         {
-            using var doc = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(sceneEditorDir, editor.GetString() + ".json")));
+            using var doc = JsonDocument.Parse(File.ReadAllBytes(path));
             if (doc.RootElement.TryGetProperty("m_kRegins", out var all) && all.ValueKind == JsonValueKind.Object)
                 foreach (var region in all.EnumerateObject())
                     if (long.TryParse(region.Name, out long id) && region.Value.TryGetProperty("center", out var center))
