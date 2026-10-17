@@ -48,6 +48,7 @@ namespace Ro3Emu.ClientHooks
                     // and its own reasons for skipping one ("current 3d num", "csGameObject is nil").
                     HappyEngine.GS_Debug.ShowLog = parts.Length < 2 || parts[1] != "off";
                     Step("game debug log " + (HappyEngine.GS_Debug.ShowLog ? "on" : "off"));
+                    TraceSound3D(HappyEngine.GS_Debug.ShowLog);
                     break;
                 case "stopall":
                     AD_WwiseManager.Instance.StopAll();
@@ -236,6 +237,59 @@ namespace Ro3Emu.ClientHooks
                 System.IO.File.WriteAllBytes(file, bytes);
                 Step("rawdata " + name + ": " + bytes.Length + " bytes -> " + file);
             }
+        }
+
+        // The game's 3D sounds (skills, hits) go through Lua AD_WwiseManager:PlaySound3D(id, go, ...). While the debug
+        // log is on, that method is wrapped to log which object each sound is posted on, and where.
+        public delegate object Sound3DMethod(object self, object id, object go, object a3, object a4, object a5, object a6);
+        private static readonly Sound3DMethod Sound3DWrapper = Sound3D;
+        private static Obf_R.Obf_ff _wwiseTable;
+        private static Obf_R.Obf_Ef _sound3DOriginal;
+
+        private static void TraceSound3D(bool on)
+        {
+            var global = LuaPatches.Global();
+            var table = global?.Obf_RuA<Obf_R.Obf_ff>("AD_WwiseManager");
+            if (table == null) { Step("sound trace: AD_WwiseManager not loaded"); return; }
+            if (on && _sound3DOriginal == null)
+            {
+                _sound3DOriginal = table.Obf_RuA<Obf_R.Obf_Ef>("PlaySound3D");
+                if (_sound3DOriginal == null) { Step("sound trace: PlaySound3D not found"); return; }
+                _wwiseTable = table;
+                table.Obf_luA<string, Sound3DMethod>("PlaySound3D", Sound3DWrapper);
+                Step("sound trace on");
+            }
+            else if (!on && _sound3DOriginal != null)
+            {
+                _wwiseTable.Obf_luA<string, Obf_R.Obf_Ef>("PlaySound3D", _sound3DOriginal);
+                _sound3DOriginal = null;
+                Step("sound trace off");
+            }
+        }
+
+        private static object Sound3D(object self, object id, object go, object a3, object a4, object a5, object a6)
+        {
+            try
+            {
+                var sb = new System.Text.StringBuilder("sound3d ").Append(id);
+                Transform t = go as Transform ?? (go as GameObject)?.transform ?? (go as Component)?.transform;
+                if (t == null) sb.Append(" on ").Append(go == null ? "nil" : go.GetType().Name);
+                else
+                {
+                    sb.Append(" on ").Append(Diagnostics.PathOf(t)).Append(" active=").Append(t.gameObject.activeInHierarchy)
+                      .Append(" pos=").Append(t.position.ToString("F2"));
+                    var player = AD_WwisePlayer.globalPlayer;
+                    if (player != null) sb.Append(" fromPlayer=").Append(Vector3.Distance(player.transform.position, t.position).ToString("F2"));
+                    var ak = t.GetComponent<AkGameObj>();
+                    sb.Append(" akGameObj=").Append(ak != null);
+                }
+                sb.Append(" args=").Append(a3).Append(',').Append(a4).Append(',').Append(a5).Append(',').Append(a6);
+                var r = _sound3DOriginal?.Obf_HuA(self, id, go, a3, a4, a5, a6);
+                sb.Append(" -> ").Append(r != null && r.Length > 0 ? r[0] : "-");
+                Step(sb.ToString());
+                return r != null && r.Length > 0 ? r[0] : null;
+            }
+            catch (Exception e) { Step("sound3d trace failed: " + e.Message); return null; }
         }
 
         private static void Listen(float metres)
