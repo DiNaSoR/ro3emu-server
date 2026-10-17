@@ -113,6 +113,22 @@ public sealed class QuestEngineTests : IAsyncLifetime
     }
 
     [ClientDataFact]
+    public async Task RentCartSideQuestIsOfferedOnceCartUseIsLearned()
+    {
+        // "Rent a Cart Merchant" (10200150): _iCondition 88000101 = [1102, 16003] CheckHasLearnedSkill (Cart Use).
+        await using var bot = await InWorld();
+        await Gm("!job 6100");
+        await Refresh();
+        await Barrier(bot);
+        Assert.False(await Read(s => s.Tasks!.Infos.ContainsKey(10200150)));
+        await Change(s => { s.Progress!.Skills[16003] = 1; return Task.CompletedTask; });
+        await Refresh();
+        await Barrier(bot);
+        Assert.Equal(TaskState.Running, (await State(10200150)).Status);
+        Assert.False(await Read(s => s.Tasks!.Infos.ContainsKey(10200160))); // Falconry Mastery not learned
+    }
+
+    [ClientDataFact]
     public async Task NoviceTrialGrantsExactlySevenExpAndReplaySurvivesRelog()
     {
         long role;
