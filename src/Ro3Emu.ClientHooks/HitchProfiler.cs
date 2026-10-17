@@ -38,6 +38,19 @@ namespace Ro3Emu.ClientHooks
         private static int _depth;
         private static bool _on;
 
+        // Sampling inside the slow event: a Lua count hook (C# delegate) takes a traceback every SampleMs and charges the
+        // time since the previous sample to that stack. Count hooks only fire on Lua instructions, so time spent in a C#
+        // call is charged to the Lua code right after it returns (its caller), which still names the culprit.
+        private const double SampleMs = 0.5;
+        private const int HookCount = 1000;
+        private static readonly TwoArgs HookWrapper = OnHook;
+        private static Obf_R.Obf_Ef _setHook, _traceback;
+        private static readonly Stopwatch SampleWatch = new Stopwatch();
+        private static double _lastSample;
+        private static bool _sampling;
+        private static readonly Dictionary<string, double> Stacks = new Dictionary<string, double>();
+        private static readonly Dictionary<string, double> Leaves = new Dictionary<string, double>();
+
         public static void Run(string args)
         {
             switch (args.Trim())
@@ -67,12 +80,78 @@ namespace Ro3Emu.ClientHooks
                             sb.Append("\n    ").Append(pair.Key).Append(" x").Append(pair.Value.Count).Append(' ')
                               .Append(pair.Value.Ms.ToString("F1")).Append(" ms");
                     sb.Append("\n  ").Append(TaskCounts());
+                    AppendTop(sb, "time by innermost named Lua function (sampled)", Leaves);
+                    AppendTop(sb, "time by stack, innermost first (sampled)", Stacks);
                 }
                 Debug.Log(sb.ToString());
             }
             Calls.Clear();
             Totals.Clear();
+            Stacks.Clear();
+            Leaves.Clear();
         }
+
+        private static void AppendTop(StringBuilder sb, string title, Dictionary<string, double> table)
+        {
+            if (table.Count == 0) return;
+            var rows = new List<KeyValuePair<string, double>>(table);
+            rows.Sort((a, b) => b.Value.CompareTo(a.Value));
+            sb.Append("\n  ").Append(title).Append(':');
+            for (int i = 0; i < rows.Count && i < 15; i++)
+                sb.Append("\n    ").Append(rows[i].Value.ToString("F1")).Append(" ms  ").Append(rows[i].Key);
+        }
+
+        private static void StartSampling()
+        {
+            if (_setHook == null || _sampling) return;
+            _sampling = true;
+            SampleWatch.Restart();
+            _lastSample = 0;
+            try { _setHook.Obf_HuA(HookWrapper, "", HookCount); }
+            catch (Exception e) { _sampling = false; Debug.LogWarning("[Ro3Emu.Hitch] sethook: " + e.Message); _setHook = null; }
+        }
+
+        private static void StopSampling()
+        {
+            if (!_sampling) return;
+            _sampling = false;
+            try { _setHook.Obf_HuA(); } catch (Exception e) { Debug.LogWarning("[Ro3Emu.Hitch] sethook off: " + e.Message); }
+            Sample(); // the tail since the last sample
+        }
+
+        private static void OnHook(object ev, object line)
+        {
+            if (SampleWatch.Elapsed.TotalMilliseconds - _lastSample >= SampleMs) Sample();
+        }
+
+        private static void Sample()
+        {
+            double now = SampleWatch.Elapsed.TotalMilliseconds;
+            double ms = now - _lastSample;
+            _lastSample = now;
+            string trace;
+            try { trace = _traceback?.Obf_HuA()?[0] as string; } catch { return; }
+            if (trace == null) return;
+            var names = new List<string>();
+            foreach (var raw in trace.Split('\n'))
+            {
+                string row = raw.Trim();
+                int at = row.IndexOf(" in ", StringComparison.Ordinal);
+                if (at < 0 || row.StartsWith("[C]", StringComparison.Ordinal)) continue;
+                string name = row.Substring(at + 4);
+                if (name.StartsWith("function <", StringComparison.Ordinal) || name.EndsWith("'?'", StringComparison.Ordinal)) continue;
+                name = name.Replace("function ", "").Replace("method ", ":").Replace("field ", ".")
+                    .Replace("upvalue ", "up ").Replace("'", "");
+                if (names.Count == 0 || names[names.Count - 1] != name) names.Add(name);
+                if (names.Count >= 5) break;
+            }
+            if (names.Count == 0) names.Add("(unnamed)");
+            Add(Leaves, names[0], ms);
+            if (Stacks.Count < 300) Add(Stacks, string.Join(" < ", names), ms);
+        }
+
+        private static void Add(Dictionary<string, double> table, string key, double ms) =>
+            table[key] = table.TryGetValue(key, out double sum) ? sum + ms : ms;
 
         /// <summary>How many quests the client holds in AllTaskInfo.TaskInfos, by status (UpdateTaskInfoEvent walks them all).</summary>
         private static string TaskCounts()
@@ -105,6 +184,9 @@ namespace Ro3Emu.ClientHooks
             if (global == null || manager == null) { Debug.Log("[Ro3Emu.Hitch] Lua is not up yet"); return; }
             if (_on) Disable();
             _eventNames = EventNames(global);
+            var debugLib = global.Obf_RuA<Obf_R.Obf_ff>("debug");
+            _setHook = debugLib?.Obf_RuA<Obf_R.Obf_Ef>("sethook");
+            _traceback = debugLib?.Obf_RuA<Obf_R.Obf_Ef>("traceback");
             _eventClass = LuaPatches.Module(manager, global, "lc_event");
             _dispatch = _eventClass?.Obf_RuA<Obf_R.Obf_Ef>("DispatchEvent");
             if (_dispatch != null) _eventClass.Obf_luA<string, Dispatch>("DispatchEvent", DispatchWrapper);
@@ -121,11 +203,13 @@ namespace Ro3Emu.ClientHooks
             }
             _on = true;
             Debug.Log("[Ro3Emu.Hitch] timing on: " + (_dispatch != null ? "events" : "no events (DispatchEvent not found)")
-                + ", " + Wrapped.Count + " LC_TaskHelper function(s), " + _eventNames.Count + " event names");
+                + ", " + Wrapped.Count + " LC_TaskHelper function(s), " + _eventNames.Count + " event names"
+            + (_setHook != null && _traceback != null ? ", sampling" : ", no sampling (debug.sethook not found)"));
         }
 
         private static void Disable()
         {
+            StopSampling();
             if (_dispatch != null && _eventClass != null) _eventClass.Obf_luA<string, Obf_R.Obf_Ef>("DispatchEvent", _dispatch);
             foreach (var (table, name, original, _) in Wrapped) table.Obf_luA<string, Obf_R.Obf_Ef>(name, original);
             Wrapped.Clear();
@@ -166,7 +250,11 @@ namespace Ro3Emu.ClientHooks
             var original = _dispatch;
             if (original == null) return;
             long key = LuaPatches.ToLong(module) << 32 | (LuaPatches.ToLong(notify) & 0xFFFFFFFFL);
-            Timed(null, () => original.Obf_HuA(self, module, notify, param), key);
+            bool sample = _depth == 0 && _eventNames != null && _eventNames.TryGetValue(key, out var name)
+                && name == "Common.UpdateTaskInfoEvent";
+            if (sample) StartSampling();
+            try { Timed(null, () => original.Obf_HuA(self, module, notify, param), key); }
+            finally { if (sample) StopSampling(); }
         }
 
         private static void Timed(string label, Action call, long eventKey = 0)
