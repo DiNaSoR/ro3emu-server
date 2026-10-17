@@ -65,7 +65,7 @@ public sealed partial class CharacterService
             // holds the role's other paths meanwhile. Item-gained hooks follow the commit, as before.
             var before = session.Items.Select(i => i.Clone()).ToList();
             var gained = new List<(int Entry, int Count)>();
-            foreach (var (entry, count) in StarterKit)
+            foreach (var (entry, count) in StarterKit())
             {
                 AddItemCore(session, entry, count, out bool currency, persist: false, notifyItemGained: false);
                 if (!currency) gained.Add((entry, count));

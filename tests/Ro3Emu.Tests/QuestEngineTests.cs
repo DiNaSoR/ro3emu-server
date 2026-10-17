@@ -98,6 +98,37 @@ public sealed class QuestEngineTests : IAsyncLifetime
     }
 
     [ClientDataFact]
+    public async Task LevelGatedSideQuestsAreOfferedWhenTheirConditionHolds()
+    {
+        // "Join a guild" (10200080) has no _kPreTask, only _iCondition 88000094 = [1002, 21] (base level 21).
+        // "Make Lots of Friends" (10200090) needs level 30; 10200060 is switched off in the data (_kPreTask [9999999]).
+        await using var bot = await InWorld();
+        Assert.False(await Read(s => s.Tasks!.Infos.ContainsKey(10200080)));
+        await Gm("!lvl 21");
+        await Refresh();
+        await Barrier(bot);
+        Assert.Equal(TaskState.Running, (await State(10200080)).Status);
+        Assert.False(await Read(s => s.Tasks!.Infos.ContainsKey(10200090)));
+        Assert.False(await Read(s => s.Tasks!.Infos.ContainsKey(10200060)));
+    }
+
+    [ClientDataFact]
+    public async Task RentCartSideQuestIsOfferedOnceCartUseIsLearned()
+    {
+        // "Rent a Cart Merchant" (10200150): _iCondition 88000101 = [1102, 16003] CheckHasLearnedSkill (Cart Use).
+        await using var bot = await InWorld();
+        await Gm("!job 6100");
+        await Refresh();
+        await Barrier(bot);
+        Assert.False(await Read(s => s.Tasks!.Infos.ContainsKey(10200150)));
+        await Change(s => { s.Progress!.Skills[16003] = 1; return Task.CompletedTask; });
+        await Refresh();
+        await Barrier(bot);
+        Assert.Equal(TaskState.Running, (await State(10200150)).Status);
+        Assert.False(await Read(s => s.Tasks!.Infos.ContainsKey(10200160))); // Falconry Mastery not learned
+    }
+
+    [ClientDataFact]
     public async Task NoviceTrialGrantsExactlySevenExpAndReplaySurvivesRelog()
     {
         long role;

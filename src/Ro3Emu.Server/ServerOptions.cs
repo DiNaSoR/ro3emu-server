@@ -99,6 +99,12 @@ public sealed class ServerOptions
     /// <summary>Server rates for monster kill rewards (RewardService, docs/guide/rates.md). 1 keeps the client's tables.</summary>
     public RatesOptions Rates { get; set; } = new();
 
+    /// <summary>
+    /// What a new character gets on its first login (docs/guide/starter-kit.md). Unset: nothing (inferred). The client
+    /// data has no starting-item table; a Novice's first potions, coins and gear come from main quests.
+    /// </summary>
+    public StarterItemOptions[]? StarterKit { get; set; }
+
     /// <summary>(inferred) Locally configured text blocklist; the original service's sensitive-word dictionary is unavailable.</summary>
     public string[] GuildBlockedWords { get; set; } = [];
 
@@ -257,4 +263,11 @@ public sealed class OpenContentOptions
     public bool ForcesActivity(long activityId) => Enabled && Activities.Contains(activityId);
     public bool OpensStageActivities => Enabled && SeasonStageActivities;
     public bool ServerDayFree => Enabled && IgnoreServerDay;
+}
+
+/// <summary>One <see cref="ServerOptions.StarterKit"/> entry: an ItemConfig id (1 is Zeny) and how many.</summary>
+public sealed class StarterItemOptions
+{
+    public int Entry { get; set; }
+    public int Count { get; set; }
 }

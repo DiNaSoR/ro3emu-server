@@ -279,6 +279,7 @@ public sealed partial class CombatService : IGameTicker
         scene.Leaving.Add(ClearSceneSkillProtocolAsync);
         skills.QueueEligibility = CanQueueSkill;
         character.ProgressHandlers.Add(buffs.ReconcileEnergyAsync);
+        ExtraHitDamage.Add(DoubleAttackDamage);
         monsters.AttackPet = MonsterAttackPetAsync;
         buffs.UnitChanged.Add(PublishTowerPetStatsAsync);
         WireBuffRules();
@@ -623,11 +624,17 @@ public sealed partial class CombatService : IGameTicker
         var flats = Numbers(skill, "_kDamageParam2");
         double p1 = ratios.Length > branch ? ratios[branch] : 10000, p2 = flats.Length > branch ? flats[branch] : 0;
         double dmg = (magic ? a.Matk : a.Atk) * p1 / 10000 + p2;
+        int element = (int)GameData.Int(skill, "_iEleType") is var se and > 1 ? se : a.Element;
+        return Mitigated(b, dmg, magic, element);
+    }
+
+    /// <summary>A raw hit after the defender's defense and element.</summary>
+    private double Mitigated(Fighter b, double dmg, bool magic, int element)
+    {
         // Defense: def / (def + ParDef 20 × the defender's level), the shape of the client's damage-reduction tooltip.
         double def = magic ? b.Mdef : b.Def;
         dmg *= 1 - def / (def + 20.0 * Math.Max(1, b.Level));
         // Element: EleConfig row = defender element, column = attacker element (/10000), clamped [0.1, 10].
-        int element = (int)GameData.Int(skill, "_iEleType") is var se and > 1 ? se : a.Element;
         return dmg * Math.Clamp(1 + ElementFactor(element, b.Element) / 10000.0, 0.1, 10);
     }
 
@@ -646,7 +653,7 @@ public sealed partial class CombatService : IGameTicker
     internal (double PlayerDps, double MonsterDps, long PlayerHp) Duel(GameSession p, MonsterTemplate m)
     {
         var stats = character.Stats(p);
-        var playerSkill = data.Row("SkillConfig", skills.NormalAttack(p.Progress!.Career))!.Value;
+        var playerSkill = data.Row("SkillConfig", skills.NormalAttack(p))!.Value;
         var player = new Fighter(stats[103], stats[104], stats[109], stats[111], p.Progress.Level, 1);
         var asTarget = new Fighter(0, 0, m.Flee, 0, m.Level, m.Element) { Def = m.Def, Mdef = m.Mdef, Flee = m.Flee };
         double playerDps = ExpectedDamage(player, asTarget, playerSkill) * 1000.0 / Math.Max(1, SkillMs(p, playerSkill));
