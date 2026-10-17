@@ -187,20 +187,50 @@ public sealed partial class CharacterService
         int result = !validType || req.OpType is < MedicineAutoUseOpType.Switch or > MedicineAutoUseOpType.Medicine
             || req.SetData == null || req.SetData.Condition is < 0 or > 100 || req.SetData.ItemEntrys.Count > 8
             ? ErrorCodes.Parameter : 0;
-        if (result == 0 && req.SetData!.ItemEntrys.Any(entry => entry <= 0 || data.Row("ItemConfig", entry) is not { } row
-            || GameData.Int(row, "_iIsUse") == 0)) result = ErrorCodes.ItemNoConfig;
+        // 0 marks an empty slot: the window sends every slot, and Remove writes 0 into its slot.
+        if (result == 0 && req.SetData!.ItemEntrys.Any(entry => entry < 0 || entry > 0 && (data.Row("ItemConfig", entry) is not { } row
+            || GameData.Int(row, "_iIsUse") == 0))) result = ErrorCodes.ItemNoConfig;
         var nextInfo = session.BagState.Info.Clone();
-        var saved = nextInfo.MedicinesAutoUse ?? new MedicinesAutoUseSet();
+        var saved = WithMedicineDefaults(nextInfo.MedicinesAutoUse);
         if (result == 0)
         {
-            if (req.Type == MedicineAutoUseType.Hp) saved.HpConfig = req.SetData!.Clone();
-            else saved.SpConfig = req.SetData!.Clone();
+            var config = PadMedicineSlots(req.SetData!.Clone());
+            if (req.Type == MedicineAutoUseType.Hp) saved.HpConfig = config;
+            else saved.SpConfig = config;
             nextInfo.MedicinesAutoUse = saved;
             await CommitBagAsync(session, "medicine-setting", nextInfo);
         }
         await session.SendGameAsync(MedicinesAutoUseSet, new MedicinesAutoUseSetResp
         { Result = result, Type = req.Type, SetData = (req.Type == MedicineAutoUseType.Hp ? saved.HpConfig : saved.SpConfig)?.Clone() });
         if (result == 0) await SyncItemsAsync(session);
+    }
+
+    /// <summary>Slots in the auto-medicine window (UI_Sys_AutoDrink_SetBoxWidget SlotItem1..3).</summary>
+    private const int MedicineSlots = 3;
+
+    /// <summary>
+    /// Condition shown before the player has touched the slider. The client has no default of its own (the prefab
+    /// text reads 60%), so this is inferred.
+    /// </summary>
+    private const int DefaultMedicineCondition = 60;
+
+    /// <summary>
+    /// The client only builds its HpAutoUseConfig from the 5009 medicinesAutoUse field. Without it, Add, Replace and
+    /// Add All index a nil config and do nothing, so every role gets both configs with all slots present.
+    /// </summary>
+    internal static MedicinesAutoUseSet WithMedicineDefaults(MedicinesAutoUseSet? saved)
+    {
+        var set = saved?.Clone() ?? new MedicinesAutoUseSet();
+        set.HpConfig = PadMedicineSlots(set.HpConfig ?? new MedicinesAutoUse { Condition = DefaultMedicineCondition });
+        set.SpConfig = PadMedicineSlots(set.SpConfig ?? new MedicinesAutoUse { Condition = DefaultMedicineCondition });
+        return set;
+    }
+
+    /// <summary>Add writes kItemList[slot]; a short list would leave a hole that ipairs stops at.</summary>
+    private static MedicinesAutoUse PadMedicineSlots(MedicinesAutoUse config)
+    {
+        while (config.ItemEntrys.Count < MedicineSlots) config.ItemEntrys.Add(0);
+        return config;
     }
 
     /// <summary>31324 sets the equipped arrow entry; count comes from actually owned bag stacks.</summary>
