@@ -366,6 +366,9 @@ public sealed class TimedEventTests : IAsyncLifetime
         var window = MatchWindow(todo);
         clock.Set(window.Start + 300);
         Assert.True(Service<TimedTodoSchedule>().IsOpen(todo));
+        // 705070 [210012,1] counts either battle, 1602100 [210009,1] only Dragon Coffin Island (TimedBattleTarget).
+        await QuestProbe.AcceptAsync(app, http, "alice", 705070);
+        await QuestProbe.AcceptAsync(app, http, "alice", 1602100);
         var exportedMatch = Service<GameData>().Row(entry == 2 ? "EatChickenMatchConfig" : "DragonIslandMatchConfig", entry)!.Value;
         Assert.Equal(entry == 2 ? 100 : 30, GameData.Int(exportedMatch, "_kStartQuantity"));
         Assert.Equal(5, GameData.Int(exportedMatch, "_kTeamQuantity"));
@@ -486,6 +489,9 @@ public sealed class TimedEventTests : IAsyncLifetime
                 (await Next(alice, TimedBattleService.DragonClaim, DragonIslandClaimRankRewardRes.Parser)).ErrorCode);
         }
         Assert.NotNull(Service<RoleStore>().LoadTimedBattle((long)alice.Self.Uuid));
+        await QuestProbe.DoneAsync(app, "alice", 705070);
+        if (entry == 6) await QuestProbe.DoneAsync(app, "alice", 1602100); // delivery waits on its action 115
+        else Assert.Equal(0, (await QuestProbe.ReadAsync(app, "alice", 1602100))!.CompleteNum[0]);
     }
 
     [ClientDataFact]

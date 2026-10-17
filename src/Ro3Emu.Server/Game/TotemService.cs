@@ -614,16 +614,19 @@ public sealed class TotemService
         }
     }
 
+    /// <summary>The sum of the deployed totems' LC_TotemHelper.GetTotemScore, each rounded up on its own (:1198-1248).</summary>
     private long Power(GameSession s, TotemPlan plan)
     {
-        double power = 0;
+        long total = 0;
         foreach (var id in plan.SetUpTotem.Values.Where(g => g != 0))
         {
             var item = Find(s, id); if (item == null) continue;
+            double power = 0;
             for (int n = 0; n < 10 && Value(item, 220 + n) != 0; n++)
                 if (data.Row("AttributeConfig", Value(item, 220 + n)) is { } attr && attr.TryGetProperty("_iPower", out var weight)) power += Value(item, 230 + n) * (GameData.Number(weight) ?? 0);
             foreach (var skill in Skills(item)) if (data.Row("TotemSkillConfig", skill) is { } row) power += GameData.Int(row, "_iPower");
+            total += (long)Math.Ceiling(power);
         }
-        return (long)Math.Ceiling(power);
+        return total;
     }
 }

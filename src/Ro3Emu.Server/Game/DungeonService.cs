@@ -26,6 +26,9 @@ public sealed partial class DungeonService
 
     /// <summary>Committed clears only; consumers receive the scene entry and whether an actual personal award was paid.</summary>
     public List<Func<GameSession, int, bool, Task>> Completed { get; } = new();
+    /// <summary>After <see cref="Completed"/> for a TenGameplay run: the boss (TenGameplayBossConfig._iBoss) and the
+    /// run's settled participants (quest target 106602).</summary>
+    public List<Func<GameSession, long, IReadOnlyCollection<GameSession>, Task>> MultiBossCleared { get; } = new();
     /// <summary>Guild Challenge owns admission and rewards; this engine retains scenes, combat and cleanup.</summary>
     internal Func<GameSession, EnterDungeonReq, Task<bool>>? GuildChallengeEnter { get; set; }
     /// <summary>Another private-room owner whose 30402 exit revives a dead member on return (the guild home).</summary>
@@ -811,9 +814,18 @@ public sealed partial class DungeonService
             }
             if (!committed) continue;
             if (committed && success)
+            {
                 foreach (var handler in Completed)
                     try { await handler(s, (int)a.Plan.SceneEntry, goods.Count > 0); }
                     catch (Exception e) { log.LogError(e, "Dungeon clear callback failed for {Role}, instance {Instance}", roleId, a.Room.Id); }
+                if (a.Plan.Boss is { } boss)
+                {
+                    var party = participants.Select(p => p.Session).ToArray();
+                    foreach (var handler in MultiBossCleared)
+                        try { await handler(s, GameData.Int(boss, "_iBoss"), party); }
+                        catch (Exception e) { log.LogError(e, "Dungeon boss clear callback failed for {Role}, instance {Instance}", roleId, a.Room.Id); }
+                }
+            }
             var result = new DungeonResNotify { DungeonEntry = a.Plan.SceneEntry, Res = (DungeonRes)(success ? 1 : 2) };
             if (success)
             {

@@ -255,6 +255,8 @@ public static class ErrorCodes
     public const int SlotEmpty = 1810;          // "There is no card in this slot"
     public const int SlotSealed = 1811;         // "Card slot has not been unsealed"
     public const int AlreadyUnlocked = 1813;    // "Already unlocked"
+    public const int CardSameName = 1816;       // "Only one card with the same name can be socketed"
+    public const int CardSameElement = 1818;    // "Only one card that changes armor elemental properties can be socketed"
     // Codex and Growth Classroom (ErrorCodeConfig; the request mapping is inferred).
     public const int CodexUnavailable = 3802;   // "Unable to view the Codex."
     public const int UnlockRequirement = 3355;  // "Unlock Requirement not met." (a locked Codex theme, inferred)

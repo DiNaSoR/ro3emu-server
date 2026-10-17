@@ -14,7 +14,7 @@ namespace Ro3Emu.Server.Game;
 /// </summary>
 public sealed partial class GenreService(
     RoleStore roles, ItemStore items, CharacterService character, SkillService skills, CardService cards,
-    PetService pets, EmblemService emblems, SeasonTalentService talents, TotemService totems,
+    PetService pets, EmblemService emblems, SeasonTalentService talents, TotemService totems, PowerService power,
     FunctionService functions, SessionRegistry sessions, GameData data, ILogger<GenreService> log)
 {
     public const uint GenreSync = 5008;
@@ -131,24 +131,12 @@ public sealed partial class GenreService(
 
     private Dictionary<int, long> Properties(GameSession s, Stage next) => WithProjection(s, next, () => new Dictionary<int, long>(character.Stats(s).Data));
 
-    private PowerUnit Power(GameSession s, Stage next) => WithProjection(s, next, () =>
-    {
-        // SchemeHelper.GetSystemPower reads each child's PowerUnit; Totem power is a derived projection.
-        var skill = next.Skills.SkillAssignPlans[next.Skills.CurrentPlanIndex].Power;
-        var attr = next.Attrs.AllPlanBaseProperty.GetValueOrDefault(next.Attrs.CurPlanIndex)?.Power;
-        var equip = next.Equipment.EquipPlans.GetValueOrDefault(next.Equipment.CurrentEquipPlan)?.Power;
-        var card = next.Cards.StoragePlans.GetValueOrDefault(next.Cards.CurrentPlan)?.Power;
-        var pet = next.Pets.SetupPlans.GetValueOrDefault(next.Pets.CurrentPlan)?.Power;
-        var totem = totems.CurrentPlanPower(s, next.Totems);
-        var echo = emblems.GenrePower(s, next.Echoes);
-        return new PowerUnit
-        {
-            NormalPower = (skill?.NormalPower ?? 0) + (attr?.NormalPower ?? 0) + (equip?.NormalPower ?? 0)
-                + (card?.NormalPower ?? 0) + (pet?.NormalPower ?? 0) + (totem?.NormalPower ?? 0),
-            SeasonPower = (skill?.SeasonPower ?? 0) + (attr?.SeasonPower ?? 0) + (equip?.SeasonPower ?? 0)
-                + (card?.SeasonPower ?? 0) + echo.SeasonPower + (pet?.SeasonPower ?? 0) + (totem?.SeasonPower ?? 0),
-        };
-    });
+    /// <summary>
+    /// The selected children's power: the role's power package for the projected state minus what the client adds
+    /// outside the plans (LC_PlayerInfoHelper.GetPlanOtherPower: base level, title, card suit). The cross-system
+    /// aggregation itself is inferred (docs/genre-implementation.md).
+    /// </summary>
+    private PowerUnit Power(GameSession s, Stage next) => WithProjection(s, next, () => power.GenrePower(s));
 
     private void RefreshPlan(GameSession s, DBGenrePlan plan, IReadOnlyDictionary<int, int> selected)
     {

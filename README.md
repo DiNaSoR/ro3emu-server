@@ -108,6 +108,7 @@ game files: everything comes from the publisher's own update service, verified w
 | `RO3Emu.exe restore` | undo the patch: the game talks to the official servers again |
 | `RO3Emu.exe check` | does this game version fit this RO3Emu? (changes nothing) |
 | `RO3Emu.exe diag` | `RO3Emu-diagnostics.zip` for a bug report |
+| `RO3Emu.exe delete-character [address]` | delete one of your characters (the game has no delete button); log out first |
 
 What it changes: in the game folder, a few DLLs in `ro3_Data\Managed` (originals kept in `ro3emu-backup`) and
 `ro3emu\loc_en.tsv` (the English texts, built from your own game files); next to RO3Emu.exe, `data\` (game data, your

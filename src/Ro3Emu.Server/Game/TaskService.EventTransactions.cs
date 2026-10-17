@@ -10,7 +10,7 @@ public sealed partial class TaskService
 
     internal CharacterService.FirstCardSightPlan? StageTimedBattleSettlement(GameSession session, int entry, string source)
         => entry is 2 or 6 ? StageEventTarget(session, "timed-battle/" + source,
-            target => target[0] == TTimedBattle && target.Length == 2) : null;
+            target => TimedBattleTarget(target, entry)) : null;
 
     internal CharacterService.FirstCardSightPlan? StageOnePieceReward(GameSession session, string source)
         => StageEventTarget(session, "one-piece/" + source,

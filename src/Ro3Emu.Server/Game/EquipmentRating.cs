@@ -7,8 +7,8 @@ namespace Ro3Emu.Server.Game;
 /// <summary>
 /// Per-instance equipment score for ItemBaseInfo.itemInfos[2]. The client reads this value rather than calculating it
 /// (LC_ItemProtoParse.ParseEquipInfo, clientB:271-293,471-487; LC_EquipmentHelper.GetEquipScore:965-975).
-/// The weighted construction below is inferred: the client does not recover the original server formula.
-/// It must not be used as an emblem or overall player-power formula.
+/// The weighted construction below is inferred: the client does not establish the original server formula.
+/// It is not an emblem or overall player-power formula; PowerService counts it as one term of equipRankScore.
 /// </summary>
 public static class EquipmentRating
 {

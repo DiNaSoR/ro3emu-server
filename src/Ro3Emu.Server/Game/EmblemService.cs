@@ -26,6 +26,8 @@ public sealed partial class EmblemService
         public Dictionary<int, Plan> Plans { get; set; } = new();
         public int CurrentPlan { get; set; }
         public long HistorySeasonPower { get; set; }
+        /// <summary>The role's published and best power total (PowerService); null before its first publish.</summary>
+        public PowerService.Record? Power { get; set; }
     }
 
     public sealed class Plan
@@ -41,6 +43,9 @@ public sealed partial class EmblemService
     private readonly RoleStore roles;
     private readonly ILogger<EmblemService> log;
 
+    /// <summary>After a committed 82424 upgrade: the levels it gained (quest target 317002). Listeners post their work.</summary>
+    public List<Action<GameSession, int>> Upgraded { get; } = new();
+
     public EmblemService(GameData data, CharacterService character, FunctionService functions, SeasonService seasons,
         RoleStore roles, ILogger<EmblemService> log)
     {
@@ -51,7 +56,11 @@ public sealed partial class EmblemService
         this.roles = roles;
         this.log = log;
         character.EmblemAttrFactory = GenerateAttrs;
+        character.ExtraAttributes.Add(ResonanceAttributes);
     }
+
+    /// <summary>Set by PowerService: publish 31502/31503/5066 after a Soul Echo change (the caller holds the lock).</summary>
+    internal Func<GameSession, Task>? PublishPower { get; set; }
 
     /// <summary>Load before 5009 and ENTITYSELF; roll missing old instance attrs and repair stale active refs (inferred).</summary>
     public async Task LoadAsync(GameSession session)
@@ -132,10 +141,11 @@ public sealed partial class EmblemService
         }
     }
 
+    /// <summary>5005 only: PowerService publishes the power once every power owner is loaded (RoleSystems).</summary>
     public async Task LoginAsync(GameSession session)
     {
+        session.EmblemPower = PlanPower(session, Active(session)).SeasonPower;
         await SyncAsync(session);
-        await PowerAsync(session, 0);
     }
 
     private static Plan Active(GameSession session) => session.Emblems.Plans[session.Emblems.CurrentPlan];
@@ -159,11 +169,15 @@ public sealed partial class EmblemService
         }
     }
 
-    private long PlanPower(IReadOnlyList<InvItem> inventory, Plan plan) => plan.Slots.Values.Distinct()
-        .Sum(guid => inventory.FirstOrDefault(i => i.Guid == guid) is { } item ? Score(item) : 0);
+    /// <summary>The plan's item scores plus its reached Echo Resonance stages' season power (StagePower).</summary>
+    private long PlanPower(IReadOnlyList<InvItem> inventory, Plan plan)
+    {
+        var worn = plan.Slots.Values.Distinct().Select(guid => inventory.FirstOrDefault(i => i.Guid == guid)).OfType<InvItem>().ToList();
+        return worn.Sum(Score) + StagePower(worn, data);
+    }
 
     /// <summary>
-    /// <see cref="CurrentPower"/> of a role from its committed "emblems" blob and item rows, for roles that are not
+    /// The Soul Echo plan power of a role from its committed "emblems" blob and item rows, for roles that are not
     /// online (leaderboards). Slots that do not resolve to an owned instance count 0, as in <see cref="PlanPower"/>.
     /// </summary>
     internal long StoredPower(byte[]? emblems, IReadOnlyList<InvItem> inventory)
@@ -236,16 +250,11 @@ public sealed partial class EmblemService
     /// counted per mark id (LC_EmblemHelper.GetAllMarkEquipedNum, LC_ItemProtoParse.lua:1055-1100), reach the
     /// EmblemMarkConfig stage whose _iMarkNum they meet (3/6/10, LC_SoulHelper.GetLevelByMarkNum). Mark id → stage.
     /// </summary>
-    internal static Dictionary<long, long> Resonances(GameSession session, GameData data)
+    internal static Dictionary<long, long> Resonances(GameSession session, GameData data) => Resonances(Worn(session), data);
+
+    internal static Dictionary<long, long> Resonances(IEnumerable<InvItem> worn, GameData data)
     {
-        var marks = new Dictionary<long, int>();
-        foreach (var item in Worn(session))
-        {
-            int lit = data.Row("EmblemConfig", item.Entry) is { } row && row.TryGetProperty("_kInitialMark", out var initial)
-                && initial.ValueKind == JsonValueKind.Array ? initial.GetArrayLength() : 0;
-            for (int i = 0; i < lit && item.Attrs?.TryGetValue(1021 + i, out long mark) == true; i++)
-                marks[mark] = marks.GetValueOrDefault(mark) + 1;
-        }
+        var marks = MarkCounts(worn, data);
         var stages = new Dictionary<long, long>();
         foreach (var row in data.Table("EmblemMarkConfig").Values)
         {
@@ -254,6 +263,20 @@ public sealed partial class EmblemService
                 stages[mark] = stage;
         }
         return stages;
+    }
+
+    /// <summary>Lit marks per mark id over the given echoes (LC_EmblemHelper.GetAllMarkEquipedNum).</summary>
+    private static Dictionary<long, int> MarkCounts(IEnumerable<InvItem> worn, GameData data)
+    {
+        var marks = new Dictionary<long, int>();
+        foreach (var item in worn)
+        {
+            int lit = data.Row("EmblemConfig", item.Entry) is { } row && row.TryGetProperty("_kInitialMark", out var initial)
+                && initial.ValueKind == JsonValueKind.Array ? initial.GetArrayLength() : 0;
+            for (int i = 0; i < lit && item.Attrs?.TryGetValue(1021 + i, out long mark) == true; i++)
+                marks[mark] = marks.GetValueOrDefault(mark) + 1;
+        }
+        return marks;
     }
 
     public static bool IsReserved(GameSession session, InvItem item) =>
@@ -289,18 +312,7 @@ public sealed partial class EmblemService
 
     private Task SyncAsync(GameSession session) => CharacterService.SyncAsync(session, PlanSync, Build(session));
 
-    public static PowerUnit CurrentPower(GameSession session)
-    {
-        // Filled by instance Score below through the owning service at sync; 5066 uses this cached value.
-        return new PowerUnit { SeasonPower = session.EmblemPower };
-    }
-
-    public static PowerUnit HistoryPower(GameSession session) => new() { SeasonPower = session.Emblems.HistorySeasonPower };
-
-    private PowerUnit PlanPower(GameSession session, Plan plan) => new()
-    {
-        SeasonPower = plan.Slots.Values.Distinct().Sum(guid => session.Items.FirstOrDefault(i => i.Guid == guid) is { } item ? Score(item) : 0),
-    };
+    private PowerUnit PlanPower(GameSession session, Plan plan) => new() { SeasonPower = PlanPower(session.Items, plan) };
 
     private long Score(InvItem item)
     {
@@ -313,31 +325,16 @@ public sealed partial class EmblemService
         for (int i = 0; i < 10 && item.Attrs?.TryGetValue(1091 + i, out long specialId) == true; i++)
             if (data.Row("SpecialEffectConfig", specialId) is { } special) score += GameData.Int(special, "_iPower");
         // Item score sums the configured base, level, subrow, special power (LC_EmblemHelper.GetEmblemScore).
-        // The plan uses the sum of item scores (inferred); no mark-stage score is added. No _kSpecialAttribute generation
+        // The plan adds its reached mark stages on top (PlanPower, StagePower). No _kSpecialAttribute generation
         // pool exists here; preexisting specials can score but their combat evaluator is outside this slice.
         return score;
     }
 
+    /// <summary>The Soul Echo part changed: PowerService republishes the whole package (31502, 31503, 5066).</summary>
     private async Task PowerAsync(GameSession session, long previous)
     {
-        long current = PlanPower(session, Active(session)).SeasonPower;
-        session.EmblemPower = current;
-        var unit = CurrentPower(session);
-        var history = HistoryPower(session);
-        // Other category scores are outside this system; zero baseline is current emulator behavior (inferred aggregate).
-        var package = new PlayerPowerPackage
-        {
-            LevelUpAddPointScore = new(), SkillAddPointScore = new(), TitleScore = new(), EquipRankScore = new(),
-            EquipRefineScore = new(), EquipStrengthenScore = new(), CardSuitScore = new(), CardFillInEquipScore = new(),
-            TotemScore = new(), EmblemScore = unit.Clone(),
-        };
-        await session.SendGameAsync(31502, new PlayerChangePowerNtf
-        {
-            CurPower = unit.Clone(), ChangePower = new PowerUnit { SeasonPower = current - previous },
-            MaxHistoryPower = history, PowerPackage = package.Clone(),
-        });
-        await session.SendGameAsync(31503, new PlayerPowerPackageNtf { PowerPackage = package });
-        await character.SyncBaseInfoAsync(session);
+        session.EmblemPower = PlanPower(session, Active(session)).SeasonPower;
+        if (PublishPower != null) await PublishPower(session);
     }
 
     /// <summary>One accepted change: 5009, 5005, final properties/AOI, power, then 5066 (packet order inferred).</summary>
@@ -528,6 +525,10 @@ public sealed partial class EmblemService
                         Feeds = feed.Select(i => new { i.Guid, i.Entry }).OrderBy(i => i.Guid).ToArray(),
                         AddedExperience = xp, Attributes = upgradedAttrs });
                 await ChangedAsync(session, previous, inventory: true);
+                int gained = (int)upgradedAttrs!.GetValueOrDefault(Level) - level;
+                foreach (var handler in Upgraded)
+                    try { handler(session, gained); }
+                    catch (Exception e) { log.LogError(e, "Soul Echo upgrade hook failed for {Role}", session.Role?.Id); }
             }
         }
         // No excess-XP refund, so gainItems is empty (inferred).

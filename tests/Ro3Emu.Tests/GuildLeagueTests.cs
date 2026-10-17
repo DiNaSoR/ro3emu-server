@@ -243,6 +243,9 @@ public sealed partial class GuildLeagueTests : IAsyncLifetime
 
         // The final: both guilds meet. Blue is the guild of the first semifinal (the client's FightThree pairing).
         await Go(At(1, 6, 20, 30, 5));
+        // Quest targets of a fought match (TaskService.OnGuildLeagueMatch): 106603 [stage, n] and 106019 [stage, points, n].
+        foreach (var (account, task) in new[] { ("alice", 706050L), ("alice", 500042L), ("alice", 1602030L), ("bob", 706050L), ("bob", 1602030L) })
+            await QuestProbe.AcceptAsync(app, http, account, task);
         var open = await MgrData(alice);
         Assert.Equal((GuildLeagueStatus.FightThree, true), (open.ActivityInfo.EStatus, open.ActivityInfo.Open));
         var cup = await Read(() => League.State.Cup!);
@@ -319,6 +322,13 @@ public sealed partial class GuildLeagueTests : IAsyncLifetime
         Assert.Equal(blue == astra ? 0 : 1, result.History.ResultInfo.Result);
         Assert.Equal(new[] { League.MainScene, League.SubScene }.Order(), result.History.DungeonRolesInfo.Keys.Order());
         await Next(bob, GuildLeagueService.ResultNotify, GuildLeagueDungeonResultNtf.Parser);
+        // The byes of rounds 1 and 2 were no match; the final is one for both fighters. 1602030 asks for more than
+        // 20 personal points in the finals: Alice scored, Bob (Sub-Battlefield, no kill or capture) did not.
+        await QuestProbe.DoneAsync(app, "alice", 706050);
+        await QuestProbe.WaitAsync(app, "alice", 500042, i => i.Status == TaskState.Delivery, "delivered");
+        await QuestProbe.DoneAsync(app, "alice", 1602030); // delivery waits on its action 115
+        await QuestProbe.DoneAsync(app, "bob", 706050);
+        Assert.Equal(0, (await QuestProbe.ReadAsync(app, "bob", 1602030))!.CompleteNum[0]);
         await Until(() => Read(() => League.State.Cup!.Settled), "the tournament settlement");
 
         await alice.SendGameAsync(GuildLeagueService.Info, new GetGuildLeagueInfoReq());

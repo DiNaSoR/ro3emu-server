@@ -73,6 +73,7 @@ public sealed partial class CombatService
             var b = new Fighter(0, 0, 0, 0, target.Progress!.Level, 1)
             { Def = defend[105], Mdef = defend[106], Flee = defend[110], ResCri = defend[112] };
             var (damage, result) = Damage(a, b, row);
+            if (result != DamageHitResult.Miss) damage = ApplyPlayerRestraints(source, target, damage);
             var committed = await CommitPlayerDamageAsync(target, damage, row,
                 () => currentSource() && CurrentPlayerHit(source, target, attackerRole, targetRole, sceneId)
                     && CanPlayerHit(source, target));

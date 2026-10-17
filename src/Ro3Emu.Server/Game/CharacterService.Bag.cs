@@ -48,11 +48,16 @@ public sealed partial class CharacterService
     /// <summary>BuffService supplies live item-use restrictions to every use path, including shortcuts.</summary>
     public Func<GameSession, bool>? IsItemUseForbidden { get; set; }
 
-    private async Task<int> UseItemCoreAsync(GameSession session, ItemUseReq req, bool reply)
+    /// <summary>Server-initiated use (ItemAutoUseService): the success reply still plays the item's client effects,
+    /// a refusal stays silent and leaves the item in the bag.</summary>
+    internal Task<int> AutoUseItemAsync(GameSession session, long guid, int count) =>
+        UseItemCoreAsync(session, new ItemUseReq { ItemGuid = guid, ItemCount = count }, reply: true, replyErrors: false);
+
+    private async Task<int> UseItemCoreAsync(GameSession session, ItemUseReq req, bool reply, bool replyErrors = true)
     {
         if (session.Role == null)
         {
-            if (reply) await session.SendGameAsync(ItemUse, new ItemUseResp { Result = ErrorCodes.FeatureUnavailable, ItemGuid = req.ItemGuid });
+            if (reply && replyErrors) await session.SendGameAsync(ItemUse, new ItemUseResp { Result = ErrorCodes.FeatureUnavailable, ItemGuid = req.ItemGuid });
             return ErrorCodes.FeatureUnavailable;
         }
         using var ownerScope = await EnterItemUseAsync(session, req);
@@ -80,7 +85,7 @@ public sealed partial class CharacterService
         if (result == 0) result = ItemRuleError(session, row!.Value, item!.Entry, count);
         if (result != 0)
         {
-            if (reply) await session.SendGameAsync(ItemUse, new ItemUseResp { Result = result, ItemGuid = req.ItemGuid });
+            if (reply && replyErrors) await session.SendGameAsync(ItemUse, new ItemUseResp { Result = result, ItemGuid = req.ItemGuid });
             return result;
         }
         int entry = item!.Entry;
@@ -130,7 +135,7 @@ public sealed partial class CharacterService
         result = specialized ?? (CanApplyUseEffects(row.Value) ? WingError(session, row.Value, req) : ErrorCodes.FeatureUnavailable);
         if (result != 0)
         {
-            if (reply) await session.SendGameAsync(ItemUse, new ItemUseResp { Result = result, ItemGuid = req.ItemGuid });
+            if (reply && replyErrors) await session.SendGameAsync(ItemUse, new ItemUseResp { Result = result, ItemGuid = req.ItemGuid });
             return result;
         }
         if (specialized == null)

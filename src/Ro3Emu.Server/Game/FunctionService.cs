@@ -32,7 +32,13 @@ public sealed class FunctionService
         this.seasons = seasons;
         this.clock = clock;
         character.ProgressHandlers.Add(SyncAsync);
+        // LC_DAL_ServerInfo.PackServerBasicInfo: iOpenDayCount (the server level and EXP catch-up read it).
+        character.ServerDay = ServerDay;
     }
+
+    /// <summary>The server's open day as the client's iOpenDayCount: day 1 is the season start.</summary>
+    public int ServerDay() =>
+        (int)Math.Clamp(Math.Floor((clock.GetUtcNow().ToUnixTimeSeconds() - seasons.StartTime) / 86400d) + 1, int.MinValue, int.MaxValue);
 
     public Task SyncAsync(GameSession session) => session.DeferFunctionSync ? Task.CompletedTask
         : CharacterService.SyncAsync(session, FunctionOpenSync, Build(session));

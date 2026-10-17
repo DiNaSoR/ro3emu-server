@@ -15,7 +15,11 @@ internal static class PetCombatRules
     /// variation * 1000 + level and PetStarConfig._iBaseAttr / 10000. The display helper uses
     /// _iAttributeVariated. (inferred) A fighting pet overlays _iBattleAttributeVariated's explicit
     /// attributes, retaining unspecified display attributes (SP), and uses the same star multiplier.
-    /// No owner equipment/share or PetAttrChangeConfig formula is established by that helper.
+    /// No owner equipment/share formula is established by that helper.
+    /// PetAttrChangeConfig (63 rows, no client reader) holds per-quality multipliers of HP / PATK / MATK (101/103/104) by
+    /// star and stage; its quality-3 HP column is PetStarConfig._iBaseAttr itself. (inferred) A fighting pet uses those
+    /// for the three attributes (PetBaseConfig._iQuality, star, stage = StarProgress) and _iBaseAttr for the rest, so
+    /// quality 4/5 pets scale their HP far more (to 450% at quality 5 star 6) than their attack.
     /// </summary>
     internal static Dictionary<int, double>? Attributes(GameData data, int id, PetData pet)
     {
@@ -36,14 +40,25 @@ internal static class PetCombatRules
         var excluded = data.Table("PublicParamConfig").GetValueOrDefault("PetNotImproveBaseAttr");
         var unscaled = excluded.ValueKind == JsonValueKind.Array
             ? excluded.EnumerateArray().Select(v => (int)(GameData.Number(v) ?? 0)).ToHashSet() : [];
+        var change = AttrChange(data, (int)GameData.Int(cfg, "_iQuality"), pet.Star, pet.StarProgress);
         foreach (int attr in values.Keys.ToArray())
-            if (!unscaled.Contains(attr)) values[attr] *= GameData.Int(star.Value, "_iBaseAttr") / 10000.0;
+            if (!unscaled.Contains(attr))
+                values[attr] *= (change != null && change.TryGetValue(attr, out long perc) ? perc : GameData.Int(star.Value, "_iBaseAttr")) / 10000.0;
         // (inferred) Missing HIT/FLEE retain the existing level fallback; movement comes from NPCConfig.
         values.TryAdd(109, level + 1);
         values.TryAdd(110, level);
         values.TryAdd(115, 100); // (inferred) Neutral attack-speed base, as in CharacterService's attribute pipeline.
         values[113] = GameData.Int(npc, "_iSpeed");
         return values;
+    }
+
+    /// <summary>PetAttrChangeConfig._kAttrPerc of a quality, star and stage (attribute id to per-10000), or null.</summary>
+    internal static Dictionary<long, long>? AttrChange(GameData data, int quality, int star, int stage)
+    {
+        foreach (var row in data.Table("PetAttrChangeConfig").Values)
+            if (GameData.Int(row, "_iQuality") == quality && GameData.Int(row, "_iStar") == star && GameData.Int(row, "_iStage") == stage)
+                return GameData.Pairs(row, "_kAttrPerc").ToDictionary(p => p.Id, p => (long)p.Value);
+        return null;
     }
 
     internal static JsonElement? Star(GameData data, int id, PetData pet)

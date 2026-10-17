@@ -1108,4 +1108,79 @@ public sealed class ActivityAdventuresTests : IAsyncLifetime
         while (path != null && !Directory.Exists(Path.Combine(path.FullName, "data", "config"))) path = path.Parent;
         return path?.FullName ?? throw new DirectoryNotFoundException("Repository data/config");
     }
+
+    /// <summary>106802 counts a committed dig at the Treasure Map's point (growth title 4's 704090 [106802,20], the
+    /// activity quest 110008 [106802,1]); using the map alone is not a dig. The count survives a relogin.</summary>
+    [ClientDataFact]
+    public async Task TreasureDigCountsTowardTheTreasureHuntQuests()
+    {
+        var window = app.Services.GetRequiredService<ActivityClock>()
+            .Segments(1017, clock.GetUtcNow().ToUnixTimeSeconds()).Single();
+        clock.Set(window.Start + 60);
+        var alice = await InWorld("Alice");
+        await Gm("alice", "!lvl 99");
+        await QuestProbe.AcceptAsync(app, http, "alice", 704090);
+        await QuestProbe.AcceptAsync(app, http, "alice", 110008);
+        await Gm("alice", "!item 1112001 1");
+        var session = app.Services.GetRequiredService<SessionRegistry>().All().Single(s => s.Role?.Name == "Alice");
+        long guid = session.Items.Single(i => i.Entry == 1112001).Guid;
+        await alice.SendGameAsync(CharacterService.ItemUse, new ItemUseReq { ItemGuid = guid, ItemCount = 1 });
+        Assert.Equal(0, (await Next(alice, CharacterService.ItemUse, ItemUseResp.Parser)).Result);
+        var cursor = await Next(alice, 5064, DBTreasureInfoIncrement.Parser, i => i.PointId > 0);
+        Assert.Equal(0, (await QuestProbe.ReadAsync(app, "alice", 704090))!.CompleteNum[0]);
+
+        var target = app.Services.GetRequiredService<SceneService>().TreasurePoint(cursor.PointId)!.Value;
+        string x = target.Position.X.ToString(CultureInfo.InvariantCulture);
+        string z = target.Position.Z.ToString(CultureInfo.InvariantCulture);
+        await Gm("alice", $"!jump {x} {z}");
+        await alice.SendGameAsync(SceneService.NpcInteraction, new NpcInteractionReq
+        {
+            NpcUid = SceneService.TreasureUidPrefix | session.Role!.Id, InteractionId = 4,
+        });
+        Assert.Equal(0, (await Next(alice, SceneService.NpcInteraction, NpcInteractionRsp.Parser)).Result);
+        await Next(alice, 83251, TreasureEventNotify.Parser);
+        await QuestProbe.AtAsync(app, "alice", 704090, 1);
+        await QuestProbe.DoneAsync(app, "alice", 110008);
+
+        await alice.DisposeAsync();
+        await QuestProbe.OfflineAsync(app, "alice");
+        await using var again = await InWorld("Alice", create: false);
+        await QuestProbe.AtAsync(app, "alice", 704090, 1);
+    }
+
+    /// <summary>
+    /// Lost Treasure (activity 106, _kTaskRenew [1013,13,132,..] and [0,13,131,..]) offers its season tasks while open:
+    /// 110007 "Log in to the game" [106801,1] is met by the login it is accepted in and claimed in the panel with 31205;
+    /// the daily group (TimeLimit 1013 "refreshTaskDaily") starts over the next game day, the other group does not.
+    /// </summary>
+    [ClientDataFact]
+    public async Task LostTreasureOffersItsTasksAndTheDailyOnesStartOverNextDay()
+    {
+        var window = app.Services.GetRequiredService<ActivityClock>()
+            .Segments(1017, clock.GetUtcNow().ToUnixTimeSeconds()).Single();
+        long start = window.Start + 60;
+        Assert.True(window.End > start + 86400 + 600);
+        clock.Set(start);
+        var alice = await InWorld("Alice");
+        await Gm("alice", "!lvl 99");
+        var login = await QuestProbe.DoneAsync(app, "alice", 110007);
+        Assert.Equal(TaskState.Finish, login.Status);
+        await QuestProbe.AtAsync(app, "alice", 110008, 0); // a dig is still to come
+        var other = await QuestProbe.AtAsync(app, "alice", 110001, 0); // [103022,1] the non-daily group
+        await alice.SendGameAsync(TaskService.TaskDelivery, new TaskDeliveryReq { Req = { new TaskDeliverySingleReq { Id = 110007 } } });
+        Assert.Single((await Next(alice, TaskService.TaskDelivery, TaskDeliveryResp.Parser)).Data);
+        await QuestProbe.WaitAsync(app, "alice", 110007, i => i.Status == TaskState.Delivery, "claimed");
+        // A running task cannot be claimed.
+        await alice.SendGameAsync(TaskService.TaskDelivery, new TaskDeliveryReq { Req = { new TaskDeliverySingleReq { Id = 110001 } } });
+        Assert.Empty((await Next(alice, TaskService.TaskDelivery, TaskDeliveryResp.Parser)).Data);
+
+        await alice.DisposeAsync();
+        await QuestProbe.OfflineAsync(app, "alice");
+        clock.Set(start + 86400);
+        await using var again = await InWorld("Alice", create: false);
+        var renewed = await QuestProbe.WaitAsync(app, "alice", 110007,
+            i => i.Status == TaskState.Finish && i.StartTime > login.StartTime, "renewed for the new day");
+        Assert.Equal(1, renewed.CompleteNum[0]);
+        Assert.Equal(other.StartTime, (await QuestProbe.ReadAsync(app, "alice", 110001))!.StartTime); // never renews
+    }
 }

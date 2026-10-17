@@ -43,14 +43,14 @@ public sealed partial class CombatService
     {
         if (session.Progress == null || data.Row("SkillConfig", requestedRowId) is not { } requested) return null;
         int group = (int)GameData.Int(requested, "_iSkillID"), level = (int)GameData.Int(requested, "_iLevel");
-        int mode = SkillParameterRules.Mode(group, SkillParameterRules.Active(session, data));
+        int mode = SkillParameterRules.Mode(group, SkillParameterRules.CategoriesOf(data, requested), SkillParameterRules.Active(session, data));
         int requestedMode = (int)GameData.Int(requested, "_iMode");
         if (requestedMode != 0 && requestedMode != mode) return null;
         if (mode != 0 && ConfiguredModeRows.TryGetValue((group, level, mode), out int selectedId)
             && data.Row("SkillConfig", selectedId) is { } selected)
-            return SkillParameterRules.Effective(selected, SkillParameterRules.Active(session, data));
+            return SkillParameterRules.Effective(session, data, selected);
         if (requestedMode != 0) return null;
-        return SkillParameterRules.Effective(requested, SkillParameterRules.Active(session, data));
+        return SkillParameterRules.Effective(session, data, requested);
     }
 
     public bool SkillModeAllowed(GameSession session, JsonElement row) =>
@@ -64,8 +64,9 @@ public sealed partial class CombatService
         int rowId = skills.RealId(group, skills.Level(session.Progress, group));
         if (data.Row("SkillConfig", rowId) is not { } row) return false;
         long allowed = GameData.Int(row, "_iQueue");
+        var tags = SkillParameterRules.CategoriesOf(data, row);
         foreach (var mod in SkillParameterRules.Active(session, data))
-            if (mod.Group == group && mod.Type == 44) allowed = SkillParameterRules.Apply(allowed, mod);
+            if (mod.Type == 44 && SkillParameterRules.Matches(mod, group, tags)) allowed = SkillParameterRules.Apply(allowed, mod);
         return allowed != 0;
     }
 
@@ -92,15 +93,24 @@ public sealed partial class CombatService
         if (session.Role == null || session.Progress == null) return;
         var mods = SkillParameterRules.Active(session, data);
         var update = new SkillBeAffectedParamExNotify { IsAll = true, Uuid = session.Role.Id };
-        foreach (var group in mods.Select(m => m.Group).Distinct().Order())
+        // Scope 0 names its group; a scope-1 tag selector reaches every learned skill whose row carries its tags.
+        var groups = new SortedSet<int>(mods.Where(m => m.Scope == 0).Select(m => m.Group));
+        if (mods.Any(m => m.Scope == 1))
+            foreach (int learned in session.Progress.Skills.Keys)
+                if (skills.Level(session.Progress, learned) is var at and > 0
+                    && data.Row("SkillConfig", skills.RealId(learned, at)) is { } learnedRow
+                    && mods.Any(m => m.Scope == 1 && SkillParameterRules.Matches(m, learned, SkillParameterRules.CategoriesOf(data, learnedRow))))
+                    groups.Add(learned);
+        foreach (var group in groups)
         {
             int level = skills.Level(session.Progress, group);
             if (level <= 0 || data.Row("SkillConfig", skills.RealId(group, level)) is not { } baseRow) continue;
             var row = EffectiveSkillRow(session, (int)GameData.Int(baseRow, "_iID")) ?? baseRow;
+            var tags = SkillParameterRules.CategoriesOf(data, baseRow);
             var groupInfo = new BeAffectedParamInfoEx();
-            foreach (var type in mods.Where(m => m.Group == group).Select(m => m.Type).Distinct().Order())
+            foreach (var type in mods.Where(m => SkillParameterRules.Matches(m, group, tags)).Select(m => m.Type).Distinct().Order())
             {
-                if (type == 15) groupInfo.AffectParam[type] = new BeAffectedValueEx { AffectValue = SkillParameterRules.Mode(group, mods) };
+                if (type == 15) groupInfo.AffectParam[type] = new BeAffectedValueEx { AffectValue = SkillParameterRules.Mode(group, tags, mods) };
                 else if (type == 44) groupInfo.AffectParam[type] = new BeAffectedValueEx { AffectValue = CanQueueSkill(session, group) ? 1 : 0 };
                 else if (SkillParameterRules.Field(type) is { } field)
                 {

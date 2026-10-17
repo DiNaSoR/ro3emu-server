@@ -39,6 +39,47 @@ public class SetupTests
     }
 
     [Fact]
+    public async Task DeleteCharacterPostsTheFormAndReadsTheAnswer()
+    {
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        int port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop();
+        using var http = new System.Net.HttpListener();
+        http.Prefixes.Add($"http://127.0.0.1:{port}/");
+        http.Start();
+        string? body = null, path = null;
+        var serve = Task.Run(async () =>
+        {
+            var context = await http.GetContextAsync();
+            path = context.Request.Url!.AbsolutePath;
+            using (var reader = new StreamReader(context.Request.InputStream)) body = await reader.ReadToEndAsync();
+            var answer = System.Text.Encoding.UTF8.GetBytes("""{"code":409,"message":"the character is in the game; log out first"}""");
+            context.Response.ContentType = "application/json";
+            await context.Response.OutputStream.WriteAsync(answer);
+            context.Response.Close();
+        });
+
+        var (code, message) = await Flows.PostDeleteRoleAsync(Flows.ServerUrl($"127.0.0.1:{port}")!, "alice", "p&ss", "Hero One");
+        await serve;
+        Assert.Equal((409, "the character is in the game; log out first"), (code, message));
+        Assert.Equal("/ro3emu/account/delete-role", path);
+        Assert.Equal("identity=alice&credential=p%26ss&role=Hero+One", body);
+        Assert.Equal("delete-character", Options.Parse(["delete-character", "10.0.0.2"]).Command);
+    }
+
+    [Fact]
+    public async Task DeleteCharacterWithNoServerSaysSo()
+    {
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        int port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop();
+        var e = await Assert.ThrowsAsync<SetupException>(() => Flows.PostDeleteRoleAsync($"http://127.0.0.1:{port}", "a", "b", "c"));
+        Assert.Contains("does not answer", e.Message);
+    }
+
+    [Fact]
     public void TranslationsAreEmbeddedInFileOrder()
     {
         var translations = Flows.Translations();

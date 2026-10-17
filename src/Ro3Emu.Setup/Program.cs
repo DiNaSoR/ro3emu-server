@@ -27,6 +27,9 @@ internal static class Program
           check              check that the game folder fits this RO3Emu, without changing anything
           export <game> <data>  export the game data only (server hosts, Linux)
           diag               write RO3Emu-diagnostics.zip for a bug report
+          delete-character [address]
+                             delete one of your characters (the game itself has no delete button): asks for the
+                             account, password and character; the server is this PC unless an address is given
 
         options:
           --client <folder>  the game folder (the one with ro3.exe); remembered for next time
@@ -90,6 +93,7 @@ internal static class Program
                 "install" => await InstallFlow.RunAsync(options, update: false),
                 "update" => await InstallFlow.RunAsync(options, update: true),
                 "diag" => Flows.Diag(options),
+                "delete-character" => await Flows.DeleteCharacterAsync(options),
                 _ => throw new SetupException($"Unknown command '{options.Command}'.", "Run RO3Emu.exe help."),
             };
         }
@@ -148,7 +152,7 @@ internal sealed class Options
     public bool ServerFiles { get; private set; }
     public ServerProcess.Ports Ports { get; private set; } = new();
 
-    private static readonly HashSet<string> Commands = ["start", "host", "join", "restore", "check", "export", "install", "update", "diag", "help"];
+    private static readonly HashSet<string> Commands = ["start", "host", "join", "restore", "check", "export", "install", "update", "diag", "delete-character", "help"];
 
     public static Options Parse(string[] args)
     {

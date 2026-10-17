@@ -112,6 +112,7 @@ public sealed class GuildCampfireTests : IAsyncLifetime
             Name = "Campers", Icon = new GuildHeadIcon { BackgroundType = 100101, IconType = 200101 },
         });
         Assert.Equal(0, (await Next(alice, GuildService.Create, GuildCreateResp.Parser)).Result);
+        await QuestProbe.AcceptAsync(app, http, "alice", 1602000); // [106018,1] "Guild Event - Campfire Quest"
         // The guild home itself is always open (GuildHomeService); before 20:00 it shows no event content.
         await alice.SendGameAsync(DungeonService.Enter, new EnterDungeonReq { SceneEntry = GuildCampfireService.Dungeon });
         Assert.Equal(0, (await Next(alice, DungeonService.Enter, EnterDungeonRsp.Parser)).Result);
@@ -125,6 +126,7 @@ public sealed class GuildCampfireTests : IAsyncLifetime
         Assert.DoesNotContain(alice.Inbox.Snapshot(), e => e.IsGame(GuildCampfireService.Stage)
             || e.IsGame(GameAoiSink.SyncAoiView) && AoIViewChangeData.Parser.ParseFrom(e.Body).Bases.Any(b => b.EntityTemplateID == 7020004));
 
+        Assert.Equal(0, (await QuestProbe.ReadAsync(app, "alice", 1602000))!.CompleteNum[0]); // no event yet
         // 20:00: the member already inside gets the fire, the seeds and stage 1.
         clock.Advance(20);
         var ao = await Next(alice, GameAoiSink.SyncAoiView, AoIViewChangeData.Parser,
@@ -132,6 +134,8 @@ public sealed class GuildCampfireTests : IAsyncLifetime
         var fire = ao.Bases.Single(b => b.EntityTemplateID == 7020004);
         var seed = ao.Bases.First(b => b.EntityTemplateID == 7020001);
         Assert.Equal(1, (await Next(alice, GuildCampfireService.Stage, GuildCampFireStageInfo.Parser)).NowStage);
+        // Present at the bonfire as the event starts: quest target 106018 is met.
+        await QuestProbe.DoneAsync(app, "alice", 1602000); // delivery waits on its action 115
 
         await alice.SendGameAsync(GuildCampfireService.Info, new GetGuildCampFireReq());
         var info = await Next(alice, GuildCampfireService.Info, GetGuildCampFireRsp.Parser);

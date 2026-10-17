@@ -1,3 +1,4 @@
+using System.Text;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
@@ -88,6 +89,35 @@ internal static class Ui
         var answer = Console.ReadLine()?.Trim() ?? "";
         SetupLog.Write($"{question} -> '{answer}'");
         return answer.Length == 0 ? defaultValue : answer;
+    }
+
+    /// <summary>A password: typed as stars, never written to the log. Empty when there is no one to ask.</summary>
+    public static string AskSecret(string question)
+    {
+        if (!Interactive) return "";
+        lock (Gate) EndProgress();
+        Console.Write("  " + question + " ");
+        SetupLog.Write($"{question} -> (hidden)");
+        if (Console.IsInputRedirected) return Console.ReadLine() ?? "";
+        var secret = new StringBuilder();
+        while (true)
+        {
+            var key = Console.ReadKey(intercept: true);
+            if (key.Key == ConsoleKey.Enter) break;
+            if (key.Key == ConsoleKey.Backspace)
+            {
+                if (secret.Length == 0) continue;
+                secret.Length--;
+                Console.Write("\b \b");
+            }
+            else if (!char.IsControl(key.KeyChar))
+            {
+                secret.Append(key.KeyChar);
+                Console.Write('*');
+            }
+        }
+        Console.WriteLine();
+        return secret.ToString();
     }
 
     /// <summary>Human sizes: 1.2 GB, 340 MB.</summary>

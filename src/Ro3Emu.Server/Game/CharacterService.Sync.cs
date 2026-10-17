@@ -31,6 +31,7 @@ public sealed partial class CharacterService
     /// <summary>Sends the dataset's change since the last send (the full object, with syncAllMark, the first time).</summary>
     internal static async Task SyncAsync(GameSession session, uint msgId, IMessage now, Action<IMessage>? prepare = null)
     {
+        session.PlanPowers?.Invoke(msgId, now);
         var inc = session.Synced.TryGetValue(msgId, out var before)
             ? AutoSync.Changes(before, now, NextVersion(session, msgId))
             : AutoSync.Full(now, NextVersion(session, msgId));
@@ -70,7 +71,7 @@ public sealed partial class CharacterService
         {
             Id = role.Id, Name = role.Name, Sex = role.Sex, Career = p.Career, Level = p.Level, JobLevel = p.JobLevel,
             Exp = p.Exp, JobExp = p.JobExp, CreateTime = role.CreateTime,
-            CurPower = EmblemService.CurrentPower(session), HistoryMaxPower = EmblemService.HistoryPower(session),
+            CurPower = PowerService.Current(session), HistoryMaxPower = PowerService.History(session),
         };
     }
 
@@ -97,7 +98,7 @@ public sealed partial class CharacterService
         var info = new DBItemsInfo { AutoDecomposeSetting = session.AutoDecompose.Clone() };
         var preferences = session.BagState.Info;
         info.QuickUseInfos.Add(preferences.QuickUseInfos);
-        info.ShortcutBarInfos.Add(preferences.ShortcutBarInfos);
+        info.ShortcutBarInfos.Add(FullShortcutBar(preferences.ShortcutBarInfos));
         info.MedicinesAutoUse = WithMedicineDefaults(preferences.MedicinesAutoUse);
         info.CurrentArrowID = preferences.CurrentArrowID;
         info.ItemCds = preferences.ItemCds?.Clone();
