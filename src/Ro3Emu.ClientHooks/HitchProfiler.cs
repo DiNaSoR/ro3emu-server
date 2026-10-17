@@ -24,6 +24,7 @@ namespace Ro3Emu.ClientHooks
         public delegate void Dispatch(object self, object module, object notify, object param);
         public delegate void OneArg(object a);
         public delegate void TwoArgs(object a, object b);
+        public delegate void ThreeArgs(object a, object b, object c);
 
         private static readonly Dispatch DispatchWrapper = TimedDispatch;
         private static Obf_R.Obf_Ef _dispatch;
@@ -32,6 +33,8 @@ namespace Ro3Emu.ClientHooks
             new List<(Obf_R.Obf_ff, string, Obf_R.Obf_Ef, object)>();
         private static Dictionary<long, string> _eventNames;
         private static readonly List<(int Depth, string Name, double Ms)> Calls = new List<(int, string, double)>();
+        // Every timed call of the frame, also the short ones: name -> (count, total ms).
+        private static readonly Dictionary<string, (int Count, double Ms)> Totals = new Dictionary<string, (int, double)>();
         private static int _depth;
         private static bool _on;
 
@@ -58,10 +61,41 @@ namespace Ro3Emu.ClientHooks
                     sb.Append("; Lua calls of the previous frame over ").Append(RecordMs).Append(" ms: ").Append(Calls.Count);
                     foreach (var (depth, name, callMs) in Calls)
                         sb.Append("\n  ").Append(' ', depth * 2).Append(name).Append(' ').Append(callMs.ToString("F1")).Append(" ms");
+                    sb.Append("\n  all timed calls (count, total):");
+                    foreach (var pair in Totals)
+                        if (pair.Value.Ms >= 1.0)
+                            sb.Append("\n    ").Append(pair.Key).Append(" x").Append(pair.Value.Count).Append(' ')
+                              .Append(pair.Value.Ms.ToString("F1")).Append(" ms");
+                    sb.Append("\n  ").Append(TaskCounts());
                 }
                 Debug.Log(sb.ToString());
             }
             Calls.Clear();
+            Totals.Clear();
+        }
+
+        /// <summary>How many quests the client holds in AllTaskInfo.TaskInfos, by status (UpdateTaskInfoEvent walks them all).</summary>
+        private static string TaskCounts()
+        {
+            try
+            {
+                var global = LuaPatches.Global();
+                var location = global?.Obf_RuA<Obf_R.Obf_ff>("ServerLocation");
+                var assets = location?.Obf_RuA<Obf_R.Obf_Ef>("GetServer")?.Obf_HuA(location, "LC_AssetManager");
+                if (assets == null || assets.Length == 0 || !(assets[0] is Obf_R.Obf_ff manager)) return "tasks: asset manager not found";
+                var infos = manager.Obf_RuA<Obf_R.Obf_Ef>("GetAssetData")?.Obf_HuA(manager, "AllTaskInfo", "TaskInfos");
+                if (infos == null || infos.Length == 0 || !(infos[0] is Obf_R.Obf_ff table)) return "tasks: none";
+                var byStatus = new SortedDictionary<long, int>();
+                table.Obf_OuA<object, object>((_, info) =>
+                {
+                    long status = info is Obf_R.Obf_ff t ? LuaPatches.ToLong(t.Obf_RuA<object>("status")) : -1;
+                    byStatus[status] = byStatus.TryGetValue(status, out int n) ? n + 1 : 1;
+                });
+                var sb = new StringBuilder("tasks by status:");
+                foreach (var pair in byStatus) sb.Append(' ').Append(pair.Key).Append('=').Append(pair.Value);
+                return sb.ToString();
+            }
+            catch (Exception e) { return "tasks: " + e.GetType().Name + ": " + e.Message; }
         }
 
         private static void Enable()
@@ -80,7 +114,10 @@ namespace Ro3Emu.ClientHooks
                 foreach (var name in new[] { "SetClientNPC", "CheckClientNPCShow", "DeleteClientNpcId", "DeleteNpcAtMap",
                     "DeleteMatchMapClientNPC", "SetClientObjectNPC", "SetMatchMapClientNPC", "ClearUpdateTaskTemplateData" })
                     WrapOne(helper, "LC_TaskHelper." + name, name);
+                foreach (var name in new[] { "AddClientNpcId" })
+                    WrapOne(helper, "LC_TaskHelper." + name, name);
                 WrapTwo(helper, "LC_TaskHelper.SetNpcAtMap", "SetNpcAtMap");
+                WrapThree(helper, "LC_TaskHelper.SetClientSingleNPC", "SetClientSingleNPC");
             }
             _on = true;
             Debug.Log("[Ro3Emu.Hitch] timing on: " + (_dispatch != null ? "events" : "no events (DispatchEvent not found)")
@@ -115,6 +152,15 @@ namespace Ro3Emu.ClientHooks
             table.Obf_luA<string, TwoArgs>(name, wrapper);
         }
 
+        private static void WrapThree(Obf_R.Obf_ff table, string label, string name)
+        {
+            var original = table.Obf_RuA<Obf_R.Obf_Ef>(name);
+            if (original == null) return;
+            ThreeArgs wrapper = (a, b, c) => Timed(label, () => original.Obf_HuA(a, b, c));
+            Wrapped.Add((table, name, original, wrapper));
+            table.Obf_luA<string, ThreeArgs>(name, wrapper);
+        }
+
         private static void TimedDispatch(object self, object module, object notify, object param)
         {
             var original = _dispatch;
@@ -133,11 +179,13 @@ namespace Ro3Emu.ClientHooks
             {
                 _depth--;
                 double ms = watch.Elapsed.TotalMilliseconds;
+                string total = label ?? "event " + (_eventNames != null && _eventNames.TryGetValue(eventKey, out var en)
+                    ? en : (eventKey >> 32) + ":" + (eventKey & 0xFFFFFFFFL));
+                if (Totals.Count < 200 || Totals.ContainsKey(total))
+                    Totals[total] = Totals.TryGetValue(total, out var sum) ? (sum.Count + 1, sum.Ms + ms) : (1, ms);
                 if (ms >= RecordMs && Calls.Count < 400)
                 {
-                    string name = label ?? "event " + (_eventNames != null && _eventNames.TryGetValue(eventKey, out var n)
-                        ? n : (eventKey >> 32) + ":" + (eventKey & 0xFFFFFFFFL));
-                    Calls.Insert(Math.Min(index, Calls.Count), (depth, name, ms)); // parents before their children
+                    Calls.Insert(Math.Min(index, Calls.Count), (depth, total, ms)); // parents before their children
                 }
             }
         }
