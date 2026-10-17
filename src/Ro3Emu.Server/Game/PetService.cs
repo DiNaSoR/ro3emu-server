@@ -137,17 +137,26 @@ public sealed partial class PetService
         await roles.CommitAsync(tx, "pet/state", _ => s.Pets = next);
     }
 
-    private async Task<bool> ExchangeAsync(GameSession s, string kind, DBPetInfo next, IReadOnlyList<(int, long)> cost, IReadOnlyList<(int, int)>? goods = null)
+    /// <param name="lottery">Hatch pity records (DBAppearanceLotteryData.pityRecords), committed with the pets blob.</param>
+    private async Task<bool> ExchangeAsync(GameSession s, string kind, DBPetInfo next, IReadOnlyList<(int, long)> cost,
+        IReadOnlyList<(int, int)>? goods = null, DBLotteryData? lottery = null)
     {
         UpdatePower(next);
         var grants = goods ?? [];
-        return await character.ExchangeLockedAsync(s, cost, grants, popup: false, sync: false,
+        bool done = await character.ExchangeLockedAsync(s, cost, grants, popup: false, sync: false,
             persist: tx =>
             {
                 tx.RoleBlob(s.Role!.Id, "pets", next.ToByteArray());
+                if (lottery != null) tx.RoleBlob(s.Role.Id, "lottery", LotteryService.Pack(lottery, s.LotteryDay));
                 tx.WithEconomy(character.FamilyEconomy(s, "cd13b/pet-" + kind, cost, grants,
                     new { StateHash = Convert.ToHexString(SHA256.HashData(next.ToByteArray())) }));
-            }, committed: () => s.Pets = next, asyncCommit: true) != null;
+            }, committed: () =>
+            {
+                s.Pets = next;
+                if (lottery != null) s.Lottery = lottery;
+            }, asyncCommit: true) != null;
+        if (done && lottery != null) await CharacterService.SyncAsync(s, LotteryService.LotterySync, lottery.Clone());
+        return done;
     }
 
     private Dictionary<int, Dictionary<int, long>> BookLedger(GameSession s) => roles.LoadPetBooks(s.Role!.Id) is { Length: > 0 } bytes
