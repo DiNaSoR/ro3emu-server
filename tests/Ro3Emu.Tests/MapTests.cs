@@ -250,6 +250,84 @@ public sealed partial class MapTests : IAsyncLifetime
     }
 
     [ClientDataFact]
+    public async Task FireBoltLaunchesItsServerBoltsAndShowsOneHitPerLevel()
+    {
+        await using var alice = await InWorld("Alice");
+        var units = await Next(alice, GameAoiSink.SyncAoiView, AoIViewChangeData.Parser, v => v.Bases.Any(b => b.EntityType == 1));
+        var monsters = units.Bases.Where(b => b.EntityType == 1).OrderBy(b => Dist(b, alice.Self!)).ToList();
+        await Gm("alice", "!job 2100");
+        var learn = new SkillGrowthSkillPlanUpdateReq();
+        learn.LevelUpList[12004] = new SkillData { SkillId = 12004, SkillLevel = 4 };
+        await alice.SendGameAsync(SkillService.PlanUpdate, learn);
+        Assert.Equal(0, (await Next(alice, SkillService.PlanUpdate, SkillGrowthSkillPlanUpdateResp.Parser)).Result);
+
+        // Fire Bolt level 4 (SkillConfig 1200404, _kShowDmg [4]). Its template 12004 shows only chant/cast effects;
+        // the bolt is effect 1200411, which only a 31120 from the server makes the client fly.
+        var monster = await CastNextToAMonster(alice, monsters, 1200404);
+        long self = (long)alice.Self!.Uuid;
+        var bolt = await Next(alice, CombatService.SkillBullet, SkillFixTimeBulletNotify.Parser, b => b.SourceId == self);
+        Assert.Equal(1200411, bolt.EffectId);
+        Assert.Equal(self, bolt.MasterId); // LC_Scene_Sync._skillFixTimeBullet finds the caster by masterId
+        Assert.Equal((long)monster.Uuid, bolt.TargetId);
+        Assert.Equal(4, bolt.Split);
+        Assert.Equal(400, bolt.FixedTime);
+        Assert.Equal(1200404, bolt.SkillConfigId);
+        var flight = System.Diagnostics.Stopwatch.StartNew();
+        var hit = await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser, h => h.SrcID == self);
+        Assert.True(flight.ElapsedMilliseconds >= 300, $"the hit came {flight.ElapsedMilliseconds} ms after launch, not on landing");
+        Assert.Equal(1200404, hit.ShowPoint); // the fire hit spark, played once per split
+        Assert.Equal(4, hit.Split);
+
+        // Walking away while the bolt flies does not cancel it: the hit still lands. The first cast may have killed
+        // its monster, so the next live one takes the second bolt.
+        await Task.Delay(600); // _iCD 500
+        monster = await CastNextToAMonster(alice, monsters, 1200404);
+        await Next(alice, CombatService.SkillBullet, SkillFixTimeBulletNotify.Parser, b => b.SourceId == self && b.TargetId == (long)monster.Uuid);
+        await alice.WalkAsync(monster.MovementInfo.Pos.X + 2, alice.Self!.MovementInfo.Pos.Y, monster.MovementInfo.Pos.Z + 3, stop: true);
+        await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser, h => h.SrcID == self && h.SessionId != hit.SessionId);
+    }
+
+    /// <summary>Jumps 3 m from each nearby monster in turn and casts at it until one accepts (some wander off or can't be hit).</summary>
+    private async Task<EntityBase> CastNextToAMonster(BotClient alice, List<EntityBase> monsters, int skillId)
+    {
+        foreach (var monster in monsters.Take(5))
+        {
+            await Gm("alice", $"!jump {monster.MovementInfo.Pos.X:0.0} {monster.MovementInfo.Pos.Z + 3:0.0}".Replace(',', '.'));
+            await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = skillId, TargetId = (long)monster.Uuid });
+            if ((await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser)).Result == 0) return monster;
+        }
+        throw new Xunit.Sdk.XunitException("no nearby monster accepted the cast");
+    }
+
+    [ClientDataFact]
+    public async Task SoulStrikeBoltsFlyForTheirDistanceOverSpeed()
+    {
+        await using var alice = await InWorld("Alice");
+        var units = await Next(alice, GameAoiSink.SyncAoiView, AoIViewChangeData.Parser, v => v.Bases.Any(b => b.EntityType == 1));
+        var monsters = units.Bases.Where(b => b.EntityType == 1).OrderBy(b => Dist(b, alice.Self!)).ToList();
+        await Gm("alice", "!job 2100");
+        var learn = new SkillGrowthSkillPlanUpdateReq();
+        learn.LevelUpList[12016] = new SkillData { SkillId = 12016, SkillLevel = 5 }; // Soul Strike needs 12016 at 5
+        learn.LevelUpList[12008] = new SkillData { SkillId = 12008, SkillLevel = 1 };
+        await alice.SendGameAsync(SkillService.PlanUpdate, learn);
+        Assert.Equal(0, (await Next(alice, SkillService.PlanUpdate, SkillGrowthSkillPlanUpdateResp.Parser)).Result);
+
+        // Soul Strike's bolt 1200803 is speed-controlled (m_fBulletSpeed 10): LC_Bullet_Helper flies it distance / speed,
+        // so 3 m takes 300 ms, and the hit waits for it.
+        await CastNextToAMonster(alice, monsters, 1200801);
+        long self = (long)alice.Self!.Uuid;
+        var bolt = await Next(alice, CombatService.SkillBullet, SkillFixTimeBulletNotify.Parser, b => b.SourceId == self);
+        Assert.Equal(1200803, bolt.EffectId);
+        Assert.Equal(5, bolt.Split);
+        float dx = bolt.TargetPosition.X - bolt.SourcePosition.X, dz = bolt.TargetPosition.Z - bolt.SourcePosition.Z;
+        Assert.InRange(bolt.FixedTime, MathF.Sqrt(dx * dx + dz * dz) * 100 - 2, MathF.Sqrt(dx * dx + dz * dz) * 100 + 2); // ms = m / 10 per s
+        var flight = System.Diagnostics.Stopwatch.StartNew();
+        var hit = await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser, h => h.SrcID == self);
+        Assert.Equal(1200804, hit.ShowPoint); // the action hit, not the bullet 1200803 before it (no hit gfx or sound)
+        Assert.True(flight.ElapsedMilliseconds >= bolt.FixedTime - 100, $"the hit came {flight.ElapsedMilliseconds} ms after launch, the bolt flies {bolt.FixedTime} ms");
+    }
+
+    [ClientDataFact]
     public async Task PotionHealsWithCooldownAndSwordmanSkillsWork()
     {
         await using var alice = await InWorld("Alice");
@@ -447,6 +525,9 @@ public sealed partial class MapTests : IAsyncLifetime
                     .Single(m => m.Uid == (long)angeling.Uuid);
                 Assert.False(player.Dead);
                 Assert.False(boss.Dead);
+                // Stop the running auto-attack: a swing still in flight would refuse the next press (it never yields to itself).
+                player.Attack = null;
+                if (player.SkillCast is { } swing) { swing.Cancelled = true; player.SkillCast = null; }
                 boss.Advance(MonsterService.NowMs);
                 boss.Moving = false;
                 boss.NextRoamMs = long.MaxValue;
@@ -700,6 +781,24 @@ public sealed partial class MapTests : IAsyncLifetime
         public void Log<TState>(LogLevel level, EventId id, TState state, Exception? error, Func<TState, Exception?, string> formatter)
         { if (level >= LogLevel.Warning) Messages.Enqueue(formatter(state, error) + " " + error); }
         public void Dispose() { }
+    }
+
+    /// <summary>Stops the account's auto-attack and waits until its live swing has ended, so a new press starts fresh.</summary>
+    private async Task StopAttackingAsync(string account)
+    {
+        var loop = _app.Services.GetRequiredService<GameLoop>();
+        var sessions = _app.Services.GetRequiredService<SessionRegistry>();
+        for (int i = 0; i < 100; i++)
+        {
+            if (await loop.InvokeAsync(() =>
+            {
+                var session = sessions.All().Single(s => s.Account == account && s.Role != null);
+                session.Attack = null;
+                return Task.FromResult(session.SkillCast == null);
+            })) return;
+            await Task.Delay(50);
+        }
+        throw new Xunit.Sdk.XunitException($"{account}'s cast did not end");
     }
 
     private async Task<(BotClient Alice, long BossUid)> ReadySoloMvpAsync()
