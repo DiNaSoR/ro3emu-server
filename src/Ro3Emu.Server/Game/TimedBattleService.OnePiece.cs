@@ -9,71 +9,48 @@ using Ro3Emu.Server.Game.Ownership;
 
 namespace Ro3Emu.Server.Game;
 
-/// <summary>OnePiece / Commendation Vault: 83350/83351 world window and a configured 3200x01 private treasure fight.</summary>
+/// <summary>OnePiece / Commendation Vault: 83350/83351 world window and the Rift stones' private 3200x01 fights.</summary>
 public sealed partial class TimedBattleService
 {
-    private const int TreasureMapEntry = 10110, TreasureNpc = 16100001, TreasureInteraction = 161000011;
-    /// <summary>Below 2^53 (the client keeps unit ids in a double array, see DungeonService.SceneActorUidBase); apart from
-    /// the per-role treasure hunt NPCs at 2^46 + role id.</summary>
-    internal const long TreasureNpcUid = 1L << 46 | 1L << 45 | TreasureMapEntry;
     private sealed class Treasure
     {
         public required GameSession Player;
         public required InstanceService.Room Room;
         public required int Monster;
         public required long Started;
+        public required RiftStone Stone;
         public MonsterUnit? Boss;
         public bool Settled;
     }
 
     private readonly Dictionary<GameSession, Treasure> treasure = new();
-    private long lastTreasureDay = -1;
-    private bool lastTreasureOpen;
 
-    private MapPoint? TreasurePoint()
+    private long[] StoneInteractions(RiftStone stone)
     {
-        var row = data.Row("OnePieceMapConfig", TreasureMapEntry);
-        if (row is not { } r || !r.TryGetProperty("_kMonsterPoint", out var points)
-            || points.ValueKind != System.Text.Json.JsonValueKind.Array || points.GetArrayLength() == 0) return null;
-        long pointId = (long)(GameData.Number(points[0]) ?? 0);
-        return worldData.Map(TreasureMapEntry)?.Points.TryGetValue(pointId, out var point) == true ? point : null;
+        if (data.Row("NPCConfig", stone.StoneNpc) is not { } npc || !npc.TryGetProperty("_iInteractID", out var ids)
+            || ids.ValueKind != JsonValueKind.Array) return [];
+        return ids.EnumerateArray().Select(GameData.Number).Where(x => x != null).Select(x => (long)x!.Value).ToArray();
     }
 
-    private async Task SendTreasureNpcAsync(GameSession session)
-    {
-        if (session.Role == null || session.SceneLoading || session.SceneEntry != TreasureMapEntry || !schedule.IsOpen(200)
-            || TreasurePoint() is not { } point || data.Row("NPCConfig", TreasureNpc) is not { } npc) return;
-        var entity = new WorldNpc(TreasureNpcUid, TreasureMapEntry, WorldNpcKind.Npc, TreasureNpc,
-            data.TextOf(npc, "_kName"), (int)GameData.Int(npc, "_iCamp"), point.X, point.Y, point.Z, point.Face, default);
-        var view = new AoIViewChangeData(); view.Bases.Add(SceneService.NpcEntity(entity));
-        await session.SendGameAsync(GameAoiSink.SyncAoiView, view);
-    }
-
-    private async Task RemoveTreasureNpcAsync(GameSession session)
-    {
-        if (session.SceneEntry != TreasureMapEntry || session.SceneLoading) return;
-        var view = new AoIViewChangeData(); view.LeaveAoi.Add((ulong)TreasureNpcUid);
-        await session.SendGameAsync(GameAoiSink.SyncAoiView, view);
-    }
-
-    /// <summary>32700 for the OnePieceMapConfig point and NPCConfig 16100001 interact 161000011.</summary>
+    /// <summary>32700 for a Rift stone and one of its NPCConfig _iInteractID entries.</summary>
     public async Task<bool> TryInteractAsync(GameSession session, NpcInteractionReq req)
     {
         if (await TryChestInteractAsync(session, req)) return true;
-        if (req.NpcUid != TreasureNpcUid || req.InteractionId is not (TreasureInteraction or 161000071)) return false;
+        if (!IsRiftUid(req.NpcUid)) return false;
         using var scope = session.Role != null && loop.Owners is { } owners
             ? await owners.EnterAsync("timed battle onepiece interaction", [ReservationKey.Role(session.Role.Id)]) : null;
         if (session.Owner != null) scope?.Context.Pin(session.Owner);
-        var point = TreasurePoint();
-        int result = session.Role == null || point == null || session.SceneEntry != TreasureMapEntry
+        var stone = riftStones.GetValueOrDefault(req.NpcUid);
+        int result = session.Role == null || stone == null || session.SceneEntry != stone.Map
+                || !StoneInteractions(stone).Contains(req.InteractionId)
             ? ErrorCodes.NpcMissing : session.SceneLoading ? ErrorCodes.SwitchingScenes
             : !session.ActivitiesReady ? ErrorCodes.FeatureUnavailable
-            : MonsterService.Distance(session.Position.X, session.Position.Z, point.Value.X, point.Value.Z) > 10f
+            : MonsterService.Distance(session.Position.X, session.Position.Z, stone.Point.X, stone.Point.Z) > 10f
                 ? ErrorCodes.NpcTooFar
             : session.Progress?.Level < 44 || !schedule.IsOpen(200) || !functions.IsOpen(session, 95)
                 ? ErrorCodes.FeatureUnavailable
             : session.TimedBattle?.OnePieceGains.GetValueOrDefault(TreasureDay()) >= TreasureCap() ? ErrorCodes.TaskRequirements
-            : session.InstanceId != 0 || treasure.ContainsKey(session) ? ErrorCodes.DungeonBusy : 0;
+            : session.InstanceId != 0 || treasure.ContainsKey(session) || stone.Challenger != null ? ErrorCodes.DungeonBusy : 0;
         await session.SendGameAsync(SceneService.NpcInteraction, new NpcInteractionRsp { Result = result, Req = req });
         return true;
     }
@@ -84,16 +61,21 @@ public sealed partial class TimedBattleService
             ? await owners.EnterAsync("timed battle onepiece info", [ReservationKey.Role(session.Role.Id)]) : null;
         if (session.Owner != null) scope?.Context.Pin(session.Owner);
         var (start, end) = TreasureWindow();
-        bool open = session.Progress?.Level >= 44 && schedule.IsOpen(200) && functions.IsOpen(session, 95);
+        bool open = session.Progress?.Level >= 44 && schedule.IsOpen(200) && functions.IsOpen(session, 95) && riftRound >= 0;
         var response = new HiddenTreasureRoundInfoResp
         {
             Result = session.Role == null ? ErrorCodes.Parameter : 0,
             IsOpen = open,
-            CurIndex = open ? 1 : 0,
-            NextOpenTime = start > time.GetUtcNow().ToUnixTimeSeconds() ? start * 1000 : 0,
+            CurIndex = open ? (int)((riftRound - start) / RiftRoundSeconds) + 1 : 0,
+            // Seconds, like 83350's endTime: UI_Sys_OnepieceWidgetCtrl compares iNextOpenTime with
+            // TimerManager.GetSystemTime (seconds) and hands it to Lua_TimeHelper.GetWeekDayNum (os.date).
+            NextOpenTime = start > time.GetUtcNow().ToUnixTimeSeconds() ? start : 0,
         };
-        response.TimeMap[1] = new HiddenTreasureRoundInfo { Index = 1, StartTime = start * 1000, EndTime = end * 1000 };
-        if (session.Role != null && session.Progress != null && data.Row("OnePieceRewardConfig", 3200101) is { } reward)
+        for (long round = start, index = 1; round < end; round += RiftRoundSeconds, index++)
+            response.TimeMap[(int)index] = new HiddenTreasureRoundInfo
+            { Index = (int)index, StartTime = round * 1000, EndTime = Math.Min(end, round + RiftRoundSeconds) * 1000 };
+        // The preview is the 1-star reward (OnePieceMonsterConfig[16100001]); each clear pays its own star's row.
+        if (session.Role != null && session.Progress != null && StarRow(1) is { } reward)
         {
             int gains = session.TimedBattle?.OnePieceGains.GetValueOrDefault(TreasureDay()) ?? 0;
             try
@@ -113,19 +95,24 @@ public sealed partial class TimedBattleService
             catch (AwardResolutionException e)
             { log.LogWarning(e, "OnePiece reward preview rejected"); response.Result = ErrorCodes.RewardMissing; }
         }
-        if (TreasurePoint() != null) response.SceneInfo[TreasureMapEntry] = new HiddenTreasureSceneLineInfo
-        { SceneEntry = TreasureMapEntry, SceneUid = TreasureMapEntry, LineNum = 1,
-            NpcRemainCount = open ? 1 : 0, NpcRoundCount = open ? 1 : 0 };
+        if (open)
+            foreach (var (map, total) in riftMapTotals)
+                response.SceneInfo[map] = new HiddenTreasureSceneLineInfo
+                { SceneEntry = map, SceneUid = map, LineNum = 1, NpcRemainCount = RiftRemaining(map), NpcRoundCount = total };
         await session.SendGameAsync(OnePieceInfo, response);
     }
 
+    /// <summary>83350 for the player's current map: the tracker's "Remaining on the current channel" and its countdown.</summary>
     private async Task SendOnePieceMapAsync(GameSession session)
     {
-        var (_, end) = TreasureWindow();
-        bool open = session.Progress?.Level >= 44 && schedule.IsOpen(200) && functions.IsOpen(session, 95);
+        bool open = session.Progress?.Level >= 44 && schedule.IsOpen(200) && functions.IsOpen(session, 95) && riftRound >= 0;
         await session.SendGameAsync(OnePieceMap, new HiddenTreasureMapInfoNotify
         { RoundState = open ? EHiddenTreasureRoundState.Open : EHiddenTreasureRoundState.NotOpen,
-            NpcCount = open ? 1 : 0, MaxNpcCount = 1, EndTime = end * 1000 });
+            NpcCount = open ? RiftRemaining(session.SceneEntry) : 0,
+            MaxNpcCount = open ? riftMapTotals.GetValueOrDefault(session.SceneEntry) : 0,
+            // Seconds: LC_DAL_OnePiece keeps it as iEndTime, which the task tracker and the vault widget compare with
+            // TimerManager.GetSystemTime (seconds); milliseconds showed "Time Limit: 20722840 Days".
+            EndTime = RiftRoundEnd() });
     }
 
     private (long Start, long End) TreasureWindow()
@@ -155,56 +142,82 @@ public sealed partial class TimedBattleService
         if (session.Role?.Id != roleId || TreasureDay() != selectedDay)
             throw new OperationCanceledException("OnePiece entry changed before admission.");
         if (session.Owner != null) scope?.Context.Pin(session.Owner);
+        // LC_SceneManagerNew.SendEnterDungeonWithOnePieceData names the stone by its unit uid; without one (or with a
+        // stone NPC / interaction id) the nearest stone of that scene on the player's map is meant.
+        var named = req.InitData?.HiddenTreasureInitData?.NpcId ?? 0;
+        var stone = riftStones.GetValueOrDefault(named) ?? NearestRiftStone(session, req.SceneEntry);
         int error = session.Role == null || session.Progress == null || session.TimedBattle == null ? ErrorCodes.Parameter
             : !session.ActivitiesReady ? ErrorCodes.FeatureUnavailable
             : session.Progress.Level < 44 || !schedule.IsOpen(200) || !functions.IsOpen(session, 95)
                 ? ErrorCodes.FeatureUnavailable
-            : session.SceneEntry != TreasureMapEntry || TreasurePoint() is not { } npcPoint
-                ? ErrorCodes.NpcMissing
-            : MonsterService.Distance(session.Position.X, session.Position.Z, npcPoint.X, npcPoint.Z) > 10f
+            : stone == null || session.SceneEntry != stone.Map ? ErrorCodes.NpcMissing
+            : MonsterService.Distance(session.Position.X, session.Position.Z, stone.Point.X, stone.Point.Z) > 10f
                 ? ErrorCodes.NpcTooFar
             : session.SceneLoading || session.InstanceId != 0 || session.Dead || treasure.ContainsKey(session)
-                ? ErrorCodes.DungeonBusy
-            : req.InitData?.HiddenTreasureInitData is { NpcId: not 0 } namedNpc
-                && namedNpc.NpcId is not (TreasureInteraction or TreasureNpc)
+                || stone.Challenger != null ? ErrorCodes.DungeonBusy
+            : named != 0 && !riftStones.ContainsKey(named) && !IsStoneReference(named) || stone.Scene != req.SceneEntry
                 ? ErrorCodes.Parameter
             : req.InitData is { HiddenTreasureInitData: not null } init && init.HiddenTreasureInitData.PlayerIds.Count > 0
                 && (init.HiddenTreasureInitData.PlayerIds.Count != 1 || init.HiddenTreasureInitData.PlayerIds[0] != session.Role.Id)
                 ? ErrorCodes.Parameter : 0;
         long day = TreasureDay();
         if (error == 0 && session.TimedBattle!.OnePieceGains.GetValueOrDefault(day) >= TreasureCap()) error = ErrorCodes.TaskRequirements;
-        var prepared = error == 0 ? PrepareTreasure(session, req.SceneEntry) : null;
+        var prepared = error == 0 ? PrepareTreasure(session, stone!) : null;
         if (error == 0 && prepared == null) error = ErrorCodes.DungeonBusy;
         await session.SendGameAsync(DungeonService.Enter, new EnterDungeonRsp { Result = error });
         if (prepared != null) await EnterTreasureAsync(prepared);
         return true;
     }
 
-    private Treasure? PrepareTreasure(GameSession session, long sceneEntry)
+    private RiftStone? NearestRiftStone(GameSession session, long scene) => riftStones.Values
+        .Where(s => s.Map == session.SceneEntry && s.Scene == scene)
+        .MinBy(s => MonsterService.Distance(session.Position.X, session.Position.Z, s.Point.X, s.Point.Z));
+
+    /// <summary>A stone NPC (16100001-16100006) or one of its interaction ids.</summary>
+    private bool IsStoneReference(long id) => data.Table("OnePieceMonsterConfig").Values.Any(r =>
+        GameData.Int(r, "_iId") == id || data.Row("NPCConfig", GameData.Int(r, "_iId")) is { } npc
+            && npc.TryGetProperty("_iInteractID", out var ids) && ids.ValueKind == JsonValueKind.Array
+            && ids.EnumerateArray().Any(x => GameData.Number(x) == id));
+
+    /// <summary>Claims the stone before anything awaits, so a second party cannot enter the same one.</summary>
+    private Treasure? PrepareTreasure(GameSession session, RiftStone stone)
     {
         InstanceService.Room room;
-        try { room = instances.Create(sceneEntry, [session]); }
+        try { room = instances.Create(stone.Scene, [session]); }
         catch (Exception e) { log.LogWarning(e, "OnePiece room create failed for {Role}", session.Role!.Id); return null; }
-        var reward = data.Row("OnePieceRewardConfig", sceneEntry)!.Value;
-        var a = new Treasure { Player = session, Room = room, Monster = (int)GameData.Int(reward, "_iMonsterId"),
+        var a = new Treasure { Player = session, Room = room, Monster = stone.Boss, Stone = stone,
             Started = time.GetUtcNow().ToUnixTimeMilliseconds() };
         treasure[session] = a;
+        stone.Challenger = session;
+        PostRiftState(stone);
         return a;
     }
 
     private async Task EnterTreasureAsync(Treasure a)
     {
-        if (await instances.EnterAsync(a.Room, a.Player, 3)) return;
+        if (await instances.EnterAsync(a.Room, a.Player, 3))
+        {
+            // The fight's own 180 s clock starts when the boss spawns on load; a client that never acknowledges the
+            // scene would otherwise hold the shared stone until it disconnects (60 s as DungeonService, inferred).
+            loop.ScheduleRuntime(TimeSpan.FromSeconds(60), async () =>
+            { if (!a.Settled && a.Boss == null && treasure.GetValueOrDefault(a.Player) == a) await SettleTreasureAsync(a, false); });
+            return;
+        }
         treasure.Remove(a.Player);
+        ReleaseRiftStone(a, cleared: false);
         await instances.AbandonAsync(a.Room, a.Player);
     }
 
     private async Task OnePieceLoadedAsync(GameSession session)
     {
-        await SendTreasureNpcAsync(session);
+        if (session.InstanceId == 0)
+        {
+            await RiftViewAsync(session, [], riftStones.Values.Where(s => s.Map == session.SceneEntry).ToArray());
+            await SendOnePieceMapAsync(session);
+        }
         if (!treasure.TryGetValue(session, out var a) || a.Room.Id != session.InstanceId || a.Settled || a.Boss != null) return;
         var init = new DungeonInitData { HiddenTreasureInitData = new HiddenTreasureInitData
-        { NpcSceneId = 10110, NpcId = 16100001, NpcEntryId = 10110, MonsterEntryId = a.Monster,
+        { NpcSceneId = a.Stone.Map, NpcId = a.Stone.StoneNpc, NpcEntryId = a.Stone.Map, MonsterEntryId = a.Monster,
             WaveEndTime = a.Started + 180000 } };
         init.HiddenTreasureInitData.PlayerIds.Add(session.Role!.Id);
         await session.SendGameAsync(DungeonService.BaseInfo, new DungeonBaseInfoNotify
@@ -224,7 +237,22 @@ public sealed partial class TimedBattleService
     private Task OnePieceLeavingAsync(GameSession session)
     {
         if (treasure.TryGetValue(session, out var a) && session.InstanceId == a.Room.Id)
-        { a.Settled = true; treasure.Remove(session); }
+        { a.Settled = true; treasure.Remove(session); ReleaseRiftStone(a, cleared: false); }
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// DungeonConfig 3200x01 _iReviveTrigger 2 (NoRevive): the client offers no self-revive in the fight, only "Help!".
+    /// The challenger is the room's only member, so its death is a wipe: the run fails 3 s later (inferred, as an ordinary
+    /// run fails when everyone present is dead and out of revivals) and the stone becomes free again.
+    /// </summary>
+    private Task OnePieceDiedAsync(GameSession player)
+    {
+        if (treasure.GetValueOrDefault(player) is { } a && !a.Settled && a.Room.Id == player.InstanceId)
+            loop.ScheduleRuntime(TimeSpan.FromSeconds(3), async () =>
+            {
+                if (!a.Settled && player.Dead && treasure.GetValueOrDefault(player) == a) await SettleTreasureAsync(a, false);
+            });
         return Task.CompletedTask;
     }
 
@@ -257,9 +285,11 @@ public sealed partial class TimedBattleService
                 long elapsed = Math.Max(1, time.GetUtcNow().ToUnixTimeMilliseconds() - a.Started);
                 long previous = next.OnePieceBestMilliseconds.GetValueOrDefault(a.Room.SceneEntry);
                 if (previous == 0 || elapsed < previous) next.OnePieceBestMilliseconds[a.Room.SceneEntry] = elapsed;
-                var reward = data.Row("OnePieceRewardConfig", a.Room.SceneEntry)!.Value;
                 try
                 {
+                    // OnePieceMonsterConfig pays by star (9101-9106 / 9201-9206); OnePieceRewardConfig names 9107-9110,
+                    // which MultiverseGroupConfig does not have.
+                    var reward = StarRow(a.Stone.Star) ?? throw new AwardResolutionException($"OnePiece star {a.Stone.Star} has no row.");
                     var baseGrants = awards.Resolve(player, GameData.Int(reward, "_iAward"), 101).Grants;
                     var extra = RestrictedExtra(GameData.Int(reward, "_iExtraAward"));
                     var itemGains = next.OnePieceItemGains.GetValueOrDefault(day) ?? new Dictionary<int, int>();
@@ -306,7 +336,8 @@ public sealed partial class TimedBattleService
                             JsonSerializer.SerializeToUtf8Bytes(new { a.Started, Day = day, Scene = a.Room.SceneEntry })));
                     }
                     await roles.CommitAsync(tx, "timed-battle/onepiece-obligation", _ =>
-                    { player.TimedBattle = next; taskPlan?.Apply(); pendingDeliveryRoles.Add(roleId); a.Settled = true; });
+                    { player.TimedBattle = next; taskPlan?.Apply(); pendingDeliveryRoles.Add(roleId); a.Settled = true;
+                        ReleaseRiftStone(a, cleared: true); });
                     toDeliver = obligation;
                 }
                 catch (AwardResolutionException e)
@@ -318,6 +349,7 @@ public sealed partial class TimedBattleService
         if (!win)
         {
             a.Settled = true;
+            ReleaseRiftStone(a, cleared: false);
             await player.SendGameAsync(DungeonService.Result, TreasureResult(a, false));
         }
         }
@@ -337,14 +369,16 @@ public sealed partial class TimedBattleService
                 catch (Exception error) { log.LogError(error, "OnePiece delivery deferred for role {Role}", roleId); }
             });
         treasure.Remove(player);
-        if (player.InstanceId == a.Room.Id) await instances.LeaveAsync(player);
+        // A fallen challenger comes back alive outside, as TowerService returns its runs (the fight has no revive).
+        if (player.InstanceId == a.Room.Id && !(player.Dead && await instances.LeaveAsync(player, recoverDeadOnReturn: true)))
+            await instances.LeaveAsync(player);
     }
 
     private DungeonResNotify TreasureResult(Treasure a, bool win) => new()
     {
         DungeonEntry = a.Room.SceneEntry, Res = (DungeonRes)(win ? 1 : 2),
         Data = new DungeonResData { OnePieceData = new OnePieceDungeonResData
-        { PassTime = time.GetUtcNow().ToUnixTimeMilliseconds() - a.Started, BossLevel = 1 } }
+        { PassTime = time.GetUtcNow().ToUnixTimeMilliseconds() - a.Started, BossLevel = a.Stone.Star } }
     };
 
     private long TreasureDay()
@@ -399,14 +433,5 @@ public sealed partial class TimedBattleService
         return result;
     }
 
-    private void TickOnePiece(long now)
-    {
-        long day = TreasureDay();
-        bool open = schedule.IsOpen(200);
-        if (day == lastTreasureDay && open == lastTreasureOpen) return;
-        lastTreasureDay = day; lastTreasureOpen = open;
-        foreach (var session in sessions.All().Where(s => s.Role != null))
-            loop.PostOwned(session, async () =>
-            { await SendOnePieceMapAsync(session); if (open) await SendTreasureNpcAsync(session); else await RemoveTreasureNpcAsync(session); });
-    }
+    private void TickOnePiece(long now) => TickRift();
 }
