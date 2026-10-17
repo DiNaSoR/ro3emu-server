@@ -98,4 +98,20 @@ public sealed partial class CharacterService
         long percent = PursueExpPercent(level, ServerLevel());
         return percent <= 0 ? baseExp : checked(baseExp + baseExp * percent / 10000);
     }
+
+    private long? _baseToJobPercent;
+
+    /// <summary>
+    /// The Job EXP that comes with <paramref name="baseExp"/>: PublicParamConfig.BaseToJobConversionPercent (2000 = 20%),
+    /// rounded down. Beta footage: kills of 5, 9 and 23 Base EXP gave 1, 1 and 4 Job EXP, and a beta character at base
+    /// level 18 (236,056 Base EXP earned, mostly from quests) was at rank 2 job level 25 (about 47,200 Job EXP earned),
+    /// which is 20% of all Base EXP.
+    /// </summary>
+    public long JobExpFromBase(long baseExp)
+    {
+        if (baseExp <= 0) return 0;
+        _baseToJobPercent ??= data.Table("PublicParamConfig").TryGetValue("BaseToJobConversionPercent", out var v)
+            && GameData.Number(v) is { } n && n >= 0 ? (long)n : 2000;
+        return baseExp * _baseToJobPercent.Value / 10000;
+    }
 }

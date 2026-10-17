@@ -90,6 +90,14 @@ public sealed class QuestEngineTests : IAsyncLifetime
     }
 
     [ClientDataFact]
+    public void JobExpIsTwentyPercentOfBaseExpRoundedDown()
+    {
+        // Beta footage: kills of 5, 9 and 23 Base EXP and a 70,000 Base EXP quest gave 1, 1, 4 and 14,000 Job EXP.
+        var character = Service<CharacterService>();
+        Assert.Equal([0L, 1, 1, 4, 14000], new long[] { 4, 5, 9, 23, 70000 }.Select(character.JobExpFromBase));
+    }
+
+    [ClientDataFact]
     public async Task NoviceTrialGrantsExactlySevenExpAndReplaySurvivesRelog()
     {
         long role;
@@ -105,8 +113,8 @@ public sealed class QuestEngineTests : IAsyncLifetime
             var request = new ClientNpcInteractReq { DialogID = 1010104001, Areapointid = 1010104001 };
             await bot.SendGameAsync(SceneService.ClientNpcInteract, request);
             var reward = await Next(bot, CharacterService.GetRewardNotify, GetRewardNotify.Parser);
-            Assert.Equal(100, Assert.Single(reward.Rewards).ItemEntry);
-            Assert.Equal(7, reward.Rewards[0].Stack);
+            // 7 Base EXP brings 20% (rounded down) = 1 Job EXP.
+            Assert.Equal([(100, 7), (101, 1)], reward.Rewards.Select(r => (r.ItemEntry, r.Stack)));
             await Next(bot, TaskService.TaskInfoSync, DBTaskInfoIncrement.Parser,
                 m => m.CompleteTaskNum.TryGetValue(10101040, out var n) && n.All == 1);
             await bot.SendGameAsync(SceneService.ClientNpcInteract, request);
