@@ -28,11 +28,6 @@ public sealed class ServerOptions
     /// Reconstructed/dungeon-monsters.json (inferred, marked "odtworzone"); off refuses them as before.</summary>
     public bool ReconstructedDungeons { get; set; } = true;
 
-    /// <summary>Pet hatchery Limited-Time Pool (PetIncubationSlotConfig _iSlotType 2 rounds). The client data gives these
-    /// rounds no end time, so on keeps them open; off answers their hatch requests FeatureUnavailable and leaves the
-    /// Permanent Pool (_iSlotType 1) open.</summary>
-    public bool LimitedPetPools { get; set; } = true;
-
     /// <summary>Game-message JSON log (data/logs/traffic-*.jsonl): "off", "on" or a comma-separated account list.
     /// Formatting and writes run off the game loop; keep it off for load tests and production.</summary>
     public string TrafficLog { get; set; } = "off";

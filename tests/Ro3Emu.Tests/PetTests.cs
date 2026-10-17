@@ -418,12 +418,14 @@ public sealed class PetTests : IAsyncLifetime
     [ClientDataFact]
     public async Task PermanentAndLimitedTimePoolsEachKeepTheirOwnEggInASlot()
     {
+        // Server day 29: activities 1022/1023 (TimeLimitConfig 1072/1073, days 28-170) open rounds 10008 and 10009.
+        _clock.Advance(29 * 86400L);
         await using var bot = await InWorld();
         await Unlock(hatch: true);
         await bot.SendGameAsync(PetService.GenerateEgg, new PetGenEggReq { RoundId = 99999, SlotId = 1 });
         Assert.Equal(ErrorCodes.Parameter, (await Next(bot, PetService.GenerateEgg, PetGenEggRes.Parser)).Result);
         await Gm("!item 1250709 3");
-        // The client's Permanent Pool tab sends round 10009 and its Limited-Time Pool a _iSlotType 2 round.
+        // The client's Permanent Pool tab then sends round 10009 and its Limited-Time Pool round 10008.
         await bot.SendGameAsync(PetService.GenerateEgg, new PetGenEggReq { RoundId = 10009, SlotId = 1 });
         Assert.Equal(0, (await Next(bot, PetService.GenerateEgg, PetGenEggRes.Parser)).Result);
         await bot.SendGameAsync(PetService.GenerateEgg, new PetGenEggReq { RoundId = 10008, SlotId = 1 });
@@ -440,22 +442,29 @@ public sealed class PetTests : IAsyncLifetime
     }
 
     [ClientDataFact]
-    public async Task LimitedPetPoolsOffClosesOnlyTheLimitedTimePool()
+    public async Task OnlyRoundsWhoseActivityIsOpenTakeEggs()
     {
+        // Server day 0 (OpenContent off): only activity 1015 (TimeLimitConfig 1065, days 0-7) is open, so the client
+        // shows round 10001; the later Permanent rounds and every Limited-Time round are still closed.
         await using var bot = await InWorld();
         await Unlock(hatch: true);
-        _app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<ServerOptions>>().Value.LimitedPetPools = false;
         await Gm("!item 1250709 2");
-        await bot.SendGameAsync(PetService.GenerateEgg, new PetGenEggReq { RoundId = 10008, SlotId = 1 });
-        Assert.Equal(ErrorCodes.FeatureUnavailable, (await Next(bot, PetService.GenerateEgg, PetGenEggRes.Parser)).Result);
+        foreach (long closed in new long[] { 10002, 10003, 10008, 10009 })
+        {
+            await bot.SendGameAsync(PetService.GenerateEgg, new PetGenEggReq { RoundId = closed, SlotId = 1 });
+            Assert.Equal(ErrorCodes.ActivityClosed, (await Next(bot, PetService.GenerateEgg, PetGenEggRes.Parser)).Result);
+        }
         Assert.Equal(2, Count(bot, 1250709));
-        await bot.SendGameAsync(PetService.GenerateEgg, new PetGenEggReq { RoundId = 10009, SlotId = 1 });
+        Assert.Empty(Saved(bot).IncubationSlot);
+        await bot.SendGameAsync(PetService.GenerateEgg, new PetGenEggReq { RoundId = 10001, SlotId = 1 });
         Assert.Equal(0, (await Next(bot, PetService.GenerateEgg, PetGenEggRes.Parser)).Result);
+        Assert.Equal(1, Count(bot, 1250709));
     }
 
     [ClientDataFact]
     public async Task SixtiethHatchIsGuaranteedFromTheGuaranteedGroupsAndEachPoolCountsApart()
     {
+        _clock.Advance(29 * 86400L); // rounds 10008/10009 open (see PermanentAndLimitedTimePoolsEachKeepTheirOwnEggInASlot)
         await using var bot = await InWorld();
         await Unlock(hatch: true);
         var game = _app.Services.GetRequiredService<GameData>();
@@ -613,6 +622,45 @@ public sealed class PetTests : IAsyncLifetime
         Assert.Equal(ErrorCodes.FeatureUnavailable, (await Next(bot, PetService.Break, PetBreakRes.Parser)).Result);
         Assert.Equal(2, Saved(bot).IncubationLv);
         Assert.Empty(Saved(bot).ListPet[10001].BreakLv);
+    }
+
+    [ClientDataFact]
+    public async Task FullBarLevelsTheRoomAfterACollectOnlyWhenTheCurrentRowsCostIsAffordable()
+    {
+        await using var bot = await InWorld();
+        await Unlock(hatch: true);
+        await Gm("!delitem 1");
+        var room = _app.Services.GetRequiredService<GameData>().Row("PetIncubationRoomConfig", 2)!.Value;
+        long bar = GameData.Int(room, "_iExp");
+        var cost = room.GetProperty("_kCost")[0];
+        int coin = cost[0].GetInt32();
+        long price = cost[1].GetInt64();
+        Assert.True(bar > 10 && price > 0);
+        // Room 2 one egg (10 proficiency) short of its bar, with one ready egg in slot 1.
+        Task ReadyEgg() => _app.Services.GetRequiredService<GameLoop>().InvokeAsync(async () =>
+        {
+            using var held = await CharacterService.Lock(Session);
+            Session.Pets!.IncubationLv = 2;
+            Session.Pets.IncubationExp = bar - 10;
+            Session.Pets.IncubationSlot[1] = new DBSlotInfo { SlotId = 1, IncubateInfo =
+                { [10001] = new DBIncubateInfo { IncubateTime = _clock.GetUtcNow().ToUnixTimeSeconds() - 600, AwardType = 2, AwardId = 1610001, AwardCount = 1 } } };
+            Roles.SavePets(RoleId(bot), Session.Pets.ToByteArray());
+        });
+        var collect = new PetEggRewardReq { RoundId = 10001, SlotIds = { 1 } };
+        await ReadyEgg();
+        await bot.SendGameAsync(PetService.EggReward, collect);
+        Assert.Equal(0, (await Next(bot, PetService.EggReward, PetEggRewardRes.Parser)).Result);
+        // Short of the cost: the bar stays full and nothing is spent.
+        Assert.Equal((2L, bar), (Saved(bot).IncubationLv, Saved(bot).IncubationExp));
+        await Gm($"!item {coin} {price}");
+        await bot.SendGameAsync(PetService.RoomLevelUp, new NullArg());
+        Assert.Equal(0, (await Next(bot, PetService.RoomLevelUp, PetIncubationLvUpRes.Parser)).Result);
+        Assert.Equal((3L, 0L, 0L), (Saved(bot).IncubationLv, Saved(bot).IncubationExp, Count(bot, coin)));
+        await ReadyEgg();
+        await Gm($"!item {coin} {price}");
+        await bot.SendGameAsync(PetService.EggReward, collect);
+        Assert.Equal(0, (await Next(bot, PetService.EggReward, PetEggRewardRes.Parser)).Result);
+        Assert.Equal((3L, 0L, 0L), (Saved(bot).IncubationLv, Saved(bot).IncubationExp, Count(bot, coin)));
     }
 
     [ClientDataFact]

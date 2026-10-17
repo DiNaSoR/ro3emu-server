@@ -2,7 +2,6 @@ using System.Text.Json;
 using System.Security.Cryptography;
 using Google.Protobuf;
 using Google.Protobuf.Collections;
-using Microsoft.Extensions.Options;
 using Romsg;
 using Ro3Emu.Server.Accounts;
 using Ro3Emu.Server.Accounts.Persistence;
@@ -29,12 +28,11 @@ public sealed partial class PetService
     private readonly PetFollowerService follower;
     private readonly TimeProvider clock;
     private readonly SeasonService seasons;
-    private readonly IOptions<ServerOptions> options;
     private readonly Dictionary<(int Pet, int Star, int Stage), JsonElement> stars;
     private readonly Dictionary<(int Quality, int Level), JsonElement> levels;
 
     public PetService(GameData data, CharacterService character, FunctionService functions, RoleStore roles,
-        PetFollowerService follower, TimeProvider clock, SeasonService seasons, IOptions<ServerOptions>? options = null)
+        PetFollowerService follower, TimeProvider clock, SeasonService seasons)
     {
         this.data = data;
         this.character = character;
@@ -43,7 +41,6 @@ public sealed partial class PetService
         this.follower = follower;
         this.clock = clock;
         this.seasons = seasons;
-        this.options = options ?? Options.Create(new ServerOptions());
         stars = data.Table("PetStarConfig").Values.ToDictionary(r => ((int)GameData.Int(r, "_iPetID"), (int)GameData.Int(r, "_iStar"), (int)GameData.Int(r, "_iStage")));
         levels = data.Table("PetExpConfig").Values.ToDictionary(r => ((int)GameData.Int(r, "_iQuality"), (int)GameData.Int(r, "_iLv")));
         character.ExtraAttributes.Add(Attributes);

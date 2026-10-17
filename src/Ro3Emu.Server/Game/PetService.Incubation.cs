@@ -36,14 +36,28 @@ public sealed partial class PetService
     private long PetParam(string name, long fallback) => data.Table("PublicParamConfig").TryGetValue(name, out var v)
         ? (long)(GameData.Number(v) ?? fallback) : fallback;
 
-    private int RoundGate(GameSession s, long round)
+    /// <summary>
+    /// A round takes new eggs (<paramref name="place"/>) only while the client offers it: LC_PetHelper.GetActivePoolTypeInfo
+    /// shows, per _iSlotType, a round whose PetIncubationSlotConfig._iActivity is open (LC_ActivityHelper.IsActivityOpen),
+    /// which is this session's NewActivity projection. Those activities follow TimeLimitConfig 1065-1073: server-open
+    /// days 0-7, 7-14, 14-21, 21-28 and 28-170 for the Permanent rounds 10001/03/05/07/09, days 10-14, 14-21, 21-28
+    /// and 28-170 for the Limited-Time rounds 10002/04/06/08. OpenContent makes them perpetual, so the client then
+    /// shows 10009 and 10008; OpenContent:ClosedActivities closes a pool. An egg already placed stays acceleratable
+    /// and collectable after its round closes.
+    /// </summary>
+    private int RoundGate(GameSession s, long round, bool place = false)
     {
         int code = Gate(s, incubation: true);
         if (code != 0) return code;
-        // The client's Permanent Pool sends a _iSlotType 1 round (10009) and its Limited-Time Pool a _iSlotType 2 round.
-        // Rounds carry no end time, so limited pools stay open unless Ro3Emu:LimitedPetPools is off (inferred).
         if (data.Row("PetIncubationSlotConfig", round) is not { } row) return ErrorCodes.Parameter;
-        return GameData.Int(row, "_iSlotType") == 1 || options.Value.LimitedPetPools ? 0 : ErrorCodes.FeatureUnavailable;
+        return !place || RoundOpen(s, row) ? 0 : ErrorCodes.ActivityClosed;
+    }
+
+    private bool RoundOpen(GameSession s, JsonElement round)
+    {
+        long now = Now;
+        return s.NewActivities?.ActivityInfo.TryGetValue(GameData.Int(round, "_iActivity"), out var activity) == true
+            && !activity.IsShielded && activity.State != "_close" && now >= activity.CurStartTime && now < activity.CurEndTime;
     }
 
     /// <summary>
@@ -95,7 +109,7 @@ public sealed partial class PetService
     public async Task GenerateAsync(GameSession s, PetGenEggReq req)
     {
         using var held = await CharacterService.Lock(s);
-        int code = RoundGate(s, req.RoundId);
+        int code = RoundGate(s, req.RoundId, place: true);
         if (code == 0 && (!EggSlotOpen(s.Pets!, req.SlotId) || Egg(s.Pets!, req.RoundId, req.SlotId) != null)) code = ErrorCodes.PetOperation;
         if (code == 0)
         {
@@ -276,7 +290,7 @@ public sealed partial class PetService
     public async Task FastAsync(GameSession s, FastIncubateReq req)
     {
         using var held = await CharacterService.Lock(s);
-        int code = RoundGate(s, req.RoundId);
+        int code = RoundGate(s, req.RoundId, place: true);
         if (code == 0 && s.Pets!.IncubationLv < PetParam("UnlockFastIncubationLv", 2))
             code = ErrorCodes.PetOperation;
         var config = code == 0 ? data.Row("PetIncubationSlotConfig", req.RoundId) : null;
