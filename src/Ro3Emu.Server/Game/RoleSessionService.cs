@@ -370,6 +370,7 @@ public sealed class RoleSessionService(RoleStore roles, Data.GameData data, Buff
                 for (uint tag; (tag = input.ReadTag()) != 0;)
                     if (tag == 18) stored.MergeFrom(input.ReadBytes()); // SaveSettingReq.dbSettingInfo, field 2
                     else input.SkipLastField();
+            bool modeChanged = ApplyGameModeAttackDefault(req.DbSettingInfo, stored);
             if (req.Type.Contains(SettingType.WildAfk) && stored.WildAFKInfo != null)
             {
                 // AFK accounting follows this preference: durable now, together with its reconciliation.
@@ -378,9 +379,36 @@ public sealed class RoleSessionService(RoleStore roles, Data.GameData data, Buff
                 await afk.SettingsChangedAsync(session, stored.WildAFKInfo);
                 await session.SendGameAsync(MsgId.AutoSyncSettings, SettingsSync(stored));
             }
-            else settings.MarkDirty(session, urgent: false);
+            else
+            {
+                settings.MarkDirty(session, urgent: false);
+                if (modeChanged) await session.SendGameAsync(MsgId.AutoSyncSettings, SettingsSync(stored));
+            }
         }
         await session.SendGameAsync(MsgId.SaveSetting, new SaveSettingResp { Result = 0 });
+    }
+
+    /// <summary>SystemSettingConfig 403001 (enum_SettingItemType.ContinuousAttackAfterTargetSelected): 1 = clicking an enemy starts the normal attack (LC_Actor_ControlMove), anything else only selects it.</summary>
+    internal const int ClickToAttackSetting = 403001;
+    private const int OldSchoolMode = 1; // enum_GameMode: OldSchool 1, Fashion 2, Mobile 3
+
+    /// <summary>
+    /// Click-to-attack follows the PC mode on every mode pick. The client sets 403001 itself only on the first pick
+    /// (UI_Sys_SetModeWidgetCtrl: OldSchool 1, other modes 2, while pcPlatformRecord is false) and the settings menu
+    /// hides it (_iShow 0), so switching modes later never changed it. Our choice: every GameModeSetting save
+    /// (clientSetting[SettingType.GameMode]) sets it, and the full 5061 resync puts it in the client's
+    /// 'eSelectTargetNormalAttack' asset (LC_DAL_Setting._processAllSetting -> DecodeBytesValue).
+    /// </summary>
+    private static bool ApplyGameModeAttackDefault(DBSettingInfo sent, DBSettingInfo stored)
+    {
+        if (!sent.ClientSetting.TryGetValue((int)SettingType.GameMode, out var bytes)) return false;
+        GameModeSetting mode;
+        try { mode = GameModeSetting.Parser.ParseFrom(bytes); }
+        catch (InvalidProtocolBufferException) { return false; }
+        var value = new CommonIntSetting { Value = mode.GameMode == OldSchoolMode ? 1 : 2 }.ToByteString();
+        if (stored.ClientSetting.TryGetValue(ClickToAttackSetting, out var current) && current.Equals(value)) return false;
+        stored.ClientSetting[ClickToAttackSetting] = value;
+        return true;
     }
 
     private DBSettingInfo LoadSettings(long roleId)
