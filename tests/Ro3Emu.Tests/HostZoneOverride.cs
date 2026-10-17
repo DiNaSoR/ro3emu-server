@@ -16,11 +16,22 @@ internal static class HostZoneOverride
     public static readonly TimeZoneInfo Default =
         TimeZoneInfo.CreateCustomTimeZone("Ro3Emu test host +08", TimeSpan.FromHours(8), "Ro3Emu test host +08", "Ro3Emu test host +08");
 
+    /// <summary>Elsewhere .NET honours TZ (an IANA id) once its zone cache is cleared; Asia/Singapore is +08 without DST.</summary>
+    private const string UnixDefault = "Asia/Singapore";
+
     [ModuleInitializer]
     internal static void Apply()
     {
         string? id = Environment.GetEnvironmentVariable("RO3EMU_TEST_HOST_TZ");
-        if (id != "host") SetLocal(string.IsNullOrEmpty(id) ? Default : TimeZoneInfo.FindSystemTimeZoneById(id));
+        if (id != "host" && OperatingSystem.IsWindows())
+            SetLocal(string.IsNullOrEmpty(id) ? Default : TimeZoneInfo.FindSystemTimeZoneById(id));
+        else if (id != "host")
+        {
+            var zone = TimeZoneInfo.FindSystemTimeZoneById(string.IsNullOrEmpty(id) ? UnixDefault : id);
+            Environment.SetEnvironmentVariable("TZ", zone.Id);
+            TimeZoneInfo.ClearCachedData();
+            Verify(zone);
+        }
         if (Environment.GetEnvironmentVariable("RO3EMU_TEST_HOST_CULTURE") is { Length: > 0 } name)
         {
             var culture = CultureInfo.GetCultureInfo(name);
@@ -43,8 +54,13 @@ internal static class HostZoneOverride
         int year = DateTime.UtcNow.Year;
         var rule = zone.GetAdjustmentRules().FirstOrDefault(r => r.DateStart.Year <= year && year <= r.DateEnd.Year);
         oneYear.SetValue(cache, Activator.CreateInstance(oneYear.FieldType, Instance | BindingFlags.Public, null, [year, zone.BaseUtcOffset, rule], null));
+        Verify(zone);
+    }
+
+    private static void Verify(TimeZoneInfo zone)
+    {
         var utc = DateTime.UtcNow;
-        if (TimeZoneInfo.Local != zone
+        if (TimeZoneInfo.Local.BaseUtcOffset != zone.BaseUtcOffset
             || Math.Abs((DateTime.Now - TimeZoneInfo.ConvertTimeFromUtc(utc, zone)).TotalMinutes) > 1
             || new DateTimeOffset(new DateTime(2026, 10, 5, 0, 0, 0, DateTimeKind.Local)).Offset != zone.GetUtcOffset(new DateTime(2026, 10, 5)))
             throw new InvalidOperationException($"HostZoneOverride: {zone.Id} did not apply; set RO3EMU_TEST_HOST_TZ=host");
