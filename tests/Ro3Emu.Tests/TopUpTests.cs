@@ -126,4 +126,26 @@ public sealed class TopUpTests : IAsyncLifetime
         Assert.NotEqual(0, short_.Result);
         Assert.Equal(290, Count(bot, Crystal));
     }
+    [ClientDataFact]
+    public async Task CrystalPricesSpendBoundCrystalsFirst()
+    {
+        await using var bot = await Enter("Spender");
+        Assert.Equal(0, (await Order(bot, 1, PcTier300)).Result); // 300 crystals + 300 bound (first purchase)
+        await Gm(bot, "!lvl 60"); // the shop of commodity 13107 (function 70108)
+        const int Commodity = 13107; // ShopCommodityConfig 13107: [3, 5] for item 1200701
+
+        Assert.Equal(0, (await Buy(bot, Commodity, 10)).Result);
+        Assert.Equal(250, Count(bot, BoundCrystal));
+        Assert.Equal(300, Count(bot, Crystal));
+
+        Assert.Equal(0, (await Buy(bot, Commodity, 60)).Result); // 300: the last 250 bound, then 50 regular
+        Assert.Equal(0, Count(bot, BoundCrystal));
+        Assert.Equal(250, Count(bot, Crystal));
+
+        Assert.Equal(ErrorCodes.CurrencyShort, (await Buy(bot, Commodity, 51)).Result);
+        Assert.Equal(250, Count(bot, Crystal));
+    }
+
+    private static Task<BuyCommodityResp> Buy(BotClient bot, int commodity, int count) =>
+        Ask(bot, ShopService.BuyCommodity, new BuyCommodityReq { CommodityId = commodity, Count = count }, BuyCommodityResp.Parser);
 }

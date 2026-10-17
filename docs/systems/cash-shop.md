@@ -14,7 +14,7 @@ sub-tabs. The cash shop is Fashion and Mall.
 | Item | Name | Client enum | Use |
 |---|---|---|---|
 | 3 | Sacred Relic Crystal | `Miao` | Paid currency: Crystal Shop, Magic Fashion, all of Fashion |
-| 16 | Sacred Relic Crystal | `ServerBound` | Bound crystal: Top Up bonuses and the first-purchase double. No commodity charges it |
+| 16 | Sacred Relic Crystal | `ServerBound` | Bound crystal: Top Up bonuses and the first-purchase double. No commodity names it; a crystal price spends it first |
 | 1 | Zeny | `Diamond` | Zeny Shop |
 | 2 | Minted Coin | `Zeny` | Supply Shop |
 
@@ -74,8 +74,15 @@ With `TopUp:Free` off (the default, which keeps the original's refusals), 2001-2
 
 Both have `_iSingleLimit` 999999 and open at base level 20. This is not a payment, so it is served whatever `TopUp:Free` says.
 
+## Bound crystals
+
+A crystal price (item 3) takes bound crystals (item 16) first and regular crystals for the rest (`ShopService.Payment`,
+every Mall and Fashion buy). No config says so: the rule is **(inferred)** from how bound currency usually works, and
+was agreed with the project owner. The client's buy dialog still checks the price against regular crystals alone
+(`LC_ItemHelper.GetItemCount(3)` reads only currency 3), so a role needs that many regular crystals for the client to
+send the buy at all.
+
 ## Not done
 
 - Gifting a look (82335 is refused with 2317; 82336/82337/82339 have no handler).
-- Spending bound crystals (item 16) for crystal prices.
 - `_kIsBindGive` on shop goods, and the server-only `_iGlobalPurchase` (meaning unknown).

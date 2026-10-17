@@ -159,7 +159,7 @@ public sealed partial class ShopService : IGameTicker
         if (error == null && appearance > 0)
         {
             int currency = PaymentItem(row!.Value);
-            var cost = currency > 0 && unit > 0 ? new[] { (currency, (long)unit) } : [];
+            var cost = currency > 0 && unit > 0 ? Payment(session, currency, unit) : [];
             var next = Copy(session.Shop!);
             next.Bought[commodityId] = new Counter { Count = bought + 1, Period = Period(Family(row.Value), session) };
             long awardGroup = GameData.Int(row.Value, "_iAppearanceAwardId");
@@ -180,13 +180,13 @@ public sealed partial class ShopService : IGameTicker
         else if (error == null)
         {
             int currency = PaymentItem(row!.Value), entry = (int)GameData.Int(row.Value, "_iItemId"), perUnit = (int)Math.Max(1, GameData.Int(row.Value, "_iItemPerMount"));
-            var cost = currency > 0 ? new[] { (currency, (long)unit * count) } : [];
+            var cost = currency > 0 ? Payment(session, currency, (long)unit * count) : [];
             if ((long)perUnit * count > int.MaxValue) error = new(ErrorCodes.Parameter, "quantity overflow");
             else
             {
                 var next = Copy(session.Shop!);
                 next.Bought[commodityId] = new Counter { Count = bought + count, Period = Period(Family(row.Value), session) };
-                var economy = NpcPurchase(session, row.Value, commodityId, count, unit, currency, entry,
+                var economy = NpcPurchase(session, row.Value, commodityId, count, unit, currency, cost, entry,
                     perUnit, bought, next.Bought[commodityId]) ?? character.FamilyEconomy(session, "cd13a/shop-buy",
                         cost, [(entry, perUnit * count)], new { Commodity = commodityId, Count = count, Unit = unit,
                             Payment = currency, Goods = entry, Before = bought, Counter = next.Bought[commodityId] });
@@ -245,7 +245,7 @@ public sealed partial class ShopService : IGameTicker
     /// operation/source survives an internal retry of the detached plan; other shops use the E05a family envelope.
     /// </summary>
     private EconomyMutation? NpcPurchase(GameSession session, JsonElement row, int commodity, int count,
-        int unit, int payment, int entry, int perUnit, int priorCount, Counter next)
+        int unit, int payment, IReadOnlyList<(int Entry, long Count)> paid, int entry, int perUnit, int priorCount, Counter next)
     {
         long classId = GameData.Int(row, "_iClassID");
         var shop = data.Table("ShopConfig").Values.FirstOrDefault(s => GameData.Int(s, "_iClassID") == classId);
@@ -259,7 +259,7 @@ public sealed partial class ShopService : IGameTicker
             UnitPrice = unit, Payment = payment, Goods = entry, PerUnit = perUnit, Config = config });
         byte[] outcome = JsonSerializer.SerializeToUtf8Bytes(new { Version = 1, Result = 0, Commodity = commodity,
             Count = count, Price = unit, BuyTimes = next.Count, BeforeBuyTimes = priorCount, next.Period, Config = config });
-        EconomyQuantity[] costs = payment > 0 && unit > 0 ? [new(Asset(payment), checked((long)unit * count))] : [];
+        EconomyQuantity[] costs = [.. paid.Select(c => new EconomyQuantity(Asset(c.Entry), c.Count))];
         return new EconomyMutation(operation, session.Account!, session.Role!.Id, "npc-shop-buy", fingerprint,
             "npc-shop/" + session.Role.Id.ToString(CultureInfo.InvariantCulture) + "/" + operation,
             DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(), costs, [new(Asset(entry), checked((long)perUnit * count))], outcome);
@@ -316,6 +316,22 @@ public sealed partial class ShopService : IGameTicker
         if (row.ValueKind != JsonValueKind.Object || !row.TryGetProperty("_kSpSkillParam", out var param)
             || param.ValueKind != JsonValueKind.Array || param.GetArrayLength() < 2) return 0;
         return Math.Clamp((long)(GameData.Number(param[1]) ?? 0), 0, 10000);
+    }
+
+    private const int CrystalItem = 3, BoundCrystalItem = 16;
+
+    /// <summary>
+    /// What a price takes from the role. A crystal price (item 3) spends bound crystals (item 16, the Top Up bonuses)
+    /// first and regular crystals for the rest. No config says so: the rule is (inferred), agreed with the project
+    /// owner. The client's buy dialog still checks the price against regular crystals alone (LC_ItemHelper.GetItemCount).
+    /// </summary>
+    private (int Entry, long Count)[] Payment(GameSession session, int currency, long amount)
+    {
+        if (currency != CrystalItem || amount <= 0) return [(currency, amount)];
+        long bound = Math.Min(amount, Math.Max(0, character.CountOf(session, BoundCrystalItem)));
+        return bound == 0 ? [(CrystalItem, amount)]
+            : bound == amount ? [(BoundCrystalItem, bound)]
+            : [(BoundCrystalItem, bound), (CrystalItem, amount - bound)];
     }
 
     /// <summary>_kItemPerPrice is one flat [payment item, amount] pair.</summary>
