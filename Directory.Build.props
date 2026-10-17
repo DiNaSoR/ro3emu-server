@@ -1,0 +1,13 @@
+<Project>
+  <!-- Distro-built .NET (Arch, CachyOS, ...) runs under its own runtime id, such as arch-x64, so the SDK asks NuGet for
+       Microsoft.NETCore.App.Host.arch-x64, which does not exist (NU1101). Use the portable linux apphost there instead,
+       so plain dotnet build, run and publish work without -r linux-x64. Microsoft's own builds (linux-x64,
+       linux-musl-x64, win-*, osx-*) are left alone. -->
+  <PropertyGroup>
+    <_Ro3HostRid>$([System.Runtime.InteropServices.RuntimeInformation]::RuntimeIdentifier)</_Ro3HostRid>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(DefaultAppHostRuntimeIdentifier)' == '' and $([MSBuild]::IsOSPlatform('Linux')) and
+                            !$(_Ro3HostRid.StartsWith('linux-'))">
+    <DefaultAppHostRuntimeIdentifier>linux-$(_Ro3HostRid.Substring($([MSBuild]::Add($(_Ro3HostRid.LastIndexOf('-')), 1))))</DefaultAppHostRuntimeIdentifier>
+  </PropertyGroup>
+</Project>
