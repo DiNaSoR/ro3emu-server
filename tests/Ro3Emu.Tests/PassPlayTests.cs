@@ -284,6 +284,9 @@ public sealed class PassPlayTests : IAsyncLifetime
             .. NewActivityService.WeeklyChallenges.Select(NewActivityService.TaskIdOf)];
         Assert.Equal(expected.Order(), await Synced());
         await Event(alice, [(NewActivityService.PassGoal.Kills, 100)], kills: 100);
+        // Event returns on the pass commit; the 5027 push (SyncTasksAsync) comes after it in the same detached operation.
+        await Until(() => OnLoop(() => ((DBTaskInfo)Session(alice).Synced[TaskService.TaskInfoSync]).Infos
+            .TryGetValue(NewActivityService.WeeklyTaskBase, out var weekly) && weekly.CompleteNum.Contains(105L)), "the weekly kills in 5027");
         var rows = await OnLoop(() => ((DBTaskInfo)Session(alice).Synced[TaskService.TaskInfoSync]).Infos);
         var weeklyKills = rows[NewActivityService.WeeklyTaskBase];
         Assert.Equal(TaskState.Running, weeklyKills.Status);

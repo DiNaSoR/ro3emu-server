@@ -40,6 +40,7 @@ public sealed partial class GuildLeagueService : IGameTicker
     private readonly BuffService buffs;
     private readonly MailService mail;
     private readonly AuctionService auctions;
+    private readonly World world;
     private readonly IOptions<ServerOptions> options;
     private readonly TimeProvider clock;
     private readonly GameLoop loop;
@@ -131,23 +132,24 @@ public sealed partial class GuildLeagueService : IGameTicker
     public GuildLeagueService(GameData data, AccountStore accounts, RoleStore roles, GuildStore guilds, GuildService guildService,
         FunctionService functions, SeasonService seasons, GuildLeagueCalendar calendar, SessionRegistry sessions,
         InstanceService instances, SceneService scene, WorldData maps, CombatService combat, BuffService buffs, MailService mail,
-        AuctionService auctions, GmCommands gm, IOptions<ServerOptions> options, TimeProvider clock, GameLoop loop, ILogger<GuildLeagueService> log)
+        AuctionService auctions, World world, GmCommands gm, IOptions<ServerOptions> options, TimeProvider clock, GameLoop loop, ILogger<GuildLeagueService> log)
     {
         this.data = data; this.accounts = accounts; this.roles = roles; this.guilds = guilds; this.guildService = guildService;
         this.functions = functions; this.seasons = seasons; this.calendar = calendar; this.sessions = sessions;
         this.instances = instances; this.scene = scene; this.maps = maps; this.combat = combat; this.buffs = buffs;
-        this.mail = mail; this.auctions = auctions; this.options = options; this.clock = clock; this.loop = loop; this.log = log;
+        this.mail = mail; this.auctions = auctions; this.world = world; this.options = options; this.clock = clock; this.loop = loop; this.log = log;
         state = accounts.ReadSync<byte[]?>(new TerritoryRealmReadPlan(RealmStateKind.GuildLeague)) is { } saved
             ? JsonSerializer.Deserialize<LeagueState>(saved)! : new();
         guildService.League = new GuildService.LeagueHooks(MgrDataCoreAsync, InfoCoreAsync, GroupInfoCoreAsync);
         HookBattle();
-        gm.Register("league", "register | status (Guild League test aid: register the current or next tournament now; show it)", GmAsync);
+        gm.Register("league", "register | fill | status (Guild League test aid: register the current or next tournament now; fill your guild's elite roster now; show it)", GmAsync);
     }
 
     private async Task GmAsync(GameSession s, string[] args)
     {
         string reply;
         if (args.Length > 0 && args[0] == "register") reply = await RegisterNowAsync();
+        else if (args.Length > 0 && args[0] == "fill") reply = await FillNowAsync(s);
         else
         {
             var info = calendar.Info(Now);
@@ -410,7 +412,7 @@ public sealed partial class GuildLeagueService : IGameTicker
         if (sweeping || now == lastSweep) return;
         lastSweep = now;
         bool live = matches.Count > 0;
-        bool due = !settling && (RegistrationDue(now) != null || SettlementDue(now));
+        bool due = !settling && (RegistrationDue(now) != null || SettlementDue(now) || ElitesDue(now));
         if (!live && !due) return;
         sweeping = true;
         loop.PostRuntime(async () =>
@@ -418,7 +420,7 @@ public sealed partial class GuildLeagueService : IGameTicker
             try
             {
                 if (live) await BattleClockAsync(now);
-                if (!settling && (RegistrationDue(now) != null || SettlementDue(now)))
+                if (!settling && (RegistrationDue(now) != null || SettlementDue(now) || ElitesDue(now)))
                 {
                     settling = true;
                     loop.PostLegacy(async () => { try { await ReconcileAsync(); } finally { settling = false; } }, "guild league reconcile");
@@ -451,6 +453,7 @@ public sealed partial class GuildLeagueService : IGameTicker
             foreach (var match in matches.Values.Where(m => m.Ended && !m.Committed).ToArray())
                 await CommitMatchAsync(match);
             await CloseRoundsAsync(now);
+            await ElitesAsync(now);
             await RewardPendingAsync();
             if (state.Cup is { Settled: false, SettledRound: >= 3 }) await SettleCupAsync();
         }

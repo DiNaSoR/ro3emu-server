@@ -16,16 +16,19 @@ public sealed class FunctionService
     public const uint FunctionOpenSync = 5056;
 
     private const int CondBaseLevel = 1002, CondTowerFloor = 1014, CondJobRank = 1019, CondRoleHasTask = 1101,
-        CondServerStage = 3031, CondServerStage2 = 3030, CondQuestDone = 4004;
+        CondServerStage = 3031, CondServerStage2 = 3030, CondQuestDone = 4004, CondItemCount = 1020;
     private const int CondJourneyAttr = 15100, CondJourneyDialogue = 15101;
+    private const int CondGuildPosition = 9007;
 
     private readonly GameData data;
+    private readonly CharacterService character;
     private readonly SeasonService seasons;
     private readonly TimeProvider clock;
 
     public FunctionService(GameData data, CharacterService character, SeasonService seasons, TimeProvider clock)
     {
         this.data = data;
+        this.character = character;
         this.seasons = seasons;
         this.clock = clock;
         character.ProgressHandlers.Add(SyncAsync);
@@ -92,16 +95,23 @@ public sealed class FunctionService
                 // LC_InteractCondition.lua:1957-1979 checks iOpenDayCount. Start is the server's first day.
                 // OpenContent counts every server-day gate as met from the first day.
                 CondServerStage or CondServerStage2 when seasons.OpenContent.ServerDayFree => true,
-                CondServerStage => Math.Floor((clock.GetUtcNow().ToUnixTimeSeconds() - new DateTimeOffset(seasons.Start).ToUnixTimeSeconds()) / 86400d) + 1 >= param,
+                CondServerStage => Math.Floor((clock.GetUtcNow().ToUnixTimeSeconds() - seasons.StartTime) / 86400d) + 1 >= param,
                 // LC_InteractCondition.CheckPlayBook: GetPlayBookOpenTime() + offset <= server system time.
-                CondServerStage2 => clock.GetUtcNow().ToUnixTimeSeconds() >= new DateTimeOffset(seasons.Start).ToUnixTimeSeconds() + param,
+                CondServerStage2 => clock.GetUtcNow().ToUnixTimeSeconds() >= seasons.StartTime + param,
                 CondQuestDone => TaskService.IsDelivered(session, param),
+                // LC_InteractCondition.CheckItemCount: [1020, item, count], LC_ItemHelper.GetItemCount(item) >= count.
+                CondItemCount => d.GetArrayLength() >= 3 && character.CountOf(session, (int)param) >= (long)(GameData.Number(d[2]) ?? 0),
                 // LC_InteractCondition.CheckJourneyAttr / CheckJourneyDialogue: per-role Journey progress.
                 CondJourneyAttr => JourneyAttributeMet(session, d),
                 CondJourneyDialogue => JourneyDialogueMet(session, d),
                 // LC_InteractCondition.CheckLifeLevel: both the stored level AND active-slot membership.
                 11001 => d.GetArrayLength() >= 3 && LifeJobService.ActiveLevel(session, param) >= (long)(GameData.Number(d[2]) ?? 0),
                 1100 => param != conditionId && IsOpen(session, param),
+                // LC_InteractCondition.CheckGuildPosition [9007, op, position] (lua :2809-2848): the guild position
+                // compared with the operator table (:313-356, 1 ==, 2 ~=, 3 >, 4 >=, 5 <, 6 <=); the Guild Store's
+                // packs are [9007,6,3], Guild Master to Vice Guild Master. No guild: false.
+                CondGuildPosition => session.Guild is { GuildId: > 0 } guild && d.GetArrayLength() >= 3
+                    && Compare(param, guild.Official, (long)(GameData.Number(d[2]) ?? 0)),
                 _ => false,
             };
             bool inverse = sub.TryGetProperty("m_bInverse", out var inv) && inv.ValueKind == JsonValueKind.True;
@@ -109,6 +119,13 @@ public sealed class FunctionService
         }
         return true;
     }
+
+    /// <summary>LC_InteractCondition operator table (lua :313-356): 1 ==, 2 ~=, 3 &gt;, 4 &gt;=, 5 &lt;, 6 &lt;=.</summary>
+    private static bool Compare(long op, long value, long param) => op switch
+    {
+        1 => value == param, 2 => value != param, 3 => value > param, 4 => value >= param, 5 => value < param, 6 => value <= param,
+        _ => false,
+    };
 
     private static bool JourneyAttributeMet(GameSession session, JsonElement values)
     {

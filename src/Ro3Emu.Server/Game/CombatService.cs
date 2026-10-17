@@ -493,9 +493,11 @@ public sealed partial class CombatService : IGameTicker
             SrcID = m.Uid, SkillID = m.Template.NormalSkill, TargetId = p.Role!.Id, TargetPos = p.Position.Clone(), Face = m.Face,
             SessionId = session, ChantMs = 0, SkillMs = m.Template.SkillMs, StartTime = Now,
         };
-        await SendMonsterTimelineAsync(m, use);
-        if (data.Row("SkillConfig", m.Template.NormalSkill) is { } cooldownRow && GameData.Int(cooldownRow, "_iCD") is var cooldown and > 0)
-            await BossCooldownStartedAsync(m, m.Template.NormalSkill, Now + cooldown);
+        // Like a player's cast: a row with an _iSkillEffectLevel takes the HIGH_LEVEL route (the Phantom Realm and
+        // Valhalla Maya swings 4340001/5920101 have level 1). A normal attack never starts a boss-panel cooldown
+        // (31125 is for the boss's skills).
+        await SendMonsterTimelineAsync(m, use, highLevel: data.Row("SkillConfig", m.Template.NormalSkill) is { } swingRow
+            && GameData.Int(swingRow, "_iSkillEffectLevel") > 0);
         ScheduleRuntime(m.WorldScene, TimeSpan.FromSeconds(m.Template.HitPointSeconds), async () =>
         {
             if (m.Dead || m.Hp <= 0 || p.Dead || p.Role == null || p.SceneLoading || p.WorldScene != m.WorldScene) return;

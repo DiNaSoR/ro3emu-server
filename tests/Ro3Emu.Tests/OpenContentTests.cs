@@ -158,6 +158,23 @@ public sealed class OpenContentTests : IAsyncLifetime
     }
 
     [ClientDataFact]
+    public async Task EveryPetHatcheryRoundTakesEggsOnTheFirstDay()
+    {
+        // PetIncubationSlotConfig rounds follow activities 1015-1023 (server-open days 0-170). Perpetual, the client
+        // offers the last round of each pool: 10009 (Permanent) and 10008 (Limited-Time).
+        await using var alice = await InWorld("Alice");
+        await Gm("alice", "!quest done 10104330");
+        await Gm("alice", "!lvl 1");
+        await Gm("alice", "!quest done 10105010");
+        await Gm("alice", "!item 1250709 2");
+        foreach (long round in new long[] { 10009, 10008 })
+        {
+            await alice.SendGameAsync(PetService.GenerateEgg, new PetGenEggReq { RoundId = round, SlotId = 1 });
+            Assert.Equal(0, (await Next(alice, PetService.GenerateEgg, PetGenEggRes.Parser)).Result);
+        }
+    }
+
+    [ClientDataFact]
     public async Task TheActivityListShowsTheReopenedEventsButNotTheTestPools()
     {
         await using var alice = await InWorld("Alice");

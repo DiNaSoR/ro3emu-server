@@ -434,11 +434,14 @@ public sealed class BotClient : IAsyncDisposable
     }
 
     /// <summary>The head-name lookup the client makes for every player unit (UserDataService.getAttributeBatchByVersion).</summary>
-    public async Task<Dictionary<string, object?>> GetRoleAttributesAsync(params long[] uids)
+    public Task<Dictionary<string, object?>> GetRoleAttributesAsync(params long[] uids) => GetRoleFieldsAsync(uids, "Base", "Name");
+
+    /// <summary>getAttributeBatchByVersion for the given global cache types ("Base", "Personal"...), each at version 0.</summary>
+    public async Task<Dictionary<string, object?>> GetRoleFieldsAsync(IEnumerable<long> uids, params string[] types)
     {
         var request = new Dictionary<string, object>
         {
-            ["UidFieldVersions"] = uids.ToDictionary(u => u.ToString(), _ => (object)new Dictionary<string, object> { ["Base"] = 0, ["Name"] = 0 }),
+            ["UidFieldVersions"] = uids.ToDictionary(u => u.ToString(), _ => (object)types.ToDictionary(t => t, _ => (object)0)),
         };
         return MessagePackSerializer.Deserialize<Dictionary<string, object?>>(await CallMicroAsync("UserDataService", "getAttributeBatchByVersion", request));
     }

@@ -15,7 +15,8 @@ internal sealed class FamilyEconomyTransactionPlan(RoleItemPlan child, EconomyMu
         string family = kind[6..].Split('-')[0];
         return family switch
         {
-            "pet" => new HashSet<string>(["pets", "pet_books", "lottery", "library", "tasks",
+            // bag_state: a 204 SelfChoosePet box (cd13b/pet-self-choose) commits its item use, cooldowns included.
+            "pet" => new HashSet<string>(["pets", "pet_books", "lottery", "bag_state", "library", "tasks",
                 "task_runtime", "task_followup"], StringComparer.Ordinal),
             // career_special: a Special Class Item lease (cd13b/mount-career) also selects the battle mount slot.
             "mount" => new HashSet<string>(["mounts", "wardrobe", "career_special", "bag_state", "library", "tasks", "task_runtime",

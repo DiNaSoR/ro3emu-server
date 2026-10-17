@@ -51,8 +51,8 @@ public sealed class SeasonService : IGameTicker
     {
         lock (clocks)
         {
-            if (!clocks.TryGetValue(book, out var clock)) clocks[book] = clock = new SeasonClock(data, Start, book).Build();
-            return clock;
+            if (!clocks.TryGetValue(book, out var built)) clocks[book] = built = new SeasonClock(data, Start, book, Zone).Build();
+            return built;
         }
     }
     private SeasonTimeInfoNotify Shared(int book) => book == 101 ? Clock(101) : Empty;
@@ -78,13 +78,31 @@ public sealed class SeasonService : IGameTicker
         seasonId = int.TryParse(Get("season_id"), CultureInfo.InvariantCulture, out int savedId) && savedId > 0 ? savedId : 1;
         history = JsonSerializer.Deserialize<Dictionary<int, Season>>(Get("season_history") ?? "{}") ?? new();
         Start = seasonId > 1 && DateTime.TryParseExact(Get("season_start"), "yyyy-MM-dd", CultureInfo.InvariantCulture,
-            DateTimeStyles.AssumeLocal, out var rolled) ? rolled : options.Value.SeasonStart is { Length: > 0 } configured
-            ? DateTime.ParseExact(configured, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal)
+            DateTimeStyles.None, out var rolled) ? rolled : options.Value.SeasonStart is { Length: > 0 } configured
+            ? DateTime.ParseExact(configured, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None)
             : FirstStart();
     }
 
-    /// <summary>Midnight of the season's first day.</summary>
+    /// <summary>
+    /// Midnight of the season's first day, a realm civil date (Kind Unspecified) in <see cref="Zone"/>. Never pass it to
+    /// <c>new DateTimeOffset(DateTime)</c>: that reads it in the host's zone, not the realm's; use <see cref="StartTime"/>.
+    /// </summary>
     public DateTime Start { get; private set; }
+
+    /// <summary>The realm time zone: the injected clock's, as every daily reset and activity window uses.</summary>
+    public TimeZoneInfo Zone => clock.LocalTimeZone;
+
+    /// <summary>Unix seconds of the season start (realm midnight).</summary>
+    public long StartTime => Unix(Start);
+
+    /// <summary>Unix seconds of a realm civil time; a Utc or Local DateTime (old persisted history) keeps its instant.</summary>
+    public long Unix(DateTime time) => Unix(time, Zone);
+
+    public static long Unix(DateTime time, TimeZoneInfo zone) => time.Kind == DateTimeKind.Unspecified
+        ? new DateTimeOffset(time, zone.GetUtcOffset(time)).ToUnixTimeSeconds() : new DateTimeOffset(time).ToUnixTimeSeconds();
+
+    /// <summary>The realm civil time (Kind Unspecified) of Unix seconds.</summary>
+    public static DateTime Civil(long seconds, TimeZoneInfo zone) => TimeZoneInfo.ConvertTime(DateTimeOffset.FromUnixTimeSeconds(seconds), zone).DateTime;
 
     /// <summary>The "everything open" policy; every server-day and season gate asks it.</summary>
     public OpenContentOptions OpenContent { get; }
@@ -95,14 +113,14 @@ public sealed class SeasonService : IGameTicker
 
     public Season Current() => Current(playBook);
 
-    private Season Current(int book) => new(seasonId, book, Start, DateTimeOffset.FromUnixTimeSeconds(
-        Shared(book).StageTimeInfo.Values.Select(s => s.EndTime).DefaultIfEmpty(new DateTimeOffset(Start).ToUnixTimeSeconds() + SeasonLengthSeconds).Max()).LocalDateTime);
+    private Season Current(int book) => new(seasonId, book, Start, Civil(
+        Shared(book).StageTimeInfo.Values.Select(s => s.EndTime).DefaultIfEmpty(StartTime + SeasonLengthSeconds).Max(), Zone));
 
     /// <summary>Only playbook 101's stage semantics are qualified by this implementation.</summary>
     public SeasonTimeInfoNotify Times() => Times(playBook);
 
     private SeasonTimeInfoNotify Times(int book) => book == 101
-        ? (timing ??= new SeasonClock(data, Start, book).Build()).Clone() : new SeasonTimeInfoNotify();
+        ? (timing ??= new SeasonClock(data, Start, book, Zone).Build()).Clone() : new SeasonTimeInfoNotify();
 
     public long StageId => StageAt(clock.GetUtcNow().ToUnixTimeSeconds(), playBook);
 
@@ -159,7 +177,7 @@ public sealed class SeasonService : IGameTicker
         long breakTime = Times().SeasonBreakStartTime;
         if (clock.GetUtcNow().ToUnixTimeSeconds() < breakTime)
             return "Current season has not reached its break.";
-        if (new DateTimeOffset(start).ToUnixTimeSeconds() < breakTime)
+        if (Unix(start) < breakTime)
             return "New season start cannot precede the current season break.";
         if (seasonId == int.MaxValue) return "Season ID exhausted.";
         // The operator-supplied next start closes the otherwise open 101005 tail (inferred historical boundary).
@@ -195,7 +213,7 @@ public sealed class SeasonService : IGameTicker
         long breakTime = Times().SeasonBreakStartTime;
         if (clock.GetUtcNow().ToUnixTimeSeconds() < breakTime)
             return "Current season has not reached its break.";
-        if (new DateTimeOffset(start).ToUnixTimeSeconds() < breakTime)
+        if (Unix(start) < breakTime)
             return "New season start cannot precede the current season break.";
         if (seasonId == int.MaxValue) return "Season ID exhausted.";
         var previous = Current() with { End = start };
@@ -218,7 +236,7 @@ public sealed class SeasonService : IGameTicker
         return $"Season {seasonId}, playbook {book}, from next login.";
     }
 
-    public string Describe() => $"Season {seasonId}, playbook {playBook}, since {Start:yyyy-MM-dd}.";
+    public string Describe() => string.Create(CultureInfo.InvariantCulture, $"Season {seasonId}, playbook {playBook}, since {Start:yyyy-MM-dd}.");
 
     /// <summary>Capture the login's playbook before its first stat refresh; GM changes apply on the next login.</summary>
     public void Load(GameSession session) => session.SeasonState = State(playBook);
@@ -242,14 +260,13 @@ public sealed class SeasonService : IGameTicker
             Current = new SeasonInfo
             {
                 SeasonId = season.Id, PlayBookId = season.PlayBook, SeasonAreaId = 1,
-                StartTime = new DateTimeOffset(season.Start).ToUnixTimeSeconds(), EndTime = new DateTimeOffset(season.End).ToUnixTimeSeconds(),
+                StartTime = Unix(season.Start), EndTime = Unix(season.End),
                 BreakTime = times.SeasonBreakStartTime, StageId = state.StageId,
             },
         };
         foreach (var (id, previous) in history)
             info.History[id] = new SeasonInfo { SeasonId = id, PlayBookId = previous.PlayBook, SeasonAreaId = 1,
-                StartTime = new DateTimeOffset(previous.Start).ToUnixTimeSeconds(),
-                EndTime = new DateTimeOffset(previous.End).ToUnixTimeSeconds() };
+                StartTime = Unix(previous.Start), EndTime = Unix(previous.End) };
         await CharacterService.SyncAsync(session, SeasonSync, info);
         if (times.StageTimeInfo.Count > 0) await session.SendGameAsync(TimeInfoNotify, times);
     }
@@ -300,7 +317,7 @@ public sealed class SeasonService : IGameTicker
 
     private DateTime FirstStart()
     {
-        if (DateTime.TryParseExact(Get("season_start"), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var saved)) return saved;
+        if (DateTime.TryParseExact(Get("season_start"), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var saved)) return saved;
         var today = clock.GetLocalNow().Date;
         Set("season_start", today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
         return today;

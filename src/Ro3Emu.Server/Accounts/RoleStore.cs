@@ -384,6 +384,17 @@ public sealed class RoleStore
     public byte[]? LoadHeroicSpirit(long id) => LoadBlob(id, "heroic_spirit");
     public byte[]? LoadAreaConcur(long id) => LoadBlob(id, "area_concur");
     public void SaveAreaConcur(long id, byte[] value, RoleItemPlanBuilder? transaction = null) => SaveBlob(id, "area_concur", value, transaction);
+    public byte[]? LoadGrowthClass(long id) => LoadBlob(id, "growth_class");
+    public void SaveGrowthClass(long id, byte[] value, RoleItemPlanBuilder? transaction = null) => SaveBlob(id, "growth_class", value, transaction);
+    public byte[]? LoadFirstHeart(long id) => LoadBlob(id, "first_heart");
+    public void SaveFirstHeart(long id, byte[] value, RoleItemPlanBuilder? transaction = null) => SaveBlob(id, "first_heart", value, transaction);
+    public byte[]? LoadPersonal(long id) => LoadBlob(id, "personal");
+    public byte[]? LoadSocialOutfit(long id) => LoadBlob(id, "social_outfit");
+    public byte[]? LoadEmojiInfo(long id) => LoadBlob(id, "emoji_info");
+    public byte[]? LoadPersonalUpvotes(long id, RoleItemPlanBuilder? transaction = null) => LoadBlob(id, "personal_upvote", transaction);
+    public void SavePersonalUpvotes(long id, byte[] value, RoleItemPlanBuilder transaction) => SaveBlob(id, "personal_upvote", value, transaction);
+    public byte[]? LoadPopularity(long id, RoleItemPlanBuilder? transaction = null) => LoadBlob(id, "popularity", transaction);
+    public void SavePopularity(long id, byte[] value, RoleItemPlanBuilder transaction) => SaveBlob(id, "popularity", value, transaction);
     public byte[]? LoadMounts(long id) => LoadBlob(id, "mounts");
     public void SaveMounts(long id, byte[] state, RoleItemPlanBuilder? transaction = null) => SaveBlob(id, "mounts", state, transaction);
     public byte[]? LoadWardrobe(long id) => LoadBlob(id, "wardrobe");
@@ -528,13 +539,19 @@ public sealed class RoleStore
             builder.ItemDelta(role, inventory, inventory);
             builder.WithEconomy(economy);
         }
+        StageCardUnlock(builder, role, epoch, card, treasure, library);
+        await CommitAsync(builder, "card/unlock-task-followup", _ => publish?.Invoke());
+    }
+
+    /// <summary>The unlocked library and its pending quest follow-up, staged into a transaction that also pays the unlock.</summary>
+    internal void StageCardUnlock(RoleItemPlanBuilder builder, long role, long epoch, int card, bool treasure, byte[] library)
+    {
         byte[]? old = builder.ReadRoleBlob(_accounts, role, "task_followup");
         var pending = old is { Length: > 0 }
             ? JsonSerializer.Deserialize<HashSet<string>>(old) ?? new HashSet<string>() : new HashSet<string>();
         pending.Add($"{role}:{epoch}:{card}:{(treasure ? 1 : 0)}");
         builder.RoleBlob(role, "library", library);
         builder.RoleBlob(role, "task_followup", JsonSerializer.SerializeToUtf8Bytes(pending));
-        await CommitAsync(builder, "card/unlock-task-followup", _ => publish?.Invoke());
     }
 
     internal bool HasTaskFollowup(long role) => LoadBlob(role, "task_followup") is { Length: > 2 };
