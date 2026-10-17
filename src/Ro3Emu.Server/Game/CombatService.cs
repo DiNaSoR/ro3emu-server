@@ -377,8 +377,7 @@ public sealed partial class CombatService : IGameTicker
             {
                 if (monster.Dead || monster.Hp <= 0) continue; // another cast may have reserved this actor while we awaited
                 processed.Add(monster);
-                var defender = new Fighter(0, 0, monster.Template.Flee, 0, monster.Template.Level, monster.Template.Element)
-                    { Def = monster.Template.Def, Mdef = monster.Template.Mdef, Flee = monster.Template.Flee };
+                var defender = AsDefender(monster.Template);
                 var (damage, result) = Damage(attacker, defender, row);
                 foreach (var adjust in MonsterDamageAdjusters) damage = adjust(monster, damage, false);
                 long previousHp = monster.Hp;
@@ -594,6 +593,15 @@ public sealed partial class CombatService : IGameTicker
         public long ResCri { get; init; }
     }
 
+    /// <summary>
+    /// A monster taking a hit. (inferred) Its DEF and MDEF do not reduce the hit: every monster in AttriMonsterConfig
+    /// carries DEF = MDEF = 20 x its level, which the player formula below would turn into a flat 50% cut, while beta
+    /// footage matches the uncut hit (a 3/3 Novice, all stats 1, hits a level 5 Poring for 12-13 = 50% x 5 ATK + 10;
+    /// an archer's Double Strafe on a level 16 Horn shows 2 x 69 = 100% x ~63 ATK + 75). The original formula names
+    /// an attacker-side ParDef (DubugDamageFormulaEnum.Formula_AParDef); its value for a player is unknown.
+    /// </summary>
+    private static Fighter AsDefender(MonsterTemplate m) => new(0, 0, m.Flee, 0, m.Level, m.Element) { Flee = m.Flee };
+
     private (long Damage, DamageHitResult Result) Damage(Fighter a, Fighter b, JsonElement skill, int branch = 0)
     {
         // A skill that never misses (_iSkillHit 10000) draws no hit roll, as before.
@@ -632,6 +640,7 @@ public sealed partial class CombatService : IGameTicker
     private double Mitigated(Fighter b, double dmg, bool magic, int element)
     {
         // Defense: def / (def + ParDef 20 × the defender's level), the shape of the client's damage-reduction tooltip.
+        // Only players carry a DEF here; a monster defender has none (AsDefender).
         double def = magic ? b.Mdef : b.Def;
         dmg *= 1 - def / (def + 20.0 * Math.Max(1, b.Level));
         // Element: EleConfig row = defender element, column = attacker element (/10000), clamped [0.1, 10].
@@ -655,7 +664,7 @@ public sealed partial class CombatService : IGameTicker
         var stats = character.Stats(p);
         var playerSkill = data.Row("SkillConfig", skills.NormalAttack(p))!.Value;
         var player = new Fighter(stats[103], stats[104], stats[109], stats[111], p.Progress.Level, 1);
-        var asTarget = new Fighter(0, 0, m.Flee, 0, m.Level, m.Element) { Def = m.Def, Mdef = m.Mdef, Flee = m.Flee };
+        var asTarget = AsDefender(m);
         double playerDps = ExpectedDamage(player, asTarget, playerSkill) * 1000.0 / Math.Max(1, SkillMs(p, playerSkill));
         var monster = new Fighter(m.Atk, m.Matk, m.Hit, m.Cri, m.Level, m.Element);
         var defender = new Fighter(0, 0, 0, 0, p.Progress.Level, 1) { Def = stats[105], Mdef = stats[106], Flee = stats[110], ResCri = stats[112] };
