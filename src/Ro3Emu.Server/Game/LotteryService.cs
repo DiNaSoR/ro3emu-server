@@ -89,7 +89,7 @@ public sealed class LotteryService
         return next;
     }
 
-    private static byte[] Pack(DBLotteryData data, long day) =>
+    internal static byte[] Pack(DBLotteryData data, long day) =>
         JsonSerializer.SerializeToUtf8Bytes(new LotterySave { Data = data.ToByteArray(), Day = day });
 
     public async Task LoginAsync(GameSession session)

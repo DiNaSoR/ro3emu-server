@@ -12,7 +12,8 @@ This implementation covers the 47 `NewActivityConfig` rows whose `_kMultiverseAr
 | 111 | Persistent world-exploration nodes and piece consumption, 5042/83450/82976 |
 | 112 | Journey act/node/event graph and authored boss dungeons 8100002/4/5/6/7 |
 | 113 | Seven distinct eligible login/connected civil days, configured rewards and durable claims |
-| 114, 999 | Product/gift-pack activity schedule; paid order and payment reports receive a refusal |
+| 114 | Seven-Day Goal (FirstHeartService): 5049 day locks, task progress and score bar from base level 10, 83500 task and 83501 score claims, role blob `first_heart` |
+| 999 | Product/gift-pack activity schedule; paid order and payment reports receive a refusal |
 | 117 | Season Eve authored clues and seven-note chapters, shared cycle progress, milestone claims, wishes and durable end-of-cycle reward mail |
 | 118 | Prontera invasion rounds, actual invaders, donation, guild/city state and settlement |
 | 119 | Training ground, real measured damage, configured race/element/size, best DPS and milestone claims, 5069/84061-84067/30106 |

@@ -207,7 +207,7 @@ public sealed class GuildChallengeService : IGameTicker
     private int Unlocked(GuildState state)
     {
         int result = 0;
-        long days = seasons.OpenContent.ServerDayFree ? long.MaxValue : (long)Math.Floor((Now - new DateTimeOffset(seasons.Start).ToUnixTimeSeconds()) / 86400d) + 1;
+        long days = seasons.OpenContent.ServerDayFree ? long.MaxValue : (long)Math.Floor((Now - seasons.StartTime) / 86400d) + 1;
         foreach (var config in Configs)
         {
             if (data.Row("LC_ConditionList", GameData.Int(config, "_kCondition")) is not { } condition) continue;

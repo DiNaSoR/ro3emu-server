@@ -149,6 +149,52 @@ public sealed class SurvivorBattleTests : IAsyncLifetime
         return Task.CompletedTask;
     });
 
+    /// <summary>A refused or lapsed ready check fails the match for everyone with 82643, naming who did not confirm.</summary>
+    [ClientDataFact]
+    public async Task RefusedOrLapsedReadyCheckFailsTheMatchNamingThePlayer()
+    {
+        await HostAsync(2, 1);
+        await using var alice = await InWorld("Alice");
+        await using var bob = await InWorld("Bob");
+        var players = new[] { alice, bob };
+        async Task QueueAndBobReadyAsync()
+        {
+            foreach (var player in players)
+            {
+                await player.SendGameAsync(TimedBattleService.StartMatch, new StartMatchReq { MatchEntryId = 2 });
+                Assert.Equal(0, (await Next(player, TimedBattleService.StartMatch, StartMatchResp.Parser)).Result);
+            }
+            foreach (var player in players)
+                await Next(player, TimedBattleService.ReadyNotify, MatchReadyNotify.Parser,
+                    n => n.ReadyInfos.All(i => i.Status == MatchReadyStatus.None));
+            await bob.SendGameAsync(TimedBattleService.Ready, new MatchReadyReq { MatchEntryId = 2, PlayerId = Id(bob), IsReady = true });
+            Assert.Equal(0, (await Next(bob, TimedBattleService.Ready, MatchReadyResp.Parser)).Result);
+        }
+        async Task FailedAsync()
+        {
+            foreach (var player in players)
+            {
+                var fail = await Next(player, DungeonMatchService.FailNotify, FailMatchNtf.Parser);
+                Assert.Equal(2, fail.MatchEntryId);
+                Assert.Equal(ErrorCodes.DungeonDeclined, fail.Result);
+                Assert.Equal(Id(alice), fail.PenaltyMemberGuid);
+                Assert.Equal(Id(alice), fail.FailPlayer);
+                Assert.Equal(0, fail.PenaltyMemberUnlockTs);
+            }
+        }
+
+        await QueueAndBobReadyAsync();
+        await alice.SendGameAsync(TimedBattleService.Ready, new MatchReadyReq { MatchEntryId = 2, PlayerId = Id(alice), IsReady = false });
+        Assert.Equal(ErrorCodes.DungeonDeclined, (await Next(alice, TimedBattleService.Ready, MatchReadyResp.Parser)).Result);
+        await FailedAsync();
+
+        await QueueAndBobReadyAsync();
+        await Tick(clock.GetUtcNow().ToUnixTimeSeconds() + 31);
+        await FailedAsync();
+        Assert.False(Battles.IsMatching(Session(alice)));
+        Assert.False(Battles.IsMatching(Session(bob)));
+    }
+
     [ClientDataFact]
     public async Task StagesCareersAndLandingFollowTheDungeonScript()
     {

@@ -19,8 +19,9 @@ namespace Ro3Emu.Server.Game;
 /// </summary>
 public sealed partial class DailyActivityService : IGameTicker
 {
-    public const uint ActivitySync = 5004, StageSync = 5059, RingAccept = 43504, StageGain = 31178;
+    public const uint ActivitySync = 5004, StageSync = 5059, RingAccept = 43504, StageGain = 31178, StageBatchGain = 31175;
     private const int Liveness = 5, RingActivity = 3302, TodoFunction = 25, RingFunction = 5902;
+    private const int FashionStage = 3, LibraryStage = 4, ChickenStage = 6, TodoStage = 7, ChickenScore = 7; // GenericStageRewardsConfig._iType; item 7
     private const int RingRuns = 1; // PublicParamConfig.RunRingTaskRefreshCount (inferred as one accept per reset).
     private static readonly int[] RingStarts = [3001, 3011, 3021];
     private readonly GameData data;
@@ -254,7 +255,7 @@ public sealed partial class DailyActivityService : IGameTicker
         if (result == 0)
         {
             // Local-day index rotates over the three configured chain roots, independent of requestId (often zero).
-            int localDay = DateOnly.FromDateTime(DateTimeOffset.FromUnixTimeSeconds(session.Daily!.DailyEpoch).LocalDateTime).DayNumber;
+            int localDay = DateOnly.FromDateTime(SeasonService.Civil(session.Daily!.DailyEpoch, clock.LocalTimeZone)).DayNumber;
             start = RingStarts[localDay % RingStarts.Length];
             var oldTasks = session.Tasks?.Clone();
             var oldDaily = JsonSerializer.SerializeToUtf8Bytes(session.Daily);
@@ -294,7 +295,7 @@ public sealed partial class DailyActivityService : IGameTicker
         });
     }
 
-    /// <summary>31178: the type-7 row, function 25 and item-5 threshold authorize one shared-list claim.</summary>
+    /// <summary>31178: one stage under StageError's rule, paid and marked in the shared list in one commit.</summary>
     public async Task ClaimAsync(GameSession session, StageRewardGainReq req)
     {
         using var gate = await TaskService.LockTasksAsync(session);
@@ -305,16 +306,11 @@ public sealed partial class DailyActivityService : IGameTicker
             return;
         }
         await ReconcileCoreAsync(session);
-        var row = data.Row("GenericStageRewardsConfig", req.StageId);
-        int result = row is not { } r || GameData.Int(r, "_iType") != 7 || GameData.Int(r, "_iItem") != Liveness ? ErrorCodes.RewardMissing
-            : !functions.IsOpen(session, TodoFunction) ? ErrorCodes.FeatureUnavailable
-            : session.Daily!.Claims.Contains(req.StageId) ? ErrorCodes.RewardClaimed
-            : character.CountOf(session, Liveness) < GameData.Int(r, "_iScore") ? ErrorCodes.CurrencyShort
-            : 0;
+        int result = StageError(session, req.StageId);
         if (result == 0)
         {
-            var grant = StageAward(session, (int)GameData.Int(row!.Value, "_iAward"));
-            if (grant.Count == 0) result = ErrorCodes.RewardMissing;
+            var grant = StageGrant(session, req.StageId);
+            if (grant == null) result = ErrorCodes.RewardMissing;
             else
             {
                 var before = JsonSerializer.SerializeToUtf8Bytes(session.Daily);
@@ -327,6 +323,97 @@ public sealed partial class DailyActivityService : IGameTicker
             }
         }
         await session.SendGameAsync(StageGain, new StageRewardGainResp { Result = result, StageId = req.StageId });
+    }
+
+    /// <summary>
+    /// 31175 (LC_StageRewardHelper.GetStageRewardByIdList): every listed stage under the 31178 rule, paid and marked in one
+    /// commit. All or nothing (inferred: the client lists only stages it shows as claimable and reads no reply; 5059 is
+    /// what updates it).
+    /// </summary>
+    public async Task BatchClaimAsync(GameSession session, StageRewardBatchGainReq req)
+    {
+        using var gate = await TaskService.LockTasksAsync(session);
+        if (session.Role == null || session.Progress == null || session.Daily == null || !session.DailyReady)
+        {
+            await session.SendGameAsync(StageBatchGain, new StageRewardBatchGainResp { Result = ErrorCodes.FeatureUnavailable, Req = req });
+            return;
+        }
+        await ReconcileCoreAsync(session);
+        var ids = req.StageIds.Distinct().ToArray();
+        int result = ids.Length == 0 ? ErrorCodes.Parameter : 0;
+        foreach (int id in ids)
+            if (result == 0) result = StageError(session, id);
+        var grant = new List<(int Entry, int Count, int Bind)>();
+        foreach (int id in ids)
+        {
+            if (result != 0) break;
+            var award = StageGrant(session, id);
+            if (award == null) result = ErrorCodes.RewardMissing;
+            else grant.AddRange(award);
+        }
+        if (result == 0)
+        {
+            var before = JsonSerializer.SerializeToUtf8Bytes(session.Daily);
+            var next = JsonSerializer.Deserialize<DailyState>(before)!;
+            next.Claims.UnionWith(ids);
+            var after = JsonSerializer.SerializeToUtf8Bytes(next);
+            result = await character.GrantDailyStageAsync(session, grant, before, after) ? 0 : ErrorCodes.Unknown;
+            if (result == 0) await SyncClaimsAsync(session);
+        }
+        await session.SendGameAsync(StageBatchGain, new StageRewardBatchGainResp { Result = result, Req = req });
+    }
+
+    /// <summary>
+    /// One stage's claim rule: a known row, not yet claimed, its type's progress reached, each as the client's claim button
+    /// decides (the reply is ignored, LC_DAL_StageReward._processStageRewardGet is empty; 5059 alone updates the panels):
+    /// <list type="bullet">
+    /// <item>7 To-Do: function 25, item-5 liveness at least _iScore (a threshold, not spent).</item>
+    /// <item>3 wardrobe: fashion score at least _iScore. LC_FashionHelper.UpdateFashionScore sums the permanent lit
+    /// appearances' WardRobeConfig._iFashionScore; UI_Sys_WardrobeLevelPanelCtrl.OnClickRewardAll claims _iLevel up to
+    /// that score's level, the same rows.</item>
+    /// <item>4 Codex: the count of the row's _iItem at least _iScore (LC_Library_Helper.SendRewardByType / GetRewardIsOver;
+    /// 118 is LibraryOverviewPointID, the Collection Points of the overview's 4001..4020).</item>
+    /// <item>6 Survivor Battle: DBChickenInfo.rankId at least _iLevel (UI_Sys_ChickenContentWidgetBaseCtrl.OnItemClick),
+    /// where rank 1 also needs points in it (its guard on GetCurRankInfo's surplus; at rank 1 that is item 7 itself).</item>
+    /// </list>
+    /// (inferred) Types 3, 4 and 6 are permanent once-only claims with no function gate: the progress already needs the
+    /// feature. A threshold not reached answers CurrencyShort for every type.
+    /// </summary>
+    private int StageError(GameSession session, int stageId)
+    {
+        if (data.Row("GenericStageRewardsConfig", stageId) is not { } r) return ErrorCodes.RewardMissing;
+        long type = GameData.Int(r, "_iType"), item = GameData.Int(r, "_iItem"), score = GameData.Int(r, "_iScore");
+        int level = (int)GameData.Int(r, "_iLevel");
+        bool? reached = type switch
+        {
+            TodoStage when item == Liveness => character.CountOf(session, Liveness) >= score,
+            FashionStage => FashionScore(session) >= score,
+            LibraryStage when item > 0 => character.CountOf(session, (int)item) >= score,
+            ChickenStage when level > 0 => (session.TimedBattle?.ChickenRank ?? 1) is var rank && rank >= level
+                && (rank > 1 || character.CountOf(session, ChickenScore) > 0),
+            _ => null
+        };
+        return reached == null ? ErrorCodes.RewardMissing
+            : type == TodoStage && !functions.IsOpen(session, TodoFunction) ? ErrorCodes.FeatureUnavailable
+            : session.Daily!.Claims.Contains(stageId) ? ErrorCodes.RewardClaimed
+            : reached == true ? 0 : ErrorCodes.CurrencyShort;
+    }
+
+    private long FashionScore(GameSession session) => session.Wardrobe?.AllLightUpAppearances.Values
+        .Where(a => a.OverdueTimeMs == 0)
+        .Sum(a => data.Row("WardRobeConfig", a.AppearanceId) is { } row ? GameData.Int(row, "_iFashionScore") : 0) ?? 0;
+
+    /// <summary>
+    /// The stage's goods, null when its _iAward resolves to nothing. A row without an award (4001, the Codex's level 1)
+    /// pays nothing and is only marked (inferred: LC_Library_Helper.SendRewardByType lists it in every overview claim,
+    /// so refusing it would refuse the whole batch).
+    /// </summary>
+    private List<(int Entry, int Count, int Bind)>? StageGrant(GameSession session, int stageId)
+    {
+        int group = (int)GameData.Int(data.Row("GenericStageRewardsConfig", stageId)!.Value, "_iAward");
+        if (group == 0) return [];
+        var award = StageAward(session, group);
+        return award.Count == 0 ? null : award;
     }
 
     private List<(int Entry, int Count, int Bind)> StageAward(GameSession session, int group)
@@ -415,12 +502,17 @@ public sealed partial class DailyActivityService : IGameTicker
     }
 
     private long ToUnix(DateTime local) => new DateTimeOffset(DateTime.SpecifyKind(local, DateTimeKind.Unspecified), clock.LocalTimeZone.GetUtcOffset(local)).ToUnixTimeSeconds();
-    private long Boundary(DateTime now) => ToUnix((now.TimeOfDay >= TimeSpan.FromHours(5) ? now.Date : now.Date.AddDays(-1)).AddHours(5));
-    private long WeekBoundary(DateTime now)
+    private long Boundary(DateTime now) => ToUnix(GameDay(now).AddHours(5));
+    private long WeekBoundary(DateTime now) => ToUnix(GameWeek(now).AddHours(5));
+
+    /// <summary>The game day a realm-local time belongs to: it starts at 05:00 (Lua_TimeHelper.GetDayRefreshTime).</summary>
+    internal static DateTime GameDay(DateTime local) => local.TimeOfDay >= TimeSpan.FromHours(5) ? local.Date : local.Date.AddDays(-1);
+
+    /// <summary>The Monday of the game week (Monday 05:00) a realm-local time belongs to.</summary>
+    internal static DateTime GameWeek(DateTime local)
     {
-        var day = now.TimeOfDay >= TimeSpan.FromHours(5) ? now.Date : now.Date.AddDays(-1);
-        int sinceMonday = ((int)day.DayOfWeek + 6) % 7;
-        return ToUnix(day.AddDays(-sinceMonday).AddHours(5));
+        var day = GameDay(local);
+        return day.AddDays(-(((int)day.DayOfWeek + 6) % 7));
     }
 
     private static int Remaining(DailyState state) => DBDailyActivityInfo.Parser.ParseFrom(state.Rows).ActivityData.TryGetValue(RingActivity, out var row)
@@ -470,7 +562,7 @@ public sealed partial class DailyActivityService : IGameTicker
         await SyncClaimsAsync(session);
     }
 
-    private bool IsDailyStage(int id) => data.Row("GenericStageRewardsConfig", id) is { } row && GameData.Int(row, "_iType") == 7;
+    private bool IsDailyStage(int id) => data.Row("GenericStageRewardsConfig", id) is { } row && GameData.Int(row, "_iType") == TodoStage;
 
     private bool Available(GameSession session, ActivityDef def) => def.Books.Length == 0 || def.Books.Contains(0) || def.Books.Contains(seasons.PlayBook);
 

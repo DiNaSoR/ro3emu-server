@@ -21,7 +21,8 @@ public sealed partial class TradeService(
         SaleHistory = 32606, OwnBooth = 32607, Credit = 32608, RecentPrice = 32609, Search = 32610,
         BuyTop = 32612, PutOn = 32613, UnlockSlot = 32614, PutOff = 32615, Follow = 32616,
         Refresh = 32617, QuerySkus = 32618, BuyNormal = 32619, Reprice = 32620, QueryAllInventory = 32621,
-        Penalties = 32623, MultiQuery = 32625, Preorder = 32626, QueryPreorders = 32628, RefundPreorder = 32629;
+        Penalties = 32623, MultiQuery = 32625, Preorder = 32626, QueryPreorders = 32628, RefundPreorder = 32629,
+        InQueue = 32622;
 
     private const string Listings = "trade_listing", History = "trade_history", Orders = "trade_preorder";
     private const int TaxBasisPoints = 900; // TradeConfigTax._kTaxZeny/_kTaxMiao; currency 1 rule is inferred.

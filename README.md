@@ -234,6 +234,10 @@ The patcher tests run without client data. The server integration tests start a 
 and talk to it through bots, covering wire format, flow and persistence. Most of them need the exported `data/`;
 without it they are skipped, and the rest still run. CI runs both suites on Linux on every push (`tests.yml`).
 
+The suite pretends the machine is in UTC+08 (no DST), whatever its real time zone, so a result never depends on where
+it runs; the realm time zone in a test comes from its injected clock. `RO3EMU_TEST_HOST_TZ=<zone id>` picks another
+host zone (`host` keeps the real one) and `RO3EMU_TEST_HOST_CULTURE=<culture>` sets the current culture.
+
 ### Load tests
 
 ```powershell

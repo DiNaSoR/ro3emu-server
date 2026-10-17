@@ -44,7 +44,7 @@ public sealed partial class DungeonService
 
     private State CurrentState(State previous)
     {
-        long start = new DateTimeOffset(seasons.Start).ToUnixTimeSeconds();
+        long start = seasons.StartTime;
         // Key progress by configured season identity; preserve role-level job preference (inferred season policy).
         return previous.PlayBook == seasons.PlayBook && previous.SeasonStart == start ? Copy(previous)
             : new State { PlayBook = seasons.PlayBook, SeasonStart = start,

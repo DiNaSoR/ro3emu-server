@@ -2,101 +2,37 @@
   "version": 1,
   "about": "Reconstructed story dungeon encounters (re/dungeon-reconstruction-plan.md, accepted 2026-10-11). The original server's encounter scripts and its 2000xxxx monster templates are not in the client. Each spawn below places a monster the client knows (NPCConfig) at an authored scene-editor point; the reason and the confidence of every decision are recorded. Waves follow the dungeon's quest stages; \"quest\" is the DungeonQuestConfig _iQuestID a wave plays (the client tracker shows it). Switch: Ro3Emu:ReconstructedDungeons. Never mixed into client data.",
   "monsterAttacks": {
-    "5300001": {
-      "from": 5020009,
-      "why": "story Eddga has no normal attack in the client (its server script chose skills); the field MVP Eddga's"
-    },
-    "5300002": {
-      "from": 5020002,
-      "why": "story Golden Thief Bug; the field MVP Golden Thief Bug's"
-    },
-    "5300003": {
-      "from": 5020013,
-      "why": "story Baphomet; the field MVP Baphomet's"
-    },
-    "5300006": {
-      "from": 5020005,
-      "why": "story Maya; the field MVP Maya's"
-    },
-    "5300010": {
-      "from": 5020016,
-      "why": "story Pharaoh; the field MVP Pharaoh's"
-    },
-    "5300018": {
-      "from": 5020004,
-      "why": "story Evil Boss (a human boss); Orc Hero's melee boss attack, low confidence"
-    },
-    "5300042": {
-      "from": 5000098,
-      "why": "story Evil Warrior (charging melee); Orc Warrior's melee attack, low confidence"
-    },
-    "5300043": {
-      "from": 5000098,
-      "why": "story Evil Warrior (charging melee); Orc Warrior's melee attack, low confidence"
-    },
-    "5300044": {
-      "from": 5000098,
-      "why": "story Evil Warrior (charging melee); Orc Warrior's melee attack, low confidence"
-    },
-    "5300045": {
-      "from": 5000098,
-      "why": "story Evil Warrior (charging melee); Orc Warrior's melee attack, low confidence"
-    },
-    "5300046": {
-      "from": 5000111,
-      "why": "story Evil Archer; Goblin Archer's ranged attack (15 m), low confidence"
-    },
-    "5300047": {
-      "from": 5000111,
-      "why": "story Evil Archer; Goblin Archer's ranged attack (15 m), low confidence"
-    },
-    "5300048": {
-      "from": 5000111,
-      "why": "story Evil Archer; Goblin Archer's ranged attack (15 m), low confidence"
-    },
-    "5300049": {
-      "from": 5000111,
-      "why": "story Evil Archer; Goblin Archer's ranged attack (15 m), low confidence"
-    },
-    "5300050": {
-      "from": 5000111,
-      "why": "story Evil Archer; Goblin Archer's ranged attack (15 m), low confidence"
-    },
-    "5300082": {
-      "from": 5000083,
-      "why": "story Elusive Pecopeco; the field Peco Peco's"
-    },
-    "about": "Story templates (530xxxx) have no normal attack in the client; each borrows the normal attack of the named monster."
+    "about": "A template without a normal attack of its own borrows the normal attack of the named monster. None does now: the story bosses swing their own MainStory_*NormalAttack rows and the airship crew the rows their NPCConfig lists (MonsterService.NormalAttack, BossNormalAttacks)."
   },
   "soloTuning": {
     "5300001": {
       "hp": 870,
-      "attack": 2060,
+      "attack": 1500,
       "why": "Eddga: solo tuning, see about"
     },
     "5300002": {
       "hp": 580,
-      "attack": 250,
+      "attack": 410,
       "why": "Golden Thief Bug: solo tuning, see about"
     },
     "5300003": {
       "hp": 540,
-      "attack": 300,
+      "attack": 360,
       "why": "Baphomet: solo tuning, see about"
     },
     "5300006": {
       "hp": 2420,
-      "attack": 810,
+      "attack": 1035,
       "why": "Maya: solo tuning, see about"
     },
     "5300010": {
       "hp": 390,
-      "attack": 220,
+      "attack": 420,
       "why": "Pharaoh: solo tuning, see about"
     },
     "5300018": {
       "hp": 2870,
-      "attack": 980,
+      "attack": 1230,
       "why": "Evil Boss: solo tuning, see about"
     },
     "5300042": {

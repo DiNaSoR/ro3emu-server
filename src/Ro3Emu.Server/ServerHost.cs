@@ -83,6 +83,8 @@ public static class ServerHost
         builder.Services.AddSingleton<GatheringService>();
         builder.Services.AddSingleton<GuideService>();
         builder.Services.AddSingleton<EmojiService>();
+        builder.Services.AddSingleton<PersonalService>();
+        builder.Services.AddSingleton<SocialOutfitService>();
         builder.Services.AddSingleton<AchievementService>();
         builder.Services.AddSingleton<TeamService>();
         builder.Services.AddSingleton<MvpService>();
@@ -92,6 +94,7 @@ public static class ServerHost
         builder.Services.AddSingleton<SeasonRefineService>();
         builder.Services.AddSingleton<SeasonTalentService>();
         builder.Services.AddSingleton<ShopService>();
+        builder.Services.AddSingleton<ItemBoxService>();
         builder.Services.AddSingleton<MountService>();
         builder.Services.AddSingleton<CareerSpecialService>();
         builder.Services.AddSingleton<WardrobeService>();
@@ -122,6 +125,8 @@ public static class ServerHost
         builder.Services.AddSingleton<TowerService>();
         builder.Services.AddSingleton<ValhallaService>();
         builder.Services.AddSingleton<MonsterHuntService>();
+        builder.Services.AddSingleton<GrowthClassService>();
+        builder.Services.AddSingleton<FirstHeartService>();
         builder.Services.AddSingleton<AppraisalService>();
         builder.Services.AddSingleton<EnchantService>();
         builder.Services.AddSingleton<PetFollowerService>();
@@ -332,6 +337,7 @@ public static class ServerHost
         // A committed dungeon clear counts toward quest target 101018 (story steps such as Payon Forest, the airship).
         var questTasks = app.Services.GetRequiredService<TaskService>();
         app.Services.GetRequiredService<DungeonService>().Completed.Add((s, scene, _) => questTasks.OnDungeonClearedAsync(s, scene));
+        app.Services.GetRequiredService<TotemService>().Combined.Add(questTasks.OnTotemCombined); // target 315004
         app.Services.GetRequiredService<ReconnectService>(); // hooks the handover and registers !netdrop
         // Create the key before the first client connects, so ClientPatch can read the public half.
         app.Services.GetRequiredService<GateCrypto>();
@@ -435,11 +441,14 @@ internal sealed class GameLoopTickers(IServiceProvider services) : IHostedServic
         Add<WorldCoreService>();
         Add<EmojiService>();
         Add<AchievementService>();
+        Add<FirstHeartService>();
         Add<DungeonMatchService>();
         Add<GatheringService>();
         Add<TotemEffects>();
         Add<Game.Persistence.PositionPersistence>();
         Add<Game.Persistence.SettingsPersistence>();
+        Add<ShopService>(); // 05:00 purchase-limit rollover
+        Add<ItemBoxService>(); // award boxes; 05:00 item use-time rollover
         return Task.CompletedTask;
     }
 

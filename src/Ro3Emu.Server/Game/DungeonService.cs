@@ -100,6 +100,8 @@ public sealed partial class DungeonService
         public required int SeasonId { get; init; }
         public bool Matched { get; init; }
         public HashSet<GameSession> Loaded { get; } = new();
+        /// <summary>30441 roster slots by role (index = 0-based position), fixed on the first roster.</summary>
+        public List<long> Slots { get; } = new();
         public HashSet<long> Killed { get; } = new();
         public HashSet<long> Precounted { get; } = new();
         public bool ObligationsFrozen { get; set; }
@@ -438,14 +440,38 @@ public sealed partial class DungeonService
     private Task BroadcastAsync(Attempt a, uint id, IMessage msg) =>
         Task.WhenAll(Present(a).Where(a.Loaded.Contains).Select(s => SendQuietAsync(s, id, msg)));
 
+    /// <summary>
+    /// 30441 DungeonTeamInfoNotify. A nonzero teamId switches the client to its Virtual team (LC_DAL_VirtualTeam
+    /// _processDungeonTeamInfoNotify, LC_TeamDataRouter), whose actions are 30442-30451; every group this engine runs is
+    /// a TeamService party or no party, so the id is 0 (Default mode): the party HUD and the 42009/42012/42015/42031 team
+    /// actions stay on the real team, as the _iConvene=1 dungeons (PVE_10P, FivePeopleDungeon, ...) imply (inferred).
+    /// Positions are 0-based: the client shows position + 1 in slots 1..5 (UI_Sys_TeamFiveWidgetCtrl).
+    /// </summary>
     private Task SendRosterAsync(Attempt a)
     {
-        var roster = new DungeonTeamInfoNotify { TeamId = a.TeamId, LeaderGuid = a.Leader, TeamType = (DungeonTeamType)1 };
+        var roster = new DungeonTeamInfoNotify { TeamId = 0, LeaderGuid = a.Leader, TeamType = (DungeonTeamType)1 };
         var squad = new DungeonTeamSquadInfo { SquadIdx = 1, SquadLeaderGuid = a.Leader };
-        int index = 0;
-        foreach (var member in Present(a)) squad.Members[member.Role!.Id] = new DungeonTeamMemberInfo { Guid = member.Role.Id, Position = ++index };
+        foreach (var member in Present(a))
+            squad.Members[member.Role!.Id] = new DungeonTeamMemberInfo { Guid = member.Role.Id, Position = Slot(a, member.Role.Id) };
         roster.Squads[1] = squad; // ordinary preformed roster, tactical reorganization is not implemented (inferred).
         return BroadcastAsync(a, TeamInfo, roster);
+    }
+
+    /// <summary>
+    /// A member's 0-based roster slot, kept for the whole run: the party's own slot order when the run started (the
+    /// leader's slot in it), else the leader first; later arrivals take the next slot (inferred).
+    /// </summary>
+    private int Slot(Attempt a, long role)
+    {
+        if (a.Slots.Count == 0)
+        {
+            if (a.TeamId != 0 && teams.TeamOf(a.Leader).TeamId == a.TeamId) a.Slots.AddRange(teams.MembersOf(a.Leader));
+            else a.Slots.Add(a.Leader);
+        }
+        int slot = a.Slots.IndexOf(role);
+        if (slot >= 0) return slot;
+        a.Slots.Add(role);
+        return a.Slots.Count - 1;
     }
 
     private async Task StartAsync(Attempt a)

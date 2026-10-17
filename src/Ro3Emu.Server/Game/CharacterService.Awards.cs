@@ -51,7 +51,7 @@ public sealed partial class CharacterService
     }
 
     /// <summary>
-    /// A type-7 stage grant is staged in copies and committed with its claim blob on one SQLite connection. No
+    /// A stage reward grant (31178/31175, any type) is staged in copies and committed with its claim blob on one SQLite connection. No
     /// session mutation or success packet precedes commit; a failed transaction leaves the old state intact.
     /// </summary>
     public async Task<bool> GrantDailyStageAsync(GameSession session, IReadOnlyList<(int Entry, int Count, int Bind)> goods,
@@ -64,13 +64,16 @@ public sealed partial class CharacterService
         var before = JsonSerializer.Deserialize<DailyActivityService.DailyState>(previousDaily);
         var after = JsonSerializer.Deserialize<DailyActivityService.DailyState>(nextDaily);
         if (before?.Claims == null || after?.Claims == null || before.DailyEpoch != after.DailyEpoch ||
-            after.Claims.Except(before.Claims).ToArray() is not [int stage] ||
+            after.Claims.Except(before.Claims).Order().ToArray() is not { Length: > 0 } stages ||
             before.Claims.Except(after.Claims).Any() || questExp < 0 ||
             goods.Any(g => g.Count <= 0 || data.Row("ItemConfig", g.Entry) == null)) return false;
         var plan = new AwardPlan(0, 0, goods.Select(g => new AwardGrant(g.Entry, g.Count, g.Bind)));
+        // One stage (31178) or a batch (31175): the batch's source names all of its stages.
+        object outcome = stages is [int stage]
+            ? new { Version = 1, Stage = stage, Epoch = after.DailyEpoch, Grants = goods, QuestExp = questExp }
+            : new { Version = 1, Stages = stages, Epoch = after.DailyEpoch, Grants = goods, QuestExp = questExp };
         var source = new OwnedAwardSource("cd13e/daily-stage",
-            $"daily-stage/{session.Role!.Id}/{after.DailyEpoch}/{stage}",
-            new { Version = 1, Stage = stage, Epoch = after.DailyEpoch, Grants = goods, QuestExp = questExp });
+            $"daily-stage/{session.Role!.Id}/{after.DailyEpoch}/{string.Join(",", stages)}", outcome);
         try
         {
             return await ApplyAwardAsync(session, plan, taskBaseExp: questExp,
@@ -228,7 +231,7 @@ public sealed partial class CharacterService
         // TaskService can hold unsaved in-memory objective progress. Compare that snapshot above, then
         // use the persisted blob as the SQLite CAS baseline for this single award transaction.
         byte[]? persistedTasks = expectedTasks == null ? null : roles.LoadTasks(session.Role.Id);
-        var cardSight = StageFirstCardSight?.Invoke(session, gained.Select(g => g.Entry).ToList());
+        var cardSight = StageFirstCardSight?.Invoke(session, gained.Select(g => g.Entry).ToList(), 0);
         void PublishAward()
         {
             session.Progress = staged;
