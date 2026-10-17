@@ -22,6 +22,9 @@ namespace Ro3Emu.ClientHooks
     /// TL_SignalWwise markers sit on tracks whose bound object receives them; in this build only TL_Receiver posts
     /// them (TL_ReceiverWwise.OnNotify is empty, and TL_Manager does not bind TL_TrackWwise tracks), so a marker whose
     /// track has no TL_Receiver on its binding is posted from here when the director's time passes it.
+    /// A cutscene with no sound of its own (no Wwise, audio or video track, clip, marker or component; 130011 is one)
+    /// would be silent from start to end under that mute, so its mute is lifted (Ctrl_UnMute_InGame, as the game
+    /// posts at the end) and the map's music and sounds go on playing. That choice is ours, not the original's.
     /// </summary>
     internal static class CutsceneAudio
     {
@@ -36,6 +39,7 @@ namespace Ro3Emu.ClientHooks
             public PlayableDirector Director;
             public readonly List<KeyValuePair<double, string>> Markers = new List<KeyValuePair<double, string>>();
             public double LastTime;
+            public bool HasSound;
         }
         private static readonly List<Pending> Watching = new List<Pending>();
         private static int _frame;
@@ -98,8 +102,16 @@ namespace Ro3Emu.ClientHooks
             Receivers(sb, "director object", director.gameObject);
             if (timeline != null)
             {
-                if (timeline.markerTrack != null) Track(sb, director, timeline.markerTrack, 1, null);
-                foreach (var track in timeline.GetRootTracks()) Track(sb, director, track, 1, pending);
+                // The timeline's own marker track (also listed among the root tracks) delivers to the director's
+                // object, whose TL_Receiver posts its Wwise markers.
+                if (timeline.markerTrack != null)
+                {
+                    Track(sb, director, timeline.markerTrack, 1, null);
+                    foreach (var marker in timeline.markerTrack.GetMarkers())
+                        if (marker is TL_SignalWwise) pending.HasSound = true;
+                }
+                foreach (var track in timeline.GetRootTracks())
+                    if (track != timeline.markerTrack) Track(sb, director, track, 1, pending);
             }
             else sb.Append("\n  (not a TimelineAsset)");
 
@@ -111,6 +123,7 @@ namespace Ro3Emu.ClientHooks
                 string type = c.GetType().Name;
                 if (!(type.StartsWith("Ak", StringComparison.Ordinal) || type.StartsWith("AD_Wwise", StringComparison.Ordinal)
                       || type.StartsWith("TL_Receiver", StringComparison.Ordinal))) continue;
+                if (type != "TL_Receiver") pending.HasSound = true;
                 if (++n > 40) { sb.Append("\n    ..."); break; }
                 sb.Append("\n    ").Append(Path(c.transform, director.transform)).Append(' ').Append(type);
                 Describe(sb, c);
@@ -122,6 +135,11 @@ namespace Ro3Emu.ClientHooks
                 pending.Markers.Sort((a, b) => a.Key.CompareTo(b.Key));
                 Watching.Add(pending);
                 sb.Append("\n  ").Append(pending.Markers.Count).Append(" Wwise marker(s) have no receiver that posts them; posting them here");
+            }
+            if (!pending.HasSound && timeline != null)
+            {
+                uint id = HappyEngine.Base.Singleton<AudioManager>.Instance.PostEvent("Ctrl_UnMute_InGame");
+                sb.Append("\n  no sound of its own: lifted the in-game mute (Ctrl_UnMute_InGame -> playingId=").Append(id).Append(')');
             }
             Debug.Log(sb.ToString());
         }
@@ -138,11 +156,13 @@ namespace Ro3Emu.ClientHooks
             var bound = binding as GameObject ?? (binding as Component)?.gameObject;
             if (bound != null) Receivers(sb, "bound object", bound);
             bool received = pending == null || (bound != null && bound.GetComponent<TL_Receiver>() != null);
+            if (pending != null && IsSound(track.GetType().Name)) pending.HasSound = true;
             foreach (var clip in track.GetClips())
             {
                 sb.Append(pad).Append("  clip ").Append(clip.start.ToString("F2")).Append('+').Append(clip.duration.ToString("F2"))
                   .Append(' ').Append(clip.asset != null ? clip.asset.GetType().Name : "null").Append(" '").Append(clip.displayName).Append('\'');
                 if (clip.asset != null) Describe(sb, clip.asset);
+                if (pending != null && clip.asset != null && IsSound(clip.asset.GetType().Name)) pending.HasSound = true;
             }
             foreach (var marker in track.GetMarkers())
             {
@@ -150,6 +170,7 @@ namespace Ro3Emu.ClientHooks
                 Describe(sb, marker);
                 if (marker is TL_SignalWwise signal && !string.IsNullOrEmpty(signal.m_kWwiseEvent))
                 {
+                    if (pending != null) pending.HasSound = true;
                     sb.Append(' ').Append(EventBank(signal.m_kWwiseEvent));
                     if (!received)
                     {
@@ -160,6 +181,10 @@ namespace Ro3Emu.ClientHooks
             }
             foreach (var child in track.GetChildTracks()) Track(sb, director, child, depth + 1, pending);
         }
+
+        private static bool IsSound(string typeName) =>
+            typeName.StartsWith("Ak", StringComparison.Ordinal) || typeName.IndexOf("Wwise", StringComparison.Ordinal) >= 0
+            || typeName.IndexOf("Audio", StringComparison.Ordinal) >= 0 || typeName.IndexOf("Video", StringComparison.Ordinal) >= 0;
 
         /// <summary>Posts the unreceived markers the playing directors passed since the last frame, as TL_Receiver does.</summary>
         private static void PostPassedMarkers()
