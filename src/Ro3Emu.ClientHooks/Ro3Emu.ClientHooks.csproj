@@ -33,6 +33,9 @@
     <Reference Include="Happyengine.Network"><HintPath>$(ClientManaged)\Happyengine.Network.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="Happyengine.Base.Runtime"><HintPath>$(ClientManaged)\Happyengine.Base.Runtime.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="Phonest.ClientForUnity"><HintPath>$(ClientManaged)\Phonest.ClientForUnity.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Audio.Runtime"><HintPath>$(ClientManaged)\Audio.Runtime.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="AK.Wwise.Unity.API"><HintPath>$(ClientManaged)\AK.Wwise.Unity.API.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="AK.Wwise.Unity.MonoBehaviour"><HintPath>$(ClientManaged)\AK.Wwise.Unity.MonoBehaviour.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="UnityEngine.CoreModule"><HintPath>$(ClientManaged)\UnityEngine.CoreModule.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="Unity.TextMeshPro"><HintPath>$(ClientManaged)\Unity.TextMeshPro.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="UnityEngine.UI"><HintPath>$(ClientManaged)\UnityEngine.UI.dll</HintPath><Private>false</Private></Reference>
