@@ -86,9 +86,10 @@ public sealed partial class CombatService
         {
             int group = (int)GameData.Int(row!.Value, "_iSkillID"), mode = (int)GameData.Int(row.Value, "_iMode");
             if (Math.Max(s.SkillCds.GetValueOrDefault(group), s.SkillModeCds.GetValueOrDefault((group, mode))) > Now) error = ErrorCodes.SkillCooldown;
-            // Preserve the established cooldown refusal for a repeated cast, including during its action tail.
+            // A live cast refuses a new one until it yields (_iInterruptedType). _bCancelCast is only the client's
+            // cancel-button flag (LC_SkillInput_Handler_Default.CheckShowCancelBtn), not a licence to recast.
             else if (s.SkillCast is { Cancelled: false } active && Now < active.StartMs + active.ChantMs + active.ActionMs
-                && GameData.Int(row.Value, "_bCancelCast") == 0) error = ErrorCodes.SkillBusy;
+                && !CastYieldsTo(active, row.Value)) error = ErrorCodes.SkillBusy;
             else error = ValidateTarget(s, row.Value, req, origin, owned == null ? WalkSlack(s) : 0);
         }
         var costs = row is { } value ? ResolveCosts(s, value) : new CastCosts();
@@ -137,6 +138,34 @@ public sealed partial class CombatService
         await StartCooldownAsync(s, row.Value);
         await StartCastAsync(s, row.Value, req, id, owned, chanted ? costs : null);
     }
+
+    /// <summary>
+    /// Whether a live cast gives way to a new skill, as LC_Skill_RunTimeContext.SkillCanInterrupted and
+    /// GetSkillCanInterrupted decide it: _iInterruptedType 1 (normal attacks) yields to any other skill at once but never
+    /// to itself; 2 yields once the template's m_fInterruptTime has passed (never without one); any other type holds
+    /// until the cast ends. An interrupt point inside the chant counts from the chant's end, as the client sets it.
+    /// </summary>
+    internal bool CastYieldsTo(ActiveSkillCast active, JsonElement next)
+    {
+        switch (GameData.Int(active.Row, "_iInterruptedType"))
+        {
+            case 1:
+                // (inferred) A swing whose hit already landed on a target that is now dead or gone has nothing left to
+                // deal, so a press on the next target starts at once instead of waiting out the animation tail.
+                return GameData.Int(next, "_iSkillID") != GameData.Int(active.Row, "_iSkillID")
+                    || active.Resolved && !TargetAlive(active.WorldScene, active.Request.TargetId);
+            case 2:
+                var template = data.SkillTemplate(GameData.Int(active.Row, "_iScriptShow"));
+                if (template is not { } t || !t.TryGetProperty("m_fInterruptTime", out var value)
+                    || GameData.Number(value) is not double point || point <= 0) return false;
+                return Now >= active.StartMs + Math.Max(active.ChantMs, ImpactOffset(template, point, active.ChantMs, active.ActionMs));
+            default:
+                return false;
+        }
+    }
+
+    private bool TargetAlive(long sceneId, long uid) => uid != 0 && (FindMonster(sceneId, uid) != null
+        || world.PlayersIn(sceneId).Any(p => p.Role?.Id == uid && !p.Dead));
 
     /// <summary>Cast item cost and frozen intent share one owner receipt; HP/SP/buffs remain runtime resources.
     /// The admission uses the same scheduled cast and lethal pipeline as every ordinary skill.</summary>

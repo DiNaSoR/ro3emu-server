@@ -9,7 +9,11 @@ public sealed partial class PetService
     private long Now => clock.GetUtcNow().ToUnixTimeSeconds();
     private JsonElement? Room(DBPetInfo state) => data.Row("PetIncubationRoomConfig", state.IncubationLv);
 
-    /// <summary>Physical slot unlocks accumulate by room level; different rounds cannot share one occupied slot (inferred).</summary>
+    /// <summary>
+    /// Physical slot unlocks accumulate by room level. Each round keeps its own egg per slot: DBSlotInfo maps
+    /// round -> egg and the client reads LC_PetHelper slot data by round, showing a slot free in one pool while
+    /// the other pool's egg sits there.
+    /// </summary>
     private bool EggSlotOpen(DBPetInfo state, long slot) => slot > 0 && data.Table("PetIncubationRoomConfig").Values
         .Any(r => GameData.Int(r, "_iLv") <= state.IncubationLv && Flat(r, "_iUnlockSlot").Contains(slot));
 
@@ -21,16 +25,39 @@ public sealed partial class PetService
     private DBIncubateInfo? Egg(DBPetInfo state, long round, long slot) =>
         state.IncubationSlot.TryGetValue(slot, out var s) ? s.IncubateInfo.GetValueOrDefault(round) : null;
 
+    /// <summary>Removes one round's egg; the slot entry goes only when no other round's egg remains in it.</summary>
+    private static void RemoveEgg(DBPetInfo state, long round, long slot)
+    {
+        if (!state.IncubationSlot.TryGetValue(slot, out var s)) return;
+        s.IncubateInfo.Remove(round);
+        if (s.IncubateInfo.Count == 0) state.IncubationSlot.Remove(slot);
+    }
+
     private long PetParam(string name, long fallback) => data.Table("PublicParamConfig").TryGetValue(name, out var v)
         ? (long)(GameData.Number(v) ?? fallback) : fallback;
 
-    private int RoundGate(GameSession s, long round)
+    /// <summary>
+    /// A round takes new eggs (<paramref name="place"/>) only while the client offers it: LC_PetHelper.GetActivePoolTypeInfo
+    /// shows, per _iSlotType, a round whose PetIncubationSlotConfig._iActivity is open (LC_ActivityHelper.IsActivityOpen),
+    /// which is this session's NewActivity projection. Those activities follow TimeLimitConfig 1065-1073: server-open
+    /// days 0-7, 7-14, 14-21, 21-28 and 28-170 for the Permanent rounds 10001/03/05/07/09, days 10-14, 14-21, 21-28
+    /// and 28-170 for the Limited-Time rounds 10002/04/06/08. OpenContent makes them perpetual, so the client then
+    /// shows 10009 and 10008; OpenContent:ClosedActivities closes a pool. An egg already placed stays acceleratable
+    /// and collectable after its round closes.
+    /// </summary>
+    private int RoundGate(GameSession s, long round, bool place = false)
     {
         int code = Gate(s, incubation: true);
         if (code != 0) return code;
-        if (data.Row("PetIncubationSlotConfig", round) == null) return ErrorCodes.Parameter;
-        // Base normal pool only: event/season availability of the other eight pools is not established (§3).
-        return round == 10001 ? 0 : ErrorCodes.FeatureUnavailable;
+        if (data.Row("PetIncubationSlotConfig", round) is not { } row) return ErrorCodes.Parameter;
+        return !place || RoundOpen(s, row) ? 0 : ErrorCodes.ActivityClosed;
+    }
+
+    private bool RoundOpen(GameSession s, JsonElement round)
+    {
+        long now = Now;
+        return s.NewActivities?.ActivityInfo.TryGetValue(GameData.Int(round, "_iActivity"), out var activity) == true
+            && !activity.IsShielded && activity.State != "_close" && now >= activity.CurStartTime && now < activity.CurEndTime;
     }
 
     /// <summary>
@@ -41,21 +68,38 @@ public sealed partial class PetService
     {
         using var held = await CharacterService.Lock(s);
         int code = Gate(s, incubation: true);
-        var room = s.Pets == null ? null : Room(s.Pets);
-        if (code == 0 && (room == null || data.Row("PetIncubationRoomConfig", s.Pets!.IncubationLv + 1) == null))
-            code = ErrorCodes.PetOperation;
-        if (code == 0 && s.Pets!.IncubationExp < GameData.Int(room!.Value, "_iExp"))
-            code = ErrorCodes.PetOperation;
+        var step = code == 0 ? RoomStep(s.Pets!) : null;
+        if (code == 0 && step == null) code = ErrorCodes.PetOperation;
         if (code == 0)
         {
-            var next = s.Pets!.Clone();
-            var cost = Cost(room!.Value, "_kCost");
-            next.IncubationExp -= GameData.Int(room.Value, "_iExp");
-            next.IncubationLv++;
+            var (next, cost) = step!.Value;
             if (!await ExchangeAsync(s, "room-level", next, cost)) code = character.ShortageOf(s, cost);
             else await ChangedAsync(s, items: cost.Count > 0);
         }
         await s.SendGameAsync(RoomLevelUp, new PetIncubationLvUpRes { Result = code });
+    }
+
+    /// <summary>One room level: the current row's _iExp and _kCost buy the next row. Null while the bar is not full.</summary>
+    private (DBPetInfo Next, List<(int, long)> Cost)? RoomStep(DBPetInfo state)
+    {
+        if (Room(state) is not { } room || data.Row("PetIncubationRoomConfig", state.IncubationLv + 1) == null
+            || state.IncubationExp < GameData.Int(room, "_iExp")) return null;
+        var next = state.Clone();
+        next.IncubationExp -= GameData.Int(room, "_iExp");
+        next.IncubationLv++;
+        return (next, Cost(room, "_kCost"));
+    }
+
+    /// <summary>
+    /// The client never sends 33316 (no UI caller of LC_DAL_Pet.SendIncubationLvUp), so a full
+    /// proficiency bar levels the room after a collect, as in the reference video. Each affordable
+    /// step is its own exchange; an unaffordable cost leaves the bar full (inferred policy).
+    /// </summary>
+    private async Task<bool> AutoRoomLevelAsync(GameSession s)
+    {
+        bool levelled = false;
+        while (RoomStep(s.Pets!) is { } step && await ExchangeAsync(s, "room-level", step.Next, step.Cost)) levelled = true;
+        return levelled;
     }
 
     /// <summary>
@@ -65,21 +109,22 @@ public sealed partial class PetService
     public async Task GenerateAsync(GameSession s, PetGenEggReq req)
     {
         using var held = await CharacterService.Lock(s);
-        int code = RoundGate(s, req.RoundId);
-        if (code == 0 && (!EggSlotOpen(s.Pets!, req.SlotId) || s.Pets!.IncubationSlot.ContainsKey(req.SlotId))) code = ErrorCodes.PetOperation;
+        int code = RoundGate(s, req.RoundId, place: true);
+        if (code == 0 && (!EggSlotOpen(s.Pets!, req.SlotId) || Egg(s.Pets!, req.RoundId, req.SlotId) != null)) code = ErrorCodes.PetOperation;
         if (code == 0)
         {
             var config = data.Row("PetIncubationSlotConfig", req.RoundId)!.Value;
-            var result = Draw(s.Pets!, config);
+            var lottery = s.Lottery?.Clone();
+            var result = Draw(s.Pets!, config, lottery);
             var cost = Cost(config, "_kMaterial");
             if (result == null || cost.Count == 0) code = ErrorCodes.FeatureUnavailable;
             else
             {
                 var next = s.Pets!.Clone();
-                var slot = new DBSlotInfo { SlotId = req.SlotId };
+                if (!next.IncubationSlot.TryGetValue(req.SlotId, out var slot))
+                    next.IncubationSlot[req.SlotId] = slot = new DBSlotInfo { SlotId = req.SlotId };
                 slot.IncubateInfo[req.RoundId] = result;
-                next.IncubationSlot[req.SlotId] = slot;
-                if (!await ExchangeAsync(s, "generate-egg", next, cost)) code = character.ShortageOf(s, cost);
+                if (!await ExchangeAsync(s, "generate-egg", next, cost, lottery: lottery)) code = character.ShortageOf(s, cost);
                 else await ChangedAsync(s, items: true);
             }
         }
@@ -89,15 +134,44 @@ public sealed partial class PetService
     /// <summary>
     /// Draw index = min(roomLv+1, length), as UI_Sys_PetGachaWidgetCtrl:613–650 (Lua 1-based).
     /// Use DrawConfig._kSubBanner groups and DrawPoolConfig._iWeight to select one row, then one _kItem tuple uniformly
-    /// (inferred allocation). Do not reinterpret draw IDs as DropPool IDs or advertise original pity/quality parity.
+    /// (inferred allocation). Do not reinterpret draw IDs as DropPool IDs.
+    /// The S-class guarantee follows UI_Sys_PetGachaWidgetCtrl.RefreshPetHit: remaining = DrawConfig._iGuaranteedCnt minus
+    /// the AppearanceLotteryPoolPityInfo pity count keyed by DrawConfig._iType for the Normal (_iSlotType 1) pool and by the
+    /// draw id otherwise. Like LotteryService, the guaranteed draw rolls only _kGuaranteedBanner groups and any hit in them
+    /// resets the count; counting at egg placement (when the outcome is fixed) is inferred.
     /// </summary>
-    private DBIncubateInfo? Draw(DBPetInfo state, JsonElement slot)
+    private DBIncubateInfo? Draw(DBPetInfo state, JsonElement slot, DBLotteryData? lottery)
     {
         var draws = Flat(slot, "_kDrawIds");
         if (draws.Length == 0) return null;
         long id = draws[(int)Math.Clamp(state.IncubationLv, 0, draws.Length - 1)];
         if (data.Row("DrawConfig", id) is not { } draw) return null;
         var groups = Flat(draw, "_kSubBanner").ToHashSet();
+        var guaranteed = Flat(draw, "_kGuaranteedBanner").ToHashSet();
+        long guarantee = GameData.Int(draw, "_iGuaranteedCnt");
+        LotteryPityRecord? pity = null;
+        if (lottery != null && guarantee > 0 && guaranteed.Count > 0)
+        {
+            int key = checked((int)(GameData.Int(slot, "_iSlotType") == 1 ? GameData.Int(draw, "_iType") : id));
+            if (!lottery.PityRecords.TryGetValue(key, out pity)) lottery.PityRecords[key] = pity = new LotteryPityRecord();
+        }
+        bool forced = pity != null && pity.PityCount + 1 >= guarantee;
+        var picked = Roll(forced ? guaranteed : groups) ?? (forced ? Roll(groups) : null);
+        if (picked is not { } outcome) return null;
+        var (group, type, item, count) = outcome;
+        if (pity != null)
+        {
+            bool hit = guaranteed.Contains(group);
+            pity.TotalCount++;
+            pity.PityCount = hit ? 0 : pity.PityCount + 1;
+            pity.MustCount = checked((int)guarantee);
+            if (forced && hit) pity.HitPityCount++;
+        }
+        return new DBIncubateInfo { IncubateTime = Now, AwardType = type, AwardId = item, AwardCount = count };
+    }
+
+    private (long Group, int Type, int Item, int Count)? Roll(IReadOnlySet<long> groups)
+    {
         var rows = data.Table("DrawPoolConfig").Values.Where(r => groups.Contains(GameData.Int(r, "_iGroupID"))
             && GameData.Int(r, "_iWeight") > 0 && Outcomes(r).Count > 0).ToList();
         long total = rows.Sum(r => GameData.Int(r, "_iWeight"));
@@ -109,7 +183,7 @@ public sealed partial class PetService
             if (roll >= 0) continue;
             var candidates = Outcomes(row);
             var (type, item, count) = candidates[Random.Shared.Next(candidates.Count)];
-            return new DBIncubateInfo { IncubateTime = Now, AwardType = type, AwardId = item, AwardCount = count };
+            return (GameData.Int(row, "_iGroupID"), type, item, count);
         }
         return null;
     }
@@ -183,19 +257,24 @@ public sealed partial class PetService
                         var broken = Flat(pet, "_kDecompose");
                         if (broken.Length != 2 || broken[1] <= 0 || broken[1] > int.MaxValue || data.Row("ItemConfig", broken[0]) == null) { code = ErrorCodes.PetNoConfig; break; }
                         goods.Add(((int)broken[0], (int)broken[1]));
-                        reply.BrokenItems.Add(new PetEggRewardItem { ItemId = broken[0], Count = broken[1] });
+                        // UI_Sys_Pet_CongratulationPanelCtrl reads brokenItems.itemId as the PET id and shows its _kDecompose item.
+                        reply.BrokenItems.Add(new PetEggRewardItem { ItemId = item, Count = broken[1] });
                     }
                     else { next.ListPet[item] = NewPet(item); reply.PetItems.Add(reward); }
                 }
                 else if (egg.AwardType == 2 && data.Row("ItemConfig", item) != null) { goods.Add((item, count)); reply.NormalItems.Add(reward); }
                 else { code = ErrorCodes.PetNoConfig; break; }
-                next.IncubationSlot.Remove(slot);
+                RemoveEgg(next, req.RoundId, slot);
                 next.IncubationCount++;
                 next.IncubationExp += GameData.Int(result, "_iExp");
                 next.IncubationHistory.Add(new DBIncubateHistory { RoundId = req.RoundId, ItemId = item, Type = egg.AwardType, Time = Now });
             }
             if (code == 0 && !await ExchangeAsync(s, "egg-reward", next, [], goods)) code = ErrorCodes.ItemNoConfig;
-            if (code == 0) await ChangedAsync(s, items: true);
+            if (code == 0)
+            {
+                await AutoRoomLevelAsync(s);
+                await ChangedAsync(s, items: true);
+            }
         }
         if (code != 0) reply = new PetEggRewardRes();
         reply.Result = code;
@@ -211,11 +290,12 @@ public sealed partial class PetService
     public async Task FastAsync(GameSession s, FastIncubateReq req)
     {
         using var held = await CharacterService.Lock(s);
-        int code = RoundGate(s, req.RoundId);
+        int code = RoundGate(s, req.RoundId, place: true);
         if (code == 0 && s.Pets!.IncubationLv < PetParam("UnlockFastIncubationLv", 2))
             code = ErrorCodes.PetOperation;
         var config = code == 0 ? data.Row("PetIncubationSlotConfig", req.RoundId) : null;
         var next = s.Pets?.Clone();
+        var lottery = s.Lottery?.Clone();
         var costs = new Dictionary<int, long>();
         var goods = new List<(int, int)>();
         var reply = new FastIncubateRes();
@@ -224,13 +304,12 @@ public sealed partial class PetService
         {
             for (long slot = 1; slot <= 5; slot++)
             {
-                if (!EggSlotOpen(next!, slot) || next!.IncubationSlot.TryGetValue(slot, out var occupied)
-                    && !occupied.IncubateInfo.ContainsKey(req.RoundId)) continue;
+                if (next == null || !EggSlotOpen(next, slot)) continue;
                 var egg = Egg(next, req.RoundId, slot);
                 long seconds;
                 if (egg == null)
                 {
-                    egg = Draw(next, config!.Value);
+                    egg = Draw(next, config!.Value, lottery);
                     if (egg == null) { code = ErrorCodes.PetNoConfig; break; }
                     foreach (var (item, count) in Cost(config.Value, "_kMaterial"))
                         costs[item] = checked(costs.GetValueOrDefault(item) + count);
@@ -259,14 +338,14 @@ public sealed partial class PetService
                         if (broken.Length != 2 || broken[1] <= 0 || broken[1] > int.MaxValue
                             || data.Row("ItemConfig", broken[0]) == null) { code = ErrorCodes.PetNoConfig; break; }
                         goods.Add(((int)broken[0], (int)broken[1]));
-                        reply.BrokenItems.Add(new PetEggRewardItem { ItemId = broken[0], Count = broken[1] });
+                        reply.BrokenItems.Add(new PetEggRewardItem { ItemId = itemId, Count = broken[1] });
                     }
                     else { next.ListPet[itemId] = NewPet(itemId); reply.PetItems.Add(reward); }
                 }
                 else if (egg.AwardType == 2 && data.Row("ItemConfig", itemId) != null)
                 { goods.Add((itemId, countAward)); reply.NormalItems.Add(reward); }
                 else { code = ErrorCodes.PetNoConfig; break; }
-                next.IncubationSlot.Remove(slot);
+                RemoveEgg(next, req.RoundId, slot);
                 next.IncubationCount++;
                 next.IncubationExp += GameData.Int(result, "_iExp");
                 next.IncubationHistory.Add(new DBIncubateHistory
@@ -277,8 +356,12 @@ public sealed partial class PetService
         if (code == 0)
         {
             var cost = costs.Select(x => (x.Key, x.Value)).ToList();
-            if (!await ExchangeAsync(s, "fast-egg", next!, cost, goods)) code = character.ShortageOf(s, cost);
-            else await ChangedAsync(s, items: true);
+            if (!await ExchangeAsync(s, "fast-egg", next!, cost, goods, lottery)) code = character.ShortageOf(s, cost);
+            else
+            {
+                await AutoRoomLevelAsync(s);
+                await ChangedAsync(s, items: true);
+            }
         }
         if (code != 0) reply = new FastIncubateRes();
         reply.Result = code;

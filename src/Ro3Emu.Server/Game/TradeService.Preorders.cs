@@ -16,8 +16,10 @@ public sealed partial class TradeService
     /// </summary>
     private async Task Reserve(GameSession s, CPreTradeTopRequest req)
     {
+        long saleMs = 0;
         int code = await market.RunAsync(s, tx =>
         {
+            saleMs = 0;
             if (!functions.IsOpen(s, 2)) return ErrorCodes.FunctionLocked;
             if (req.TotalQuantity < 1 || req.Price < 1 || (long)req.Price * req.TotalQuantity != req.TotalPrice)
                 return ErrorCodes.TradeRequest;
@@ -45,9 +47,20 @@ public sealed partial class TradeService
                 Sequence = sequence,
             };
             tx.Put(Orders, order.Id, order);
+            saleMs = listing.PublicUntilMs;
             return 0;
         });
         await s.SendGameAsync(Preorder, new CPreTradeTopResponse { Result = code });
+        // 32622 skuQueueNtf: LC_DAL_Trade._notifyInQueue (lua:2151-2384) pops UIWords 21090 "You have joined the Lineup
+        // to purchase this item. In ${1} seconds, a random player from the Lineup will be selected..." counting down to
+        // saleTime (seconds, ignored once past) and closes itself then. The lineup is this pre-purchase (21172 "one buyer
+        // will be randomly selected from all purchase Lineups"); pushing it on the accepted 32626 is (inferred).
+        if (code == 0 && saleMs > NowMs)
+            await s.SendGameAsync(InQueue, new skuQueueNtf
+            {
+                ItemId = req.ItemId, Price = req.Price, Quantity = req.TotalQuantity,
+                SaleTime = (saleMs + 999) / 1000, SkuId = req.SkuId,
+            });
     }
 
     private CPreTradeTopOrderDTO OrderInfo(PreorderRow o, Listing? listing)

@@ -57,7 +57,7 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
         Daily = null; DailyRows = null; DailyReady = false;
         WildAfk = null; Guild = null; Tasks = null;
         Achievements = null; AchievementRuntime = null; AdventureGroupRole = null;
-        Library = null; CardLibraryReadyAttachment = null;
+        Library = null; CardLibraryReadyAttachment = null; GrowthClass = null;
         NewActivities = null; ActivitiesReady = false;
         Dungeons = null; DungeonAttempt = null;
         Tower = null; TowerAttempt = null;
@@ -233,6 +233,16 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
     /// <summary>Emote favourites, unlocks and idle emote (5006, role blob "emoji_play"); EmojiService.</summary>
     public Romsg.DBEmojiPlayInfo? EmojiPlay { get; set; }
 
+    /// <summary>Chat emoticons unlocked by items (5041, role blob "emoji_info"); EmojiService.</summary>
+    public Romsg.DBEmojiInfo? EmojiInfo { get; set; }
+
+    /// <summary>Profile card presets and 620 item unlocks (5016, role blob "personal"; other unlockInfos are derived); PersonalService.</summary>
+    public Romsg.DBPersonalInfo? Personal { get; set; }
+
+    /// <summary>Chat cosmetics unlocked by items and the worn choices (role blob "social_outfit"; 5044 lays them over the
+    /// configuration's defaults); SocialOutfitService.</summary>
+    public Romsg.DBSocialOutfit? SocialOutfit { get; set; }
+
     /// <summary>The emote or sitting in progress (state 17 Prepare or 14 Play); runtime only, gone at logout.</summary>
     public EmojiService.Emote? Emote { get; set; }
 
@@ -283,6 +293,12 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
     public byte[] AreaConcurPersisted { get; set; } = [];
     /// <summary>A committed kill changed the counters; the 5053 sync follows the kill.</summary>
     public bool AreaConcurChanged { get; set; }
+
+    /// <summary>Growth Classroom claimed rank rewards (role blob "growth_class", only rankReward); GrowthClassService.</summary>
+    public Romsg.DBGrowthClassInfo? GrowthClass { get; set; }
+
+    /// <summary>Seven-Day Goal tasks, score and claims (5049, role blob "first_heart"); FirstHeartService.</summary>
+    public Romsg.DBFirstHeartTaskActivityData? FirstHeart { get; set; }
 
     /// <summary>The leased items' PendantConfig ids (EntityBase.pendantInfo), derived from <see cref="CareerSpecial"/>.</summary>
     public int[] CareerPendants { get; set; } = [];

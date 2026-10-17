@@ -93,6 +93,7 @@ public sealed partial class AdventureGroupService : IGameTicker
         this.character = character; this.functions = functions; this.awards = awards; this.tasks = tasks;
         this.daily = daily; this.teams = teams; this.instances = instances; this.scene = scene; this.loop = loop;
         this.clock = clock; this.options = options; this.log = log;
+        character.RegisterItemAction(UnlockBackgroundAction, UseBackgroundItemAsync, keys: _ => [Ownership.ReservationKey.Realm]);
         // The creation instance's saplings and mentor: scene-editor monster points 26..36 of sc_prontera_001_dg02 carry
         // npcId 0 (HLP:70-97 tSaplingToMonsterAreaMap / iDungeonOathNpc), so the server places them.
         world.PlacePointNpcs(DungeonScene, SaplingNpcs.Select((npc, i) => (npc, 26 + i)).Append((OathNpc, 36)).ToArray());

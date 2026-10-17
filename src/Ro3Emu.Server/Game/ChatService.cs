@@ -3,7 +3,9 @@ using System.Text.Json;
 using Google.Protobuf;
 using Romsg;
 using Tencent.IM;
+using Microsoft.Extensions.Options;
 using Ro3Emu.Server.Accounts;
+using Ro3Emu.Server.Data;
 
 namespace Ro3Emu.Server.Game;
 
@@ -14,8 +16,26 @@ namespace Ro3Emu.Server.Game;
 /// ("4_&lt;sceneId&gt;" map chat, "@TGS#_1_&lt;cluster&gt;" world, ...), joined through romsg 77002; whispers address
 /// a role id.
 /// </summary>
-public sealed class ChatService(GmCommands gm, FeedbackService feedback, GuildStore guilds, FriendStore friends, ILogger<ChatService> log)
+public sealed partial class ChatService
 {
+    private readonly GmCommands gm;
+    private readonly FeedbackService feedback;
+    private readonly GuildStore guilds;
+    private readonly FriendStore friends;
+    private readonly CharacterService character;
+    private readonly GameData data;
+    private readonly SessionRegistry sessions;
+    private readonly IOptions<ServerOptions> options;
+    private readonly ILogger<ChatService> log;
+
+    public ChatService(GmCommands gm, FeedbackService feedback, GuildStore guilds, FriendStore friends, CharacterService character,
+        GameData data, SessionRegistry sessions, IOptions<ServerOptions> options, ILogger<ChatService> log)
+    {
+        this.gm = gm; this.feedback = feedback; this.guilds = guilds; this.friends = friends; this.character = character; this.data = data;
+        this.sessions = sessions; this.options = options; this.log = log;
+        character.RegisterItemAction(SoundTransmissionAction, UseHornAsync, takesParam: true);
+    }
+
     /// <summary>Bug reports: "/bug" lines here and the client hook's message (GameMessageHandler routes it through this).</summary>
     public FeedbackService Feedback => feedback;
 
@@ -377,6 +397,32 @@ public sealed class ChatService(GmCommands gm, FeedbackService feedback, GuildSt
                 try { await DownAsync(target, Cmd.NotifyNewText, new NotifyNewTextChatMessage { Msg = message }); }
                 catch (Exception e) when (e is IOException or System.Net.Sockets.SocketException or ObjectDisposedException) { }
         }
+    }
+
+    /// <summary>
+    /// The Guild League elite team card in the guild channel "2_&lt;guild&gt;": extra_param templateId 102 GuildTeam with
+    /// commonData guildId/teamId/playerId (LC_ChatMessageHandler.lua:850-870; the client shows text 170138 and the
+    /// LC_LinkHelper GuildTeam link, whose tap sends 42014 for teamId).
+    /// </summary>
+    public async Task PublishGuildTeamAsync(GameSession sender, long guildId, long teamId, string content)
+    {
+        string group = $"2_{guildId}";
+        GameSession[] recipients;
+        lock (_sync) recipients = _groups.TryGetValue(group, out var members) ? members.ToArray() : [];
+        var message = new TextChatMessage
+        {
+            MessageId = Interlocked.Increment(ref _nextMessageId).ToString(), SenderId = sender.Role!.Id.ToString(),
+            ReceiveId = group, SendTime = (ulong)DateTimeOffset.UtcNow.ToUnixTimeSeconds(), Content = content,
+            ExtraParam = JsonSerializer.Serialize(new
+            {
+                templateId = 102,
+                commonData = JsonSerializer.Serialize(new { guildId, teamId = teamId.ToString(), playerId = sender.Role.Id.ToString() }),
+            }),
+        };
+        Remember(message);
+        foreach (var to in recipients.Where(r => GuildAllowed(r, group)))
+            try { await DownAsync(to, Cmd.NotifyNewText, new NotifyNewTextChatMessage { Msg = message }); }
+            catch (Exception e) when (e is IOException or System.Net.Sockets.SocketException or ObjectDisposedException) { }
     }
 
     private void Join(GameSession session, string group)

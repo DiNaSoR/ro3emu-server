@@ -41,6 +41,35 @@ public sealed class TotemService
     private static long Value(InvItem item, int key) => item.Attrs?.GetValueOrDefault(key) ?? 0;
     public static bool IsTotem(GameData data, int entry) => data.Row("ItemConfig", entry) is { } row && GameData.Int(row, "_iType") == 7;
 
+    /// <summary>A committed combine: the session and the made totem's entry (quest target 315004).</summary>
+    public List<Action<GameSession, int>> Combined { get; } = new();
+
+    /// <summary>The active plan's deployed totem instances.</summary>
+    internal static IEnumerable<InvItem> Deployed(GameSession s, GameData data)
+    {
+        if (s.Totems?.TotemPlans.TryGetValue(s.Totems.CurrentPlan, out var plan) != true) yield break;
+        foreach (long guid in plan.SetUpTotem.Values.Where(g => g != 0).Distinct())
+            if (s.Items.FirstOrDefault(i => i.Guid == guid && i.Grid == 0 && i.Pack == 4 && IsTotem(data, i.Entry)) is { } item)
+                yield return item;
+    }
+
+    /// <summary>
+    /// Attribute lines at their bar's end: value &gt;= the upper bound 260+i, else PublicParam TotemAttrLimits
+    /// (LC_ItemProtoParse.lua:700-770 iMaxValue; UI_Sys_Totem_Refine_ListWidgetCtrl.lua:235-250 shows full at iValue &gt;= iMaxValue).
+    /// </summary>
+    internal static int MaxedAttributes(GameData data, InvItem item)
+    {
+        var limits = data.Table("PublicParamConfig").TryGetValue("TotemAttrLimits", out var param) ? Rows(param) : [];
+        int maxed = 0;
+        for (int i = 0; i < 10 && Value(item, 220 + i) is var attr and not 0; i++)
+        {
+            long upper = item.Attrs!.TryGetValue(260 + i, out long bound) ? bound
+                : limits.FirstOrDefault(r => r.Length >= 3 && r[0] == attr)?[2] ?? long.MaxValue;
+            if (Value(item, 230 + i) >= upper) maxed++;
+        }
+        return maxed;
+    }
+
     /// <summary>Every saved plan reserves its GUIDs against unrelated consumption (LC_SchemeHelper.IsInSchemeByItemInfo).</summary>
     public static bool IsReserved(GameSession s, InvItem item) => s.Totems?.TotemPlans.Values.Any(p => p.SetUpTotem.Values.Contains(item.Guid)) == true;
 
@@ -504,6 +533,7 @@ public sealed class TotemService
                 newGuid = next.Guid;
             });
             await character.ItemsChangedAsync(s, stats: true); await SyncAsync(s);
+            foreach (var handler in Combined) handler(s, next.Entry);
         }
         await s.SendGameAsync(82366, new CombineTotemResp { Result = error, NewTotemGuid = newGuid });
     }

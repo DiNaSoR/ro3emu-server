@@ -82,7 +82,7 @@ public static class ClientPatcher
         {
             Func<ModuleDefinition, string>? extra = file switch
             {
-                "Assembly-CSharp.dll" => m => RedirectChat(m, hooksDll) + "; " + TextSink.PatchLanguageGet(m, locDll),
+                "Assembly-CSharp.dll" => m => RedirectChat(m, hooksDll) + "; " + VoiceStubPatch.Patch(m) + "; " + TextSink.PatchLanguageGet(m, locDll),
                 "Happyengine.Base.Runtime.dll" when VerboseLogs => ForceShowLog,
                 "Unity.TextMeshPro.dll" => m => TextSink.PatchTmp(m, locDll, hooksDll),
                 "HUD.dll" => m => TextSink.PatchHud(m, locDll),
@@ -160,6 +160,11 @@ public static class ClientPatcher
             foreach (var (_, value) in Literals(assembly))
                 foreach (var rule in rules.Where(r => r.Match(value))) rule.Hits++;
             if (file == "Assembly-CSharp.dll" && assembly.MainModule.GetType("NetworkLib.NW_ChatNetworkManager") == null) problems.Add("NW_ChatNetworkManager not found");
+            if (file == "Assembly-CSharp.dll")
+            {
+                try { VoiceStubPatch.Patch(assembly.MainModule); } // in memory only: does the voice stub fit this build
+                catch (InvalidOperationException e) { problems.Add(e.Message); }
+            }
             if (file == "Unity.TextMeshPro.dll" && assembly.MainModule.GetType("TMPro.TMP_Text") == null) problems.Add("TMPro.TMP_Text not found");
         }
         problems.AddRange(rules.Where(r => r.Hits == 0).Select(r => "literal not found: " + r.Description));

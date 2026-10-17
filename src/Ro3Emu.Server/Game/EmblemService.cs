@@ -231,6 +231,31 @@ public sealed partial class EmblemService
             if (session.Items.FirstOrDefault(i => i.Guid == guid && i.Grid == 0) is { } item) yield return item;
     }
 
+    /// <summary>
+    /// Echo Resonance (残响共鸣): lit marks (itemInfos 1021+, up to the entry's _kInitialMark count) of the worn echoes,
+    /// counted per mark id (LC_EmblemHelper.GetAllMarkEquipedNum, LC_ItemProtoParse.lua:1055-1100), reach the
+    /// EmblemMarkConfig stage whose _iMarkNum they meet (3/6/10, LC_SoulHelper.GetLevelByMarkNum). Mark id → stage.
+    /// </summary>
+    internal static Dictionary<long, long> Resonances(GameSession session, GameData data)
+    {
+        var marks = new Dictionary<long, int>();
+        foreach (var item in Worn(session))
+        {
+            int lit = data.Row("EmblemConfig", item.Entry) is { } row && row.TryGetProperty("_kInitialMark", out var initial)
+                && initial.ValueKind == JsonValueKind.Array ? initial.GetArrayLength() : 0;
+            for (int i = 0; i < lit && item.Attrs?.TryGetValue(1021 + i, out long mark) == true; i++)
+                marks[mark] = marks.GetValueOrDefault(mark) + 1;
+        }
+        var stages = new Dictionary<long, long>();
+        foreach (var row in data.Table("EmblemMarkConfig").Values)
+        {
+            long mark = GameData.Int(row, "_iEmblemMarkID"), stage = GameData.Int(row, "_iMarkStage");
+            if (stage > 0 && marks.GetValueOrDefault(mark) >= GameData.Int(row, "_iMarkNum") && stage > stages.GetValueOrDefault(mark))
+                stages[mark] = stage;
+        }
+        return stages;
+    }
+
     public static bool IsReserved(GameSession session, InvItem item) =>
         item.Attrs?.GetValueOrDefault(Source) == 2 || session.Emblems.Plans.Values.Any(p => p.Slots.Values.Contains(item.Guid));
 

@@ -102,10 +102,10 @@ public sealed partial class DungeonTests
         Assert.True((DungeonService.SceneActorUidBase << 1) <= limit);
         Assert.NotEqual((double)DungeonService.SceneActorUidBase, (double)(DungeonService.SceneActorUidBase | 1));
         // The other dynamic NPC namespaces the client can stand next to (guild campfire seeds: prefix | 24-bit room | 12-bit
-        // point; treasure hunt NPCs: prefix | role id; the One Piece treasure).
+        // point; treasure hunt NPCs: prefix | role id; the Rift Crisis stones below 2^47).
         Assert.True((GuildCampfireService.UidPrefix << 1) <= limit);
         Assert.True((SceneService.TreasureUidPrefix << 1) <= limit);
-        Assert.True(TimedBattleService.TreasureNpcUid < limit);
+        Assert.True(TimedBattleService.IsRiftUid((1L << 47) - 1) && !TimedBattleService.IsRiftUid(1L << 47) && (1L << 47) < limit);
     }
 
     [ClientDataTheory]

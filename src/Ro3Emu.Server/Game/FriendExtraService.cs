@@ -9,7 +9,7 @@ namespace Ro3Emu.Server.Game;
 
 /// <summary>82200-82210 friend metadata, chat groups and gifts.</summary>
 public sealed partial class FriendExtraService(FriendStore friends, RoleStore roles, SessionRegistry sessions,
-    CharacterService character, ChatService chat, Micro.FriendService micro, GameLoop loop)
+    CharacterService character, ChatService chat, Micro.FriendService micro, GameLoop loop, PersonalService personal)
 {
     public const uint CreateGroup = 82200, RenameGroup = 82201, InviteGroup = 82202, KickGroup = 82203,
         DismissGroup = 82204, LeaveGroup = 82205, SetGroupDnd = 82206, FetchMetadata = 82207,
@@ -237,6 +237,7 @@ public sealed partial class FriendExtraService(FriendStore friends, RoleStore ro
             Sender = self, Receiver = req.RoleId, ItemId = req.ItemId, Count = req.Count, Message = req.Message,
             IsAnonymous = req.IsAnonymous, SendTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds(), Intimacy = intimacy,
         };
+        (record.Popularity, record.Affection) = personal.GiftValues(req.ItemId, req.Count);
         sender.SendGiftRecords.Add(record);
         receiver.ReceiveGiftRecords.Add(record);
         while (sender.SendGiftRecords.Count > 100) sender.SendGiftRecords.RemoveAt(0);
@@ -263,6 +264,8 @@ public sealed partial class FriendExtraService(FriendStore friends, RoleStore ro
         }, asyncCommit: true);
         if (paid == null) { await s.SendGameAsync(GiveGift, new GiveFriendGiftResp { Result = ErrorCodes.ItemsShort }); return; }
         committed(intimacy);
+        // (inferred) Popularity is no asset: credited in its own commit once the gift is paid.
+        await personal.CreditGiftAsync(self, receiverId, record.Popularity, record.Affection);
         await s.SendGameAsync(GiveGift, new GiveFriendGiftResp { FriendGiftRecord = record });
         if (Online(req.RoleId) is { } target) await target.SendGameAsync(GiftNotify, record);
     }

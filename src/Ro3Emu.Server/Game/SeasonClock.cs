@@ -7,14 +7,15 @@ namespace Ro3Emu.Server.Game;
 /// MultiverseStage times, anchored only to SeasonService.Start. Lua_GameDefine.lua:7788-7805 and
 /// LC_SeasonHelper.ConvertConfigTimeStamp prove 3 = season start, 5 = break, 9 = referenced stage end.
 /// Types 7/8 have no enum or converter branch in the supplied Lua: the weekday-aligned and duration
-/// interpretations below are (inferred), not recovered original-server algorithms.
+/// interpretations below are (inferred), not recovered original-server algorithms. <paramref name="start"/> is a civil
+/// time in the realm <paramref name="zone"/> (SeasonService.Zone), which also aligns type 7 to its weekday.
 /// </summary>
-public sealed class SeasonClock(GameData data, DateTime start, int playBook)
+public sealed class SeasonClock(GameData data, DateTime start, int playBook, TimeZoneInfo zone)
 {
     private readonly HashSet<(long, bool)> resolving = new();
     private readonly Dictionary<(long, bool), long> resolved = new();
 
-    public long StartTime => new DateTimeOffset(start).ToUnixTimeSeconds();
+    public long StartTime => SeasonService.Unix(start, zone);
 
     /// <summary>
     /// (inferred) This single-server first season uses MultiverseMainStage's season-1/day-1 length (77 days).
@@ -71,11 +72,11 @@ public sealed class SeasonClock(GameData data, DateTime start, int playBook)
         return value;
     }
 
-    private static long WeekdayAtOrAfter(long timestamp, int weekday)
+    private long WeekdayAtOrAfter(long timestamp, int weekday)
     {
         if (weekday is < 1 or > 7) throw new InvalidDataException("Invalid season weekday");
-        var local = DateTimeOffset.FromUnixTimeSeconds(timestamp).LocalDateTime;
+        var local = SeasonService.Civil(timestamp, zone);
         int current = (int)local.DayOfWeek == 0 ? 7 : (int)local.DayOfWeek;
-        return new DateTimeOffset(local.AddDays((weekday - current + 7) % 7)).ToUnixTimeSeconds();
+        return SeasonService.Unix(local.AddDays((weekday - current + 7) % 7), zone);
     }
 }

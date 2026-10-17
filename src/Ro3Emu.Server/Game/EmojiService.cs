@@ -16,7 +16,7 @@ namespace Ro3Emu.Server.Game;
 /// The client never ends an emote by itself (a non-loop emote holds its last frame), so the server ends it on STOP,
 /// on its PerformanceConfig duration, on movement, combat, death and scene change, and for a duo on either side.
 /// </summary>
-public sealed class EmojiService : IGameTicker
+public sealed partial class EmojiService : IGameTicker
 {
     public const uint Sync = 5006, Invite = 82601, StartPlay = 82602, SetIdle = 82603, InviteNtf = 82604,
         Accept = 82605, Refuse = 82606, StopPlay = 82607, AddCollection = 82608, DelCollection = 82609,
@@ -53,6 +53,7 @@ public sealed class EmojiService : IGameTicker
     private readonly Maps.World world;
     private readonly SessionRegistry sessions;
     private readonly TaskService tasks;
+    private readonly CharacterService character;
     private readonly GameLoop loop;
     private readonly TimeProvider clock;
     private readonly ILogger<EmojiService> log;
@@ -78,9 +79,11 @@ public sealed class EmojiService : IGameTicker
         IOptions<ServerOptions> options, ILogger<EmojiService> log)
     {
         this.data = data; this.roles = roles; this.world = world; this.sessions = sessions; this.tasks = tasks;
+        this.character = character;
         this.loop = loop; this.clock = clock; this.log = log;
         sceneEditorDir = Path.Combine(options.Value.GameDataDir ?? options.Value.DataDir, "sceneeditor");
         character.ProgressHandlers.Add(RefreshUnlocksAsync);
+        character.RegisterItemAction(EmoticonCollectionAction, UseEmoticonItemAsync);
         combat.PlayerDied.Add(s => EndAsync(s));
         scene.Leaving.Add(LeavingAsync);
     }
@@ -101,6 +104,7 @@ public sealed class EmojiService : IGameTicker
         session.Emote = null;
         if (Recompute(session)) Save(session);
         await CharacterService.SyncAsync(session, Sync, session.EmojiPlay.Clone());
+        await LoginEmoticonsAsync(session);
     }
 
     /// <summary>
