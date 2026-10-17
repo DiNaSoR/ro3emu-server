@@ -65,7 +65,42 @@ public sealed partial class CombatService
         if (!CurrentCastMap(s, action)) return;
         if (GameData.Int(row, "_bMovement") == 1) await MoveCasterAsync(s, action);
         if (!CurrentCastMap(s, action)) return;
+        if (action.Operator == null && ServerBullet(GameData.Int(row, "_iScriptShow")) is { Effect: > 0 } bullet)
+        {
+            await LaunchBulletAsync(s, action, bullet);
+            return;
+        }
         await ApplyEffectsAsync(s, action, action.Request.TargetPos ?? action.Origin);
+    }
+
+    /// <summary>
+    /// The server script's bolt (31120) flies first; its damage, 31101 and the damage numbers follow when the first
+    /// bolt lands, m_fBulletLifeTime later (Fire Bolt 400 ms), so the client shows them on impact (inferred timing).
+    /// Moving or casting again after launch no longer cancels it; caster death, a scene change or a new
+    /// attachment still does (ApplyEffectsAsync's own checks).
+    /// </summary>
+    private async Task LaunchBulletAsync(GameSession s, ActiveSkillCast action, (int Effect, int FlightMs) bullet)
+    {
+        var row = action.Row;
+        var center = action.Request.TargetPos ?? action.Origin;
+        var targets = SelectEnemies(s, action, center);
+        action.Launched = true;
+        int split = ShowHits(row);
+        bool high = GameData.Int(row, "_iSkillEffectLevel") > 0;
+        foreach (var target in targets)
+        {
+            if (!CurrentCastMap(s, action)) return;
+            await SendSkillBulletAsync(s, new SkillFixTimeBulletNotify
+            {
+                SourceId = s.Role!.Id, MasterId = s.Role.Id, TargetId = target.Uid, EffectId = bullet.Effect,
+                FixedTime = bullet.FlightMs, Split = split, SkillConfigId = action.Request.SkillId,
+                SourcePosition = s.Position.Clone(), TargetPosition = target.Pos.Clone(), StartTimestampMs = Now,
+            }, high);
+        }
+        ScheduleRuntime(action.WorldScene, TimeSpan.FromMilliseconds(bullet.FlightMs), async () =>
+        {
+            if (CurrentCastMap(s, action)) await ApplyEffectsAsync(s, action, center);
+        });
     }
 
     private List<MonsterUnit> SelectEnemies(GameSession s, ActiveSkillCast action, Vec3 center, float? radiusOverride = null)
@@ -105,7 +140,7 @@ public sealed partial class CombatService
         var row = action.Row;
         var castingRole = s.Role;
         bool CurrentCaster() => ReferenceEquals(s.Role, castingRole) && !s.SceneLoading
-            && s.SceneGeneration == action.SceneGeneration && (field != null ? !field.Removing : !action.Cancelled)
+            && s.SceneGeneration == action.SceneGeneration && (field != null ? !field.Removing : !action.Cancelled || action.Launched)
             && s.WorldScene == action.WorldScene && sessions.All().Contains(s);
         bool CanApplyMoreEffects() => CurrentCaster() && ReferenceEquals(s.Attachment, action.Attachment)
             && action.Attachment?.Cancelled != true;
@@ -247,19 +282,6 @@ public sealed partial class CombatService
                 });
             }
             if (CurrentCaster() && hit.Dsts.Any(d => d.HitResult != DamageHitResult.Miss)) await buffs.RecoverEnergyOnHitAsync(s, row);
-            if (field == null && action.Operator == null && CurrentCaster()
-                && ServerBullet(GameData.Int(row, "_iScriptShow")) is { Effect: > 0 } bullet)
-                foreach (var target in processed)
-                {
-                    if (!CurrentCaster()) break;
-                    // The bolt the server script launches; the client has no other source for it (see ServerBullet).
-                    await SendSkillBulletAsync(s, new SkillFixTimeBulletNotify
-                    {
-                        SourceId = s.Role.Id, MasterId = s.Role.Id, TargetId = target.Uid, EffectId = bullet.Effect,
-                        FixedTime = bullet.FlightMs, Split = shownHits, SkillConfigId = action.Request.SkillId,
-                        SourcePosition = s.Position.Clone(), TargetPosition = target.Pos.Clone(), StartTimestampMs = Now,
-                    }, highLevel: GameData.Int(row, "_iSkillEffectLevel") > 0);
-                }
             var sourceViewers = CurrentCaster() ? world.Viewers(s).Append(s) : Enumerable.Empty<GameSession>();
             foreach (var viewer in processed.SelectMany(t => t.Viewers).Concat(sourceViewers).Distinct()) await viewer.SendGameAsync(SkillHit, hit);
             if (CurrentCaster() && field?.Trap == true)

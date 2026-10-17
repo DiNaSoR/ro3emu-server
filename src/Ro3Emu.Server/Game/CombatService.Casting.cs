@@ -24,6 +24,8 @@ public sealed class ActiveSkillCast
     public required int ActionMs { get; init; }
     public bool Cancelled { get; set; }
     public bool Resolved { get; set; }
+    /// <summary>A server bullet is in flight (CombatService.ServerBullet): cancelling the cast no longer stops it landing.</summary>
+    public bool Launched { get; set; }
     public SkillObject? Operator { get; init; }
     public long SourceId => Operator?.Uid ?? OwnerId;
 }
@@ -463,7 +465,7 @@ public sealed partial class CombatService
         await ToPlayerAndViewersAsync(s, SkillEnd, new SkillEndNotify
         {
             SrcID = action.SourceId, SessionId = action.Id, Type = SkillEndNotify.Types.SkillEndType.Interrupted,
-            ClearEffect = true, InterruptedInfo = new SkillInterruptedInfo { Type = cause },
+            ClearEffect = !action.Launched, InterruptedInfo = new SkillInterruptedInfo { Type = cause },
         });
     }
 

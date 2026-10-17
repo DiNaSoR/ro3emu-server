@@ -22,7 +22,7 @@ public sealed partial class CombatService
         });
     }
 
-    private static bool CurrentCastMap(GameSession session, ActiveSkillCast cast) => !cast.Cancelled
+    private static bool CurrentCastMap(GameSession session, ActiveSkillCast cast) => (!cast.Cancelled || cast.Launched)
         && !session.SceneLoading && !session.SceneRecoveryRequired && !session.Dead
         && session.Role?.Id == cast.OwnerId && session.WorldScene == cast.WorldScene
         && ReferenceEquals(session.Attachment, cast.Attachment) && cast.Attachment?.Cancelled != true

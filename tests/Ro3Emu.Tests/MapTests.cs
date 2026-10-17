@@ -253,9 +253,19 @@ public sealed partial class MapTests : IAsyncLifetime
         Assert.Equal(4, bolt.Split);
         Assert.Equal(400, bolt.FixedTime);
         Assert.Equal(1200404, bolt.SkillConfigId);
+        var flight = System.Diagnostics.Stopwatch.StartNew();
         var hit = await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser, h => h.SrcID == self);
+        Assert.True(flight.ElapsedMilliseconds >= 300, $"the hit came {flight.ElapsedMilliseconds} ms after launch, not on landing");
         Assert.Equal(1200404, hit.ShowPoint); // the fire hit spark, played once per split
         Assert.Equal(4, hit.Split);
+
+        // Walking away while the bolt flies does not cancel it: the hit still lands.
+        await Task.Delay(600); // _iCD 500
+        await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1200404, TargetId = (long)monster.Uuid });
+        Assert.Equal(0, (await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
+        await Next(alice, CombatService.SkillBullet, SkillFixTimeBulletNotify.Parser, b => b.SourceId == self && b.TargetId == (long)monster.Uuid);
+        await alice.WalkAsync(monster.MovementInfo.Pos.X + 2, alice.Self!.MovementInfo.Pos.Y, monster.MovementInfo.Pos.Z + 3, stop: true);
+        await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser, h => h.SrcID == self && h.SessionId != hit.SessionId);
     }
 
     [ClientDataFact]
