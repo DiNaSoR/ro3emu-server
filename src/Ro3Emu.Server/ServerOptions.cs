@@ -76,6 +76,9 @@ public sealed class ServerOptions
     /// <summary>Battle pass policy: the premium track is free for now.</summary>
     public PassOptions Pass { get; set; } = new();
 
+    /// <summary>The in-game Top Up screen and currency exchange (ShopService.TopUp, docs/systems/cash-shop.md).</summary>
+    public TopUpOptions TopUp { get; set; } = new();
+
     /// <summary>
     /// Accounts allowed to use GM commands in game ("!" lines in chat, the client's GM panel, 1031/1034). Empty:
     /// <see cref="GmOpenWhenEmpty"/> decides. docs/guide/gm-access.md.
@@ -175,6 +178,16 @@ public sealed class PassOptions
 
     /// <summary>Pass EXP from play: challenges, daily activity, monsters, dungeons, MVPs and story (NewActivityService.PassPlay).</summary>
     public bool Play { get; set; }
+}
+
+/// <summary>Off by default so the tests keep the original's refusals; a realm turns it on.</summary>
+public sealed class TopUpOptions
+{
+    /// <summary>
+    /// Every Top Up tier, month card and pass purchase is granted at once and for free (no payment provider): the
+    /// crystals, the bound bonus and the first-purchase double, or the product's award. Off: 2001-2003 are refused.
+    /// </summary>
+    public bool Free { get; set; }
 }
 
 /// <summary>

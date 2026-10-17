@@ -16,7 +16,7 @@ namespace Ro3Emu.Server.Game;
 /// and keeps the personal purchase counters and favourites in 5024 DBShopInfo. Fashion-tab commodities (shop type 7)
 /// carry _iAppearanceId instead of _iItemId: WardrobeService.BuyFromShopLockedAsync unlocks the look in the same commit.
 /// </summary>
-public sealed class ShopService : IGameTicker
+public sealed partial class ShopService : IGameTicker
 {
     public const uint ShopSync = 5024;
     public const uint BuyCommodity = 82332, CommodityCollect = 82333, CommodityPresent = 82335, CommodityGetInfo = 82338,
@@ -36,8 +36,9 @@ public sealed class ShopService : IGameTicker
 
     public ShopService(GameData data, CharacterService character, FunctionService functions, RoleStore roles, SeasonService seasons,
         WardrobeService wardrobe, AwardService awards, TimeProvider clock, SessionRegistry sessions, GameLoop loop,
-        ILogger<ShopService> log)
+        ILogger<ShopService> log, Microsoft.Extensions.Options.IOptions<ServerOptions>? options = null)
     {
+        freeTopUp = options?.Value.TopUp.Free ?? false;
         this.data = data;
         this.character = character;
         this.functions = functions;
@@ -77,6 +78,8 @@ public sealed class ShopService : IGameTicker
     {
         public Dictionary<int, Counter> Bought { get; set; } = new();
         public HashSet<int> Favorites { get; set; } = new();
+        /// <summary>RechargeConfig id -> tiers bought (Top Up); a tier at 0 still pays its first-purchase double.</summary>
+        public Dictionary<int, int> Recharged { get; set; } = new();
     }
 
     public sealed class Counter
@@ -354,6 +357,7 @@ public sealed class ShopService : IGameTicker
     {
         Favorites = new HashSet<int>(state.Favorites),
         Bought = state.Bought.ToDictionary(p => p.Key, p => new Counter { Count = p.Value.Count, Period = p.Value.Period }),
+        Recharged = new Dictionary<int, int>(state.Recharged),
     };
 
     /// <summary>A refusal: the ErrorCodes result for the client and the reason for the log.</summary>
