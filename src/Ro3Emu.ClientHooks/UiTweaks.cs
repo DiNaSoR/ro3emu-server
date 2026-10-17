@@ -45,6 +45,7 @@ namespace Ro3Emu.ClientHooks
                 if (Done.Count > 64) Done.Clear();
                 QuitButton.Tick();
                 LuaPatches.Tick();
+                BgmOnWindowFocus.Tick();
                 PassChallenges.Tick();
                 PassButton.Tick();
             }
