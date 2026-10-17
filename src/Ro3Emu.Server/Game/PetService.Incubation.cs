@@ -290,7 +290,7 @@ public sealed partial class PetService
         {
             for (long slot = 1; slot <= 5; slot++)
             {
-                if (!EggSlotOpen(next!, slot)) continue;
+                if (next == null || !EggSlotOpen(next, slot)) continue;
                 var egg = Egg(next, req.RoundId, slot);
                 long seconds;
                 if (egg == null)
