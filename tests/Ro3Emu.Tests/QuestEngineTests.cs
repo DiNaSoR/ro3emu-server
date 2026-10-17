@@ -553,6 +553,7 @@ public sealed class QuestEngineTests : IAsyncLifetime
     {
         await using var bot = await InWorld();
         await Gm("!job 1100");
+        await Gm("!lvl 14"); // the chain's 10101220/10101240 EXP puts a real player past the gift's _iLevelNeed 10
         await Accept(10101250);
         var point = Service<WorldData>().Map(10111)!.Points[1010121001];
         await Change(s => { s.Position = new Vec3 { X = point.X, Y = point.Y, Z = point.Z }; return Task.CompletedTask; });
@@ -564,11 +565,44 @@ public sealed class QuestEngineTests : IAsyncLifetime
             await Barrier(bot);
             Assert.Equal(TaskState.Delivery, (await State(id)).Status);
         }
-        var granted = await Read(s => s.Items.Where(i => i.Entry == 1501014).Select(i => (i.Stack, i.BindType)).ToArray());
-        Assert.Equal((1, 1), Assert.Single(granted));
+        // The pool gift 1501014 (_QuickUse [3, 0]) is used on receipt: the PC guide (GuideConfig 1811, task 10101251)
+        // opens the wardrobe expecting the Swordsman's mount already unlocked and lit there.
+        Assert.Equal(60030020, (await Next(bot, MountService.Unlock, PlayerMountUnLockNtf.Parser)).RiderId);
+        Assert.Equal(0, (await Next(bot, CharacterService.ItemUse, ItemUseResp.Parser, m => m.ItemId == 1501014)).Result);
+        Assert.Equal(0, await Read(s => Service<CharacterService>().CountOf(s, 1501014)));
+        Assert.True(await Read(s => s.Mounts!.Mounts[60030020].OverdueTimeMs == 0));
+        int look = Service<WardrobeService>().MountAppearance(60030020);
+        Assert.True(await Read(s => s.Wardrobe!.AllLightUpAppearances.ContainsKey(look)));
         await bot.SendGameAsync(SceneService.ClientNpcInteract, new ClientNpcInteractReq { DialogID = 1010125001, Areapointid = 1010121001 });
         await Barrier(bot);
-        Assert.Equal(1, await Read(s => Service<CharacterService>().CountOf(s, 1501014)));
+        Assert.Equal(0, await Read(s => Service<CharacterService>().CountOf(s, 1501014)));
+        Assert.Single(await Read(s => s.Mounts!.Mounts.Keys.ToArray()));
+    }
+
+    [ClientDataFact]
+    public async Task HeldMountGiftIsUsedOnLevelUpAndLogin()
+    {
+        await using (var bot = await InWorld())
+        {
+            // Below the gift's _iLevelNeed the award stays in the bag, with no error reply for a use nobody asked for.
+            var plan = Service<AwardService>().Resolve(Alice, 31125);
+            Assert.True(await Service<GameLoop>().InvokeAsync(() => Service<CharacterService>().ApplyAwardAsync(Alice, plan)));
+            await Barrier(bot);
+            Assert.Equal(1, await Read(s => Service<CharacterService>().CountOf(s, 1501014)));
+            Assert.DoesNotContain(bot.Inbox.Snapshot(), e => e.IsGame(CharacterService.ItemUse));
+            await Gm("!lvl 14");
+            Assert.Equal(60030020, (await Next(bot, MountService.Unlock, PlayerMountUnLockNtf.Parser)).RiderId);
+            Assert.Equal(0, await Read(s => Service<CharacterService>().CountOf(s, 1501014)));
+            // A GM grant is not an award: it stays for the manual path until the next login.
+            await Gm("!item 1501016 1");
+            await Barrier(bot);
+            Assert.Equal(1, await Read(s => Service<CharacterService>().CountOf(s, 1501016)));
+        }
+        await using (var bot = await InWorld(create: false))
+        {
+            Assert.Equal(60030040, (await Next(bot, MountService.Unlock, PlayerMountUnLockNtf.Parser)).RiderId);
+            Assert.Equal(0, await Read(s => Service<CharacterService>().CountOf(s, 1501016)));
+        }
     }
 
     private static string RepoRoot()
