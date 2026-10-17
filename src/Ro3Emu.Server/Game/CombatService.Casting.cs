@@ -116,15 +116,19 @@ public sealed partial class CombatService
         await s.SendGameAsync(UseSkill, new CastSkillRsp { SessionId = id, IsAutoCast = req.IsAutoCast });
         var target = FindMonster(s.WorldScene, req.TargetId);
         var playerTarget = EventTarget(s, req.TargetId);
+        // _iIfAutoAtk 2 (enum_AutoNormalAttackType.AutoNormalAttack) follows the cast with the career's normal attack
+        // (LC_AutoAttackAppendState: GetNormalSkill). Repeating the cast skill itself bypassed its cooldown: Blade
+        // Smash and Sonic Slash fired every swing.
+        int loopSkill = GameData.Int(row!.Value, "_iIsNormalAtk") == 1 ? req.SkillId : skills.NormalAttack(s.Progress!.Career);
         if (GameData.Int(row!.Value, "_iIfAutoAtk") == 2 && owned == null && target != null && CanHitMonster(s, target))
         {
-            s.Attack = new AttackLoop { Target = target, SkillId = req.SkillId,
+            s.Attack = new AttackLoop { Target = target, SkillId = loopSkill,
                 NextSwingMs = Now + SkillMs(s, row.Value) + Math.Max(0, GameData.Int(row.Value, "_iChantFix") + GameData.Int(row.Value, "_iChantVar")) + 1,
                 StartX = s.Position.X, StartZ = s.Position.Z };
         }
         else s.Attack = null;
         if (GameData.Int(row.Value, "_iIfAutoAtk") == 2 && owned == null && playerTarget != null)
-            eventAttacks[s] = new EventAttack(playerTarget, req.SkillId,
+            eventAttacks[s] = new EventAttack(playerTarget, loopSkill,
                 Now + SkillMs(s, row.Value) + Math.Max(0, GameData.Int(row.Value, "_iChantFix") + GameData.Int(row.Value, "_iChantVar")) + 1,
                 s.Position.X, s.Position.Z);
         await StartCooldownAsync(s, row.Value);
