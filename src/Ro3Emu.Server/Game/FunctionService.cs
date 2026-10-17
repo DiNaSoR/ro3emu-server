@@ -16,19 +16,22 @@ public sealed class FunctionService
     public const uint FunctionOpenSync = 5056;
 
     private const int CondBaseLevel = 1002, CondTowerFloor = 1014, CondJobRank = 1019, CondRoleHasTask = 1101,
-        CondServerStage = 3031, CondServerStage2 = 3030, CondQuestDone = 4004, CondItemCount = 1020;
+        CondServerStage = 3031, CondServerStage2 = 3030, CondQuestDone = 4004, CondItemCount = 1020,
+        CondLearnedSkill = 1102;
     private const int CondJourneyAttr = 15100, CondJourneyDialogue = 15101;
     private const int CondGuildPosition = 9007;
 
     private readonly GameData data;
     private readonly CharacterService character;
+    private readonly SkillService skills;
     private readonly SeasonService seasons;
     private readonly TimeProvider clock;
 
-    public FunctionService(GameData data, CharacterService character, SeasonService seasons, TimeProvider clock)
+    public FunctionService(GameData data, CharacterService character, SkillService skills, SeasonService seasons, TimeProvider clock)
     {
         this.data = data;
         this.character = character;
+        this.skills = skills;
         this.seasons = seasons;
         this.clock = clock;
         character.ProgressHandlers.Add(SyncAsync);
@@ -105,6 +108,9 @@ public sealed class FunctionService
                 // LC_InteractCondition.CheckPlayBook: GetPlayBookOpenTime() + offset <= server system time.
                 CondServerStage2 => clock.GetUtcNow().ToUnixTimeSeconds() >= seasons.StartTime + param,
                 CondQuestDone => TaskService.IsDelivered(session, param),
+                // LC_InteractCondition.CheckHasLearnedSkill [1102, skillGroup]: ServerAllSkills (the current plan's
+                // skill levels, LC_DAL_SkillDevelop) holds the group above level 0. The Rent side quests use it.
+                CondLearnedSkill => param is > 0 and <= int.MaxValue && skills.Level(p, (int)param) > 0,
                 // LC_InteractCondition.CheckItemCount: [1020, item, count], LC_ItemHelper.GetItemCount(item) >= count.
                 CondItemCount => d.GetArrayLength() >= 3 && character.CountOf(session, (int)param) >= (long)(GameData.Number(d[2]) ?? 0),
                 // LC_InteractCondition.CheckJourneyAttr / CheckJourneyDialogue: per-role Journey progress.
