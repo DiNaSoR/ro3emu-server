@@ -128,6 +128,7 @@ public sealed partial class MapTests
                 Assert.DoesNotContain(alice.Inbox.Snapshot(), e => e.IsGame(CombatService.SkillHit)
                     && SkillHitInfo.Parser.ParseFrom(e.Body).Dsts.Any(d => d.DstID == uid && d.IsDead));
                 accounts.BeforeOwnedCommitForTest = null;
+                await StopAttackingAsync("alice"); // a Normal Attack never breaks its own live swing
                 await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1000001, TargetId = uid });
                 Assert.Equal(0, (await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
                 await Next(alice, MvpService.DeadNotify, MVPDeadNotify.Parser);
