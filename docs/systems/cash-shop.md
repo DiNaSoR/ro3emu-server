@@ -78,9 +78,10 @@ Both have `_iSingleLimit` 999999 and open at base level 20. This is not a paymen
 
 A crystal price (item 3) takes bound crystals (item 16) first and regular crystals for the rest (`ShopService.Payment`,
 every Mall and Fashion buy). No config says so: the rule is **(inferred)** from how bound currency usually works, and
-was agreed with the project owner. The client's buy dialog still checks the price against regular crystals alone
-(`LC_ItemHelper.GetItemCount(3)` reads only currency 3), so a role needs that many regular crystals for the client to
-send the buy at all.
+was agreed with the project owner. The currency exchange (2005) pays crystals the same way. The client's own checks
+(buy dialog, Fashion cart, exchange) ask `LC_ItemHelper.GetItemCount(3)`, which reads currency 3 alone; the client
+hook `BoundCrystals` wraps it so item 3 counts both kinds. Without the hook a role needs enough regular crystals for
+the client to send the buy at all.
 
 ## Not done
 

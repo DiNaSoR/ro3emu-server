@@ -107,7 +107,7 @@ public sealed class TopUpTests : IAsyncLifetime
     public async Task ExchangeTurnsCrystalsIntoZenyAndZenyIntoMintedCoin()
     {
         await using var bot = await Enter("Changer");
-        Assert.Equal(0, (await Order(bot, 1, PcTier300)).Result); // 300 crystals
+        Assert.Equal(0, (await Order(bot, 1, PcTier300)).Result); // 300 crystals + 300 bound
         // Functions 7005/7006 open at base level 20 (conditions 2000265/2000266 [1002,20]).
         var locked = await Ask(bot, ShopService.ItemExchange, new ItemExchangeReq { ItemId = Crystal, Count = 10 }, ItemExchangeResp.Parser);
         Assert.Equal(ErrorCodes.FunctionLocked, locked.Result);
@@ -115,7 +115,8 @@ public sealed class TopUpTests : IAsyncLifetime
         long zeny = Count(bot, Zeny);
         var done = await Ask(bot, ShopService.ItemExchange, new ItemExchangeReq { ItemId = Crystal, Count = 10 }, ItemExchangeResp.Parser);
         Assert.Equal(0, done.Result);
-        Assert.Equal(290, Count(bot, Crystal));
+        Assert.Equal(290, Count(bot, BoundCrystal)); // bound crystals go first
+        Assert.Equal(300, Count(bot, Crystal));
         Assert.Equal(zeny + 1000, Count(bot, Zeny)); // ItemExchangeConfig 3: rate 100
 
         long coins = Count(bot, MintedCoin);
@@ -124,7 +125,8 @@ public sealed class TopUpTests : IAsyncLifetime
 
         var short_ = await Ask(bot, ShopService.ItemExchange, new ItemExchangeReq { ItemId = Crystal, Count = 1000 }, ItemExchangeResp.Parser);
         Assert.NotEqual(0, short_.Result);
-        Assert.Equal(290, Count(bot, Crystal));
+        Assert.Equal(290, Count(bot, BoundCrystal));
+        Assert.Equal(300, Count(bot, Crystal));
     }
     [ClientDataFact]
     public async Task CrystalPricesSpendBoundCrystalsFirst()

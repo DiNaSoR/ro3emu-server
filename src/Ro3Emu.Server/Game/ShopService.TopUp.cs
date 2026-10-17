@@ -17,7 +17,8 @@ namespace Ro3Emu.Server.Game;
 /// <item>2004 UPDATE_RECHARGE_FIRST_AWARD_RESULT (push) {rechargeId}: removes that tier from the first-purchase list.</item>
 /// <item>2002 PAY_RESULT: the client only logs the answer.</item>
 /// <item>2005 ITEM_EXCHANGE {itemId = the item paid, count}: ItemExchangeConfig is keyed by the paid item
-/// (3 crystal -> 1 Zeny, 1 Zeny -> 2 Minted Coin, x _iRate), up to _iSingleLimit, gated by _iFunction.</item>
+/// (3 crystal -> 1 Zeny, 1 Zeny -> 2 Minted Coin, x _iRate), up to _iSingleLimit, gated by _iFunction. Paying crystals
+/// takes bound crystals first, as every crystal price does (Payment).</item>
 /// </list>
 /// A tier grants _kAward (crystal item 3), plus _kFirstChargeAward on its first purchase or else _kAwardBonus (both
 /// bound crystal item 16). That the first-purchase double replaces the regular bonus is (inferred) from the tier
@@ -146,7 +147,7 @@ public sealed partial class ShopService
             else if (req.Count < 1 || (limit > 0 && req.Count > limit) || req.Count * rate > int.MaxValue) code = ErrorCodes.Parameter;
             else
             {
-                (int Entry, long Count)[] cost = [((int)req.ItemId, req.Count)];
+                var cost = Payment(session, (int)req.ItemId, req.Count); // crystals: bound ones first
                 (int Entry, int Count)[] goods = [(target, (int)(req.Count * rate))];
                 var economy = character.FamilyEconomy(session, "cd13a/shop-exchange", cost, goods,
                     new { Paid = req.ItemId, req.Count, Target = target, Rate = rate });
