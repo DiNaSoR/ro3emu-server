@@ -380,6 +380,11 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
     /// <summary>Last accepted 83552 switch in this session (PublicParamConfig.SchemeCD).</summary>
     public DateTime TalentPlanSwitchUtc { get; set; }
 
+    /// <summary>Skill parameter modifiers from non-buff sources (season talent opcode 21), read by SkillParameterRules
+    /// with the live buffs' modifiers. Replace the list and bump the version together.</summary>
+    internal IReadOnlyList<SkillParameterRules.Modifier> ExtraSkillModifiers { get; set; } = [];
+    internal long ExtraSkillModifierVersion { get; set; }
+
     public EquipLevels EquipLevels { get; set; } = new();
 
     /// <summary>5007 plan references/names/current index; instances remain exclusively in Items.</summary>

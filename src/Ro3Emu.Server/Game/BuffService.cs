@@ -8,7 +8,7 @@ namespace Ro3Emu.Server.Game;
 /// <summary>A buff on a player: BuffConfig id, its attribute changes, when it ends (absolute server ms).</summary>
 public sealed record ActiveBuff(long Guid, int ConfigId, long ExpireMs, int DurationMs, IReadOnlyList<(long Attr, double Value)> Changes, long SourceId,
     int PileCount = 1, bool IsPassive = false, bool IsTotemOwned = false, int StateOrdinal = 0, bool ShowIcon = true,
-    long ShieldRemaining = 0);
+    long ShieldRemaining = 0, bool IsTalentOwned = false);
 
 /// <summary>
 /// Buff lifetime and control state. The explicit state map below is inferred from
@@ -112,14 +112,16 @@ public sealed partial class BuffService : IGameTicker
 
     /// <summary>Source-owned passive configuration. Zero-time totem passives are permanent until that source is removed;
     /// they are executable server registrations, not a fabricated 60-second icon. Socketed-card passives
-    /// (<paramref name="totemOwned"/> false, CardEffects) share the lifetime rule under their card GUID.</summary>
-    public async Task AddPassiveAsync(GameSession p, int configId, long sourceId, bool totemOwned = true)
+    /// (<paramref name="totemOwned"/> false, CardEffects) share the lifetime rule under their card GUID; season talent
+    /// passives (<paramref name="talentOwned"/>, SeasonTalentEffects) under their talent node ID.</summary>
+    public async Task AddPassiveAsync(GameSession p, int configId, long sourceId, bool totemOwned = true, bool talentOwned = false)
     {
         if (data.Row("BuffConfig", configId) is not { } row
-            || p.Buffs.Any(b => b.IsPassive && b.IsTotemOwned == totemOwned && b.ConfigId == configId && b.SourceId == sourceId)) return;
+            || p.Buffs.Any(b => b.IsPassive && b.IsTotemOwned == totemOwned && b.IsTalentOwned == talentOwned
+                && b.ConfigId == configId && b.SourceId == sourceId)) return;
         var buff = new ActiveBuff(++_guids, configId, long.MaxValue, 0,
             GameData.Pairs(row, "_kChangeAttri").Where(c => c.Value != 0).ToArray(), sourceId, IsPassive: true, IsTotemOwned: totemOwned,
-            ShowIcon: GameData.Int(row, "_iShowIcon") != 0);
+            ShowIcon: GameData.Int(row, "_iShowIcon") != 0, IsTalentOwned: talentOwned);
         p.Buffs.Add(buff);
         TrackHalo(p, buff);
         // SceneService resends visible passives after ENTITYSELF when the client has created the unit.

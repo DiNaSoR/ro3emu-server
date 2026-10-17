@@ -86,8 +86,10 @@ internal static class SkillParameterRules
         long signature = 17;
         foreach (var buff in session.Buffs)
             signature = unchecked(((signature * 31 + buff.Guid) * 31 + buff.ConfigId) * 31 + buff.PileCount * 2 + (buff.ExpireMs > now ? 1 : 0));
+        signature = unchecked(signature * 31 + session.ExtraSkillModifierVersion);
         if (cache.Signature == signature && ReferenceEquals(cache.Data, data)) return cache;
-        var result = new List<Modifier>();
+        // Non-buff sources (season talent SpecialEffectConfig opcode 21) come first; buffs follow in buff order.
+        var result = new List<Modifier>(session.ExtraSkillModifiers);
         foreach (var buff in session.Buffs)
         {
             if (buff.ExpireMs <= now) continue;

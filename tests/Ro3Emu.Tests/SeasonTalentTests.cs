@@ -34,7 +34,7 @@ public sealed class SeasonTalentTests
         public string GameDataDir => Path.Combine(dir, "game");
 
         public async Task StartAsync(int playbook = 101, bool removeLevelTwo = false, bool extraMemberAttr = false,
-            bool oathOpen = false, bool missingGraph = false, bool jobSpecificRow = false)
+            bool oathOpen = false, bool missingGraph = false, bool jobSpecificRow = false, bool jobTreeOpen = false)
         {
             string config = Path.Combine(dir, "game", "config");
             Directory.CreateDirectory(config);
@@ -60,6 +60,16 @@ public sealed class SeasonTalentTests
                 var trees = JsonNode.Parse(File.ReadAllText(treeFile))!.AsObject();
                 trees["10104"]!["_iNeedLevel"] = 0;
                 trees["10105"]!["_iNeedLevel"] = 0;
+                File.WriteAllText(treeFile, trees.ToJsonString());
+            }
+
+            if (jobTreeOpen)
+            {
+                // The first job tree opens at 40 total levels; a private fixture opens it so a short test reaches its
+                // branch points through the ordinary nodes before them.
+                string treeFile = Path.Combine(config, "SeasonTalentTreeConfig.json");
+                var trees = JsonNode.Parse(File.ReadAllText(treeFile))!.AsObject();
+                trees["10102"]!["_iNeedLevel"] = 0;
                 File.WriteAllText(treeFile, trees.ToJsonString());
             }
 
@@ -452,6 +462,115 @@ public sealed class SeasonTalentTests
         Assert.Equal(1, fixture.Session.SeasonTalent!.Plan[0].TalentNodes[Root].CurrentLevel);
         Assert.Equal(40, fixture.Character.CountOf(fixture.Session, Remnant));
         Assert.Equal(400, fixture.Character.CountOf(fixture.Session, MintedCoin));
+    }
+
+    private const int Point = 10102003, Pierce = 10102101, PierceA = 10102102, PierceB = 10102103,
+        Bash = 10102105, BashA = 10102106, AfterPoint = 10102004;
+
+    private static async Task Eventually(Func<bool> condition, string what)
+    {
+        for (int i = 0; i < 250 && !condition(); i++) await Task.Delay(20);
+        Assert.True(condition(), what);
+    }
+
+    /// <summary>A third-rank job at base level 30 (the first job tree's condition) with materials for the ordinary nodes.</summary>
+    private static async Task<BotClient> JobTreeRole(ServerFixture fixture, int job)
+    {
+        var bot = await fixture.InWorld("Alice");
+        await fixture.Unlock("alice");
+        await fixture.Gm("alice", FormattableString.Invariant($"!job {job}"));
+        await fixture.Gm("alice", "!lvl 30"); // the tree's condition 80000001: job rank 3 and base level 30
+        await fixture.Gm("alice", "!item 1250900 500");
+        await fixture.Gm("alice", "!item 2 5000");
+        await Next(bot, CharacterService.ItemsSync, DBItemsInfoIncrement.Parser,
+            m => m.Currency.TryGetValue(MintedCoin, out var c) && c.All == 5000);
+        return bot;
+    }
+
+    private static async Task Max(BotClient bot, int node)
+    {
+        for (int level = 0; level < 10; level++) Assert.Equal(0, await Upgrade(bot, node));
+    }
+
+    [ClientDataFact]
+    public async Task JobNodeChoosesOneBranchOpensTheMainLineAndAppliesItsEffects()
+    {
+        await using var fixture = new ServerFixture();
+        await fixture.StartAsync(jobTreeOpen: true);
+        var alice = await JobTreeRole(fixture, 1200);
+        await Max(alice, 10102001);
+        await Max(alice, 10102002);
+        var state = fixture.Session.SeasonTalent!;
+        Assert.True(state.UnlockedNode[Point]);
+        Assert.True(state.UnlockedNode[Pierce]);
+        Assert.True(state.UnlockedNode[PierceA]);
+        Assert.False(state.UnlockedNode[AfterPoint]);
+        Assert.Equal(ErrorCodes.Parameter, await Upgrade(alice, Point)); // the client never buys a branch point
+        Assert.Equal(ErrorCodes.TalentLocked, await Upgrade(alice, AfterPoint));
+        long remnants = fixture.Character.CountOf(fixture.Session, Remnant);
+
+        // Select panel Finish: a small node of Pierce's branch, free, chooses Pierce and fills the branch point.
+        Assert.Equal(0, await Upgrade(alice, PierceA));
+        var plan = fixture.Session.SeasonTalent!.Plan[0].TalentNodes;
+        Assert.Equal(1, plan[PierceA].CurrentLevel);
+        Assert.Equal(1, plan[Pierce].CurrentLevel);
+        Assert.Equal(1, plan[Point].CurrentLevel);
+        Assert.True(fixture.Session.SeasonTalent.UnlockedNode[AfterPoint]);
+        Assert.Equal(remnants, fixture.Character.CountOf(fixture.Session, Remnant));
+        Assert.Equal(ErrorCodes.SkillMaxLevel, await Upgrade(alice, PierceA));
+        Assert.Equal(0, await Upgrade(alice, PierceB));
+        await Eventually(() => fixture.Session.Buffs.Any(b => b.IsTalentOwned && b.SourceId == PierceA && b.ConfigId == 1112101)
+            && fixture.Session.Buffs.Any(b => b.IsTalentOwned && b.SourceId == PierceB && b.ConfigId == 1112201), "branch buffs");
+        // Pierce itself: [21,0,0,11120,29,1,100] and [21,0,0,11120,30,1,20].
+        Assert.Contains(fixture.Session.ExtraSkillModifiers, m => m is { Group: 11120, Type: 29, Operation: 1, Value: 100 });
+        Assert.Contains(fixture.Session.ExtraSkillModifiers, m => m is { Group: 11120, Type: 30, Operation: 1, Value: 20 });
+
+        // Another large node of the same branch point replaces Pierce and its small nodes.
+        Assert.Equal(0, await Upgrade(alice, BashA));
+        plan = fixture.Session.SeasonTalent!.Plan[0].TalentNodes;
+        Assert.Equal(0, plan[Pierce].CurrentLevel);
+        Assert.Equal(0, plan[PierceA].CurrentLevel);
+        Assert.Equal(0, plan[PierceB].CurrentLevel);
+        Assert.Equal(1, plan[Bash].CurrentLevel);
+        Assert.Equal(1, plan[BashA].CurrentLevel);
+        Assert.Equal(1, plan[Point].CurrentLevel);
+        await Eventually(() => !fixture.Session.Buffs.Any(b => b.IsTalentOwned), "replaced branch buffs removed");
+        Assert.DoesNotContain(fixture.Session.ExtraSkillModifiers, m => m.Group == 11120);
+        Assert.Contains(fixture.Session.ExtraSkillModifiers, m => m is { Group: 11104, Type: 0, Operation: 2, Value: 8000 });
+        Assert.Contains(fixture.Session.ExtraSkillModifiers, m => m is { Group: 11104, Type: 15, Operation: 2, Value: 1 });
+        Assert.Equal(0, await Upgrade(alice, AfterPoint)); // the main line continues past the chosen branch point
+
+        await alice.DisposeAsync();
+        await using var again = await fixture.InWorld("Alice", create: false);
+        var saved = await Next(again, SeasonTalentService.TalentSync, DBSeasonTalentIncrement.Parser);
+        Assert.Equal(1, saved.Plan[0].All.TalentNodes[BashA].CurrentLevel);
+        Assert.Equal(1, saved.Plan[0].All.TalentNodes[Point].CurrentLevel);
+        await Eventually(() => fixture.Session.ExtraSkillModifiers.Any(m => m.Group == 11104), "modifiers after relog");
+
+        await again.SendGameAsync(SeasonTalentService.SetPlan, new SeasonTalentSetCurPlanReq { PlanId = 1 });
+        Assert.Equal(0, (await Next(again, SeasonTalentService.SetPlan, SeasonTalentSetCurPlanResp.Parser)).Result);
+        Assert.Empty(fixture.Session.ExtraSkillModifiers);
+        Assert.False(fixture.Session.SeasonTalent!.UnlockedNode[AfterPoint]); // plan 1 has not chosen a branch
+    }
+
+    [ClientDataFact]
+    public async Task JobNodesNeedTheRolesJobAndApplyAttributeEffects()
+    {
+        await using var fixture = new ServerFixture();
+        await fixture.StartAsync(jobTreeOpen: true);
+        var alice = await JobTreeRole(fixture, 5200);
+        await Max(alice, 10102001);
+        await Max(alice, 10102002);
+        Assert.Equal(ErrorCodes.FeatureUnavailable, await Upgrade(alice, 10102104)); // a Blacksmith (2x00) node only
+        Assert.Equal(0, await Upgrade(alice, PierceA));
+        await Eventually(() => fixture.Session.Buffs.Any(b => b.IsTalentOwned && b.ConfigId == 1522201)
+            && fixture.Session.Buffs.Any(b => b.IsTalentOwned && b.ConfigId == 1522301), "assassin branch buffs");
+        await Max(alice, AfterPoint);
+        await Max(alice, 10102005);
+        long before = fixture.Character.Stats(fixture.Session)[103];
+        Assert.Equal(0, await Upgrade(alice, 10102117)); // [1,103,15]: Physical ATK +15
+        Assert.Equal(15, fixture.Character.Stats(fixture.Session)[103] - before);
+        Assert.Equal(1, fixture.Session.SeasonTalent!.Plan[0].TalentNodes[10102006].CurrentLevel);
     }
 
     private static string RepoRoot()
