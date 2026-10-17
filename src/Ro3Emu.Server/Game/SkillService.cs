@@ -63,13 +63,11 @@ public sealed class SkillService
             : 1000001;
 
     /// <summary>
-    /// The role's normal attack now. The client's Lua_CFG_JobAttackConfig.GetNormalSkillID picks it for the skill
-    /// window from JobAttackConfig by job and weapon (ItemConfig._iSubType of the main hand * 10 + dual wield), then
-    /// the job's any-weapon row (_kWeaponType empty). A weapon row wins here: a Thief with a Dagger attacks with
-    /// 1005001 "Basic Attack" (ATK x 50% + 45), with a Katar 1005101, with two Daggers 1005201. Without one this keeps
-    /// JobConfig._kSkillNormalID (Thief 1500001 "Normal Attack", ATK x 50%), which equals the any-weapon row for every
-    /// job but the Swordman line (any-weapon 1001001/1001101 against JobConfig 1100001/1140001; inferred to keep
-    /// JobConfig's, which the story bosses are tuned against). All of a career's rows count as learned, because the
+    /// The role's normal attack now, as the client's Lua_CFG_JobAttackConfig.GetNormalSkillID picks it: JobAttackConfig
+    /// by job and weapon (ItemConfig._iSubType of the main hand * 10 + dual wield), then the job's any-weapon row
+    /// (_kWeaponType empty), then JobConfig._kSkillNormalID. A Thief with a Dagger attacks with 1005001 "Basic Attack"
+    /// (ATK x 50% + 45), with a Katar 1005101, with two Daggers 1005201, otherwise 1500001 "Normal Attack" (ATK x 50%);
+    /// a Swordman with 1001001, a Knight or Crusader with 1001101. All of a career's rows count as learned, because the
     /// skill window shows GetNormalSkillID's group in the Novice tree's Normal Attack cell
     /// (UI_Sys_Skill_AddBitWidgetBaseCtrl). Battle-mount rows are not applied (inferred: unmounted rows only).
     /// </summary>
@@ -119,10 +117,10 @@ public sealed class SkillService
         return map;
     }
 
-    /// <summary>The job's JobAttackConfig row for this weapon key (Lua_CFG_JobAttackConfig._getData's first lookup).</summary>
+    /// <summary>Lua_CFG_JobAttackConfig._getData: the weapon's row, else the job's any-weapon row.</summary>
     private int? JobAttack(int career, int weaponKey) =>
         JobAttacks.TryGetValue(career, out var byWeapon)
-            && byWeapon.TryGetValue(weaponKey, out int id) ? id : null;
+            && (byWeapon.TryGetValue(weaponKey, out int id) || byWeapon.TryGetValue(-1, out id)) ? id : null;
 
     private readonly System.Collections.Concurrent.ConcurrentDictionary<int, HashSet<int>> _normalGroups = new();
 

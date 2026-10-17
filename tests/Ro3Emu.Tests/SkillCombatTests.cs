@@ -269,6 +269,8 @@ public sealed partial class SkillCombatTests : IAsyncLifetime
             h => h.SessionId != reply.SessionId && h.Dsts.Any(d => d.DstID == target.Uid));
         long doubled = Assert.Single(next.Dsts, d => d.DstID == target.Uid).Damage;
         Assert.True(doubled > plain, $"Double Attack added nothing: {plain} then {doubled}");
+        Assert.Equal(0, first.Split); // one number for a plain swing
+        Assert.Equal(2, next.Split); // the proc shows as a second number
     }
 
     [ClientDataFact]

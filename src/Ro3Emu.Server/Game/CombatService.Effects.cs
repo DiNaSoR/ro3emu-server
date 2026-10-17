@@ -221,6 +221,9 @@ public sealed partial class CombatService
                 {
                     foreach (var modifier in DamageAdjusters) amount = Math.Max(0, modifier(s, target, row, result, amount));
                     foreach (var extra in ExtraHitDamage) amount += Math.Max(0, extra(s, target, row, amount));
+                    // A Double Attack proc shows as its own number(s) on this swing, as _kShowDmg splits multi-hit skills.
+                    if (_doubleAttackHits > 0) hit.Split = Math.Max(hit.Split, shownHits + _doubleAttackHits);
+                    _doubleAttackHits = 0;
                 }
                 long beforeHp = target.Hp;
                 target.Hp = Math.Max(0, beforeHp - amount);

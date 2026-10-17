@@ -512,7 +512,7 @@ public sealed class CharacterTests : IAsyncLifetime
         long dagger = bag.PackInfo[2].All.Items.Values.Single(i => i.ItemEntry == Dagger).ItemGuid;
         await Gm("alice", "!job 5100");
         var bare = await Next(alice, SkillService.SkillDataSync, DBSkillDataIncrement.Parser, m => !m.SyncAllMark && m.HasCurrentAtkSkillId);
-        Assert.Equal(1500001, bare.CurrentAtkSkillId); // no weapon row: "Normal Attack", ATK x 50%
+        Assert.Equal(1500001, bare.CurrentAtkSkillId); // JobAttackConfig 5100 any weapon: "Normal Attack", ATK x 50%
 
         await alice.SendGameAsync(CharacterService.EquipItemOpr, new EquipItemOprReq { Opr = 0, Pos = (EquipGridType)1, ItemGUID = dagger });
         var armed = await Next(alice, SkillService.SkillDataSync, DBSkillDataIncrement.Parser, m => !m.SyncAllMark && m.HasCurrentAtkSkillId);
@@ -556,7 +556,7 @@ public sealed class CharacterTests : IAsyncLifetime
 
         await Gm("alice", "!job 1100");
         var swordman = await Next(alice, SkillService.SkillDataSync, DBSkillDataIncrement.Parser, m => !m.SyncAllMark && m.HasCurrentAtkSkillId);
-        Assert.Equal(1100001, swordman.CurrentAtkSkillId); // JobConfig._kSkillNormalID (no Swordman weapon row)
+        Assert.Equal(1001001, swordman.CurrentAtkSkillId); // JobAttackConfig 1100 any weapon (JobConfig says 1100001)
 
         // Job 15 of rank 2 = 15 points (JobLvConfig 201..215); learn Bash level 3.
         var req = new SkillGrowthSkillPlanUpdateReq { Plan = 0 };
