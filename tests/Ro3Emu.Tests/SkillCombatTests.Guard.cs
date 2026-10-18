@@ -115,6 +115,7 @@ public sealed partial class SkillCombatTests
         Assert.Equal(0, await CastSelf(alice, 1200201, Session("alice").Role!.Id));
         await Until(s => !s.Stealthed, "bob");
 
+        await Until(s => s.SkillCast == null, "alice"); // Sight's action time, else the next cast is busy (3005)
         await Gm("alice", "!job 4100"); await Teach("alice", 14005);
         await Loop.InvokeAsync(() => Buffs.AddAsync(Session("bob"), 5000901, 30000, Session("bob").Role!.Id));
         await Until(s => s.Stealthed, "bob");
