@@ -90,6 +90,14 @@ public sealed partial class CombatService
         var update = new SkillBeAffectedParamExNotify { IsAll = true, Uuid = session.Role.Id };
         // Scope 0 names its group; a scope-1 tag selector reaches every learned skill whose row carries its tags.
         var groups = new SortedSet<int>(mods.Where(m => m.Scope == 0).Select(m => m.Group));
+        var stats = character.Stats(session);
+        // per_sp_dedution changes every learned SP cost, so the client needs those skills' cost lists too.
+        bool spDeduction = stats[SpDeductionAttribute] != 0;
+        if (spDeduction)
+            foreach (int learned in session.Progress.Skills.Keys)
+                if (skills.Level(session.Progress, learned) is var at and > 0
+                    && data.Row("SkillConfig", skills.RealId(learned, at)) is { } learnedRow && HasSpCost(learnedRow))
+                    groups.Add(learned);
         if (mods.Any(m => m.Scope == 1))
             foreach (int learned in session.Progress.Skills.Keys)
                 if (skills.Level(session.Progress, learned) is var at and > 0
@@ -103,9 +111,17 @@ public sealed partial class CombatService
             var row = EffectiveSkillRow(session, (int)GameData.Int(baseRow, "_iID")) ?? baseRow;
             var tags = SkillParameterRules.CategoriesOf(data, baseRow);
             var groupInfo = new BeAffectedParamInfoEx();
-            foreach (var type in mods.Where(m => SkillParameterRules.Matches(m, group, tags)).Select(m => m.Type).Distinct().Order())
+            var types = mods.Where(m => SkillParameterRules.Matches(m, group, tags)).Select(m => m.Type);
+            if (spDeduction) types = types.Append(35);
+            foreach (var type in types.Distinct().Order())
             {
-                if (type == 15) groupInfo.AffectParam[type] = new BeAffectedValueEx { AffectValue = SkillParameterRules.Mode(group, tags, mods) };
+                if (type == 35)
+                {
+                    // Compared with the configured cost of the row the client casts (a mode row, when type 15 picks one).
+                    var configured = data.Row("SkillConfig", (int)GameData.Int(row, "_iID")) ?? baseRow;
+                    if (ClientCostList(stats, configured, row) is { } costs) groupInfo.AffectParam[type] = costs;
+                }
+                else if (type == 15) groupInfo.AffectParam[type] = new BeAffectedValueEx { AffectValue = SkillParameterRules.Mode(group, tags, mods) };
                 else if (type == 44) groupInfo.AffectParam[type] = new BeAffectedValueEx { AffectValue = CanQueueSkill(session, group) ? 1 : 0 };
                 else if (SkillParameterRules.Field(type) is { } field)
                 {
