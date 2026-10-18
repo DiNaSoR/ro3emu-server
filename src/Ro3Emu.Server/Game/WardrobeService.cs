@@ -193,7 +193,7 @@ public sealed partial class WardrobeService
         var current = session.Wardrobe!;
         var row = Row(req.AppearanceId);
         int result = row == null ? ErrorCodes.Parameter : Validate(session, current, req.AppearanceId, requireOwned: false);
-        if (result == 0 && Owns(current, req.AppearanceId)) result = ErrorCodes.Parameter; // (inferred) already unlocked.
+        if (result == 0 && Owns(current, req.AppearanceId)) result = ErrorCodes.ShopAppearanceOwned; // (inferred) already unlocked.
         var costs = row is { } r ? Materials(r) : [];
         if (result == 0 && costs.Count == 0) result = ErrorCodes.FeatureUnavailable; // No free unlock path inferred.
         if (result == 0 && costs.Any(c => c.Entry <= 0 || c.Count <= 0 || data.Row("ItemConfig", c.Entry) == null))
@@ -242,7 +242,9 @@ public sealed partial class WardrobeService
             else appearanceId = (int)(GameData.Number(effects[0][2]) ?? 0);
         }
         if (result == 0) result = Validate(session, session.Wardrobe!, appearanceId, requireOwned: false);
-        if (result == 0 && Owns(session.Wardrobe!, appearanceId)) result = ErrorCodes.Parameter;
+        // Each Fashion look's bonus (_iAppearanceAwardId) is a voucher for the piece the purchase already lit, so a
+        // duplicate is the common case: 2316 "Appearance already unlocked", and the voucher is kept (inferred).
+        if (result == 0 && Owns(session.Wardrobe!, appearanceId)) result = ErrorCodes.ShopAppearanceOwned;
         if (result == 0)
         {
             var next = session.Wardrobe!.Clone();
@@ -273,11 +275,14 @@ public sealed partial class WardrobeService
     /// <item>Owned means allLightUpAppearances[_iAppearanceId] (UI_Sys_AppearanceShopWidgetCtrl.lua:2455-2464 shows
     /// "already owned"; :3484-3500 and :3550-3582 leave lit looks out of the buyable cart). The client never offers an
     /// owned look, so a request for one is refused with 2316 "Appearance already unlocked" and nothing is charged.</item>
-    /// <item>A suit unlocks itself and its pieces. The wardrobe's suit tab lights a suit only when every piece of
+    /// <item>A suit unlocks itself and its pieces, except a piece its bonus award unlocks through a voucher item. Every
+    /// suit with pieces in this export (5000002-5000006) has one piece, and its bonus is that piece's voucher, which says
+    /// "Activate the ... matching Headwear Appearance": the matching piece is the gift, not part of the purchase. The
+    /// wardrobe's suit tab lights a suit only when every piece of
     /// GetSuitPieces (WardRobeConfig rows whose _iMain is the suit: Lua_CFG_WardRobeConfig.lua:66-88, :644) is in
     /// allLightUpAppearances, and never checks the suit id (UI_Sys_WardrobePanelCtrl.lua:1724-1740); the shop checks
     /// only the suit id. The shop previews GetSuitPieces, else _kAppearanceParts (UI_Sys_AppearanceShopWidgetCtrl.lua
-    /// :2255-2310). Every commodity's _kAppearanceParts equals its suit's pieces in the export; both are unlocked.</item>
+    /// :2255-2310). Every commodity's _kAppearanceParts equals its suit's pieces in the export.</item>
     /// <item>The bonus is _iAppearanceAwardId, a MultiverseGroupConfig id the shop previews with GetSeasonAwardList
     /// (UI_Sys_AppearanceShopWidgetCtrl.lua:2002-2066) and the wardrobe shows as a lit look's giveaway
     /// (WardRobeConfig._iGiftAward, UI_Sys_WardrobePanelCtrl.lua:5564-5575). Unresolvable: 2324, nothing charged.</item>
@@ -293,7 +298,8 @@ public sealed partial class WardrobeService
         await RefreshExpiredAsync(session);
         var current = session.Wardrobe!;
         var looks = new List<int> { appearanceId };
-        looks.AddRange(parts.Concat(SuitPieces(appearanceId)).Where(id => id != appearanceId).Distinct());
+        var vouchered = bonus.Grants.Select(g => VoucherLook(g.Entry)).Where(id => id > 0).ToHashSet();
+        looks.AddRange(parts.Concat(SuitPieces(appearanceId)).Where(id => id != appearanceId && !vouchered.Contains(id)).Distinct());
         foreach (int id in looks)
         {
             if (Row(id) is not { } row || GameData.Int(row, "_iType") is < 1 or > MaxSlot) return ErrorCodes.ShopAppearanceMissing;
@@ -341,6 +347,15 @@ public sealed partial class WardrobeService
         log.LogInformation("{Name} buys appearance {Id} (+{Parts} pieces, award {Award})", session.Role!.Name,
             appearanceId, looks.Count - 1, bonus.GroupId);
         return 0;
+    }
+
+    /// <summary>The look an action-200 voucher item unlocks (ItemConfig._iUseEffect [[200, 0, look]]), else 0.</summary>
+    private int VoucherLook(int item)
+    {
+        if (data.Row("ItemConfig", item) is not { } row || !row.TryGetProperty("_iUseEffect", out var effects)
+            || effects.ValueKind != JsonValueKind.Array || effects.GetArrayLength() != 1 || effects[0].ValueKind != JsonValueKind.Array
+            || effects[0].GetArrayLength() < 3 || (long)(GameData.Number(effects[0][0]) ?? 0) != 200) return 0;
+        return (int)(GameData.Number(effects[0][2]) ?? 0);
     }
 
     /// <summary>Lua_CFG_WardRobeConfig.GetSuitPieces: the rows whose _iMain names the suit.</summary>
