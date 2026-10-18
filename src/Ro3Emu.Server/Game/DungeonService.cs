@@ -880,5 +880,6 @@ public sealed partial class DungeonService
         }
         // A disconnected member's channel must never prevent another participant's committed award.
         foreach (var notify in notifications) await notify();
+        if (won) await ScheduleAutoLeaveAsync(a);
     }
 }
