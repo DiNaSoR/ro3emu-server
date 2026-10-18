@@ -193,7 +193,7 @@ public sealed partial class CombatService
             }
         }
         var stats = character.Stats(s);
-        var attacker = new Fighter(stats[103], stats[104], stats[109], stats[111], s.Progress!.Level, 1);
+        var attacker = PlayerAttacker(s, stats);
         var hit = new SkillHitInfo
         {
             SrcID = field?.Uid ?? action.SourceId, SkillId = action.Request.SkillId, SessionId = action.Id,
@@ -264,9 +264,10 @@ public sealed partial class CombatService
             {
                 double multiplier = Numbers(row, "_kDamageParam1").FirstOrDefault(), flat = Numbers(row, "_kDamageParam2").FirstOrDefault();
                 // Heal's friendly branch is P1[0]/P2[0]; its enemy branch is [1] (description + select race mask).
-                long amount = (long)Math.Max(0, Math.Round(stats[104] * multiplier / 10000 + flat));
-                foreach (var modifier in ExtraHeal) amount = modifier(s, amount);
                 var before = character.Stats(recipient);
+                long amount = (long)Math.Max(0, Math.Round((stats[104] * multiplier / 10000 + flat)
+                    * HealFactor(attacker, PlayerDefender(recipient, before))));
+                foreach (var modifier in ExtraHeal) amount = modifier(s, amount);
                 long actual = Math.Min(amount, Math.Max(0, before[101] - before[2000]));
                 await character.SetHpSpAsync(recipient, before[2000] + amount, null);
                 hit.Dsts.Add(new DamageInfo { DstID = recipient.Role!.Id, Damage = actual, DamageType = DamageType.Heal, DstElement = 1 });

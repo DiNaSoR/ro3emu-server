@@ -111,7 +111,7 @@ public sealed partial class CombatService
         if (role == null || role.Id != effect.TargetId || p.Dead || p.SceneLoading || p.Progress == null) return;
         long scene = p.WorldScene, generation = p.SceneGeneration;
         var stats = character.Stats(p);
-        var defender = new Fighter(0, 0, 0, 0, p.Progress.Level, 1) { Def = stats[105], Mdef = stats[106] };
+        var defender = PlayerDefender(p, stats);
         var rule = effect.Rule;
         long damage = PeriodicAmount(attacker, defender, rule, buff.PileCount);
         var committed = await CommitPlayerDamageAsync(p, damage, rule.Row,

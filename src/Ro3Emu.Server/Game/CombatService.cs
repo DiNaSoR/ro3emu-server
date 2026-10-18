@@ -367,7 +367,7 @@ public sealed partial class CombatService : IGameTicker
                     ? new List<MonsterUnit> { target } : [];
             if (targets.Count == 0) return;
             var stats = pet.CombatStats;
-            var attacker = new Fighter(stats[103], stats[104], stats[109], stats[111], pet.Level, pet.Element);
+            var attacker = new Fighter(stats[103], stats[104], stats[109], stats[111], pet.Level, pet.Element) { Stats = stats };
             var hit = new SkillHitInfo
             {
                 SrcID = pet.Uid, SkillId = skillId, ShowPoint = HitEffect(GameData.Int(row, "_iScriptShow")),
@@ -456,7 +456,7 @@ public sealed partial class CombatService : IGameTicker
             var attacker = AsAttacker(monster);
             var stats = pet.CombatStats;
             var defender = new Fighter(0, 0, 0, 0, pet.Level, pet.Element)
-                { Def = stats[105], Mdef = stats[106], Flee = stats[110], ResCri = stats[112] };
+                { Def = stats[105], Mdef = stats[106], Flee = stats[110], ResCri = stats[112], Stats = stats };
             var row = data.Row("SkillConfig", monster.Template.NormalSkill);
             var (damage, result) = row is { } r ? Damage(attacker, defender, r)
                 : (Math.Max(1, monster.Template.Atk), DamageHitResult.Normal);
@@ -514,7 +514,7 @@ public sealed partial class CombatService : IGameTicker
             if (MonsterService.Distance(m, p) > m.Template.AttackRange + 2f) return; // stepped away
             var stats = character.Stats(p);
             var attacker = AsAttacker(m);
-            var defender = new Fighter(0, 0, 0, 0, p.Progress!.Level, 1) { Def = stats[105], Mdef = stats[106], Flee = stats[110], ResCri = stats[112] };
+            var defender = PlayerDefender(p, stats);
             var row = data.Row("SkillConfig", m.Template.NormalSkill);
             var (damage, result) = row is { } r ? Damage(attacker, defender, r) : (Math.Max(1, m.Template.Atk), DamageHitResult.Normal);
             damage = ScaleMonsterDamage(damage, m.DamageRatio);
@@ -589,12 +589,21 @@ public sealed partial class CombatService : IGameTicker
 
     // ---- damage formula (inferred) ----
 
-    private sealed record Fighter(long Atk, long Matk, long Hit, long Cri, int Level, int Element)
+    internal sealed record Fighter(long Atk, long Matk, long Hit, long Cri, int Level, int Element)
     {
         public long Def { get; init; }
         public long Mdef { get; init; }
         public long Flee { get; init; }
         public long ResCri { get; init; }
+        /// <summary>The secondary stats (damage %, race, element, size ...) that scale the hit; null for none.</summary>
+        public StatSheet? Stats { get; init; }
+        /// <summary>NPCConfig race 1..10 (players are 2, Demi-Human), size 1..3, and whether this side is a monster or a boss.</summary>
+        public int Race { get; init; }
+        public int Size { get; init; }
+        public bool IsMonster { get; init; }
+        public bool Boss { get; init; }
+        /// <summary>The part of a stat another system already applies (deployed totems' own multipliers).</summary>
+        public Func<int, double>? Covered { get; init; }
     }
 
     /// <summary>
@@ -604,7 +613,7 @@ public sealed partial class CombatService : IGameTicker
     /// an archer's Double Strafe on a level 16 Horn shows 2 x 69 = 100% x ~63 ATK + 75). The original formula names
     /// an attacker-side ParDef (DubugDamageFormulaEnum.Formula_AParDef); its value for a player is unknown.
     /// </summary>
-    private static Fighter AsDefender(MonsterTemplate m) => new(0, 0, m.Flee, 0, m.Level, m.Element) { Flee = m.Flee };
+    private Fighter AsDefender(MonsterTemplate m) => AsMonster(new(0, 0, m.Flee, 0, m.Level, m.Element) { Flee = m.Flee }, m, null);
 
     /// <summary>A live monster taking a hit: its template plus what its live buffs change (FLEE 110 and crit
     /// resistance 112 flat; Sluggish and Curse carry no FLEE, so most debuffs leave this unchanged).</summary>
@@ -612,7 +621,8 @@ public sealed partial class CombatService : IGameTicker
     {
         var (_, _, _, _, flee, resCri) = MonsterBuffStats(m);
         var t = m.Template;
-        return new Fighter(0, 0, t.Flee + flee, 0, t.Level, t.Element) { Flee = Math.Max(0, t.Flee + flee), ResCri = Math.Max(0, resCri) };
+        return AsMonster(new Fighter(0, 0, t.Flee + flee, 0, t.Level, t.Element) { Flee = Math.Max(0, t.Flee + flee), ResCri = Math.Max(0, resCri) },
+            t, UnitSheet(m));
     }
 
     /// <summary>A live monster attacking: its template ATK/MATK scaled by its buffs' PATK%/MATK% (1032/1042, Curse -5%)
@@ -621,7 +631,8 @@ public sealed partial class CombatService : IGameTicker
     {
         var (atk, matk, hit, cri, _, _) = MonsterBuffStats(m);
         var t = m.Template;
-        return new Fighter(Math.Max(0, atk), Math.Max(0, matk), Math.Max(0, t.Hit + hit), Math.Max(0, t.Cri + cri), t.Level, t.Element);
+        return AsMonster(new Fighter(Math.Max(0, atk), Math.Max(0, matk), Math.Max(0, t.Hit + hit), Math.Max(0, t.Cri + cri), t.Level, t.Element),
+            t, UnitSheet(m));
     }
 
     private (long Atk, long Matk, long Hit, long Cri, long Flee, long ResCri) MonsterBuffStats(MonsterUnit m)
@@ -653,7 +664,7 @@ public sealed partial class CombatService : IGameTicker
         var result = DamageHitResult.Normal;
         if (!magic && Rolls.Crit() < CritRate(a, b, skill))
         {
-            dmg *= 1.5; // FormulaParamCriDmg 15000
+            dmg *= CritFactor(a, b); // FormulaParamCriDmg 15000 plus Crit Damage% 209 minus Crit Damage Reduction% 210
             result = DamageHitResult.Critical;
         }
         return (Math.Max(1, (long)Math.Round(dmg)), result);
@@ -675,7 +686,7 @@ public sealed partial class CombatService : IGameTicker
         double p1 = ratios.Length > branch ? ratios[branch] : 10000, p2 = flats.Length > branch ? flats[branch] : 0;
         double dmg = (magic ? a.Matk : a.Atk) * p1 / 10000 + p2;
         int element = (int)GameData.Int(skill, "_iEleType") is var se and > 1 ? se : a.Element;
-        return Mitigated(b, dmg, magic, element);
+        return Mitigated(b, dmg, magic, element) * BonusFactor(a, b, skill, magic, element);
     }
 
     /// <summary>A raw hit after the defender's defense and element.</summary>
@@ -693,7 +704,7 @@ public sealed partial class CombatService : IGameTicker
     private double ExpectedDamage(Fighter a, Fighter b, JsonElement skill)
     {
         double dmg = Math.Max(1, BaseDamage(a, b, skill, 0, out bool magic));
-        return HitRate(a, b, skill) * dmg * (magic ? 1 : 1 + 0.5 * CritRate(a, b, skill));
+        return HitRate(a, b, skill) * dmg * (magic ? 1 : 1 + (CritFactor(a, b) - 1) * CritRate(a, b, skill));
     }
 
     /// <summary>
@@ -705,11 +716,11 @@ public sealed partial class CombatService : IGameTicker
     {
         var stats = character.Stats(p);
         var playerSkill = data.Row("SkillConfig", skills.NormalAttack(p))!.Value;
-        var player = new Fighter(stats[103], stats[104], stats[109], stats[111], p.Progress.Level, 1);
+        var player = PlayerAttacker(p, stats);
         var asTarget = AsDefender(m);
         double playerDps = ExpectedDamage(player, asTarget, playerSkill) * 1000.0 / Math.Max(1, SkillMs(p, playerSkill));
-        var monster = new Fighter(m.Atk, m.Matk, m.Hit, m.Cri, m.Level, m.Element);
-        var defender = new Fighter(0, 0, 0, 0, p.Progress.Level, 1) { Def = stats[105], Mdef = stats[106], Flee = stats[110], ResCri = stats[112] };
+        var monster = AsMonster(new Fighter(m.Atk, m.Matk, m.Hit, m.Cri, m.Level, m.Element), m, null);
+        var defender = PlayerDefender(p, stats);
         double monsterHit = data.Row("SkillConfig", m.NormalSkill) is { } row ? ExpectedDamage(monster, defender, row) : Math.Max(1, m.Atk);
         return (playerDps, monsterHit * 1000.0 / Math.Max(1, m.SwingIntervalMs), stats[101]);
     }
