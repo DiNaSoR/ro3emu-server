@@ -382,6 +382,7 @@ internal static class Flows
                 "Check the address with the server owner, and that the server is running with TCP ports 5380, 20000 and 33100 open to you.");
         }
         Ui.Ok("the server answers");
+        EnsureLocMap(client);
         PatchClient(client, serverUrl, pem);
         if (!options.NoLaunch) LaunchGame(client);
         Ui.Info($"Next time, run RO3Emu.exe join {address} again. This window can be closed.");
@@ -444,6 +445,30 @@ internal static class Flows
         {
             throw new SetupException($"The server at {serverUrl} does not answer ({e.Message}).",
                 "Start the server first (RO3Emu.exe, or your own server), then run RO3Emu.exe delete-character again.");
+        }
+    }
+
+    /// <summary>
+    /// Joining runs no export, so data/loc_en.tsv (which <see cref="PatchClient"/> copies next to the game) did not exist
+    /// and the client had no English map: every string the client draws in Chinese stayed Chinese. Build the map alone
+    /// from the player's own client when it is missing or older than the client's Localization chunks.
+    /// </summary>
+    internal static void EnsureLocMap(string client)
+    {
+        var map = Path.Combine(SetupHome.DataDir, "loc_en.tsv");
+        var sources = GameDataExport.LocSourceFiles(client);
+        if (File.Exists(map) && sources.All(s => File.Exists(s) && File.GetLastWriteTimeUtc(s) <= File.GetLastWriteTimeUtc(map))) return;
+        Ui.Step("English texts");
+        try
+        {
+            int entries = GameDataExport.WriteLocMap(client, map, new GameDataExport.Options { Translations = Translations(), Log = SetupLog.Write });
+            Ui.Ok($"{entries} English texts made from your game files");
+        }
+        catch (Exception e) when (e is ExportException or IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            // English text is a comfort, not a requirement: joining still works with the client's own texts.
+            SetupLog.Write("English text map not built: " + e);
+            Ui.Warn("The English texts could not be made from your game files; some texts may stay in Chinese. " + e.Message);
         }
     }
 

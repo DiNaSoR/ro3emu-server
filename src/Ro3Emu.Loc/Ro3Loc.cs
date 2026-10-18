@@ -123,21 +123,45 @@ namespace Ro3Emu.Loc
         private static bool HasCjk(string s)
         {
             for (int i = 0; i < s.Length; i++)
-            {
-                char c = s[i];
-                // Han and kana only: full-width punctuation alone ("World\uFF1A World") needs no translation.
-                if ((c >= '\u3040' && c <= '\u9FFF') || (c >= '\u2E80' && c <= '\u2FDF') || (c >= '\uF900' && c <= '\uFAFF')) return true;
-            }
+                if (IsCjk(s[i])) return true;
             return false;
         }
 
-        /// <summary>Normalized form, segments, then templates; null when nothing covers every CJK part.</summary>
+        // Han and kana only: full-width punctuation alone ("World\uFF1A World") needs no translation.
+        private static bool IsCjk(char c) =>
+            (c >= '\u3040' && c <= '\u9FFF') || (c >= '\u2E80' && c <= '\u2FDF') || (c >= '\uF900' && c <= '\uFAFF');
+
+        /// <summary>Normalized form, segments, then templates, then CJK runs; null when nothing covers every CJK part.</summary>
         private static string Resolve(string text)
         {
             string norm = Normalize(text);
             if (!ReferenceEquals(norm, text) && _map.TryGetValue(norm, out var en)) return en;
             if (text.IndexOf('<') >= 0 || text.IndexOf('\n') >= 0) return Segments(text);
-            return MatchTemplate(text);
+            return MatchTemplate(text) ?? CjkRuns(text);
+        }
+
+        /// <summary>
+        /// Text the client composed from an English format and a Chinese name ("利刃重击 is on cooldown.", a skill name
+        /// from a table the client reads in Chinese): each maximal CJK run (a middle dot may join two) is mapped on its own.
+        /// All or nothing: one unknown run leaves the whole string as it was.
+        /// </summary>
+        private static string CjkRuns(string text)
+        {
+            StringBuilder sb = null;
+            int i = 0, copied = 0;
+            while (i < text.Length)
+            {
+                if (!IsCjk(text[i])) { i++; continue; }
+                int end = i + 1;
+                while (end < text.Length && (IsCjk(text[end]) || (text[end] == '·' || text[end] == '・') && end + 1 < text.Length && IsCjk(text[end + 1]))) end++;
+                if (i == 0 && end == text.Length) return null; // the whole string: the exact lookup already missed it
+                if (!_map.TryGetValue(text.Substring(i, end - i), out var en) || HasCjk(en)) return null;
+                if (sb == null) sb = new StringBuilder(text.Length * 2);
+                sb.Append(text, copied, i - copied).Append(en);
+                copied = i = end;
+            }
+            if (sb == null) return null;
+            return sb.Append(text, copied, text.Length - copied).ToString();
         }
 
         private static string Normalize(string s)
@@ -171,7 +195,7 @@ namespace Ro3Emu.Loc
                 {
                     string core = run.Trim();
                     string en = null;
-                    if (!_map.TryGetValue(core, out en)) en = MatchTemplate(core);
+                    if (!_map.TryGetValue(core, out en)) en = MatchTemplate(core) ?? CjkRuns(core);
                     if (en == null) return null;
                     int lead = run.IndexOf(core, StringComparison.Ordinal);
                     sb.Append(run, 0, lead).Append(en).Append(run, lead + core.Length, run.Length - lead - core.Length);
