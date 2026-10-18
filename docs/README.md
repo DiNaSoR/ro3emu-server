@@ -2,7 +2,7 @@
 
 ## Guides: running a server
 
-- [GM access](guide/gm-access.md): who may use GM commands (`Ro3Emu:GmAccounts`)
+- [GM access](guide/gm-access.md): who may use GM commands (`Ro3Emu:GmAccounts`) and what the client's GM panel can do
 - [Open content](guide/open-content.md): every feature the client can show is playable (`Ro3Emu:OpenContent`)
 - [Rates](guide/rates.md): Base/Job EXP, item drop and currency drop multipliers for monster kills (`Ro3Emu:Rates`)
 - [Starter kit](guide/starter-kit.md): what a new character starts with (nothing by default; `Ro3Emu:StarterKit`)

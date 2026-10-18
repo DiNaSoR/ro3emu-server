@@ -171,6 +171,12 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
     /// <summary>GM override added to the speed attribute (113), not saved (!speed).</summary>
     public long SpeedBonus { get; set; }
 
+    /// <summary>GM panel GmUnlimit: hits on this player deal no damage. Test aid, not saved.</summary>
+    public bool GmInvincible { get; set; }
+
+    /// <summary>GM panel GmNoCD: casts start no cooldown. Test aid, not saved.</summary>
+    public bool GmNoCooldown { get; set; }
+
     /// <summary>Between sending 70010 and the client's 30005: walks still refer to the old map and are dropped.</summary>
     public bool SceneLoading { get; set; }
 
