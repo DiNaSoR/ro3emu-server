@@ -190,11 +190,31 @@ public sealed class SkillService
         return list.DistinctBy(t => t.Group).ToList();
     }
 
-    private int Initial(RoleProgress p, int group)
+    /// <summary>
+    /// Free starting level (SkillConfig._iInitialLevel), gated by _iActivateCondition like the client's GetInitLevel.
+    /// A free skill with its own _kPreSkillRequired (only Wizard Sight Sprout 12110, which needs Magician Sight 12002)
+    /// is free only while those prerequisites hold: the client resets it to 0 together with Sight and saves that.
+    /// </summary>
+    private int Initial(RoleProgress p, int group, bool requirements = true)
     {
         if (data.Row("SkillConfig", RealId(group, 1)) is not { } row) return 0;
         int activation = (int)GameData.Int(row, "_iActivateCondition");
-        return activation <= 0 || p.Level >= activation ? (int)GameData.Int(row, "_iInitialLevel") : 0;
+        int initial = activation <= 0 || p.Level >= activation ? (int)GameData.Int(row, "_iInitialLevel") : 0;
+        return initial > 0 && requirements && !RequirementsMet(p, row, InTree) ? 0 : initial;
+    }
+
+    /// <summary>_kPreSkillRequired [group, level] pairs: level -1 means the group must stay unlearned.</summary>
+    private bool RequirementsMet(RoleProgress p, JsonElement row, Func<int, int, bool> inTree)
+    {
+        if (!row.TryGetProperty("_kPreSkillRequired", out var pre) || pre.ValueKind != JsonValueKind.Array) return true;
+        foreach (var req in pre.EnumerateArray())
+            if (req.ValueKind == JsonValueKind.Array && req.GetArrayLength() >= 2 && GameData.Number(req[0]) is { } g
+                && GameData.Number(req[1]) is { } l)
+            {
+                int actual = inTree(p.Career, (int)g) ? Level(p, (int)g) : 0;
+                if (l == -1 ? actual > 0 : l > 0 && actual < l) return false;
+            }
+        return true;
     }
 
     private int Parameter(string key, int fallback) => data.Table("PublicParamConfig").TryGetValue(key, out var value)
@@ -257,14 +277,14 @@ public sealed class SkillService
         for (int index = 1; index < PlanCount; index++)
         {
             var blank = new SkillPlan { IsUnlock = true };
+            var blankProgress = CharacterService.GenreCloneProgress(p);
+            blankProgress.Skills.Clear();
             foreach (int group in skillData.SkillList)
                 blank.SkillAssigns[group] = new SkillData { SkillId = group,
-                    SkillLevel = group == atkGroup ? 1 : Initial(p, group) };
+                    SkillLevel = group == atkGroup ? 1 : Initial(blankProgress, group) };
             blank.SkillQueue[0] = new SkillData(); // paired by the client even in a fresh plan.
             blank.ManualLoadSkill.Add(new SkillData());
             blank.AutoLoadSkill.Add(new SkillData());
-            var blankProgress = CharacterService.GenreCloneProgress(p);
-            blankProgress.Skills.Clear();
             foreach (var (rank, points) in SkillPoints(blankProgress)) blank.SkillPoints[rank] = Math.Max(0, points);
             skillData.SkillAssignPlans.Add(blank);
         }
@@ -555,6 +575,13 @@ public sealed class SkillService
             if (assignment.SkillId != 0 && assignment.SkillId != group) return ErrorCodes.Parameter;
             if (assignment.SkillLevel > Initial(progress, group)) progress.Skills[group] = assignment.SkillLevel;
         }
+        // Plans saved before Sight Sprout's free level followed Sight hold it at 1 without Sight: drop that free level.
+        foreach (var (group, level) in progress.Skills.ToList())
+            if (level <= Initial(progress, group, requirements: false) && Initial(progress, group) == 0)
+            {
+                progress.Skills.Remove(group);
+                source.SkillAssigns[group] = new SkillData { SkillId = group, SkillLevel = 0 };
+            }
         var remaining = SkillPoints(progress);
         if (remaining.Values.Any(v => v < 0)) return ErrorCodes.SkillPointsShort;
         if (progress.Skills.Any(kv => RealId(kv.Key, kv.Value) == 0)) return ErrorCodes.SkillMaxLevel;
@@ -656,7 +683,7 @@ public sealed class SkillService
                     code = !tree.Contains(group) ? ErrorCodes.SkillNotInTree
                         : target.SkillId != 0 && target.SkillId != group ? ErrorCodes.Parameter
                         : target.SkillLevel > MaxLevel(group) ? ErrorCodes.SkillMaxLevel
-                        : target.SkillLevel < Initial(p, group) || target.SkillLevel < 0 ? ErrorCodes.Parameter : 0;
+                        : target.SkillLevel < 0 ? ErrorCodes.Parameter : 0;
                     if (code != 0) break;
                     selected.SkillAssigns[group] = new SkillData { SkillId = group, SkillLevel = target.SkillLevel };
                 }
@@ -673,6 +700,12 @@ public sealed class SkillService
                     int oldIndex = plans.CurrentPlanIndex;
                     code = StageSkillPlan(session, plans, candidate, req.Plan);
                     plans.CurrentPlanIndex = oldIndex;
+                    // Free levels can't be unlearned, judged on the final graph: Sight Sprout may drop to 0 with Sight.
+                    if (code == 0 && req.LevelUpList.Any(kv => kv.Value.SkillLevel < Initial(candidate, kv.Key)))
+                        code = ErrorCodes.Parameter;
+                    // Staging drops a free level whose prerequisites are missing; a request can't ask for it.
+                    if (code == 0 && req.LevelUpList.Any(kv => kv.Value.SkillLevel > Level(candidate, kv.Key)))
+                        code = ErrorCodes.SkillPrerequisite;
                     if (code == 0)
                     {
                         PruneLoads(selected, candidate);
@@ -756,15 +789,8 @@ public sealed class SkillService
         {
             int level = Level(p, group);
             if (level <= 0) continue;
-            if (data.Row("SkillConfig", RealId(group, level)) is not { } row) return false;
-            if (!row.TryGetProperty("_kPreSkillRequired", out var pre) || pre.ValueKind != JsonValueKind.Array) continue;
-            foreach (var req in pre.EnumerateArray())
-                if (req.ValueKind == JsonValueKind.Array && req.GetArrayLength() >= 2 && GameData.Number(req[0]) is { } g
-                    && GameData.Number(req[1]) is { } l)
-                {
-                    int actual = tree.Contains((int)g) ? Level(p, (int)g) : 0;
-                    if (l == -1 ? actual > 0 : l > 0 && actual < l) return false;
-                }
+            if (data.Row("SkillConfig", RealId(group, level)) is not { } row
+                || !RequirementsMet(p, row, (_, g) => tree.Contains(g))) return false;
         }
         return true;
     }
