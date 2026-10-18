@@ -15,7 +15,7 @@ namespace Ro3Emu.Server.Voice;
 /// and drains in <see cref="StopAsync"/>, like <see cref="Net.GateListener"/>.
 /// </summary>
 public sealed class VoiceGateServer(IOptions<ServerOptions> options, VoiceTicketRegistry tickets, VoiceRooms rooms,
-    TeamService teams, SessionRegistry sessions, GameLoop loop, ILogger<VoiceGateServer> log)
+    TeamService teams, SessionRegistry sessions, GameLoop loop, GmCommands gm, ILogger<VoiceGateServer> log)
     : BackgroundService
 {
     private const long IpBanDurationMs = 60_000;
@@ -54,6 +54,13 @@ public sealed class VoiceGateServer(IOptions<ServerOptions> options, VoiceTicket
             throw;
         }
         _listener = listener;
+        // Test aid: the connection ends as a network drop would (no Kicked frame); the client reconnects on its own.
+        gm.Register("voicedrop", "(voice relay test aid: drops your voice connection; the client reconnects)", async (s, _) =>
+        {
+            var connection = s.Account == null ? null : rooms.ConnectionOf(s.Account);
+            connection?.Close();
+            await GmCommands.ReplyAsync(s, connection == null ? "No voice connection." : "Voice connection dropped.");
+        });
         if (IPAddress.IsLoopback(address)) log.LogInformation("VoiceGate listening on {Address}:{Port}", address, opts.Voice.Port);
         else log.LogWarning("VoiceGate listening on {Address}:{Port} WITHOUT encryption (AllowPlaintextOffLoopback)", address, opts.Voice.Port);
         return base.StartAsync(cancellationToken);

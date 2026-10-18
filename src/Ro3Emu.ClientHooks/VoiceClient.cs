@@ -39,6 +39,8 @@ namespace Ro3Emu.ClientHooks
         private const int ReceiveTimeoutMs = 30000;
         /// <summary>A ticket request without an answer (a server without voice support) may be repeated after this.</summary>
         private const long TicketRetryMs = 10000;
+        /// <summary>A link that dropped while in a channel reconnects after this, doubling up to RejoinMaxMs.</summary>
+        private const int RejoinFirstMs = 2000, RejoinMaxMs = 30000;
 
         private static readonly ConcurrentQueue<Action> Main = new ConcurrentQueue<Action>();
         private static int _pending;
@@ -49,6 +51,8 @@ namespace Ro3Emu.ClientHooks
         private static string _joined;     // the channel the relay confirmed
         private static bool _micOn, _speakerOn;
         private static long _ticketAskedAt = -TicketRetryMs;
+        private static long _rejoinAt; // 0: no reconnect scheduled
+        private static int _rejoinDelay = RejoinFirstMs;
         private static long _lastPing;
         private static Link _link;
         /// <summary>The link captured frames go to: set while joined with the mic on (read by the capture thread).</summary>
@@ -82,10 +86,15 @@ namespace Ro3Emu.ClientHooks
                 if (_link != null && _link.Authed) { _link.Send(VoiceProtocol.ChannelFrame(VoiceProtocol.Join, channel)); return; }
                 if (_link != null) return; // the join goes out once authenticated
                 if (Clock.ElapsedMilliseconds - _ticketAskedAt < TicketRetryMs) return;
-                _ticketAskedAt = Clock.ElapsedMilliseconds;
-                SingletonMonoBehaviour<NW_CBBNetworkManager>.Instance.Obf_jBd(VoiceProtocol.TicketRequestMsgId, new byte[0]);
-                Debug.Log("[Ro3Emu.Voice] join " + channel + ": ticket requested");
+                RequestTicket("join " + channel);
             });
+        }
+
+        private static void RequestTicket(string why)
+        {
+            _ticketAskedAt = Clock.ElapsedMilliseconds;
+            SingletonMonoBehaviour<NW_CBBNetworkManager>.Instance.Obf_jBd(VoiceProtocol.TicketRequestMsgId, new byte[0]);
+            Debug.Log("[Ro3Emu.Voice] " + why + ": ticket requested");
         }
 
         public static void LeaveChannel(string channel)
@@ -135,6 +144,8 @@ namespace Ro3Emu.ClientHooks
                 if (_wanted == null && _link == null) return;
                 Debug.Log("[Ro3Emu.Voice] game connection closed: voice off");
                 _wanted = null;
+                _rejoinAt = 0;
+                _rejoinDelay = RejoinFirstMs;
                 Drop();
             });
         }
@@ -154,6 +165,7 @@ namespace Ro3Emu.ClientHooks
                 try { action(); }
                 catch (Exception e) { Debug.LogError("[Ro3Emu.Voice] " + e); }
             }
+            if (_rejoinAt > 0 && Clock.ElapsedMilliseconds >= _rejoinAt) Rejoin();
             if (_joined != null) VoiceSettings.Poll(Clock.ElapsedMilliseconds);
             if (_joined != null && Clock.ElapsedMilliseconds - _lastStats >= StatsEveryMs) LogStats();
             var link = _link;
@@ -170,7 +182,7 @@ namespace Ro3Emu.ClientHooks
         {
             _ticketAskedAt = -TicketRetryMs;
             if (ticket == null) { Debug.LogWarning("[Ro3Emu.Voice] malformed ticket"); return; }
-            if (ticket.Port == 0) { Note("voice is off on this server"); return; }
+            if (ticket.Port == 0) { _rejoinAt = 0; Note("voice is off on this server"); return; }
             if (string.IsNullOrEmpty(ticket.Host)) { Debug.LogWarning("[Ro3Emu.Voice] the ticket names no relay host"); return; }
             if (_wanted == null || _link != null) return; // left meanwhile, or already connected
             if (_userId != ticket.RoleId.ToString(CultureInfo.InvariantCulture)) Debug.LogWarning("[Ro3Emu.Voice] ticket for role " + ticket.RoleId + ", voice user " + _userId);
@@ -202,6 +214,8 @@ namespace Ro3Emu.ClientHooks
                 return;
             }
             _joined = channel;
+            _rejoinAt = 0;
+            _rejoinDelay = RejoinFirstMs;
             Debug.Log("[Ro3Emu.Voice] joined " + channel);
             link.Send(VoiceProtocol.SwitchFrame(VoiceProtocol.Speaker, _speakerOn));
             link.Send(VoiceProtocol.SwitchFrame(VoiceProtocol.Mic, _micOn));
@@ -229,15 +243,45 @@ namespace Ro3Emu.ClientHooks
             }
         }
 
-        /// <summary>The relay kicked us or the connection ended: audio off, Lua told when we were in the channel.</summary>
+        /// <summary>
+        /// The relay connection ended without the game asking (relay restart, network, a kick): audio off, then back into
+        /// the same channel with a new ticket after a growing pause, keeping the player's mic and speaker choices. Lua is not
+        /// told anything: OnLeaveChannel only answers the game's own LeaveChannel (it reads the callback that call
+        /// registered), and the game still means to be in the channel. A connection of the same account that took over
+        /// (kick code 1) is not fought over.
+        /// </summary>
         private static void OnClosed(Link link, string why)
         {
             if (link != _link) return;
             Debug.Log("[Ro3Emu.Voice] disconnected: " + why);
-            string joined = _joined;
+            bool mic = _micOn, speaker = _speakerOn;
             Drop();
-            _wanted = null;
-            if (joined != null) CallLua("OnLeaveChannel", joined);
+            _micOn = mic;
+            _speakerOn = speaker;
+            if (_wanted == null) return;
+            if (why.StartsWith("kicked (code 1)", StringComparison.Ordinal))
+            {
+                Note("another voice connection of this account took over");
+                _wanted = null;
+                return;
+            }
+            ScheduleRejoin();
+        }
+
+        private static void ScheduleRejoin()
+        {
+            _rejoinAt = Clock.ElapsedMilliseconds + _rejoinDelay;
+            Debug.Log("[Ro3Emu.Voice] reconnecting to " + _wanted + " in " + _rejoinDelay / 1000 + " s");
+            _rejoinDelay = Math.Min(_rejoinDelay * 2, RejoinMaxMs);
+        }
+
+        /// <summary>Due reconnect: a new ticket, and the next attempt already scheduled in case no ticket or link comes.</summary>
+        private static void Rejoin()
+        {
+            _rejoinAt = 0;
+            if (_wanted == null || _link != null) return;
+            RequestTicket("rejoin " + _wanted);
+            ScheduleRejoin();
         }
 
         private static void LeaveCurrent()
@@ -246,6 +290,8 @@ namespace Ro3Emu.ClientHooks
             if (link != null && link.Authed && _wanted != null) link.Send(VoiceProtocol.ChannelFrame(VoiceProtocol.Leave, _wanted));
             Debug.Log("[Ro3Emu.Voice] leave " + _wanted);
             _wanted = null;
+            _rejoinAt = 0;
+            _rejoinDelay = RejoinFirstMs;
             Drop();
         }
 
