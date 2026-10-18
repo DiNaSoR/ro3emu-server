@@ -32,6 +32,14 @@ public sealed class ActiveSkillCast
     public bool Launched { get; set; }
     public SkillObject? Operator { get; init; }
     public long SourceId => Operator?.Uid ?? OwnerId;
+    /// <summary>A server-started follow-up (CombatService.Procs): it does not roll further procs.</summary>
+    internal bool Proc { get; init; }
+    /// <summary>A follow-up hits the row's area even when its _iRangeType names one target (Auto Counter's front box).</summary>
+    internal bool AreaProc { get; init; }
+    /// <summary>A follow-up's damage multiplier (Auto Counter +50% after a parried hit).</summary>
+    internal double ProcScale { get; init; } = 1;
+    /// <summary>A follow-up that deals a set amount instead of the formula (Death Bound's reflected damage).</summary>
+    internal long ProcFixedDamage { get; init; }
 }
 
 public sealed partial class CombatService

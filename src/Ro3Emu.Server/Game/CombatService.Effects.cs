@@ -71,6 +71,7 @@ public sealed partial class CombatService
             await LaunchBulletAsync(s, action, bullet);
             return;
         }
+        if (Script(row) == "Counter_Attack") ScheduleAutoCounter(s, action);
         await ApplyEffectsAsync(s, action, action.Request.TargetPos ?? action.Origin);
     }
 
@@ -111,14 +112,20 @@ public sealed partial class CombatService
         });
     }
 
+    /// <summary>A damaging follow-up always hits enemies: some name their trigger's self-cast visual (Death Bound's 11381
+    /// selects the caster), so the visual's selector does not decide its targets.</summary>
+    private static bool HostileProc(ActiveSkillCast action) => action.Proc && GameData.Int(action.Row, "_iDmgType") is 1 or 2;
+
+    private bool Hostile(ActiveSkillCast action, MonsterUnit m) => HostileProc(action) || Relation(action.Row, false, race: m.Template.Race);
+
     private List<MonsterUnit> SelectEnemies(GameSession s, ActiveSkillCast action, Vec3 center, float? radiusOverride = null)
     {
         var row = action.Row;
         int max = (int)Math.Max(1, GameData.Int(row, "_iTargetMax"));
-        if (GameData.Int(row, "_iRangeType") != 2 && radiusOverride == null)
+        if (GameData.Int(row, "_iRangeType") != 2 && radiusOverride == null && !action.AreaProc)
         {
             var target = FindMonster(s.WorldScene, action.Request.TargetId);
-            return target != null && target.Hp > 0 && CanHitMonster(s, target) && Relation(row, false, race: target.Template.Race) ? [target] : [];
+            return target != null && target.Hp > 0 && CanHitMonster(s, target) && Hostile(action, target) ? [target] : [];
         }
         int release = (int)GameData.Int(row, "_iRelease");
         if (release is not (1 or 7 or 8) && radiusOverride == null) center = action.Origin;
@@ -136,7 +143,7 @@ public sealed partial class CombatService
             if (Distance(center, m.Pos) > radius + 0.1f) return false;
             return radiusOverride != null || release != 4 || Math.Atan2(Math.Abs(side), forward) <= (range.Length > 1 ? range[1] : 90) * Math.PI / 360;
         }
-        return world.Map(s.WorldScene).Units.OfType<MonsterUnit>().Where(m => m.Hp > 0 && CanHitMonster(s, m) && Relation(row, false, race: m.Template.Race) && InShape(m))
+        return world.Map(s.WorldScene).Units.OfType<MonsterUnit>().Where(m => m.Hp > 0 && CanHitMonster(s, m) && Hostile(action, m) && InShape(m))
             .OrderBy(m => Distance(center, m.Pos)).ThenBy(m => m.Uid).Take(max).ToList();
     }
 
@@ -174,7 +181,7 @@ public sealed partial class CombatService
                 row, action.Request.SkillId, HitEffect(GameData.Int(row, "_iScriptShow")), action.Id, CanApplyMoreEffects);
         }
         if (!CanApplyMoreEffects()) return; // player publication can yield before any monster hit is committed
-        bool friendly = Relation(row, true, true) || Relation(row, true);
+        bool friendly = !HostileProc(action) && (Relation(row, true, true) || Relation(row, true));
         var allies = new List<GameSession>();
         if (friendly)
         {
@@ -204,7 +211,9 @@ public sealed partial class CombatService
         if (shownHits > 1) hit.Split = shownHits;
         var killed = new List<MonsterUnit>();
         var processed = new List<MonsterUnit>();
-        bool damage = Numbers(row, "_kDamageParam1").Any(v => v > 0) || Numbers(row, "_kDamageParam2").Any(v => v > 0);
+        var landed = new List<(MonsterUnit Target, long Amount)>();
+        bool damage = Numbers(row, "_kDamageParam1").Any(v => v > 0) || Numbers(row, "_kDamageParam2").Any(v => v > 0)
+            || action.ProcFixedDamage > 0;
         try
         {
         foreach (var target in targets)
@@ -216,10 +225,13 @@ public sealed partial class CombatService
             {
                 var defender = AsDefender(target);
                 var (amount, result) = Damage(attacker, defender, row, DamageBranch(s, script));
+                if (action.ProcFixedDamage > 0 && result != DamageHitResult.Miss) amount = action.ProcFixedDamage;
+                else if (amount > 0 && action.ProcScale != 1) amount = Math.Max(1, (long)Math.Round(amount * action.ProcScale));
                 if (amount > 0)
                 {
                     foreach (var modifier in DamageAdjusters) amount = Math.Max(0, modifier(s, target, row, result, amount));
-                    foreach (var extra in ExtraHitDamage) amount += Math.Max(0, extra(s, target, row, amount));
+                    // (inferred) A follow-up is itself the extra hit: it adds no Double Attack or card extra hit.
+                    if (!action.Proc) foreach (var extra in ExtraHitDamage) amount += Math.Max(0, extra(s, target, row, amount));
                     // A Double Attack proc shows as its own number(s) on this swing, as _kShowDmg splits multi-hit skills.
                     if (_doubleAttackHits > 0) hit.Split = Math.Max(hit.Split, shownHits + _doubleAttackHits);
                     _doubleAttackHits = 0;
@@ -228,6 +240,11 @@ public sealed partial class CombatService
                 target.Hp = target.HpAfter(beforeHp, amount);
                 long effective = beforeHp - target.Hp;
                 if (target.Hp == 0) killed.Add(target); // reserve before awaited damage callbacks
+                if (amount > 0)
+                {
+                    landed.Add((target, amount));
+                    await ConsumeOnHitDebuffsAsync(target);
+                }
                 await SettleMonsterHitAsync(s, target, beforeHp, amount);
                 if (CanApplyMoreEffects())
                     foreach (var handler in DealtAsync)
@@ -333,6 +350,7 @@ public sealed partial class CombatService
                 await FinalizeLethalPublicationAsync(target);
             }
         }
+        if (!action.Proc && landed.Count > 0 && CanApplyMoreEffects()) await RunOutgoingProcsAsync(s, action, landed, CanApplyMoreEffects);
     }
 
     /// <summary>

@@ -90,6 +90,18 @@ public sealed class SecondaryStatTests
     }
 
     [Fact]
+    public void The12xxCopiesAreTheirOwnFactors()
+    {
+        // Lex Aeterna (1216 -2000) on the monster, True Sight (1211 +5%) and Damage% (215 +10%) on the player.
+        var a = Player((1211, 500), (215, 1000));
+        Assert.Equal(1.2 * 1.05 * 1.1, CombatService.BonusFactor(a, Monster(4, 2, 5, false, (1216, -2000)), Normal, false, 1), 6);
+        // Magic ignores the Physical copy; ranged Physical 1229 against 1230 only for ranged skills.
+        Assert.Equal(1.1, CombatService.BonusFactor(a, Monster(4, 2, 5), Normal, true, 1), 6);
+        Assert.Equal(0.9, CombatService.BonusFactor(Player((1229, 1000)), Monster(4, 2, 5, false, (1230, 2000)), RangedSkill, false, 1), 6);
+        Assert.Equal(1, CombatService.BonusFactor(Player((1229, 1000)), Monster(4, 2, 5), Normal, false, 1), 6);
+    }
+
+    [Fact]
     public void TotemCoveredPartsAreNotCountedTwice()
     {
         var a = Player((211, 3000)) with { Covered = id => id == 211 ? 1000 : 0 };
