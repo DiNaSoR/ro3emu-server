@@ -126,7 +126,7 @@ public sealed class AppearanceShopTests : IAsyncLifetime
         Assert.Equal((TeaParty, 0, 1, 1880, 1), (item.CommodityId, item.Result, item.Count, item.Price, item.BuyTimes));
         var unlocked = await Next(bot, WardrobeService.WardrobeSync, DBWardRobeInfoIncrement.Parser,
             i => i.AllLightUpAppearances.ContainsKey(TeaPartySuit));
-        Assert.True(unlocked.AllLightUpAppearances.ContainsKey(TeaPartyHat));
+        Assert.False(unlocked.AllLightUpAppearances.ContainsKey(TeaPartyHat)); // the bonus voucher's piece
         Assert.Equal(TeaPartySuit, (await Next(bot, WardrobeService.UnlockNotice, WardRobeUnLockNtf.Parser)).AppearanceId);
         var counter = await Next(bot, ShopService.ShopSync, DBShopInfoIncrement.Parser, s => s.CommodityBuyTimes.ContainsKey(TeaParty));
         Assert.Equal(1, counter.CommodityBuyTimes[TeaParty].All);
@@ -135,7 +135,7 @@ public sealed class AppearanceShopTests : IAsyncLifetime
         Assert.Equal(bonus + 1, Bag(TeaPartyBonus));
         Assert.Equal(crystals - 1880, Service<RoleStore>().LoadProgress(Alice.Role!.Id).Currency[Fashion]);
         Assert.True(SavedWardrobe.AllLightUpAppearances.ContainsKey(TeaPartySuit));
-        Assert.True(SavedWardrobe.AllLightUpAppearances.ContainsKey(TeaPartyHat));
+        Assert.False(SavedWardrobe.AllLightUpAppearances.ContainsKey(TeaPartyHat));
         Assert.Equal(1, SavedShop.Bought[TeaParty].Count);
 
         var closing = Cut();
@@ -149,11 +149,12 @@ public sealed class AppearanceShopTests : IAsyncLifetime
         Assert.Equal((EconomyReason.ShopGoods, (long)TeaPartyBonus, 1L), (source.Reason, source.Asset.Id, source.Delta));
         Exact(opening, closing, ledger);
 
-        // The bonus voucher unlocks the hat the purchase already lit: refused as already unlocked, and kept.
+        // The bonus voucher ("Activate the Sweetheart Tea Party matching Headwear") lights the hat.
         long voucher = Alice.Items.First(i => i.Entry == TeaPartyBonus && i.Grid == 0).Guid;
         await bot.SendGameAsync(CharacterService.ItemUse, new ItemUseReq { ItemGuid = voucher, ItemCount = 1 });
-        Assert.Equal(ErrorCodes.ShopAppearanceOwned, (await Next(bot, CharacterService.ItemUse, ItemUseResp.Parser)).Result);
-        Assert.Equal(bonus + 1, Bag(TeaPartyBonus));
+        Assert.Equal(0, (await Next(bot, CharacterService.ItemUse, ItemUseResp.Parser)).Result);
+        Assert.Equal(bonus, Bag(TeaPartyBonus));
+        Assert.True(SavedWardrobe.AllLightUpAppearances.ContainsKey(TeaPartyHat));
     }
 
     [ClientDataFact]
