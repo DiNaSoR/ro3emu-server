@@ -68,6 +68,16 @@ public sealed partial class CombatService
         // SkillConfig._bMovement is enum_SkillLockMoveType (may the caster walk while casting), not a displacement.
         await MoveCasterAsync(s, action);
         if (!CurrentCastMap(s, action)) return;
+        await SpendCastResourcesAsync(s, action);
+        if (!CurrentCastMap(s, action)) return;
+        await ResolveHitsAsync(s, action);
+        if (CurrentCastMap(s, action)) await AfterCastResourcesAsync(s, action);
+    }
+
+    /// <summary>The landed cast's hits: its server bolt, its staged packets, or one application (plus bounces).</summary>
+    private async Task ResolveHitsAsync(GameSession s, ActiveSkillCast action)
+    {
+        var row = action.Row;
         if (action.Operator == null && ServerBullet(GameData.Int(row, "_iScriptShow")) is { Effect: > 0 } bullet)
         {
             await LaunchBulletAsync(s, action, bullet);
@@ -354,7 +364,11 @@ public sealed partial class CombatService
                     DamageBeShield = result.SheildDamage, DamageType = result.DamageType, HitResult = result.HitResult, SkillId = hit.SkillId,
                 });
             }
-            if (CurrentCaster() && firstBolt && hit.Dsts.Any(d => d.HitResult != DamageHitResult.Miss)) await buffs.RecoverEnergyOnHitAsync(s, row);
+            if (CurrentCaster() && firstBolt && hit.Dsts.Any(d => d.HitResult != DamageHitResult.Miss))
+            {
+                await buffs.RecoverEnergyOnHitAsync(s, row);
+                if (CurrentCaster()) await ConvertChargesAsync(s, row);
+            }
             var sourceViewers = CurrentCaster() ? world.Viewers(s).Append(s) : Enumerable.Empty<GameSession>();
             foreach (var viewer in processed.SelectMany(t => t.Viewers).Concat(sourceViewers).Distinct()) await viewer.SendGameAsync(SkillHit, hit);
             if (CurrentCaster() && field?.Trap == true)
@@ -411,7 +425,12 @@ public sealed partial class CombatService
     private async Task GrantSkillBuffAsync(GameSession caster, GameSession recipient, int id, int durationMs)
     {
         long shield = data.Row("BuffConfig", id) is { } row ? ShieldAmount(row, character.Stats(caster), character.Stats(recipient)) : 0;
-        if (shield > 0) await buffs.AddSupportAsync(recipient, id, durationMs, caster.Role!.Id, shield);
+        if (durationMs < 0 && LastingSkillBuffs.Contains(id))
+        {
+            await buffs.AddLastingAsync(recipient, id, caster.Role!.Id);
+            await LastingBuffGrantedAsync(recipient, id);
+        }
+        else if (shield > 0) await buffs.AddSupportAsync(recipient, id, durationMs, caster.Role!.Id, shield);
         else await buffs.AddAsync(recipient, id, durationMs, caster.Role!.Id);
     }
 

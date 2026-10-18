@@ -65,7 +65,7 @@ public sealed partial class CharacterService(RoleStore roles, ItemStore itemStor
 
     /// <summary>Always in the self property list, even when no table contributes to them.</summary>
     private static readonly int[] SelfProperties = [1, 2, 3, 4, 5, 6, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, Hp, Sp, Lv];
-    private static readonly int[] AoiProperties = [MaxHp, Hp, MaxSp, Sp, Speed, Lv, 2003];
+    private static readonly int[] AoiProperties = [MaxHp, Hp, MaxSp, Sp, Speed, Lv, 2003, 3010];
 
     /// <summary>
     /// A new character's kit when <see cref="ServerOptions.StarterKit"/> is unset: nothing (inferred; the client data

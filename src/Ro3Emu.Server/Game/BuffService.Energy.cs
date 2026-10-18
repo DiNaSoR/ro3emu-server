@@ -144,6 +144,22 @@ public sealed partial class BuffService
         await SendEnergyAsync(p, id, (EPlayerEnergyChangeReason)2);
     }
 
+    /// <summary>Sets a meter the role has to <paramref name="value"/> (clamped to the row's limit) and sends 31334;
+    /// false when the role has no such meter. Skill-driven changes (Cross Ripper's blades, spellbook pages).</summary>
+    public async Task<bool> SetEnergyAsync(GameSession p, int id, long value)
+    {
+        if (!p.Energy.TryGetValue(id, out var meter) || data.Row("EnergyConfig", id) is not { } config) return false;
+        long next = Math.Clamp(value, 0, GameData.Int(config, "_iLimitValue"));
+        if (next == meter.Value) return true;
+        var reason = (EPlayerEnergyChangeReason)(next < meter.Value ? 5 : 2);
+        meter.Value = next;
+        await SendEnergyAsync(p, id, reason);
+        return true;
+    }
+
+    /// <summary>The meter's limit (EnergyConfig._iLimitValue), 0 when the row is missing.</summary>
+    public long EnergyLimit(int id) => data.Row("EnergyConfig", id) is { } row ? GameData.Int(row, "_iLimitValue") : 0;
+
     private void TickEnergy(GameSession p, long now)
     {
         if (p.Role == null) return;
