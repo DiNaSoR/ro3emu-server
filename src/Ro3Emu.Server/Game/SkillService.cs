@@ -700,9 +700,12 @@ public sealed class SkillService
                     int oldIndex = plans.CurrentPlanIndex;
                     code = StageSkillPlan(session, plans, candidate, req.Plan);
                     plans.CurrentPlanIndex = oldIndex;
-                    // Free levels can't be unlearned, judged on the final graph: Sight Sprout may drop to 0 with Sight.
-                    if (code == 0 && req.LevelUpList.Any(kv => kv.Value.SkillLevel < Initial(candidate, kv.Key)))
-                        code = ErrorCodes.Parameter;
+                    // Free levels can't be unlearned, judged on the final graph: Sight Sprout drops to 0 with Sight
+                    // and comes back free with it, though the client still shows the 0 it set when Sight went.
+                    if (code == 0)
+                        foreach (var (group, target) in req.LevelUpList)
+                            if (Initial(candidate, group) is var free && target.SkillLevel < free)
+                                selected.SkillAssigns[group] = new SkillData { SkillId = group, SkillLevel = free };
                     // Staging drops a free level whose prerequisites are missing; a request can't ask for it.
                     if (code == 0 && req.LevelUpList.Any(kv => kv.Value.SkillLevel > Level(candidate, kv.Key)))
                         code = ErrorCodes.SkillPrerequisite;
