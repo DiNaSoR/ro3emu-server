@@ -372,7 +372,16 @@ public sealed class MonsterService : MonsterBrain, IGameTicker
                 if (m.Target == null) SendStop(m, now);
             }
         }
-        if (now < m.BusyUntilMs)
+        // A control buff (stun, freeze, stone, sleep, immobilize) holds the unit where it is; the walk segment stops
+        // here and WalkTo refuses new ones until the buff ends. Swings check the normal-attack ordinal below.
+        if (m.Forbids(3) && m.Moving)
+        {
+            m.Advance(now);
+            map.Moved(m);
+            m.Moving = false;
+            SendStop(m, now);
+        }
+        if (now < m.BusyUntilMs || m.Forbids(3) && m.Forbids(5))
         {
             if (m.Moving)
             {
@@ -405,7 +414,7 @@ public sealed class MonsterService : MonsterBrain, IGameTicker
                 return;
             }
         }
-        if (m.Returning && !m.Moving)
+        if (m.Returning && !m.Moving && !m.Forbids(3))
         {
             m.Returning = false;
             if (m.Hp < m.Template.MaxHp)
@@ -438,6 +447,22 @@ public sealed class MonsterService : MonsterBrain, IGameTicker
         m.NextChaseMs = 0;
         await world.ToUnitViewersAsync(m, CombatService.AoiAttrChange, SpeedChange(m, now));
         if (m.Returning && m.Target == null) WalkTo(m, world.Map(m.WorldScene), m.Home.X, m.Home.Z, 2f);
+    }
+
+    /// <summary>A control or speed buff changed (BuffService.UnitControlChanged): end the current walk segment so the
+    /// unit stops or re-paths at its new speed, and publish the speed when it changed.</summary>
+    public async Task OnControlChangedAsync(MonsterUnit m, bool speedChanged)
+    {
+        if (m.Dead) return;
+        long now = NowMs;
+        if (m.Moving)
+        {
+            m.Advance(now);
+            m.Moving = false;
+            await world.MoveUnitAsync(m, Stop(m, now));
+        }
+        m.NextChaseMs = 0;
+        if (speedChanged) await world.ToUnitViewersAsync(m, CombatService.AoiAttrChange, SpeedChange(m, now));
     }
 
     private static AOIAttrChange SpeedChange(MonsterUnit m, long now) => new()
@@ -519,7 +544,7 @@ public sealed class MonsterService : MonsterBrain, IGameTicker
                 m.Moving = false;
                 SendStop(m, now);
             }
-            if (now >= m.NextSwingMs && AttackMonster != null && m.Template.NormalSkill != 0)
+            if (now >= m.NextSwingMs && !m.Forbids(5) && AttackMonster != null && m.Template.NormalSkill != 0)
             {
                 m.NextSwingMs = now + m.Template.SwingIntervalMs;
                 m.Face = Angle(m.X, m.Z, target.X, target.Z);
@@ -555,7 +580,7 @@ public sealed class MonsterService : MonsterBrain, IGameTicker
                 m.Moving = false;
                 SendStop(m, now);
             }
-            if (now >= m.NextSwingMs && AttackPet != null)
+            if (now >= m.NextSwingMs && !m.Forbids(5) && AttackPet != null)
             {
                 m.NextSwingMs = now + m.Template.SwingIntervalMs;
                 m.Face = Angle(m.X, m.Z, target.X, target.Z);
@@ -604,7 +629,7 @@ public sealed class MonsterService : MonsterBrain, IGameTicker
                 m.Moving = false;
                 SendStop(m, now);
             }
-            if (now >= m.NextSwingMs && Attack != null)
+            if (now >= m.NextSwingMs && !m.Forbids(5) && Attack != null)
             {
                 m.NextSwingMs = now + m.Template.SwingIntervalMs;
                 m.Face = Angle(m.X, m.Z, target.Position.X, target.Position.Z);
@@ -642,6 +667,7 @@ public sealed class MonsterService : MonsterBrain, IGameTicker
     /// <summary>One straight Walk segment when the nav grid allows it.</summary>
     private void WalkTo(MonsterUnit m, MapInstance map, float x, float z, float speedFactor)
     {
+        if (m.Forbids(3)) return;
         var nav = worldData.Map(m.SceneEntry)?.Nav;
         float? y = nav?.WalkHeight(x, z, m.Y) ?? m.Y;
         if (y == null || nav != null && !nav.CanWalk(m.X, m.Y, m.Z, x, z)) return;

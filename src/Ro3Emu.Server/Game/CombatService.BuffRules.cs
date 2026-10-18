@@ -18,6 +18,7 @@ public sealed partial class CombatService
         buffs.PeriodicTick = PeriodicTickAsync;
         buffs.HaloHostilePlayer = (carrier, other) => PlayerHostile?.Invoke(carrier, other) == true;
         buffs.HaloEnemyMonster = CanHitMonster;
+        buffs.UnitControlChanged.Add(monsters.OnControlChangedAsync);
     }
 
     /// <summary>
@@ -151,7 +152,7 @@ public sealed partial class CombatService
         bool Current() => ReferenceEquals(s.Role, role) && ReferenceEquals(s.Attachment, attachment) && !s.SceneLoading
             && s.SceneGeneration == generation && s.WorldScene == scene && sessions.All().Contains(s);
         var rule = effect.Rule;
-        var defender = AsDefender(m.Template);
+        var defender = AsDefender(m);
         long amount = PeriodicAmount(attacker, defender, rule, buff.PileCount);
         long before = m.Hp;
         m.Hp = m.HpAfter(before, amount);

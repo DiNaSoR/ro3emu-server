@@ -170,6 +170,7 @@ public sealed partial class CombatService : IGameTicker
             if (monster.Hp > 0)
             {
                 foreach (var handler in Dealt) handler(player, monster, damage);
+                if (damage > 0) await buffs.BreakOnHitAsync(monster);
                 return;
             }
             foreach (var handler in BeforeLethalPublication) await handler(player, monster, previousHp);
@@ -380,7 +381,7 @@ public sealed partial class CombatService : IGameTicker
             {
                 if (monster.Dead || monster.Hp <= 0) continue; // another cast may have reserved this actor while we awaited
                 processed.Add(monster);
-                var defender = AsDefender(monster.Template);
+                var defender = AsDefender(monster);
                 var (damage, result) = Damage(attacker, defender, row);
                 foreach (var adjust in MonsterDamageAdjusters) damage = adjust(monster, damage, false);
                 long previousHp = monster.Hp;
@@ -452,8 +453,7 @@ public sealed partial class CombatService : IGameTicker
             if (pet.Dead || pet.Hp <= 0 || monster.Dead || monster.Hp <= 0 || monster.WorldScene != pet.WorldScene
                 || pet.Owner.TowerAttempt is not { Loaded: true, Settled: false } current || !current.Pets.Contains(pet)
                 || MonsterService.Distance(monster.X, monster.Z, pet.X, pet.Z) > monster.Template.AttackRange + 2f) return;
-            var attacker = new Fighter(monster.Template.Atk, monster.Template.Matk, monster.Template.Hit,
-                monster.Template.Cri, monster.Template.Level, monster.Template.Element);
+            var attacker = AsAttacker(monster);
             var stats = pet.CombatStats;
             var defender = new Fighter(0, 0, 0, 0, pet.Level, pet.Element)
                 { Def = stats[105], Mdef = stats[106], Flee = stats[110], ResCri = stats[112] };
@@ -513,7 +513,7 @@ public sealed partial class CombatService : IGameTicker
                 || targetLease?.Cancelled == true) return;
             if (MonsterService.Distance(m, p) > m.Template.AttackRange + 2f) return; // stepped away
             var stats = character.Stats(p);
-            var attacker = new Fighter(m.Template.Atk, m.Template.Matk, m.Template.Hit, m.Template.Cri, m.Template.Level, m.Template.Element);
+            var attacker = AsAttacker(m);
             var defender = new Fighter(0, 0, 0, 0, p.Progress!.Level, 1) { Def = stats[105], Mdef = stats[106], Flee = stats[110], ResCri = stats[112] };
             var row = data.Row("SkillConfig", m.Template.NormalSkill);
             var (damage, result) = row is { } r ? Damage(attacker, defender, r) : (Math.Max(1, m.Template.Atk), DamageHitResult.Normal);
@@ -605,6 +605,44 @@ public sealed partial class CombatService : IGameTicker
     /// an attacker-side ParDef (DubugDamageFormulaEnum.Formula_AParDef); its value for a player is unknown.
     /// </summary>
     private static Fighter AsDefender(MonsterTemplate m) => new(0, 0, m.Flee, 0, m.Level, m.Element) { Flee = m.Flee };
+
+    /// <summary>A live monster taking a hit: its template plus what its live buffs change (FLEE 110 and crit
+    /// resistance 112 flat; Sluggish and Curse carry no FLEE, so most debuffs leave this unchanged).</summary>
+    private Fighter AsDefender(MonsterUnit m)
+    {
+        var (_, _, _, _, flee, resCri) = MonsterBuffStats(m);
+        var t = m.Template;
+        return new Fighter(0, 0, t.Flee + flee, 0, t.Level, t.Element) { Flee = Math.Max(0, t.Flee + flee), ResCri = Math.Max(0, resCri) };
+    }
+
+    /// <summary>A live monster attacking: its template ATK/MATK scaled by its buffs' PATK%/MATK% (1032/1042, Curse -5%)
+    /// plus flat PATK/MATK/HIT/CRIT (103/104/109/111).</summary>
+    private Fighter AsAttacker(MonsterUnit m)
+    {
+        var (atk, matk, hit, cri, _, _) = MonsterBuffStats(m);
+        var t = m.Template;
+        return new Fighter(Math.Max(0, atk), Math.Max(0, matk), Math.Max(0, t.Hit + hit), Math.Max(0, t.Cri + cri), t.Level, t.Element);
+    }
+
+    private (long Atk, long Matk, long Hit, long Cri, long Flee, long ResCri) MonsterBuffStats(MonsterUnit m)
+    {
+        double atkFlat = 0, atkPct = 0, matkFlat = 0, matkPct = 0, hit = 0, cri = 0, flee = 0, resCri = 0;
+        foreach (var (id, value) in buffs.UnitAttributes(m))
+            switch (id)
+            {
+                case 103: atkFlat += value; break;
+                case 1032: atkPct += value; break;
+                case 104: matkFlat += value; break;
+                case 1042: matkPct += value; break;
+                case 109: hit += value; break;
+                case 111: cri += value; break;
+                case 110: flee += value; break;
+                case 112: resCri += value; break;
+            }
+        var t = m.Template;
+        return ((long)Math.Round((t.Atk + atkFlat) * (10000 + atkPct) / 10000), (long)Math.Round((t.Matk + matkFlat) * (10000 + matkPct) / 10000),
+            (long)hit, (long)cri, (long)flee, (long)resCri);
+    }
 
     private (long Damage, DamageHitResult Result) Damage(Fighter a, Fighter b, JsonElement skill, int branch = 0)
     {

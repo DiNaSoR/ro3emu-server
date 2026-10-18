@@ -52,7 +52,7 @@ public sealed partial class CombatService
         var defender = ally
             ? new Fighter(0, 0, 0, 0, target.Template.Level, target.Template.Element)
                 { Def = target.Template.Def, Mdef = target.Template.Mdef, Flee = target.Template.Flee }
-            : AsDefender(target.Template);
+            : AsDefender(target);
         var (damage, result) = Damage(attacker, defender, row);
         damage = ScaleMonsterDamage(damage, source.DamageRatio);
         if (scaleBp != 10000 && damage > 0) damage = Math.Max(1, damage * scaleBp / 10000);
