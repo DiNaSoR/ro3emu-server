@@ -1110,7 +1110,7 @@ public sealed class ActivityAdventuresTests : IAsyncLifetime
     }
 
     /// <summary>A dig that disturbs the Drake boss (TreasureHuntResultRateConfig 5) announces ChatConfig 401 to everyone
-    /// online. The finder gets the boss's _iAwardId (Dig - Precious Chest) and another player who hit it gets
+    /// online. The finder is mailed the boss's _iAwardId (Dig - Precious Chest) and another player who hit it is mailed
     /// _iAssistAwardId (Dig - Co-op Chest).</summary>
     [ClientDataFact]
     public async Task TreasureBossIsAnnouncedAndHelpersGetTheCoopChest()
@@ -1172,13 +1172,20 @@ public sealed class ActivityAdventuresTests : IAsyncLifetime
         Assert.Equal(0, (await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
         await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser, h => h.Dsts.Any(d => d.DstID == boss.Uid && d.IsDead));
 
-        bool Has(GameSession s, int entry) => s.Items.Any(i => i.Entry == entry && i.Stack > 0);
+        // MailConfig 11603 "Dig Rewards" (finder's boss kill) and 11604 (assist), each carrying its configured chest.
+        var roles = app.Services.GetRequiredService<RoleStore>();
+        MailService.Letter[] Letters(GameSession s) => roles.LoadMailbox(s.Role!.Id) is { } blob
+            ? JsonSerializer.Deserialize<MailService.Mailbox>(blob)!.Letters.ToArray() : [];
+        bool Mailed(GameSession s, int template, int entry) =>
+            Letters(s).Any(l => l.TemplateId == template && l.Attachments.Any(a => a.Entry == entry && a.Count == 1));
         var deadline = DateTime.UtcNow + Wait;
-        while (DateTime.UtcNow < deadline && !(Has(finder, 1300088) && Has(helper, 1300089))) await Task.Delay(50);
-        Assert.True(Has(finder, 1300088), "finder's Dig - Precious Chest");
-        Assert.True(Has(helper, 1300089), "helper's Dig - Co-op Chest");
-        Assert.False(Has(finder, 1300089), "the finder is not their own helper");
-        Assert.Equal(0, finder.ActivityRuntime.AdventureTreasure.PendingAssistAward);
+        while (DateTime.UtcNow < deadline && !(Mailed(finder, 11603, 1300088) && Mailed(helper, 11604, 1300089)))
+            await Task.Delay(50);
+        Assert.True(Mailed(finder, 11603, 1300088), "finder's Dig - Precious Chest mail");
+        Assert.True(Mailed(helper, 11604, 1300089), "helper's Dig - Co-op Chest mail");
+        Assert.DoesNotContain(Letters(finder), l => l.TemplateId == 11604);
+        Assert.DoesNotContain(finder.Items, i => i.Entry == 1300088);
+        Assert.Equal(0, finder.ActivityRuntime.AdventureTreasure.PendingMonsterAward);
     }
 
     /// <summary>106802 counts a committed dig at the Treasure Map's point (growth title 4's 704090 [106802,20], the
