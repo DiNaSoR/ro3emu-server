@@ -179,6 +179,37 @@ public sealed class SkillGrowthTests : IAsyncLifetime
     }
 
     [ClientDataFact]
+    public async Task SightSproutFreeLevelFollowsSight()
+    {
+        await using var alice = await InWorld("Alice");
+        await Next(alice, SkillService.SkillDataSync, DBSkillDataIncrement.Parser);
+        await Gm("alice", "!job 2200");
+        await Next(alice, SkillService.SkillDataSync, DBSkillDataIncrement.Parser,
+            m => !m.SyncAllMark && m.SkillList?.All?.Value.Contains(12110) == true);
+
+        async Task<int> Save(int sight, int sprout)
+        {
+            var req = new SkillGrowthSkillPlanUpdateReq { Plan = 0 };
+            req.LevelUpList[12002] = new SkillData { SkillId = 12002, SkillLevel = sight };
+            req.LevelUpList[12110] = new SkillData { SkillId = 12110, SkillLevel = sprout };
+            await alice.SendGameAsync(SkillService.PlanUpdate, req);
+            return (await Next(alice, SkillService.PlanUpdate, SkillGrowthSkillPlanUpdateResp.Parser)).Result;
+        }
+
+        // Without Sight the free Sight Sprout level is not owed, so the client's 0 saves (it was "Client Parameter error").
+        Assert.Equal(0, await Save(0, 0));
+        Assert.Equal(0, await Save(1, 1));
+        // Learning Sight again brings the free level back even though the client still shows Sight Sprout at 0.
+        Assert.Equal(0, await Save(1, 0));
+        var restored = await Next(alice, SkillService.SkillDataSync, DBSkillDataIncrement.Parser,
+            m => !m.SyncAllMark && m.SkillAssignPlans?.Inc?.Value[0].SkillAssigns.ContainsKey(12110) == true);
+        Assert.Equal(1, restored.SkillAssignPlans.Inc.Value[0].SkillAssigns[12110].Inc.SkillLevel);
+        // Unlearning Sight resets Sight Sprout in the client too.
+        Assert.Equal(0, await Save(0, 0));
+        Assert.Equal(ErrorCodes.SkillPrerequisite, await Save(0, 1));
+    }
+
+    [ClientDataFact]
     public async Task PlansNameGenreAndSelectedLevelsSurviveRelog()
     {
         await using (var alice = await InWorld("Alice"))
