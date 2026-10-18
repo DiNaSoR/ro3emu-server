@@ -257,7 +257,7 @@ public sealed class GmCommands(IOptions<ServerOptions> options, GameData data, S
         ["clearbag"] = ("", (s, a) => Op(s, OpClearPack, a)),
         ["client"] = ("<find name>", ClientDiagnostics),
         ["speed"] = ("<speed, 0 = normal>", async (s, a) => await ReplyAsync(s, await character.SetSpeedAsync(s, L(a[0])))),
-        ["quest"] = ("[accept|finish|done <taskId> | reset]", async (s, a) => await ReplyAsync(s, a.Length == 0
+        ["quest"] = ("[accept|finish|done|drop <taskId> | reset]", async (s, a) => await ReplyAsync(s, a.Length == 0
             ? "Quests: " + tasks.Describe(s)
             : await tasks.GmAsync(s, a[0].ToLowerInvariant(), a.Length > 1 ? L(a[1]) : 0))),
         ["mvp"] = ("[spawn|where|goto|weaken <cfg>]", async (s, a) =>
