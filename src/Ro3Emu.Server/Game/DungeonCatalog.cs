@@ -28,13 +28,29 @@ public sealed class DungeonCatalog(GameData data, WorldData worldData, MonsterSe
         public long SceneEntry => GameData.Int(Config, "_iID");
         public int MultiId => Multi is { } row ? (int)GameData.Int(row, "_iID") : 0;
         public int DurationMs => (int)Math.Clamp(GameData.Int(Config, "_iLimitTime"), 1000, int.MaxValue);
-        public DungeonInitData Init(long teamId = 0, long instanceId = 0) => LayerId != 0
-            // The client never reads it (LC_DunGeon_Valhalla); filled as the proto defines it (inferred).
-            ? new() { HeroicSpiritDungeonInitData = new HeroicSpiritDungeonInitData { ChallengeId = LayerId } }
-            : MultiId == 0 ? new()
-            : new() { MultiDungeonInitData = new MultiDungeonInitData
-            { MultiDungeonId = MultiId, MarkId = Mark, TeamID = teamId, DungeonId = instanceId } };
+        /// <summary>A Hidden Realm run: the random entry (TenGameplayConfig _iIsRandomDungeon) this boss was drawn for.</summary>
+        public RandomOrigin? Origin { get; init; }
+        /// <summary>The entry whose rewards, allowance and record the run counts against: the Hidden Realm's own row when
+        /// drawn from it (inferred: its boss row 4300099 carries the awards and _iMatchID), else the fought boss's.</summary>
+        public JsonElement? RewardMulti => Origin?.Multi ?? Multi;
+        public JsonElement? RewardBoss => Origin?.Boss ?? Boss;
+        public int RewardMark => Origin?.Mark ?? Mark;
+        public int RewardMultiId => RewardMulti is { } row ? (int)GameData.Int(row, "_iID") : 0;
+        public DungeonInitData Init(long teamId = 0, long instanceId = 0)
+        {
+            var init = LayerId != 0
+                // The client never reads it (LC_DunGeon_Valhalla); filled as the proto defines it (inferred).
+                ? new DungeonInitData { HeroicSpiritDungeonInitData = new HeroicSpiritDungeonInitData { ChallengeId = LayerId } }
+                : MultiId == 0 ? new DungeonInitData()
+                : new DungeonInitData { MultiDungeonInitData = new MultiDungeonInitData
+                { MultiDungeonId = MultiId, MarkId = Mark, TeamID = teamId, DungeonId = instanceId } };
+            if (Origin is { } origin && init.MultiDungeonInitData != null)
+                init.MultiDungeonInitData.Origin = new MultiDungeonInfo { MultiDungeonId = GameData.Int(origin.Multi, "_iID"), MarkId = origin.Mark };
+            return init;
+        }
     }
+
+    public sealed record RandomOrigin(JsonElement Multi, JsonElement Boss, int Mark);
 
     public IEnumerable<JsonElement> MultiRows => data.Table("TenGameplayConfig").Values
         .Where(r => TowerService.FitsPlayBook(r, seasons.PlayBook));
@@ -299,13 +315,18 @@ public sealed class DungeonCatalog(GameData data, WorldData worldData, MonsterSe
     }
 
     /// <summary>
-    /// A scripted scene's steps (ReconstructedDungeons.Scripted): one wave without monsters per step. Every reference
+    /// A scripted scene's steps (ReconstructedDungeons.Scripted): one wave per step, without monsters unless it is a
+    /// fight step. Every reference
     /// must resolve in the client data and the scene's map, or the scene is refused like any unresolved encounter:
     /// the quests the tracker shows, the actors' NPCConfig rows, points and buffs, the stories, regions and points,
-    /// and the interactions and dungeon messages the step's actors can actually send.
+    /// the interactions and dungeon messages the step's actors can actually send, a fight step's monsters and points, and
+    /// every line with its speaker among the step's actors or monsters.
     /// </summary>
     private IReadOnlyList<Wave> ScriptedWaves(ReconstructedDungeons.ScriptedScene scene, MapWorld map)
     {
+        // The scene a won run goes on to must be a dungeon that loads without a loading screen from this one.
+        if (scene.Next != 0 && (data.Row("DungeonConfig", scene.Next) is not { } next
+            || GameData.Int(next, "_iSameDupLoadingType") != 2)) return [];
         var waves = new List<Wave>();
         foreach (var step in scene.Steps)
         {
@@ -317,6 +338,10 @@ public sealed class DungeonCatalog(GameData data, WorldData worldData, MonsterSe
                     || actor.Buffs.Any(b => data.Row("BuffConfig", b) is not { } buff || GameData.Int(buff, "_iBuffID") <= 0)) return [];
             if (step.Story != 0 && data.Row("PlotInterpretation", step.Story) == null) return [];
             if (step.TeleportAfter != 0 && !map.Points.ContainsKey(step.TeleportAfter)) return [];
+            if (step.Slide is { } slide && !(slide.Side >= 0 && slide.Down > 0 && slide.Side < 100 && slide.Down < 100)) return [];
+            if (step.Fallback is { } fallback && (fallback.Ms <= 0 || step.Fight
+                || fallback.Teleport != 0 && !map.Points.ContainsKey(fallback.Teleport)
+                || fallback.FromMount && !step.Actors.Any(a => Interactions(a.NpcId).Any(i => VehicleSeat(a.NpcId, i) != null)))) return [];
             foreach (var t in step.Complete.Concat(step.Ignore))
             {
                 bool known = t.Kind switch
@@ -330,7 +355,16 @@ public sealed class DungeonCatalog(GameData data, WorldData worldData, MonsterSe
                 };
                 if (!known) return [];
             }
-            waves.Add(new Wave(waves.Count + 1, [], step.Quest, step));
+            // A fight step: its monsters, at server spawn points of the scene, with a template the server knows.
+            var spawns = new List<Spawn>();
+            foreach (var spawn in step.Spawns)
+            {
+                if (monsters.Template(spawn.NpcId) == null || !map.Points.TryGetValue(spawn.Point, out var at)) return [];
+                spawns.Add(new Spawn(spawn.NpcId, at));
+            }
+            if (step.Lines.Concat(step.DoneLines).Any(l => data.Row("ChatConfig", l.Chat) == null
+                    || l.By != 0 && step.Actors.All(x => x.NpcId != l.By) && step.Spawns.All(x => x.NpcId != l.By))) return [];
+            waves.Add(new Wave(waves.Count + 1, spawns, step.Quest, step));
         }
         // An unplayed quest is one of the scene's own quests that no step shows.
         if (scene.Unplayed.Any(q => scene.Steps.Any(s => s.Quest == q) || !data.Table("DungeonQuestConfig").Values.Any(r =>
@@ -426,6 +460,42 @@ public sealed class DungeonCatalog(GameData data, WorldData worldData, MonsterSe
     public IReadOnlyList<long> Interactions(int npcId) => data.Row("NPCConfig", npcId) is { } npc
         && npc.TryGetProperty("_iInteractID", out var ids) && ids.ValueKind == JsonValueKind.Array
         ? ids.EnumerateArray().Select(v => (long)(GameData.Number(v) ?? 0)).Where(v => v > 0).ToArray() : [];
+
+    /// <summary>
+    /// The BuffConfig groups (_iBuffID) an interaction's NPC condition asks its NPC to carry: the 1004 CheckHaveBuff
+    /// parts of its LC_ConditionList _iNPCCondition (LC_CommonCondition.lua:180-196), which the client checks before it
+    /// offers the interaction.
+    /// </summary>
+    public IReadOnlyList<long> BuffGates(long interactionId)
+    {
+        if (data.Row("NPCInteractConfig", interactionId) is not { } interaction
+            || data.Row("LC_ConditionList", GameData.Int(interaction, "_iNPCCondition")) is not { } condition) return [];
+        var parts = condition.TryGetProperty("m_kSubConditionList", out var list) && list.ValueKind == JsonValueKind.Array
+            ? list.EnumerateArray().ToArray() : [condition];
+        return parts.Where(p => p.TryGetProperty("m_kData", out var d) && d.ValueKind == JsonValueKind.Array && d.GetArrayLength() >= 2
+                && GameData.Number(d[0]) == 1004 && !(p.TryGetProperty("m_bInverse", out var inv) && inv.ValueKind == JsonValueKind.True))
+            .Select(p => (long)(GameData.Number(p.GetProperty("m_kData")[1]) ?? 0)).ToArray();
+    }
+
+    /// <summary>
+    /// The vehicle ride an interaction starts on an NPC, as WorldInteractionService reads it for world NPCs: the
+    /// interaction's GameplayStatusConfig (_iStatusID) is type 3 "enter vehicle driver state", the NPC is a vehicle
+    /// (NPCConfig _iNPCSubType 103, VehicleConfig _iSubTypeValue) and its _iStatusLocation names one of the vehicle's
+    /// VehicleSeatConfig seats. Null for any other interaction.
+    /// </summary>
+    public (int StatusId, int Seat, JsonElement SeatRow)? VehicleSeat(int npcId, long interactionId)
+    {
+        if (data.Row("NPCInteractConfig", interactionId) is not { } interaction
+            || data.Row("GameplayStatusConfig", GameData.Int(interaction, "_iStatusID")) is not { } status
+            || GameData.Int(status, "_iStatusType") != 3
+            || data.Row("NPCConfig", npcId) is not { } npc || GameData.Int(npc, "_iNPCSubType") != 103
+            || data.Row("VehicleConfig", GameData.Int(npc, "_iSubTypeValue")) is not { } vehicle
+            || !vehicle.TryGetProperty("_kSeats", out var seats) || seats.ValueKind != JsonValueKind.Array) return null;
+        int seat = (int)GameData.Int(interaction, "_iStatusLocation") - 1;
+        if (seat < 0 || seat >= seats.GetArrayLength()
+            || data.Row("VehicleSeatConfig", (long)(GameData.Number(seats[seat]) ?? 0)) is not { } row) return null;
+        return ((int)GameData.Int(interaction, "_iStatusID"), seat, row);
+    }
 
     /// <summary>
     /// The dungeon message an interaction sends: its NPCInteractConfig _iEXECAction ["210", id, ...]. ActionConfig 210

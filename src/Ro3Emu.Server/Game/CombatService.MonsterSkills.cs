@@ -11,14 +11,18 @@ public sealed partial class CombatService
     /// A monster skill landing on players (MVP minion blasts, boss ground fields): the row's damage from the caster's
     /// stats (the same inferred formula as a monster swing), the protected HP transition, one 31101 per player from
     /// <paramref name="sourceId"/> (the caster or its ground object) and the row's _kBuff2 on each surviving player.
-    /// Returns the number of players hit. <paramref name="scaleBp"/> scales the damage (one hit of a multi-hit skill).
+    /// Returns the number of players hit. A boss special passes its cast's <paramref name="session"/>, its damage percent
+    /// (BossSkillOptions.DamagePercent) and <paramref name="bossDebuffsOnly"/>: a _kBuff2 without a positive time is an
+    /// encounter script's marker (Maya's 4340101, -1 ms) that the script also removed, and one of BuffConfig _iType 1
+    /// (a buff) is the boss's own (inferred); neither goes on the players. <paramref name="scaleBp"/> scales the damage
+    /// (one hit of a multi-hit skill).
     /// </summary>
     internal async Task<int> MonsterSkillHitAsync(MonsterUnit caster, JsonElement row, IEnumerable<GameSession> targets, long sourceId,
-        long scaleBp = 10000, long sessionId = 0)
+        long session = 0, int damagePercent = 100, bool bossDebuffsOnly = false, long scaleBp = 10000)
     {
         if (caster.Dead || caster.Hp <= 0) return 0;
         int skillId = (int)GameData.Int(row, "_iID");
-        long session = sessionId > 0 ? sessionId : ++_sessionIds;
+        if (session <= 0) session = ++_sessionIds;
         int show = HitEffect(GameData.Int(row, "_iScriptShow"));
         int element = (int)GameData.Int(row, "_iEleType") is var e and > 1 ? e : caster.Template.Element;
         var attacker = AsMonster(new Fighter(caster.Template.Atk, caster.Template.Matk, caster.Template.Hit, caster.Template.Cri,
@@ -36,6 +40,7 @@ public sealed partial class CombatService
             var defender = PlayerDefender(p, stats);
             var (damage, result) = Damage(attacker, defender, row);
             damage = ScaleMonsterDamage(damage, caster.DamageRatio);
+            if (damagePercent != 100) damage = damagePercent <= 0 ? 0 : ScaleMonsterDamage(damage, damagePercent * 100);
             if (scaleBp != 10000 && damage > 0) damage = Math.Max(1, damage * scaleBp / 10000);
             foreach (var adjust in MonsterDamageAdjusters) damage = adjust(caster, damage, true);
             if (damage > 0) foreach (var modifier in IncomingDamageAdjusters) damage = Math.Max(0, await modifier(caster, p, result, damage));
@@ -62,10 +67,13 @@ public sealed partial class CombatService
                     continue;
                 }
                 foreach (var tuple in Tuples(row, "_kBuff2"))
-                    if (Current() && RollHostileBuff(tuple, null, caster, p, null, out int buff, out int ms)) await buffs.AddAsync(p, buff, ms, caster.Uid);
+                    if (Current() && (!bossDebuffsOnly || BossDebuff(tuple)) && RollHostileBuff(tuple, null, caster, p, null, out int buff, out int ms)) await buffs.AddAsync(p, buff, ms, caster.Uid);
             }
             finally { if (hp == 0) ReleaseDeathPublication(p); }
         }
         return hits;
     }
+
+    private bool BossDebuff(JsonElement tuple) => tuple.GetArrayLength() >= 3 && GameData.Number(tuple[2]) > 0
+        && GameData.Number(tuple[0]) is double id && !(data.Row("BuffConfig", (long)id) is { } buff && GameData.Int(buff, "_iType") == 1);
 }

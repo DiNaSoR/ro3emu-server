@@ -19,6 +19,8 @@ public static class ServerHost
             ContentRootPath = AppContext.BaseDirectory,
         });
         var options = Resolve(builder.Configuration, configure);
+        // Fail fast, before any service is built, if an offline restore of this data dir did not finish (C/D 19).
+        DatabaseRestore.ThrowIfUnfinished(options.DataDir);
         // Stage G: the default host on Windows also writes Warning and above to the Windows Event Log, synchronously on
         // the logging thread - the game loop included (a quarter of a walk's cost at 500 players). The console logger
         // queues to a background writer; the metrics provider registered below stays.
@@ -122,6 +124,8 @@ public static class ServerHost
         builder.Services.AddSingleton<InstanceService>();
         builder.Services.AddSingleton<DungeonCatalog>();
         builder.Services.AddSingleton<DungeonObligationStore>();
+        builder.Services.AddSingleton<PraiseService>();
+        builder.Services.AddSingleton<CasualBattleService>();
         builder.Services.AddSingleton<DungeonService>();
         builder.Services.AddSingleton<TerritoryWarsClock>();
         builder.Services.AddSingleton<TerritoryWarsService>();
@@ -156,6 +160,10 @@ public static class ServerHost
         builder.Services.AddSingleton<SessionRegistry>();
         builder.Services.AddSingleton<GateAuthRegistry>();
         builder.Services.AddSingleton<ReconnectService>();
+        builder.Services.AddSingleton<Voice.VoiceTicketRegistry>();
+        builder.Services.AddSingleton<Voice.VoiceRooms>();
+        // The voice relay PoC only opens a second listener when a port is configured for it.
+        if (options.Voice.Port > 0) builder.Services.AddHostedService<Voice.VoiceGateServer>();
         builder.Services.AddHostedService<DatabaseBackup>();
         builder.Services.AddSingleton<Game.Persistence.PositionPersistence>();
         builder.Services.AddSingleton<Game.Persistence.SettingsPersistence>();
@@ -169,6 +177,7 @@ public static class ServerHost
         builder.Services.AddSingleton<Game.Messaging.IMessageModule, SocialMessages>();
         builder.Services.AddSingleton<Game.Messaging.IMessageModule, ActivitiesMessages>();
         builder.Services.AddSingleton<Game.Messaging.IMessageModule, AdventureGroupMessages>();
+        builder.Services.AddSingleton<Game.Messaging.IMessageModule, Voice.VoiceTicketService>();
         builder.Services.AddSingleton<GameMessageHandler>();
         builder.Services.AddSingleton(sp => GateCrypto.LoadOrCreate(options.DataDir, sp.GetRequiredService<ILogger<GateCrypto>>()));
         builder.Services.AddSingleton<IMicroService, LoginService>();
@@ -258,8 +267,10 @@ public static class ServerHost
         app.MapPost("/ro3emu/account/delete-role", async (HttpRequest request, AccountStore accounts, RoleStore roles, SessionRegistry sessions, GameLoop loop, Game.Ownership.OwnerRegistry owners, ILogger<RoleStore> log) =>
         {
             var form = await request.ReadFormAsync();
-            string identity = form["identity"].ToString().Trim(), credential = form["credential"].ToString(), which = form["role"].ToString().Trim();
-            if (!await accounts.VerifyAsync(identity, credential)) return Results.Json(new { code = 401, message = "bad account or password" });
+            string typed = form["identity"].ToString().Trim(), credential = form["credential"].ToString(), which = form["role"].ToString().Trim();
+            // Roles are keyed by the account's stored name, whatever letter case the form used.
+            if (await accounts.VerifiedAccountAsync(typed, credential) is not { } identity)
+                return Results.Json(new { code = 401, message = "bad account or password" });
             var role = roles.ForAccount(identity).FirstOrDefault(r => r.Id.ToString() == which || string.Equals(r.Name, which, StringComparison.OrdinalIgnoreCase));
             if (role == null) return Results.Json(new { code = 404, message = "no such character on this account" });
             return await loop.InvokeAsync(async () =>
@@ -317,7 +328,10 @@ public static class ServerHost
         app.Services.GetRequiredService<TimedEventService>();
         app.Services.GetRequiredService<PronteraDefenseService>();
         var timedBattles = app.Services.GetRequiredService<TimedBattleService>();
-        app.Services.GetRequiredService<CombatService>().SetEventPvPHandlers(timedBattles.CanFight, timedBattles.PlayerKilledAsync);
+        var casual = app.Services.GetRequiredService<CasualBattleService>();
+        app.Services.GetRequiredService<CombatService>().SetEventPvPHandlers(
+            (a, b) => timedBattles.CanFight(a, b) || casual.CanFight(a, b),
+            async (killer, victim) => { await timedBattles.PlayerKilledAsync(killer, victim); await casual.PlayerKilledAsync(killer, victim); });
         app.Services.GetRequiredService<FestivalService>();
         app.Services.GetRequiredService<TrainingService>();
         app.Services.GetRequiredService<GuildHomeService>();
@@ -451,6 +465,7 @@ internal sealed class GameLoopTickers(IServiceProvider services) : IHostedServic
         Add<TimedEventService>();
         Add<PronteraDefenseService>();
         Add<TimedBattleService>();
+        Add<CasualBattleService>();
         Add<FestivalService>();
         Add<TrainingService>();
         Add<GuildHomeService>();
@@ -477,6 +492,7 @@ internal sealed class GameLoopTickers(IServiceProvider services) : IHostedServic
         Add<ShopService>(); // 05:00 purchase-limit rollover
         Add<ItemBoxService>(); // award boxes; 05:00 item use-time rollover
         Add<PowerService>(); // throttled 31502/31503 republish of changed power
+        Add<Voice.VoiceRooms>(); // VAD silence timeout every tick, team-membership sweep every second
         return Task.CompletedTask;
     }
 

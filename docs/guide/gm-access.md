@@ -5,7 +5,7 @@ GM commands are the `!` lines in chat (`!help`), the client's GM panel (30300) a
 
 | `GmAccounts` | `GmOpenWhenEmpty` | in game |
 |---|---|---|
-| listed accounts | any | only those accounts (case-insensitive) |
+| listed accounts | any | only those accounts, spelled as stored (an account name is one account in any letter case; the list matches its stored spelling) |
 | empty | unset, host not started as Production | everyone (tests, `tools/run-server.ps1`, local play) |
 | empty | unset, host started as **Production** | **nobody** |
 | empty | `true` / `false` | everyone / nobody (an explicit value wins over the environment) |
@@ -53,3 +53,23 @@ Environment=Ro3Emu__GmAccounts__0=your-admin-login
 
 More GMs: `Ro3Emu__GmAccounts__1=...`. Passwords never go in the unit, the repository or these docs. After
 `systemctl daemon-reload` and a restart, the log shows `GM accounts: your-admin-login`.
+
+## The client's GM panel
+
+The large draggable GM button opens the client's own GM panel (`UI_Sys_GMPanel`, rows from `GMConfig` and the
+one-click presets from `GMCombinationConfig`). Each button sends 30300 with its `GmOpEnum` and the fields joined by
+commas; the emulator answers with a text line. A target ID of 0 or an empty field means yourself; monster IDs come
+from Spawn NPC's answer or the unit list.
+
+Working buttons (40 of 66): add or remove item, clear bag, set level, add EXP, strengthen and refine a part (free, to
+the given level), add stat points, reset stats, change HP, drop pool, send personal mail, send custom or template
+mail to everyone online, quests (accept, give up, hand in, complete), job change, spawn NPC, show and change
+attributes (current HP and SP only), no cooldowns, damage fluctuation, add, remove and list buffs, kill target, full
+HP and SP, invincible, warp, fly to target, show position, create guild, enter and leave a dungeon, set a monster's
+camp, learn all skills (with the role's own skill points) or reset them, and the server level. No cooldowns and
+invincible last for the session; damage fluctuation is server-wide until a restart.
+
+Not implemented: server time and open day, bulk character creation, revoking mail, the Tavern tools (the emulator
+has no Tavern yet), casting a skill, reloading skill blueprints, combat logs, and the GvG reset. Ten buttons have no
+op the server could receive. Presets that use season talents, emblems, equipping gear or skill wheels run only
+their other steps.

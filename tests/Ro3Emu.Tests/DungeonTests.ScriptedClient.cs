@@ -26,7 +26,7 @@ public sealed partial class DungeonTests
     {
         await using var alice = await InWorld("Alice");
         Assert.Equal(0, await Enter(alice, new EnterDungeonReq { SceneEntry = scene }));
-        await Load(alice, scene);
+        long instance = await Load(alice, scene);
         var plan = Session(alice).DungeonAttempt!.Plan;
         var catalog = Service<DungeonCatalog>();
         var map = Service<WorldData>().Map(scene)!;
@@ -36,6 +36,12 @@ public sealed partial class DungeonTests
             await Stage(alice, wave + 1, quest: step.Quest);
             await ActorsWhen(alice, shown => shown.Count == step.Actors.Count && step.Actors.All(spec => shown.Any(u =>
                 u.NpcId == spec.NpcId && u.Point == spec.Point && u.Buffs.Select(b => b.ConfigId).Order().SequenceEqual(spec.Buffs.Order()))));
+            if (step.Fight)
+            {
+                // A fight step waits on no interaction: its monsters are killed.
+                foreach (var spawn in step.Spawns) await Kill(alice, await BossIn(instance, spawn.NpcId));
+                continue;
+            }
             var t = step.Complete[0];
             switch (t.Kind)
             {
@@ -115,14 +121,16 @@ public sealed partial class DungeonTests
         await using var alice = await InWorld("Alice");
         await Gm(alice, "!actors use"); // outside a scene: refused, nothing happens
         Assert.Equal(0, await Enter(alice, new EnterDungeonReq { SceneEntry = scene }));
-        await Load(alice, scene);
+        long instance = await Load(alice, scene);
         var plan = Session(alice).DungeonAttempt!.Plan;
         for (int wave = 0; wave < plan.Waves.Count; wave++)
         {
             var step = plan.Waves[wave].Step!;
             await Stage(alice, wave + 1, quest: step.Quest);
             await ActorsIn(alice, step.Actors.Count);
-            await Gm(alice, "!actors use");
+            if (step.Fight) // the aid does not end a fight step: its monsters are killed
+                foreach (var spawn in step.Spawns) await Kill(alice, await BossIn(instance, spawn.NpcId));
+            else await Gm(alice, "!actors use");
         }
         Assert.Equal((DungeonRes)1, (await Next(alice, DungeonService.Result, DungeonResNotify.Parser)).Res);
     }

@@ -688,6 +688,51 @@ public sealed class SkillService
         if (learned) foreach (var handler in Learned) await handler(session);
     }
 
+    /// <summary>
+    /// GM panel GmCurAllSkillLevUpMax "learn all": raise every skill of the current career chain, in tree order, one
+    /// level at a time while the plan stays valid (skill points, prerequisites, maximum levels), repeating until
+    /// nothing more fits. Spends only the points the role has; returns how many levels were added.
+    /// </summary>
+    public async Task<int> GmLearnAllAsync(GameSession session)
+    {
+        int raised = 0;
+        using (await CharacterService.Lock(session))
+        {
+            var p = session.Progress!;
+            var plans = Build(session);
+            int index = plans.CurrentPlanIndex;
+            var selected = plans.SkillAssignPlans[index];
+            var tree = Tree(p.Career);
+            for (bool more = true; more;)
+            {
+                more = false;
+                foreach (var (group, _) in tree)
+                {
+                    if (UpgradeGroups().TryGetValue(group, out int upgraded) && selected.SkillAssigns.GetValueOrDefault(upgraded)?.SkillLevel > 0)
+                        continue;
+                    int level = Math.Max(selected.SkillAssigns.GetValueOrDefault(group)?.SkillLevel ?? 0, Level(p, group));
+                    if (level >= MaxLevel(group)) continue;
+                    var trial = plans.Clone();
+                    trial.SkillAssignPlans[index].SkillAssigns[group] = new SkillData { SkillId = group, SkillLevel = level + 1 };
+                    if (StageSkillPlan(session, trial, CharacterService.GenreCloneProgress(p), index) != 0) continue;
+                    selected.SkillAssigns[group] = new SkillData { SkillId = group, SkillLevel = level + 1 };
+                    raised++;
+                    more = true;
+                }
+            }
+            if (raised > 0)
+            {
+                var candidate = CharacterService.GenreCloneProgress(p);
+                if (StageSkillPlan(session, plans, candidate, index) != 0) return 0;
+                PruneLoads(selected, candidate);
+                await CommitAsync(session, plans, candidate, "cd13c/skill-update");
+                await SyncAsync(session);
+            }
+        }
+        if (raised > 0) foreach (var handler in Learned) await handler(session);
+        return raised;
+    }
+
     /// <summary>Skills were learned (quests: 104012 CheckCostJobPoint).</summary>
     public List<Func<GameSession, Task>> Learned { get; } = new();
 

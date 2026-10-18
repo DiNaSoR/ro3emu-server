@@ -6,11 +6,12 @@ using Kind = Ro3Emu.Server.Game.ReconstructedDungeons.TriggerKind;
 namespace Ro3Emu.Server.Game;
 
 /// <summary>
-/// Scripted story scenes without a fight (ReconstructedDungeons.Scripted, Reconstructed/scripted-scenes.json). A step
+/// Scripted story scenes (ReconstructedDungeons.Scripted, Reconstructed/scripted-scenes.json). A step
 /// shows its scene actors, may start a story, and completes on one of its client events: a 32700 interaction on one
 /// of its actors (or the dungeon message that interaction's server-hosted action 210 names), the participant's walked
 /// position in a server region or near a point, or 84011 at the end of a story. Then the room moves on to the next
-/// step, and the last one settles the room as a clear (so DungeonService.Completed counts quest target 101018).
+/// step, and the last one settles the room as a clear (so DungeonService.Completed counts quest target 101018). A fight
+/// step instead spawns its monsters (SpawnWaveAsync) and completes when they are all killed.
 /// Generic: nothing here knows a scene, task or NPC id.
 /// </summary>
 public sealed partial class DungeonService
@@ -73,8 +74,16 @@ public sealed partial class DungeonService
     /// <summary>Called by SpawnWaveAsync for a scripted step instead of spawning monsters.</summary>
     private async Task BeginStepAsync(Attempt a, ReconstructedDungeons.ScriptedStep step)
     {
-        a.StepDone = false;
+        // A fight step has no client event to wait for: AdvanceAsync waits for its kills instead.
+        a.StepDone = step.Fight;
         await SyncSceneActorsAsync(a, step.Actors);
+        if (step.Slide is { } slide && !a.Settled && !a.Room.Closed) await StartSlideAsync(a, slide);
+        if (step.Fallback is { FromMount: false } fallback) ScheduleFallback(a, fallback);
+        int wave = a.Wave;
+        foreach (var line in step.Lines.Where(l => l.Ms > 0))
+            loop.ScheduleLegacy(TimeSpan.FromMilliseconds(line.Ms),
+                () => a.Wave != wave || a.Settled || a.Room.Closed ? Task.CompletedTask : SayStepLinesAsync(a, [line]));
+        await SayStepLinesAsync(a, step.Lines.Where(l => l.Ms <= 0).ToArray());
         if (step.Story != 0 && !a.Settled && !a.Room.Closed)
         {
             foreach (var s in Present(a).Where(a.Loaded.Contains)) s.BeginCutscene();
@@ -84,6 +93,32 @@ public sealed partial class DungeonService
                 DungeonEntry = a.Plan.SceneEntry, EventType = (DungeonEventType)4, // DungeonEventDungeonVarChange
                 StageNum = a.Wave + 1, LevelNum = 1, Vars = { new DungeonVar { VarId = StoryVar, Vi64 = { step.Story } } },
             });
+        }
+    }
+
+    /// <summary>
+    /// A step's story lines, as the story encounters say theirs (30404 DungeonEventInvokeClientFunc): a type-2 bubble
+    /// through ShowShoutingChatBubble(chat, speaker uid), needing its speaker (a shown scene actor or a living monster of
+    /// the room with that NPC id), every other type through Shouting(chat). When each line is said is (inferred).
+    /// </summary>
+    private async Task SayStepLinesAsync(Attempt a, IReadOnlyList<ReconstructedDungeons.StepLine> lines)
+    {
+        foreach (var line in lines)
+        {
+            if (a.Room.Closed || data.Row("ChatConfig", line.Chat) is not { } chat) continue;
+            bool bubble = GameData.Int(chat, "_iType") == 2;
+            long speaker = line.By == 0 ? 0
+                : a.SceneActors.FirstOrDefault(u => u.NpcId == line.By)?.Uid
+                  ?? a.Room.Monsters.FirstOrDefault(m => m.Template.NpcId == line.By && !m.Dead)?.Uid ?? 0;
+            if (bubble && speaker == 0) continue; // its speaker is not in the scene
+            var call = new DungeonEventNotify
+            {
+                DungeonEntry = a.Plan.SceneEntry, EventType = (DungeonEventType)6, StageNum = a.Wave + 1, LevelNum = 1,
+                CliFuncname = bubble ? "ShowShoutingChatBubble" : "Shouting",
+                Params = { new EventParams { IntParams = { line.Chat } } },
+            };
+            if (bubble) call.Params.Add(new EventParams { IntParams = { speaker } });
+            await BroadcastAsync(a, Event, call);
         }
     }
 
@@ -176,6 +211,7 @@ public sealed partial class DungeonService
         if (code != 0) return true;
         // Dracula's Lair: a bush search may find the key; its finder is the rescuer, the only one the cage opens for.
         if (a!.Dracula is { } dracula) await dracula.Owner.InteractedAsync(a, s, actor!.NpcId);
+        if (await RideInteractionAsync(a, s, actor!, (int)req.InteractionId)) return true;
         var events = new List<(Kind, long)> { (Kind.Interaction, req.InteractionId) };
         if (catalog.DungeonMessage(req.InteractionId) is { } message) events.Add((Kind.Message, message));
         await StepEventAsync(a!, s, events);
@@ -204,8 +240,8 @@ public sealed partial class DungeonService
             // TEST AID, not the original: the server takes the step's first completing event as if the client had
             // sent it (for an interaction, as a 32700 on its actor), so a scene can be finished while a client-side
             // problem is investigated. The usual step completion runs (teleport, next step, settlement).
-            if (Active(s) is not { } used || Step(used) is not { } current || used.StepDone)
-                throw new ArgumentException("not in a scripted scene step that is waiting");
+            if (Active(s) is not { } used || Step(used) is not { Fight: false } current || used.StepDone)
+                throw new ArgumentException("not in a scripted scene step that is waiting (a fight step ends on its kills)");
             var t = current.Complete[0];
             log.LogWarning("GM test aid: {Role} completes scripted scene {Scene} step {Step} with {Kind} {Id}",
                 s.Role?.Id, used.Plan.SceneEntry, used.Wave + 1, t.Kind, t.Id);
@@ -280,6 +316,7 @@ public sealed partial class DungeonService
         a.StepDone = true;
         log.LogInformation("Scripted scene {Scene} step {Step} '{Stage}' completed by {Role} ({Events})",
             a.Plan.SceneEntry, a.Wave + 1, step.Stage, s.Role?.Id, string.Join(", ", events));
+        await EndStepMovementAsync(a);
         if (step.TeleportAfter != 0 && catalog.ScenePoint(a.Plan.SceneEntry, step.TeleportAfter) is { } to)
             foreach (var member in Present(a).Where(m => a.Loaded.Contains(m) && !m.SceneLoading))
                 await scenes.TeleportInMapAsync(member, to);

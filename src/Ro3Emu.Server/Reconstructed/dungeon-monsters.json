@@ -88,24 +88,6 @@
     "about": "Story bosses were fought with allied NPC companions in the original; those are not reproduced. Each is scaled (basis points of HP and of attack) so a Swordman at the boss level, every stat point spent STR:VIT 2:1, no equipment, normal attacks only, kills it in about 90 s and would fall to it in about 1.4 times that (DungeonTests.EveryStoryBossIsASoloFightAtItsLevel). Inferred, not original data."
   },
   "dungeons": {
-    "1000401": {
-      "name": "Maya's nest",
-      "confidence": "medium",
-      "skipped": "Stages 2-5 (find and free the Professor from the ant egg, help him walk, open the chest) are scripted interactions; only Maya is placed, so the instance completes after stage 1.",
-      "waves": [
-        {
-          "stage": "Encounter Maya: defeat Maya",
-          "quest": 1,
-          "spawns": [
-            {
-              "point": 21,
-              "npc": 5300006,
-              "why": "label 蚁后刷怪点 'ant queen spawn point' and stage 1 'Defeat Maya'; story Maya template 5300006 (L30)"
-            }
-          ]
-        }
-      ]
-    },
     "1000501": {
       "name": "Airship",
       "confidence": "medium",
@@ -616,6 +598,7 @@
     "1000101": "Job advance scene; no spawn points.",
     "1000201": "Ant nest exploration: walking, jumping into the vortex, avoiding ant eggs; no fight. Rebuilt as a scripted scene: scripted-scenes.json.",
     "1000301": "Riding and feeding the Deniro; no fight. Rebuilt as a scripted scene: scripted-scenes.json.",
+    "1000401": "Maya's nest: Maya, then freeing the Professor from the ant egg, helping him up and the chest. Rebuilt as a scripted scene with a fight step: scripted-scenes.json.",
     "1010101": "Izlude scene; no spawn points.",
     "1015052": "Culvert variant without spawn points.",
     "1023001": "Payon instance without spawn points.",

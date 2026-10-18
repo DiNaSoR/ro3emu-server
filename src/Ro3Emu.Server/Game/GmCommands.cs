@@ -14,7 +14,7 @@ namespace Ro3Emu.Server.Game;
 /// ServerOptions.GmOpenWhenEmpty is false (a Production host, docs/guide/gm-access.md). The loopback HTTP /ro3emu/gm keeps
 /// "empty = everyone" (<see cref="Allowed(ServerOptions, string?, bool)"/>).
 /// </summary>
-public sealed class GmCommands(IOptions<ServerOptions> options, GameData data, SessionRegistry sessions, CharacterService character, SceneService scene, TaskService tasks, IServiceProvider services, ILogger<GmCommands> log)
+public sealed partial class GmCommands(IOptions<ServerOptions> options, GameData data, SessionRegistry sessions, CharacterService character, SceneService scene, TaskService tasks, IServiceProvider services, ILogger<GmCommands> log)
 {
     public const uint BroadcastNotify = 83270;
     public const uint GeneralProcGm = 30300;
@@ -49,7 +49,7 @@ public sealed class GmCommands(IOptions<ServerOptions> options, GameData data, S
     {
         var allowed = options.GmAccounts;
         if (allowed.Length == 0) return loopbackTool || options.GmOpenWhenEmpty != false;
-        return account != null && allowed.Contains(account, StringComparer.OrdinalIgnoreCase);
+        return account != null && allowed.Contains(account, StringComparer.Ordinal);
     }
 
     internal static bool IsEventOwnerCommand(string line)
@@ -189,12 +189,10 @@ public sealed class GmCommands(IOptions<ServerOptions> options, GameData data, S
                 return $"Warp to {scene} {data.MapName(scene)}";
             case OpClearPack:
                 return await character.ClearBagAsync(s);
-            case OpFullHpMp:
-                return "HP and SP are always full (no combat yet).";
             case OpSetJob:
                 return await character.SetJobAsync(s, I(args[0]));
             default:
-                return $"GM op {op} is not implemented by the emulator.";
+                return await PanelOpAsync(s, op, args) ?? $"GM op {op} is not implemented by the emulator.";
         }
     }
 
@@ -275,6 +273,11 @@ public sealed class GmCommands(IOptions<ServerOptions> options, GameData data, S
                 }
             }
             await ReplyAsync(s, reply);
+        }),
+        ["boss"] = ("spawn <npcId> | skills [npcId] | phase <n> | cast <skillId> | kill (boss skill test aids: the nearest boss within 40 m)", async (s, a) =>
+        {
+            string reply = await services.GetRequiredService<MonsterService>().BossGmAsync(s, a);
+            foreach (string line in reply.Split('\n')) await ReplyAsync(s, line);
         }),
         ["season"] = ("[playbook]", async (s, a) =>
         {

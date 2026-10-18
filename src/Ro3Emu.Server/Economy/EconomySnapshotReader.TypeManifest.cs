@@ -64,7 +64,13 @@ public static partial class EconomySnapshotReader
     // Quests: role.task_runtime TaskRuntimeState.Forgotten counts deliveries a GM !quest drop/reset forgot (task id ->
     // deliveries), only so the quest-award ledger key of a later hand-in is new. A counter, no balance and no asset; absent
     // unless a GM dropped a delivered quest.
-    public const string ExpectedFormatManifestHash = "300E5AF763FF05E0E9368118F78C7F9C0BE260570AAF755FABCD3A5E93B96003";
+    // Realm of the Gods: dungeons Honors (Final Trial goal states) and BlessingsSeen (acknowledged blessing levels) are
+    // markers; a Received honor is only the once-only source of its event/dungeon/honor-award receipt. server_state
+    // multi_dungeon_server (DBMultiDungeonServerInfo) holds the realm's first clears: the hall of fame keeps the clearing
+    // roles' equipment as a display snapshot, never a holding.
+    // Mock Battle: role.timed_battle CasualMmr/CasualRecords/CasualBest/CasualTotal are a rating and statistics, and
+    // CasualSettled the once-only markers of each match's event/casual-battle receipt; no balance, no asset.
+    public const string ExpectedFormatManifestHash = "201478235A89C85FBCCC725FBFCFD6B624EB1590FD0FCC188DCAD4DCD1EF03D5";
     public static string FormatManifestHash => State.FormatManifestHash;
 
     private sealed partial class State
@@ -133,6 +139,8 @@ public static partial class EconomySnapshotReader
             TypeShape(typeof(Ro3Emu.Server.Game.FestivalService.Round));
             entries.Add("server_state/season_history:Ro3Emu.Server.Game.SeasonService.Season");
             TypeShape(typeof(Ro3Emu.Server.Game.SeasonService.Season));
+            entries.Add("server_state/multi_dungeon_server:romsg.DBMultiDungeonServerInfo");
+            Message(Romsg.DBMultiDungeonServerInfo.Descriptor);
             return Hash(string.Join("\n", entries));
         }
     }

@@ -96,6 +96,10 @@ public sealed partial class BuffService
         return damage;
     }
 
+    /// <summary>The unit's live buffs (GM panel GmShowBuff).</summary>
+    public IReadOnlyList<ActiveBuff> UnitBuffs(WorldUnit unit) =>
+        _unitBuffs.TryGetValue(unit.Uid, out var buffs) ? buffs.ToArray() : [];
+
     /// <summary>Clear all buff lifetimes on a dead unit; removal from World also clears state.</summary>
     public async Task ClearUnitAsync(WorldUnit unit)
     {
