@@ -220,4 +220,40 @@ public sealed partial class SkillCombatTests
             return Task.CompletedTask;
         });
     }
+    [ClientDataFact]
+    public async Task JupitelThunderLandsEachBoltAsItsOwnHit()
+    {
+        await using var alice = await InWorld("Alice");
+        await Gm("alice", "!job 2200"); await Teach("alice", 12102);
+        Combat.Rolls = new FixedRolls(9999);
+        // Lv1 shows 10 bolts 250 ms apart (_kShowDmg [10], bullet 1210202 m_fBulletHatchInterval 250), and its hit
+        // effect 1210203 does not spread one hit's numbers, so each bolt is a hit of its own.
+        var target = await CastAt(alice, "alice", 1210201);
+        var first = await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser, h => h.SkillId == 1210201);
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        long total = first.Dsts.Single(d => d.DstID == target.Uid).Damage;
+        for (int i = 1; i < 10; i++)
+            total += (await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser, h => h.SessionId == first.SessionId))
+                .Dsts.Single(d => d.DstID == target.Uid).Damage;
+        Assert.InRange(clock.ElapsedMilliseconds, 1900, 4000); // nine more bolts, 250 ms apart
+        Assert.Equal(0, first.Split);
+        await Loop.InvokeAsync(() => { Assert.Equal(1_000_000 - total, target.Hp); return Task.CompletedTask; });
+    }
+    [ClientDataFact]
+    public async Task MeteorStormStrikesOncePerMeteor()
+    {
+        await using var alice = await InWorld("Alice");
+        await Gm("alice", "!job 2200"); await Teach("alice", 12106);
+        Combat.Rolls = new FixedRolls(9999);
+        var target = await Target("alice", stationary: true);
+        await Loop.InvokeAsync(() => { target.Hp = 1_000_000; return Task.CompletedTask; });
+        // Lv1: "strikes in 2 waves" ([npc 1200014, 300 ms, 1600 ms, 550, 550, 2]).
+        await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1210601, TargetId = target.Uid, TargetPos = target.Pos.Clone() });
+        Assert.Equal(0, (await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
+        await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser, h => h.SkillId == 1210601);
+        await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser, h => h.SkillId == 1210601);
+        await Task.Delay(2500); // the shower's 1.6 s are over
+        Assert.Equal(2, alice.Inbox.Snapshot().Count(e => e.IsGame(CombatService.SkillHit)
+            && SkillHitInfo.Parser.ParseFrom(e.Body).SkillId == 1210601));
+    }
 }
