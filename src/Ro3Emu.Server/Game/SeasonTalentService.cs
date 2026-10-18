@@ -143,7 +143,7 @@ public sealed class SeasonTalentService
         s.TalentEffectsEnabled = Available(s);
         Seed(state);
         var active = state.Plan[state.CurPlanId];
-        long total = Total(active);
+        long total = Total(state, active);
         state.UnlockedTrees.Clear();
         long? oathMax = null;
         foreach (var tree in Trees())
@@ -189,12 +189,13 @@ public sealed class SeasonTalentService
 
     private sealed record TalentNode(long Id, long Tree, long Type, long NeedLevel, bool Start, long MaxLevel, long Group);
 
-    /// <summary>(inferred) Tree and node thresholds count the selected plan's purchased ordinary levels: not the
-    /// shared oath, nor the free branch point and job nodes.</summary>
-    private long Total(SeasonTalentPlan plan)
+    /// <summary>(inferred) Tree and node thresholds count the total the talent panel shows
+    /// (UI_Sys_Skill_SeasonTalentPanelCtrl._refreshGrade): every node of every tree but the SkillPoint branch points,
+    /// so the selected plan's ordinary and job node levels plus the shared oath level.</summary>
+    private long Total(DBSeasonTalent state, SeasonTalentPlan plan)
     {
         Nodes();
-        long total = 0;
+        long total = Math.Max(0, state.BattleOathLevel);
         foreach (var (id, node) in plan.TalentNodes)
             if (_countedIds!.Contains(id)) total += Math.Max(0, node.CurrentLevel);
         return total;
@@ -265,7 +266,7 @@ public sealed class SeasonTalentService
         _byId = byId;
         _branchPoint = branchPoint;
         _branchOf = branchOf;
-        _countedIds = nodes.Where(n => n.Type is not (PvpNodeType or BranchPointType or BranchType or BranchPassiveType))
+        _countedIds = nodes.Where(n => n.Type is not (PvpNodeType or BranchPointType)) // the oath is added once, from its shared level
             .Select(n => n.Id).ToHashSet();
         _nodeIds = nodes.Select(n => n.Id).ToHashSet();
         return _nodes = nodes;
@@ -534,7 +535,7 @@ public sealed class SeasonTalentService
         if (!Available(s) || s.SeasonTalent is not { } state || s.Progress == null
             || !state.Plan.TryGetValue(state.CurPlanId, out var plan)) yield break;
         Nodes();
-        long total = Total(plan);
+        long total = Total(state, plan);
         foreach (var (id, saved) in plan.TalentNodes)
         {
             if (saved.CurrentLevel <= 0 || !_byId!.TryGetValue(id, out var node)

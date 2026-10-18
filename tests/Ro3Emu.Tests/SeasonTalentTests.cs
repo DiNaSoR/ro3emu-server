@@ -34,7 +34,8 @@ public sealed class SeasonTalentTests
         public string GameDataDir => Path.Combine(dir, "game");
 
         public async Task StartAsync(int playbook = 101, bool removeLevelTwo = false, bool extraMemberAttr = false,
-            bool oathOpen = false, bool missingGraph = false, bool jobSpecificRow = false, bool jobTreeOpen = false)
+            bool oathOpen = false, bool missingGraph = false, bool jobSpecificRow = false, bool jobTreeOpen = false,
+            long? afterPointNeedLevel = null)
         {
             string config = Path.Combine(dir, "game", "config");
             Directory.CreateDirectory(config);
@@ -71,6 +72,14 @@ public sealed class SeasonTalentTests
                 var trees = JsonNode.Parse(File.ReadAllText(treeFile))!.AsObject();
                 trees["10102"]!["_iNeedLevel"] = 0;
                 File.WriteAllText(treeFile, trees.ToJsonString());
+            }
+
+            if (afterPointNeedLevel is { } need)
+            {
+                string nodeFile = Path.Combine(config, "SeasonTalentConfig.json");
+                var nodes = JsonNode.Parse(File.ReadAllText(nodeFile))!.AsObject();
+                nodes[AfterPoint.ToString(System.Globalization.CultureInfo.InvariantCulture)]!["_iNeedLevel"] = need;
+                File.WriteAllText(nodeFile, nodes.ToJsonString());
             }
 
             if (removeLevelTwo || extraMemberAttr || jobSpecificRow)
@@ -571,6 +580,37 @@ public sealed class SeasonTalentTests
         Assert.Equal(0, await Upgrade(alice, 10102117)); // [1,103,15]: Physical ATK +15
         Assert.Equal(15, fixture.Character.Stats(fixture.Session)[103] - before);
         Assert.Equal(1, fixture.Session.SeasonTalent!.Plan[0].TalentNodes[10102006].CurrentLevel);
+    }
+
+    [ClientDataFact]
+    public async Task JobNodeLevelsCountTowardTheTotalTalentLevel()
+    {
+        // The talent panel's total counts job nodes (not branch points), and the third tree's 126 needs them: the
+        // first two trees' ordinary nodes stop at 120. A private node threshold of 22 stands in for it here.
+        await using var fixture = new ServerFixture();
+        await fixture.StartAsync(jobTreeOpen: true, afterPointNeedLevel: 22);
+        var alice = await JobTreeRole(fixture, 1200);
+        await Max(alice, 10102001);
+        await Max(alice, 10102002); // 20 ordinary levels
+        Assert.Equal(0, await Upgrade(alice, PierceA)); // + Pierce and Pierce A; the branch point does not count
+        Assert.True(fixture.Session.SeasonTalent!.UnlockedNode[AfterPoint]);
+        Assert.Equal(0, await Upgrade(alice, AfterPoint));
+    }
+
+    [ClientDataFact]
+    public async Task JobNodesStopCountingWhenTheBranchIsReplaced()
+    {
+        await using var fixture = new ServerFixture();
+        await fixture.StartAsync(jobTreeOpen: true, afterPointNeedLevel: 23);
+        var alice = await JobTreeRole(fixture, 1200);
+        await Max(alice, 10102001);
+        await Max(alice, 10102002);
+        Assert.Equal(0, await Upgrade(alice, PierceA));
+        Assert.Equal(ErrorCodes.TalentLocked, await Upgrade(alice, AfterPoint)); // 22 of 23
+        Assert.Equal(0, await Upgrade(alice, PierceB));
+        Assert.True(fixture.Session.SeasonTalent!.UnlockedNode[AfterPoint]); // 23
+        Assert.Equal(0, await Upgrade(alice, BashA)); // Bash and Bash A replace three Pierce levels: 22
+        Assert.False(fixture.Session.SeasonTalent!.UnlockedNode[AfterPoint]);
     }
 
     private static string RepoRoot()
