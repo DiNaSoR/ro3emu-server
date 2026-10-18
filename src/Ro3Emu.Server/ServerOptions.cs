@@ -228,6 +228,14 @@ public sealed class VoiceOptions
     /// <summary>Extra frames the token bucket allows in a short burst on top of <see cref="FramesPerSecond"/>.</summary>
     public int Burst { get; set; } = 10;
 
+    /// <summary>Control frames (Join, Leave, Mic, Speaker, Ping, anything else after Auth) a connection may send per
+    /// second; the extra ones are dropped, and a sustained flood (3x this rate over 5 s) disconnects it. A real
+    /// client sends a few per minute: a ping every 10 s plus the player's own clicks.</summary>
+    public int ControlPerSecond { get; set; } = 10;
+
+    /// <summary>Extra control frames allowed in a short burst on top of <see cref="ControlPerSecond"/>.</summary>
+    public int ControlBurst { get; set; } = 20;
+
     /// <summary>Longest opus payload accepted in one Audio frame, in bytes.</summary>
     public int MaxPayload { get; set; } = 512;
 
