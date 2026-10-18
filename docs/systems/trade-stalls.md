@@ -83,4 +83,5 @@ dotnet test tests/Ro3Emu.Tests --filter "Category!=Slow" --settings tests/Ro3Emu
 - 32601 has no recovered sender; 32611 has no extracted schema; 32622 queue notification is not emitted; no invented 32624/32627 behavior.
 - 33402 line-query schemas are missing; 33422 avatar sync has no recovered active consumer. Cross-line behavior is unavailable in the current single-line world.
 - Original market dynamics, anti-abuse/credit review and dynamic system-stall scheduler remain unproven as described above.
+- TradeConfig copy/recycle triggers are disabled on every row and not implemented. The optional built-in seller and buy-back for solo play ([exchange.md](../guide/exchange.md)) are emulator aids, not reconstructions.
 - Ordinary and guild mail use the canonical mail service ([mail.md](mail.md)); dormant legacy protocols and localization presentation are not extended here. Ordinary-client UI rendering, attachment msgpack decoding, request reattachment and original-server packet comparison have not been verified.

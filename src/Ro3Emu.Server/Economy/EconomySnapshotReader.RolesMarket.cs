@@ -345,7 +345,9 @@ public static partial class EconomySnapshotReader
                             long seller = Long(row, "SellerId"), quantity = Long(row, "Quantity");
                             if (!Try(row, "Item", out var item) || Long(item, "Stack") != quantity || Long(item, "Entry") != Long(row, "Entry"))
                                 throw new FormatException("Trade listing item/quantity mismatch.");
-                            Item(item, Role(seller, key), EconomyCompartment.TradeListing, key); break;
+                            // Seller 0 is the built-in exchange seller (TradeService.SystemSellerId).
+                            Item(item, seller == 0 ? new EconomyOwner(EconomyOwnerKind.System, "trade-exchange") : Role(seller, key),
+                                EconomyCompartment.TradeListing, key); break;
                         case "trade_preorder":
                             Fields(row, "Id Sku Spu BuyerId Entry Quantity Price Currency TimeMs Sequence Status Hidden Item");
                             long status = Long(row, "Status"), count = Long(row, "Quantity"), price = Long(row, "Price");

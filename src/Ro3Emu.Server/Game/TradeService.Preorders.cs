@@ -211,7 +211,7 @@ public sealed partial class TradeService
             }
             // (inferred) PublicParam listing-display times are hours. Remaining unsold escrow
             // expires into the current exchange return template and can be claimed once.
-            foreach (var listing in Active(tx).Where(l => l.ExpiresAtMs is > 0 && l.ExpiresAtMs <= now))
+            foreach (var listing in Active(tx).Where(l => !IsSystem(l) && l.ExpiresAtMs is > 0 && l.ExpiresAtMs <= now))
             {
                 var back = listing.Item.Clone(); back.Guid = 0; back.Grid = 0; back.Stack = listing.Quantity;
                 tx.DeliverMail(listing.SellerId, 1067, [back], contentParams: [data.ItemName(back.Entry)]);
@@ -228,7 +228,7 @@ public sealed partial class TradeService
                 tx.Delete(Listings, listing.Sku);
             }
             wrote = matured.Count > 0 || expiredCount.Count > 0;
-            foreach (var listing in Active(tx))
+            foreach (var listing in Active(tx).Where(l => !IsSystem(l))) // TickSystemAsync keeps its own listings
             {
                 if (listing.PublicUntilMs > 0) due = Math.Min(due, listing.PublicUntilMs);
                 if (listing.ExpiresAtMs > 0) due = Math.Min(due, listing.ExpiresAtMs);

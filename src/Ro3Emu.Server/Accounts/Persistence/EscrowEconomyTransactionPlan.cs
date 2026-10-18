@@ -406,9 +406,11 @@ internal sealed class EscrowEconomyTransactionPlan(RoleItemPlan child, EscrowEco
                 return authorization.Reason switch
                 {
                     EconomyReason.MailExpiry => location.Compartment is EconomyCompartment.Mail or EconomyCompartment.LegacyMail,
+                    // The built-in exchange seller (TradeService.System) restocks and retires its own listings, and
+                    // its buy-back retires a player's whole listing.
                     EconomyReason.SystemRetire => location.Compartment == EconomyCompartment.Stall &&
-                        location.Owner.Kind == EconomyOwnerKind.System,
-                    EconomyReason.SystemRestock => location.Compartment == EconomyCompartment.Stall &&
+                        location.Owner.Kind == EconomyOwnerKind.System || location.Compartment == EconomyCompartment.TradeListing,
+                    EconomyReason.SystemRestock => (location.Compartment is EconomyCompartment.Stall or EconomyCompartment.TradeListing) &&
                         location.Owner.Kind == EconomyOwnerKind.System,
                     EconomyReason.GuildMarketCapDiscard => location.Compartment is EconomyCompartment.GuildMarket or EconomyCompartment.Recovery,
                     _ => true

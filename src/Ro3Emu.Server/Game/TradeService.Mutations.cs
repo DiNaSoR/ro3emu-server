@@ -139,8 +139,12 @@ public sealed partial class TradeService
                 item.Guid = 0; // (inferred) a claimed escrow part gets a new bag GUID; all item fields survive.
                 item.Stack = take; item.Grid = 0;
                 long gross = (long)take * listing.UnitPrice;
-                long fee = MarketFee(gross, currency);
+                bool system = IsSystem(listing);
+                long fee = system ? 0 : MarketFee(gross, currency);
                 if (fee > 0) tx.Economy.Sink(new(EconomyAssetKind.Currency, currency), fee, EconomyReason.MarketTax,
+                    EconomyCompartment.Currency, new(EconomyOwnerKind.Role, buyer.RoleId.ToString(CultureInfo.InvariantCulture)));
+                // The built-in seller (TradeService.System) is paid by nobody: the whole price leaves the economy.
+                if (system) tx.Economy.Sink(new(EconomyAssetKind.Currency, currency), gross, EconomyReason.NpcShopPayment,
                     EconomyCompartment.Currency, new(EconomyOwnerKind.Role, buyer.RoleId.ToString(CultureInfo.InvariantCulture)));
                 var sale = new Sale
                 {
@@ -149,7 +153,7 @@ public sealed partial class TradeService
                     UnitPrice = listing.UnitPrice, TimeMs = NowMs, Item = item,
                 };
                 tx.DeliverMail(buyer.RoleId, 1064, [item], contentParams: SaleMailParams(sale, gross, false));
-                tx.DeliverMail(listing.SellerId, 1063, currency: new Dictionary<int, long> { [currency] = gross - fee },
+                if (!system) tx.DeliverMail(listing.SellerId, 1063, currency: new Dictionary<int, long> { [currency] = gross - fee },
                     contentParams: SaleMailParams(sale, gross, true));
                 tx.Put(History, sale.Id, sale);
                 listing.Quantity -= take;

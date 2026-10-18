@@ -656,8 +656,13 @@ public static class EconomyLedgerReader
     private static bool EscrowReasonLocation(EconomyLeg leg) => leg.Reason switch
     {
         EconomyReason.MailExpiry => leg.Location.Compartment is EconomyCompartment.Mail or EconomyCompartment.LegacyMail,
-        EconomyReason.SystemRetire or EconomyReason.SystemRestock =>
-            leg.Location.Compartment == EconomyCompartment.Stall && leg.Location.Owner.Kind == EconomyOwnerKind.System,
+        // Same rule as EscrowEconomyTransactionPlan: system stalls, the built-in exchange seller and its buy-back.
+        EconomyReason.SystemRetire =>
+            leg.Location.Compartment == EconomyCompartment.Stall && leg.Location.Owner.Kind == EconomyOwnerKind.System
+            || leg.Location.Compartment == EconomyCompartment.TradeListing,
+        EconomyReason.SystemRestock =>
+            (leg.Location.Compartment is EconomyCompartment.Stall or EconomyCompartment.TradeListing)
+            && leg.Location.Owner.Kind == EconomyOwnerKind.System,
         EconomyReason.GuildMarketCapDiscard =>
             leg.Location.Compartment is EconomyCompartment.GuildMarket or EconomyCompartment.Recovery,
         _ => true

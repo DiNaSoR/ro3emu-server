@@ -104,6 +104,12 @@ public sealed class ServerOptions
     public RatesOptions Rates { get; set; } = new();
 
     /// <summary>
+    /// Solo-play aids for the Trade Exchange (TradeService.System, docs/guide/exchange.md). Off by default so the tests
+    /// keep the player-only market; appsettings.Development.json turns them on for local play.
+    /// </summary>
+    public ExchangeOptions Exchange { get; set; } = new();
+
+    /// <summary>
     /// What a new character gets on its first login (docs/guide/starter-kit.md). Unset: nothing (inferred). The client
     /// data has no starting-item table; a Novice's first potions, coins and gear come from main quests.
     /// </summary>
@@ -161,6 +167,37 @@ public sealed class RatesOptions
 
     /// <summary>Amount of each currency (Zeny and the like) a kill drops.</summary>
     public double CurrencyDrop { get; set; } = 1;
+}
+
+/// <summary>
+/// NOT original behaviour. A built-in seller keeps every Trade Exchange item in stock, and optionally buys cheap player
+/// listings back, so the exchange works on a realm with few or no other players.
+/// </summary>
+public sealed class ExchangeOptions
+{
+    /// <summary>List every TradeConfig market item from a built-in seller and restock it.</summary>
+    public bool SystemSeller { get; set; }
+
+    /// <summary>Units the seller keeps listed of each stackable item (cards, materials, blueprints).</summary>
+    public int Stock { get; set; } = 10;
+
+    /// <summary>Single pieces the seller keeps listed of each equipment, appearance or other unstackable item.</summary>
+    public int UniqueStock { get; set; } = 2;
+
+    /// <summary>Minutes between restocks back up to <see cref="Stock"/> and <see cref="UniqueStock"/>.</summary>
+    public int RestockMinutes { get; set; } = 30;
+
+    /// <summary>The seller's price as a multiple of the item's recommended (base) price, kept in the item's price range.</summary>
+    public double SellPrice { get; set; } = 1.0;
+
+    /// <summary>Buy player listings priced at or below <see cref="BuyBackPrice"/> times the base price.</summary>
+    public bool BuyBack { get; set; }
+
+    /// <summary>Minutes a listing waits (after any public listing period) before the seller buys it.</summary>
+    public int BuyBackMinutes { get; set; } = 10;
+
+    /// <summary>Highest price the seller pays, as a multiple of the base price.</summary>
+    public double BuyBackPrice { get; set; } = 1.0;
 }
 
 /// <summary>In-game bug reports: the menu's Feedback button and "/bug" in chat (FeedbackService).</summary>
