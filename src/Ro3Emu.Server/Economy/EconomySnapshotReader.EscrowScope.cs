@@ -183,8 +183,9 @@ public static partial class EconomySnapshotReader
                     case "trade_listing":
                         if (Long(row, "Quantity") != Long(Prop(row, "Item"), "Stack"))
                             throw new InvalidDataException("E03 listing quantity mismatch.");
-                        ScopedItem(Prop(row, "Item"), new(EconomyOwnerKind.Role, Id(Long(row, "SellerId"))),
-                            EconomyCompartment.TradeListing, key);
+                        long seller = Long(row, "SellerId"); // 0: the built-in exchange seller (TradeService.SystemSellerId)
+                        ScopedItem(Prop(row, "Item"), seller == 0 ? new(EconomyOwnerKind.System, "trade-exchange")
+                            : new(EconomyOwnerKind.Role, Id(seller)), EconomyCompartment.TradeListing, key);
                         break;
                     case "trade_preorder":
                         if (Long(row, "Status") == 0) ScopedHold(new(EconomyAssetKind.Currency, Long(row, "Currency")),

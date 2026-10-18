@@ -89,6 +89,10 @@ public sealed partial class CharacterService
     /// </summary>
     private Dictionary<int, long>? RollAttrs(int entry) => EquipmentAffixes.Create(entry, data);
 
+    /// <summary>The per-instance attributes a newly granted item of this entry gets (totem, emblem or equipment rolls).</summary>
+    internal Dictionary<int, long>? NewItemAttrs(int entry) =>
+        TotemAttrFactory?.Invoke(entry) ?? EmblemAttrFactory?.Invoke(entry) ?? RollAttrs(entry);
+
     /// <summary>A worn item's base attributes: its rolled values, or EquipConfig's minimums for an instance without them.</summary>
     private static IEnumerable<(long Id, double Value)> BaseAttributes(InvItem item, JsonElement equip)
     {
