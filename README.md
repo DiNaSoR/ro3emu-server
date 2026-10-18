@@ -209,8 +209,9 @@ dotnet test tests/Ro3Emu.Setup.Tests -c Release                         # RO3Emu
 dotnet test tests/Ro3Emu.Patcher.Tests -c Release                       # update engine
 ```
 
-Most server tests need the exported `data/` and are skipped without it. CI runs all three suites on Linux on every
-push. The suite runs as if the machine were in UTC+08, so results don't depend on where it runs
+Tests of content need the exported `data/` and are skipped without it; tests of rules (persistence, retries,
+ownership, logins) run on a small invented data set in `tests/Ro3Emu.Tests/Fixtures/GameData`, so CI runs them too
+([docs/guide/testing.md](docs/guide/testing.md)). CI runs all three suites on Linux on every push. The suite runs as if the machine were in UTC+08, so results don't depend on where it runs
 (`RO3EMU_TEST_HOST_TZ=<zone id>` picks another zone, `host` keeps the real one).
 
 ### Load tests
@@ -250,6 +251,7 @@ flowchart LR
 - **One game loop** owns all game state on a 50 ms tick; network readers only parse and queue, so services need no
   locks of their own.
 - **Persistence off the loop:** stores hand immutable plans to a single writer thread, one transaction per plan.
+  Activity rewards are settled through durable payout obligations ([docs](docs/systems/durable-settlement.md)).
 - **Visibility:** a grid per scene, views capped at the client's own limit, nearest players first; broadcasts are
   serialized once and shared.
 - **Map lines:** busy public maps open more channels and close empty ones.

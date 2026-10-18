@@ -97,6 +97,17 @@ public sealed class ServerOptions
     /// <summary>In-game bug reports (FeedbackService, docs/guide/feedback.md).</summary>
     public FeedbackOptions Feedback { get; set; } = new();
 
+    /// <summary>
+    /// Credential checks (SDK login, character deletion) one remote address may make per minute; past it the server
+    /// answers 429 without hashing. Each check costs a 100 000-round PBKDF2 hash, and logins register accounts.
+    /// Loopback is exempt (local play, the load tests, RO3Emu.exe); behind a reverse proxy every player shares the
+    /// proxy's address, so raise this there.
+    /// </summary>
+    public int LoginAttemptsPerMinute { get; set; } = 20;
+
+    /// <summary>Tests: the credential limit applies to loopback too.</summary>
+    public bool LoginLimitIncludesLoopback { get; set; }
+
     /// <summary>Team voice relay proof of concept (Voice/, docs TBD). Off until a port is set.</summary>
     public VoiceOptions Voice { get; set; } = new();
 
