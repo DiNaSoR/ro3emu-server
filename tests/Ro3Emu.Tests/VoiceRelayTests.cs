@@ -81,14 +81,27 @@ public sealed class VoiceRelayTests : IAsyncLifetime
 
     private static async Task<(long RoleId, byte[] Token)> GetTicketAsync(BotClient bot, int expectedPort = 0)
     {
+        var ticket = await GetRawTicketAsync(bot);
+        if (expectedPort != 0) Assert.Equal(expectedPort, ticket.Port);
+        return (ticket.RoleId, ticket.Token);
+    }
+
+    /// <summary>77016 parsed by hand (not through BotVoiceTicket) so the wire layout itself is pinned here:
+    /// u16 port | u8 hostLen | host ASCII | i64 roleId | 16-byte token | u32 ttlSeconds.</summary>
+    private static async Task<(ushort Port, string Host, long RoleId, byte[] Token, uint Ttl)> GetRawTicketAsync(BotClient bot)
+    {
         using var expected = bot.Inbox.Expect(e => e.IsGame(VoiceTicketService.Ticket));
         await bot.SendGameBytesAsync(VoiceTicketService.TicketReq, []);
         byte[] body = (await expected.WaitAsync(Wait)).Body;
         ushort port = BitConverter.ToUInt16(body, 0);
-        long roleId = BitConverter.ToInt64(body, 2);
-        byte[] token = body[10..26];
-        if (expectedPort != 0) Assert.Equal(expectedPort, port);
-        return (roleId, token);
+        int hostLen = body[2];
+        string host = System.Text.Encoding.ASCII.GetString(body, 3, hostLen);
+        int at = 3 + hostLen;
+        Assert.Equal(at + 8 + 16 + 4, body.Length);
+        long roleId = BitConverter.ToInt64(body, at);
+        byte[] token = body[(at + 8)..(at + 24)];
+        uint ttl = BitConverter.ToUInt32(body, at + 24);
+        return (port, host, roleId, token, ttl);
     }
 
     private async Task<VoiceTestClient> ConnectAuthedAsync(long roleId, byte[] token)
@@ -108,6 +121,19 @@ public sealed class VoiceRelayTests : IAsyncLifetime
         var (roleId, token) = await GetTicketAsync(alice, _voicePort);
         Assert.Equal(aliceId, roleId);
         Assert.NotEqual(new byte[16], token);
+    }
+
+    [Fact]
+    public async Task TicketCarriesTheHostTheGameGateWasReachedOn()
+    {
+        var (alice, _) = await InWorld("Alice");
+        await using var a = alice;
+        var ticket = await GetRawTicketAsync(alice);
+        // The bot reached the game gate on loopback, so GateHost falls back to PublicHost: the same rule as the
+        // server list.
+        Assert.Equal("127.0.0.1", ticket.Host);
+        Assert.Equal(_voicePort, ticket.Port);
+        Assert.Equal(60u, ticket.Ttl);
     }
 
     [Fact]
@@ -157,6 +183,49 @@ public sealed class VoiceRelayTests : IAsyncLifetime
 
         // 300 ms of silence after the last frame flips speaking back to 0 (the sweep ticks every 50 ms).
         await bobVoice.WaitAsync((t, p) => t == VoiceDown.Vad && p[8] == 0, TimeSpan.FromSeconds(2));
+    }
+
+    [Fact]
+    public async Task EchoBotRepeatsAPartyMembersAudioUnderItsOwnRoleIdAndStopsWhenItLeaves()
+    {
+        var (alice, _) = await InWorld("Alice");
+        var (echo, echoId) = await InWorld("EchoBot");
+        await using var a = alice;
+        await using var e = echo;
+        using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+
+        // The bot waits for an invite and accepts it, the way BotCli voice-echo does.
+        var accepted = BotVoiceEcho.AcceptPartyInviteAsync(echo, _ => { }, stop.Token);
+        await alice.SendGameAsync(Server.Game.TeamService.TeamCreate, new Romsg.TeamCreateReq { TeamType = Romsg.TeamType.Five, TargetId = 1001 });
+        var created = await Next(alice, Server.Game.TeamService.TeamCreate, Romsg.TeamCreateResp.Parser);
+        await alice.SendGameAsync(Server.Game.TeamService.TeamInvite, new Romsg.InviteIntoTeamReq { Guid = echoId });
+        long teamId = await accepted.WaitAsync(Wait);
+        Assert.Equal(created.TeamId, teamId);
+
+        var (aliceRole, aliceToken) = await GetTicketAsync(alice);
+        await using var aliceVoice = await ConnectAuthedAsync(aliceRole, aliceToken);
+        await aliceVoice.JoinAsync(teamId.ToString());
+        Assert.Equal(VoiceJoinCode.Ok, (await aliceVoice.WaitTypeAsync(VoiceDown.JoinResult, Wait)).Payload[0]);
+        await aliceVoice.MicAsync(true);
+
+        var run = BotVoiceEcho.RunAsync(echo, echoId, teamId, TimeSpan.FromMilliseconds(50), _ => { }, stop.Token);
+        // The bot is in the room with its mic on before Alice talks.
+        await aliceVoice.WaitAsync((t, p) => t == VoiceDown.MicState && BitConverter.ToInt64(p) == echoId && p[8] == 1, Wait);
+
+        for (ushort seq = 0; seq < 5; seq++)
+            await aliceVoice.SendAudioAsync(seq, [(byte)(0xA0 + seq), (byte)seq, 7]);
+        for (ushort seq = 0; seq < 5; seq++)
+        {
+            var (_, payload) = await aliceVoice.WaitAsync((t, p) => t == VoiceDown.Audio, Wait);
+            Assert.Equal(echoId, BitConverter.ToInt64(payload));
+            Assert.Equal(new byte[] { (byte)(0xA0 + seq), (byte)seq, 7 }, payload[10..]);
+        }
+
+        // Leaving the party: the membership sweep removes it from the room and the run ends on that Kicked.
+        await echo.SendGameAsync(Server.Game.TeamService.TeamLeave, new Romsg.LeaveTeamReq());
+        var end = await run.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(BotVoiceEchoEndKind.Kicked, end.Kind);
+        Assert.Equal(VoiceKickCode.RemovedFromRoom, end.KickCode);
     }
 
     [Fact]
@@ -370,6 +439,10 @@ public sealed class VoiceRelayTests : IAsyncLifetime
         await aliceVoice.MicAsync(true);
         await bobVoice.WaitTypeAsync(VoiceDown.MicState, Wait);
         await bobVoice.SpeakerAsync(false);
+        // Speaker has no reply; a Pong on the same connection proves the server handled it before Alice's audio,
+        // which travels on another socket and could otherwise overtake it.
+        await bobVoice.PingAsync();
+        await bobVoice.WaitTypeAsync(VoiceDown.Pong, Wait);
         await aliceVoice.SendAudioAsync(1, [4, 5, 6]);
         await bobVoice.ExpectNoneAsync((t, _) => t == VoiceDown.Audio, TimeSpan.FromMilliseconds(500));
     }
@@ -395,11 +468,11 @@ public sealed class VoiceRelayTests : IAsyncLifetime
 
             var (bot, _) = await InWorldOn($"http://127.0.0.1:{httpPort}", dataDir, "Solo");
             await using var s = bot;
-            using var expected = bot.Inbox.Expect(e => e.IsGame(VoiceTicketService.Ticket));
-            await bot.SendGameBytesAsync(VoiceTicketService.TicketReq, []);
-            byte[] body = (await expected.WaitAsync(Wait)).Body;
-            Assert.Equal(0, BitConverter.ToUInt16(body, 0));
-            Assert.Equal(new byte[16], body[10..26]);
+            var ticket = await GetRawTicketAsync(bot);
+            Assert.Equal(0, ticket.Port);
+            Assert.Equal("", ticket.Host);
+            Assert.Equal(new byte[16], ticket.Token);
+            Assert.Equal(0u, ticket.Ttl);
         }
         finally
         {
