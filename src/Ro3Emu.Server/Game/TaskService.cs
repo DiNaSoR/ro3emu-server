@@ -409,8 +409,17 @@ public sealed partial class TaskService
                 session.Tasks.CompleteTaskNum[FirstTask] = 0;
                 break;
             case "drop":
+                bool shown = Active(session, id);
                 session.Tasks.Infos.Remove(id);
                 session.Tasks.CompleteTaskNum.Remove(id);
+                if (shown)
+                {
+                    // The quest log and tracker drop a quest only on 31203 (LC_DAL_Task TaskGiveUpResp ->
+                    // TaskGiveUpEvent -> LC_System_Task.CancelOrRsetTask), as for the player's own give-up; the
+                    // dataset's del alone leaves it on screen. Synced before settling, which may offer it again.
+                    await session.SendGameAsync(TaskGiveUp, new TaskGiveUpResp { Result = 0, Id = id });
+                    await FlushAsync(session);
+                }
                 break;
             case "accept" when defs.ContainsKey(id):
                 Accept(session, id);
