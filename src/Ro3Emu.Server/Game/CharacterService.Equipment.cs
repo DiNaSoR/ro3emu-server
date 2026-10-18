@@ -173,6 +173,22 @@ public sealed partial class CharacterService
     };
 
     /// <summary>
+    /// The grids an item may go to for a career. A job whose JobConfig._kWeaponForm lacks SingleHand (1) and has
+    /// DoubleHand (3), the Assassin line [2, 3], is enum_WeaponStatusType.TwoHandAndDoubleHand: a main-hand weapon
+    /// (EquipPosType 2) may also go to the off hand (LC_EquipmentHelper.GetWeaponStatusType / CanEquipToGrid /
+    /// GetSelectableGridTypes), which Dual-Wield Mastery describes as "equip a Dagger in your Off-Hand".
+    /// </summary>
+    private int[] GridsFor(int part, int career) => part == 2 && DualWields(career) ? [1, 2] : GridsFor(part);
+
+    internal bool DualWields(int career)
+    {
+        if (data.Row("JobConfig", career) is not { } job || !job.TryGetProperty("_kWeaponForm", out var forms)
+            || forms.ValueKind != JsonValueKind.Array || forms.GetArrayLength() < 2) return false;
+        var set = forms.EnumerateArray().Select(f => GameData.Number(f) ?? 0).ToHashSet();
+        return !set.Contains(1) && set.Contains(3);
+    }
+
+    /// <summary>
     /// 31400 equip / unequip (spec §4.7): bag 5009, equipment 5007 (before the reply, so the client's gear map exists),
     /// the reply with the item, then the model (31049 equipInfo) for the owner and everyone around, then the new stats.
     /// </summary>
@@ -197,7 +213,7 @@ public sealed partial class CharacterService
         else if (item != null && (int)req.Opr == 0 && item.Grid == 0 && data.Row("ItemConfig", item.Entry) is { } row && GameData.Int(row, "_iType") == ItemTypeEquip)
         {
             int part = (int)GameData.Int(row, "_iEquipPart");
-            var grids = GridsFor(part);
+            var grids = GridsFor(part, session.Progress?.Career ?? 0);
             if (grids.Length > 0)
             {
                 if (!grids.Contains(grid)) grid = grids.FirstOrDefault(g => staged.Where(i => i.Grid > 0 && i.Pack == 2 && i.Grid <= 8).All(e => e.Grid != g), grids[0]);

@@ -149,6 +149,40 @@ public sealed class CharacterTests : IAsyncLifetime
     }
 
     [ClientDataFact]
+    public async Task AssassinsWearADaggerInEachHand()
+    {
+        await using var alice = await InWorld("Alice");
+        var bag = await Next(alice, CharacterService.ItemsSync, DBItemsInfoIncrement.Parser);
+        long first = bag.PackInfo[2].All.Items.Values.Single(i => i.ItemEntry == Dagger).ItemGuid;
+        var loop = _app.Services.GetRequiredService<GameLoop>();
+        var session = _app.Services.GetRequiredService<SessionRegistry>().All().Single(s => s.Role?.Id == (long)alice.Self!.Uuid);
+        await Gm("alice", $"!item {Dagger} 1");
+        long second = 0;
+        for (int i = 0; i < 50 && second == 0; i++)
+        {
+            second = await loop.InvokeAsync(() => Task.FromResult(session.Items.FirstOrDefault(x => x.Entry == Dagger && x.Guid != first)?.Guid ?? 0));
+            if (second == 0) await Task.Delay(50);
+        }
+        async Task<int> Wear(long guid, int grid)
+        {
+            await alice.SendGameAsync(CharacterService.EquipItemOpr, new EquipItemOprReq { Opr = 0, Pos = (EquipGridType)grid, ItemGUID = guid });
+            return (await Next(alice, CharacterService.EquipItemOpr, EquipItemOprResp.Parser, r => r.ItemGUID == guid)).Result;
+        }
+        int[] Grids() => session.Items.Where(i => i.Entry == Dagger).Select(i => i.Grid).Order().ToArray();
+
+        // A Novice's off hand takes no dagger: the request lands in the main hand.
+        Assert.Equal(0, await Wear(first, 2));
+        var novice = await loop.InvokeAsync(() => Task.FromResult(Grids()));
+        Assert.Equal(new[] { 0, 1 }, novice);
+
+        // JobConfig 5200 _kWeaponForm [2, 3]: TwoHandAndDoubleHand, so a main-hand weapon may go to the off hand.
+        await Gm("alice", "!job 5200");
+        Assert.Equal(0, await Wear(second, 2));
+        var assassin = await loop.InvokeAsync(() => Task.FromResult(Grids()));
+        Assert.Equal(new[] { 1, 2 }, assassin);
+    }
+
+    [ClientDataFact]
     public async Task EquipmentAndLevelSurviveRelog()
     {
         long dagger;
