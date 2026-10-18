@@ -136,7 +136,13 @@ public sealed partial class DungeonTests
         Service<CharacterService>().StateChanged.Add(abort);
         try
         {
-            try { await OnLoop(() => Service<WorldCoreService>().ItemReviveAsync(session)); }
+            // Through the dispatcher's admission, as the client's request runs: it pins the role owner, so the
+            // aborted socket's handover cannot detach the role while the paid revive is still publishing.
+            try
+            {
+                await OnLoop(() => Service<GameMessageHandler>().HandleAsync(session, WorldCoreService.ReliveItem,
+                    ReadOnlyMemory<byte>.Empty));
+            }
             catch (Exception e) when (e is IOException or ObjectDisposedException or InvalidOperationException) { }
         }
         finally { Service<CharacterService>().StateChanged.Remove(abort); }
