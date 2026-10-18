@@ -732,7 +732,7 @@ public sealed partial class TaskService
                 accepted++;
             }
         }
-        // Side and Guide quests with no _kPreTask are gated only by _iCondition (e.g. "Join a guild", [1002, 21] =
+        // Side and Guide quests (and custom quests) with no _kPreTask are gated only by _iCondition (e.g. "Join a guild", [1002, 21] =
         // base level 21). Nothing delivers into them, so they are offered here once the condition holds.
         foreach (long root in _conditionRoots!)
         {
@@ -831,8 +831,11 @@ public sealed partial class TaskService
             foreach (var pre in def.Pre)
                 (children.TryGetValue(pre, out var list) ? list : children[pre] = new()).Add(def.Id);
         _children = children;
+        // Custom quests (content/*.json) of any type start this way too, main ones included.
+        var custom = data.Custom.Rows.TryGetValue("TaskConfig", out var rows) ? rows.Keys.ToHashSet() : [];
         _conditionRoots = defs.Values
-            .Where(d => d.Pre.Length == 0 && d.Condition != 0 && d.Accept == ReceiveAuto && d.Type is TypeSide or TypeGuide)
+            .Where(d => d.Pre.Length == 0 && d.Condition != 0 && d.Accept == ReceiveAuto
+                && (d.Type is TypeSide or TypeGuide || custom.Contains(d.Id.ToString())))
             .Select(d => d.Id).OrderBy(id => id).ToList();
         _defs = defs;
         log.LogInformation("Tasks: {Count} TaskConfig rows", defs.Count);
