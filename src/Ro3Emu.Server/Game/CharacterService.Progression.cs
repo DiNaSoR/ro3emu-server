@@ -153,7 +153,12 @@ public sealed partial class CharacterService
         return $"{TotalPoints(p) - UsedPoints(p)} free stat points.";
     }
 
-    /// <summary>31500: six absolute values in one saved plan; the active plan also changes combat stats.</summary>
+    /// <summary>
+    /// 31500: six absolute values in one saved plan; the active plan also changes combat stats. A value may go below
+    /// the saved one: the client's minus button only stops at 1 (LC_DAL_PlayerInfo.CanMinusBaseAttr), and its
+    /// Recommend build (RecommendAddPoint) sends the JobProfessPointConfig row for the role's level as-is, which is
+    /// often lower than a hand-built stat. Lowering is a free partial respec, like the free 31501 reset.
+    /// </summary>
     public async Task AllocateAsync(GameSession session, AllocateAttrPointReq req)
     {
         using var _ = await LockAsync(session);
@@ -169,7 +174,7 @@ public sealed partial class CharacterService
         foreach (var (stat, value) in req.Points)
             if (stat is >= 1 and <= 6) wanted[stat - 1] = value;
         bool ok = req.Points.Keys.All(k => k is >= 1 and <= 6)
-            && wanted.Select((v, i) => v >= previous[i] && v <= MaxStat).All(x => x) && wanted.Sum(StatCost) <= TotalPoints(p);
+            && wanted.All(v => v is >= 1 and <= MaxStat) && wanted.Sum(StatCost) <= TotalPoints(p);
         if (ok)
         {
             for (int i = 0; i < 6; i++) selected.BaseProperty[i + 1] = wanted[i];

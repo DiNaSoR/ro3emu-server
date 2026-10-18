@@ -220,7 +220,7 @@ public sealed class CharacterTests : IAsyncLifetime
         var levelStats = await Next(alice, CharacterService.OnePropertyChange, OnePropertyChange.Parser, m => m.AttrModTypes.Count > 0);
         Assert.Equal(new[] { 0 }, levelStats.AttrModTypes); // EAttrModTypeBase: the client floats the gains
 
-        // STR 1 -> 5 costs 4 x 2 (BasePointConfig); a value lower than now is refused.
+        // STR 1 -> 5 costs 4 x 2 (BasePointConfig).
         var req = new AllocateAttrPointReq { PlanIndex = 0 };
         foreach (var (stat, value) in new[] { (1, 5), (2, 1), (3, 1), (4, 1), (5, 1), (6, 1) }) req.Points[stat] = value;
         await alice.SendGameAsync(CharacterService.AllocateAttrPoints, req);
@@ -233,9 +233,20 @@ public sealed class CharacterTests : IAsyncLifetime
         Assert.Contains(str.Property.Propertys, p => p.PropertyId == 103);
         Assert.Equal(new[] { 0 }, str.AttrModTypes);
 
+        // A lower value is a free partial respec (the client's Recommend build sends one); 0 and 100 are refused.
         req.Points[1] = 2;
         await alice.SendGameAsync(CharacterService.AllocateAttrPoints, req);
-        Assert.NotEqual(0, (await Next(alice, CharacterService.AllocateAttrPoints, AllocateAttrPointRsp.Parser)).Result);
+        var lowered = await Next(alice, CharacterService.AllocateAttrPoints, AllocateAttrPointRsp.Parser);
+        Assert.Equal(0, lowered.Result);
+        Assert.Equal(2, lowered.PlanBaseProperty.BaseProperty[1]);
+        Assert.Equal(2, lowered.PlanBaseProperty.UsedAttrPoints);
+        Assert.Equal(68 - 2, lowered.PlanBaseProperty.AttrPoints);
+        foreach (var bad in new[] { 0, CharacterService.MaxStat + 1 })
+        {
+            req.Points[1] = bad;
+            await alice.SendGameAsync(CharacterService.AllocateAttrPoints, req);
+            Assert.NotEqual(0, (await Next(alice, CharacterService.AllocateAttrPoints, AllocateAttrPointRsp.Parser)).Result);
+        }
     }
 
     [ClientDataFact]
