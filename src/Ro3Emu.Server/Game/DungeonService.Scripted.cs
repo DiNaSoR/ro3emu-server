@@ -77,6 +77,8 @@ public sealed partial class DungeonService
         // A fight step has no client event to wait for: AdvanceAsync waits for its kills instead.
         a.StepDone = step.Fight;
         await SyncSceneActorsAsync(a, step.Actors);
+        if (step.Slide is { } slide && !a.Settled && !a.Room.Closed) await StartSlideAsync(a, slide);
+        if (step.Fallback is { FromMount: false } fallback) ScheduleFallback(a, fallback);
         int wave = a.Wave;
         foreach (var line in step.Lines.Where(l => l.Ms > 0))
             loop.ScheduleLegacy(TimeSpan.FromMilliseconds(line.Ms),
@@ -209,6 +211,7 @@ public sealed partial class DungeonService
         if (code != 0) return true;
         // Dracula's Lair: a bush search may find the key; its finder is the rescuer, the only one the cage opens for.
         if (a!.Dracula is { } dracula) await dracula.Owner.InteractedAsync(a, s, actor!.NpcId);
+        if (await RideInteractionAsync(a, s, actor!, (int)req.InteractionId)) return true;
         var events = new List<(Kind, long)> { (Kind.Interaction, req.InteractionId) };
         if (catalog.DungeonMessage(req.InteractionId) is { } message) events.Add((Kind.Message, message));
         await StepEventAsync(a!, s, events);
@@ -313,6 +316,7 @@ public sealed partial class DungeonService
         a.StepDone = true;
         log.LogInformation("Scripted scene {Scene} step {Step} '{Stage}' completed by {Role} ({Events})",
             a.Plan.SceneEntry, a.Wave + 1, step.Stage, s.Role?.Id, string.Join(", ", events));
+        await EndStepMovementAsync(a);
         if (step.TeleportAfter != 0 && catalog.ScenePoint(a.Plan.SceneEntry, step.TeleportAfter) is { } to)
             foreach (var member in Present(a).Where(m => a.Loaded.Contains(m) && !m.SceneLoading))
                 await scenes.TeleportInMapAsync(member, to);

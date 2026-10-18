@@ -141,6 +141,10 @@ public sealed partial class DungeonService
         public bool StepDone { get; set; }
         /// <summary>The scripted scene actors shown now (also tracked by the room for cleanup).</summary>
         internal List<SceneActorUnit> SceneActors { get; } = new();
+        /// <summary>Participants a scripted step put on a slide (DungeonService.Ride).</summary>
+        internal HashSet<GameSession> Sliding { get; } = new();
+        /// <summary>Participants riding a scene actor (DungeonService.Ride).</summary>
+        internal Dictionary<GameSession, Ride> Riders { get; } = new();
         internal GuildChallengeService.Run? GuildChallenge { get; set; }
         /// <summary>Dracula's Lair: DraculaWeddingService owns admission, the bride, the key and the settlement.</summary>
         internal DraculaWeddingService.Run? Dracula { get; set; }
@@ -747,6 +751,7 @@ public sealed partial class DungeonService
         if (s.DungeonAttempt is not { } a) return;
         s.DungeonAttempt = null; s.Attack = null;
         if (a.Dracula is { } dracula) await dracula.Owner.LeftAsync(a, s);
+        await EndMovementAsync(a, s);
         await ClearBondsAsync(s, a);
         await instances.AbandonAsync(s);
         var remaining = Present(a);
@@ -764,6 +769,7 @@ public sealed partial class DungeonService
     private async Task SettleAsync(Attempt a, bool won)
     {
         if (a.Settled || a.Room.Closed) return;
+        await EndStepMovementAsync(a);
         await EndEncounterAsync(a, won);
         if (a.GuildChallenge is { } challenge)
         {
@@ -888,6 +894,6 @@ public sealed partial class DungeonService
         }
         // A disconnected member's channel must never prevent another participant's committed award.
         foreach (var notify in notifications) await notify();
-        if (won) await ScheduleAutoLeaveAsync(a);
+        if (won && !TryContinue(a)) await ScheduleAutoLeaveAsync(a);
     }
 }

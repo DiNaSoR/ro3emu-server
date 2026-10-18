@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "about": "Reconstructed scripted story scenes (no fight, or a fight followed by scripted stages). The original server drove their stages with an encounter script the client does not ship. Each scene is a sequence of steps; a step names the DungeonQuestConfig quest the tracker shows (var 10001) and its goal counter (var 10003), the scene actors the server shows during it (client NPCConfig ids at scene-editor points, with the buffs that open their interactions), an optional story the client plays (dungeon var 100020016), the client events that complete it, and an optional teleport after it. A fight step instead names its monsters (\"spawns\": client NPCConfig templates at server spawn points) and completes when they are all killed. A step may say ChatConfig story lines (\"lines\" at its start, \"doneLines\" when it completes; a type-2 bubble names its speaker, one of the step's actors or monsters). A quest of the scene that only a branch the reconstruction cannot reach would show is listed under \"unplayed\" with its reason. Every decision carries its reason and the scene its confidence; what is guessed is listed per scene. Switch: Ro3Emu:ReconstructedDungeons. Never mixed into client data.",
+  "about": "Reconstructed scripted story scenes (no fight, or a fight followed by scripted stages). The original server drove their stages with an encounter script the client does not ship. Each scene is a sequence of steps; a step names the DungeonQuestConfig quest the tracker shows (var 10001) and its goal counter (var 10003), the scene actors the server shows during it (client NPCConfig ids at scene-editor points, with the buffs that open their interactions), an optional story the client plays (dungeon var 100020016), the client events that complete it, and an optional teleport after it. A fight step instead names its monsters (\"spawns\": client NPCConfig templates at server spawn points) and completes when they are all killed. A step may say ChatConfig story lines (\"lines\" at its start, \"doneLines\" when it completes; a type-2 bubble names its speaker, one of the step's actors or monsters). A step may put its players on the client's slide (\"slide\", speeds in m/s) until it completes; an actor interaction that is a vehicle ride (GameplayStatusConfig type 3) seats the player on that actor until the step completes; \"fallback\" completes a step by itself after its time (from the step's start, or from \"mount\"), optionally moving the players to a point. A won scene with \"next\" goes straight on to that scene. A quest of the scene that only a branch the reconstruction cannot reach would show is listed under \"unplayed\" with its reason. Every decision carries its reason and the scene its confidence; what is guessed is listed per scene. Switch: Ro3Emu:ReconstructedDungeons. Never mixed into client data.",
   "contract": {
     "interaction": "32700 NpcInteractionReq {npc_uid, interaction_id} on a scene actor: the client sends it from LC_DAL_Interact.SendNPCInteractionReq when the player presses the interaction's skill button (InteractMode 3 ClickSkillIcon), walks into range (2 AutoInteractWhenInRange) or a dialogue option runs action 211 TriggerNpcInteract (LC_InteractActions.lua:5672-5698). The interaction must be one of the actor's NPCConfig _iInteractID; the server answers 32700 with the request echoed (LC_InteractManager._onInteractResponse then runs the client-hosted actions, e.g. 53 NPCInteractDialogue).",
     "message": "The NPCInteractConfig _iEXECAction [\"210\", id, ...] of that interaction: ActionConfig 210 SendDungeonMessage is server-hosted (_iEXECHost 1), so the client never runs it; it is the dungeon script's own message id (LC_InteractManager.lua:1975-2030 runs only client/all-hosted actions).",
@@ -13,19 +13,23 @@
     "1000201": {
       "name": "Ant Queen's Nest: the vortex and the egg passage",
       "confidence": "medium",
+      "next": { "scene": 1000301, "why": "DungeonConfig 1000301 _iSameDupLoadingType 2: the original went straight from this scene into Bobo and the Deniro, without the player leaving" },
       "evidence": [
         "DungeonQuestConfig 5300008-5300010: 1 Explore ahead (Head deeper into Maya's lair), 2 Bobo was sucked into the vortex (Jump into the vortex), 3 The Passage Beneath the Vortex (Avoid the ant eggs and reach the end of the passage).",
         "Editor sc_plot_yhcx_001_dg01: guide point 24 runs from the born point to (98.8, 82.3) at the corridor, guide point 38 from there to (99.2, 99.8) beside region 20; region 20 is a 5 m circle (regionType 2) at (100.5, 102.3), region 22 a 30 x 5 m rectangle (regionType 2, triggerType 1) at the bottom of the passage (z 624.9), region 25 the 40 x 10 m corridor in front of the vortex.",
         "NPC 5300030 is the empty model 70010 with interaction 5300030: AutoInteractWhenInRange, interaction skill 5362001 'Jump into the Cave'.",
         "Nav sc_plot_yhcx_001: the passage is one continuous walkable ramp from z 238 (y 253) to z 622 (y 31); point 21 (100.0, 235.9, 267.5) lies on it near its top; point 27 'final drop position' is below it, off the nav.",
-        "Points 29-33 are client-only Ant Eggs (monsterType 1, clientMonsterConfigKey MainStoryAntEggExploseParam, npc 5300036, not created on scene init)."
+        "The passage is a slide: ChatConfig 5300306 (type 5, a tip) says 'Use the movement wheel or the A and D keys to steer. Be careful to avoid the ant eggs.', which is how the client's LC_Movement_Controller_Slide is steered (side input only, downhill on its own).",
+        "Points 29-33 are client-only Ant Eggs (monsterType 1, clientMonsterConfigKey MainStoryAntEggExploseParam, npc 5300036, not created on scene init).",
+        "ChatConfig 5300301-5300310 are this scene's lines: Maya's underground kingdom (301), the sand pulling Bobo in (302, and the bubbles 308-309, 'There seems to be a huge pit up ahead...', 'Why is the sand moving?!'), the deep hole (310), Bobo's cries from below (303, 304), 'Am I... still alive...?' (305) and 'a big pit up ahead' (307)."
       ],
       "guessed": [
         "Step 1 completes in region 25 (the corridor where guide 24 ends): region 25 is regionType 1, not one of the explicit server regions.",
         "Bobo (5300027) stands at point 26 (the anchor of patrol 26, which runs into the vortex) during step 1 and is gone in step 2; the run into the vortex itself is not animated.",
-        "The jump is a teleport to point 21 at the top of the passage; the original fall/slide (and its camera) is not reproduced.",
+        "The jump is a teleport to point 21 at the top of the passage; the fall into it (and its camera) is not reproduced. The slide then starts there, at the slide controller's own default speeds (10 m/s down, 8 m/s to the side), and stops at the bottom (region 22).",
         "The exploding ant eggs are not reproduced: their creation trigger is not in the client data.",
-        "The original continued seamlessly into 1000301 (DungeonConfig 1000301 _iSameDupLoadingType 2 from 1000201); here the player leaves and enters 1000301 from the quest tracker (action 3000)."
+        "Each line's moment: the order is the ChatConfig order where it tells the story; which step says it and the delays are chosen.",
+        "The pause before the next scene loads (3 s) is chosen."
       ],
       "steps": [
         {
@@ -34,8 +38,17 @@
           "actors": [
             { "npc": 5300027, "point": 26, "why": "Bobo (NPCConfig 5300027, no interaction) at patrol 26's point beside the vortex; quest 2 says he was sucked into it" }
           ],
+          "lines": [
+            { "chat": 5300301, "ms": 1000 },
+            { "chat": 5300307, "ms": 7000 },
+            { "chat": 5300308, "by": 5300027, "ms": 11000 }
+          ],
           "complete": [
             { "region": 25, "why": "guide point 24 ends in this corridor in front of the vortex" }
+          ],
+          "doneLines": [
+            { "chat": 5300309, "by": 5300027 },
+            { "chat": 5300302 }
           ]
         },
         {
@@ -43,6 +56,9 @@
           "stage": "Bobo was sucked into the vortex: jump into the vortex",
           "actors": [
             { "npc": 5300030, "point": 20, "why": "the vortex: empty model with the auto interaction 'Jump into the Cave', at region 20's centre" }
+          ],
+          "lines": [
+            { "chat": 5300310, "ms": 5000 }
           ],
           "complete": [
             { "interaction": 5300030, "why": "the client sends it when the player walks into the vortex's interaction range" },
@@ -52,9 +68,19 @@
         },
         {
           "quest": 3,
-          "stage": "The passage beneath the vortex: reach the end of the passage",
+          "stage": "The passage beneath the vortex: slide to the end of the passage",
+          "slide": { "side": 8, "down": 10, "why": "the slide controller's own defaults (m_fSlideSpeed 10, its movement speed 8): the client has no other speed for this passage" },
+          "lines": [
+            { "chat": 5300303, "ms": 500 },
+            { "chat": 5300306, "ms": 3000 },
+            { "chat": 5300304, "ms": 14000 }
+          ],
           "complete": [
             { "region": 22, "why": "the server region (regionType 2, triggerType 1) at the bottom of the ramp" }
+          ],
+          "fallback": { "ms": 120000, "why": "a slide stuck on the way (the ramp is about 450 m long, 45 s at 10 m/s) still ends the passage, and the run goes on to the next scene" },
+          "doneLines": [
+            { "chat": 5300305 }
           ]
         }
       ]
@@ -65,14 +91,16 @@
       "evidence": [
         "DungeonQuestConfig 5300011-5300015: 1 Help Bobo up, 2 Ride the Deniro, 3 Collect the fluorescent substance, 4 Feed the Deniro, 5 Ride the Deniro to the depths of the Ant Hell.",
         "Editor sc_plot_yhcx_002_dg01 labels: point 23 'Bobo position', 29 'soldier ant (Deniro) position', 27 'fluorescent substance position'; guide points 26 'rescue Bobo', 33 'interact with the ant', 34 'collect the fluorescent substance', 35 'ride the soldier ant', 36 'riding' (down the ramp to region 31 'end region').",
-        "Bobo 5300041 has interaction 5300028 (skill 5362101 'Rescue Bobo', message 5300028, NPC condition buff 53014). Deniro 5300005 has 5300005 (skill 'Ride', vehicle status 3, message 5300005, buff 53654), 5300009 (skill 'Feed', message 5300009, buff 53653) and 5300008 (skill 'Ride', message 5300008, buff 53651). NPC 5300055 (collect-light model 100144) has 5300010 (skill 'Collect', message 5300010, buff 53652).",
-        "Each interaction is gated by its own buff (BuffConfig 5301401, 5365401, 5365201, 5365301, 5365101), so exactly one of them is open at a time: the step order is the quest order."
+        "Bobo 5300041 has interaction 5300028 (skill 5362101 'Rescue Bobo', message 5300028, NPC condition buff 53014). Deniro 5300005 has 5300008 (skill 5362901 'Try to Ride the Deniro', no status, message 5300008, condition 7100019: buff 53651), 5300009 (skill 'Feed', message 5300009, buff 53653) and 5300005 (skill 5362501 'Ride the Deniro', GameplayStatusConfig 3 'enter vehicle driver state', seat 1, message 5300005, condition 7100017: seat 0 free and buff 53654). NPC 5300055 (collect-light model 100144) has 5300010 (skill 'Collect', message 5300010, buff 53652).",
+        "The Deniro is a vehicle: NPCConfig 5300005 _iNPCSubType 103, VehicleConfig 5300005 (_iMoveOnSurface 1) with one seat, VehicleSeatConfig 5300005 (controls Change3CConfig 9, exit interaction 4900025, exit button 26, MainStoryDeniro animations on its DSeat bone).",
+        "Each interaction is gated by its own buff (BuffConfig 5301401, 5365101, 5365201, 5365301, 5365401), so exactly one of them is open at a time: the step order is the quest order.",
+        "ChatConfig 5300401-5300410 are this scene's lines, all Bobo's: 'You're finally here!' (401), filthy (402), 'Where are we?' (403), the ant crawling toward them (404), it likes the glowing things (405), 'so big, but surprisingly agile' (406), too narrow for the ant (407), it knows where it is going (408), 'This should be enough' (409), 'Our bribe worked!' (410)."
       ],
       "guessed": [
         "Bobo stays where he was helped up for the rest of the scene; patrol 28 (his short walk) is not animated.",
-        "Step 2 answers the ride without mounting the player: the quest that follows ('Find a way to earn Deniro's Faith') says the first ride fails.",
         "Collecting the fluorescent substance grants no item: no item is named by the client data.",
-        "The ride to the depths (guide 36 down the ramp through regions 38, 37 and 31, camera prefab mianstorybingyicamera) is a teleport to region 31's centre."
+        "The player drives the Deniro down the ramp themselves (the seat's controls); the camera prefab mianstorybingyicamera is not used.",
+        "Each line's moment: the order is the ChatConfig order; which step says it and the delays are chosen."
       ],
       "steps": [
         {
@@ -82,8 +110,14 @@
             { "npc": 5300041, "point": 23, "buffs": [5301401], "why": "Bobo at 'Bobo position'; buff group 53014 opens 'Rescue Bobo' (5300028)" },
             { "npc": 5300005, "point": 29, "why": "the Deniro at 'soldier ant position', not yet interactable" }
           ],
+          "lines": [
+            { "chat": 5300401, "ms": 1500 }
+          ],
           "complete": [
             { "message": 5300028, "why": "interaction 5300028 'Rescue Bobo' sends dungeon message 5300028" }
+          ],
+          "doneLines": [
+            { "chat": 5300402 }
           ]
         },
         {
@@ -91,10 +125,14 @@
           "stage": "Try to ride the Deniro",
           "actors": [
             { "npc": 5300041, "point": 23, "why": "Bobo, helped up" },
-            { "npc": 5300005, "point": 29, "buffs": [5365401], "why": "buff group 53654 opens 'Ride' (5300005)" }
+            { "npc": 5300005, "point": 29, "buffs": [5365101], "why": "buff group 53651 opens 'Try to Ride the Deniro' (5300008)" }
+          ],
+          "lines": [
+            { "chat": 5300403, "ms": 3000 },
+            { "chat": 5300404, "ms": 6000 }
           ],
           "complete": [
-            { "message": 5300005, "why": "interaction 5300005 'Ride' sends dungeon message 5300005" }
+            { "message": 5300008, "why": "interaction 5300008 'Try to Ride the Deniro' sends dungeon message 5300008; it has no status, so the player is not seated: the next quest, 'Find a way to earn Deniro's Faith', says the try fails" }
           ]
         },
         {
@@ -105,8 +143,15 @@
             { "npc": 5300005, "point": 29, "why": "the Deniro" },
             { "npc": 5300055, "point": 27, "buffs": [5365201], "why": "the fluorescent substance (collect-light model) at its labelled point; buff group 53652 opens 'Collect' (5300010)" }
           ],
+          "lines": [
+            { "chat": 5300405, "ms": 1000 },
+            { "chat": 5300407, "ms": 9000 }
+          ],
           "complete": [
             { "message": 5300010, "why": "interaction 5300010 'Collect' sends dungeon message 5300010" }
+          ],
+          "doneLines": [
+            { "chat": 5300409 }
           ]
         },
         {
@@ -118,6 +163,9 @@
           ],
           "complete": [
             { "message": 5300009, "why": "interaction 5300009 'Feed' sends dungeon message 5300009" }
+          ],
+          "doneLines": [
+            { "chat": 5300410 }
           ]
         },
         {
@@ -125,13 +173,16 @@
           "stage": "Ride the Deniro to the depths of the Ant Hell",
           "actors": [
             { "npc": 5300041, "point": 23, "why": "Bobo" },
-            { "npc": 5300005, "point": 29, "buffs": [5365101], "why": "buff group 53651 opens the second 'Ride' (5300008)" }
+            { "npc": 5300005, "point": 29, "buffs": [5365401], "why": "buff group 53654 opens 'Ride the Deniro' (5300005), which seats the player on it (vehicle status 3)" }
+          ],
+          "lines": [
+            { "chat": 5300406, "ms": 4000 },
+            { "chat": 5300408, "ms": 15000 }
           ],
           "complete": [
-            { "message": 5300008, "why": "interaction 5300008 'Ride' sends dungeon message 5300008" },
-            { "region": 31, "why": "the 'end region' (regionType 2) where the riding guide 36 ends" }
+            { "region": 31, "why": "the 'end region' (regionType 2) where the riding guide 36 ends; the rider is set down there" }
           ],
-          "after": { "teleport": 31, "why": "the ride itself is not reproduced: the player arrives at the end region" }
+          "fallback": { "ms": 120000, "from": "mount", "teleport": 31, "why": "a ride that never reaches the end region still ends there" }
         }
       ]
     },

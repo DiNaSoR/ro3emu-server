@@ -51,7 +51,8 @@ public sealed class WorldMessages(Maps.World world, CombatService combat, SceneS
         });
         routes.Map(32703, "interaction", async (session, msgId, body) =>
         {
-            await interaction.UseActionAsync(session, UseInteractActionReq.Parser.ParseFrom(body.Span));
+            var req = UseInteractActionReq.Parser.ParseFrom(body.Span);
+            if (!await dungeons.TryUseActionAsync(session, req)) await interaction.UseActionAsync(session, req);
         });
         routes.Map(32708, "interaction", async (session, msgId, body) =>
         {
@@ -59,7 +60,8 @@ public sealed class WorldMessages(Maps.World world, CombatService combat, SceneS
         });
         routes.Map(31074, "interaction", async (session, msgId, body) =>
         {
-            await interaction.SyncVehicleAsync(session, SyncVehicleReq.Parser.ParseFrom(body.Span));
+            var req = SyncVehicleReq.Parser.ParseFrom(body.Span);
+            if (!await dungeons.TrySyncVehicleAsync(session, req)) await interaction.SyncVehicleAsync(session, req);
         });
         routes.Map(WorldCoreService.PlayerDetail, "worldCore", async (session, msgId, body) =>
         {

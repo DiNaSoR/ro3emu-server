@@ -308,6 +308,9 @@ public sealed class DungeonCatalog(GameData data, WorldData worldData, MonsterSe
     /// </summary>
     private IReadOnlyList<Wave> ScriptedWaves(ReconstructedDungeons.ScriptedScene scene, MapWorld map)
     {
+        // The scene a won run goes on to must be a dungeon that loads without a loading screen from this one.
+        if (scene.Next != 0 && (data.Row("DungeonConfig", scene.Next) is not { } next
+            || GameData.Int(next, "_iSameDupLoadingType") != 2)) return [];
         var waves = new List<Wave>();
         foreach (var step in scene.Steps)
         {
@@ -319,6 +322,10 @@ public sealed class DungeonCatalog(GameData data, WorldData worldData, MonsterSe
                     || actor.Buffs.Any(b => data.Row("BuffConfig", b) is not { } buff || GameData.Int(buff, "_iBuffID") <= 0)) return [];
             if (step.Story != 0 && data.Row("PlotInterpretation", step.Story) == null) return [];
             if (step.TeleportAfter != 0 && !map.Points.ContainsKey(step.TeleportAfter)) return [];
+            if (step.Slide is { } slide && !(slide.Side >= 0 && slide.Down > 0 && slide.Side < 100 && slide.Down < 100)) return [];
+            if (step.Fallback is { } fallback && (fallback.Ms <= 0 || step.Fight
+                || fallback.Teleport != 0 && !map.Points.ContainsKey(fallback.Teleport)
+                || fallback.FromMount && !step.Actors.Any(a => Interactions(a.NpcId).Any(i => VehicleSeat(a.NpcId, i) != null)))) return [];
             foreach (var t in step.Complete.Concat(step.Ignore))
             {
                 bool known = t.Kind switch
@@ -437,6 +444,42 @@ public sealed class DungeonCatalog(GameData data, WorldData worldData, MonsterSe
     public IReadOnlyList<long> Interactions(int npcId) => data.Row("NPCConfig", npcId) is { } npc
         && npc.TryGetProperty("_iInteractID", out var ids) && ids.ValueKind == JsonValueKind.Array
         ? ids.EnumerateArray().Select(v => (long)(GameData.Number(v) ?? 0)).Where(v => v > 0).ToArray() : [];
+
+    /// <summary>
+    /// The BuffConfig groups (_iBuffID) an interaction's NPC condition asks its NPC to carry: the 1004 CheckHaveBuff
+    /// parts of its LC_ConditionList _iNPCCondition (LC_CommonCondition.lua:180-196), which the client checks before it
+    /// offers the interaction.
+    /// </summary>
+    public IReadOnlyList<long> BuffGates(long interactionId)
+    {
+        if (data.Row("NPCInteractConfig", interactionId) is not { } interaction
+            || data.Row("LC_ConditionList", GameData.Int(interaction, "_iNPCCondition")) is not { } condition) return [];
+        var parts = condition.TryGetProperty("m_kSubConditionList", out var list) && list.ValueKind == JsonValueKind.Array
+            ? list.EnumerateArray().ToArray() : [condition];
+        return parts.Where(p => p.TryGetProperty("m_kData", out var d) && d.ValueKind == JsonValueKind.Array && d.GetArrayLength() >= 2
+                && GameData.Number(d[0]) == 1004 && !(p.TryGetProperty("m_bInverse", out var inv) && inv.ValueKind == JsonValueKind.True))
+            .Select(p => (long)(GameData.Number(p.GetProperty("m_kData")[1]) ?? 0)).ToArray();
+    }
+
+    /// <summary>
+    /// The vehicle ride an interaction starts on an NPC, as WorldInteractionService reads it for world NPCs: the
+    /// interaction's GameplayStatusConfig (_iStatusID) is type 3 "enter vehicle driver state", the NPC is a vehicle
+    /// (NPCConfig _iNPCSubType 103, VehicleConfig _iSubTypeValue) and its _iStatusLocation names one of the vehicle's
+    /// VehicleSeatConfig seats. Null for any other interaction.
+    /// </summary>
+    public (int StatusId, int Seat, JsonElement SeatRow)? VehicleSeat(int npcId, long interactionId)
+    {
+        if (data.Row("NPCInteractConfig", interactionId) is not { } interaction
+            || data.Row("GameplayStatusConfig", GameData.Int(interaction, "_iStatusID")) is not { } status
+            || GameData.Int(status, "_iStatusType") != 3
+            || data.Row("NPCConfig", npcId) is not { } npc || GameData.Int(npc, "_iNPCSubType") != 103
+            || data.Row("VehicleConfig", GameData.Int(npc, "_iSubTypeValue")) is not { } vehicle
+            || !vehicle.TryGetProperty("_kSeats", out var seats) || seats.ValueKind != JsonValueKind.Array) return null;
+        int seat = (int)GameData.Int(interaction, "_iStatusLocation") - 1;
+        if (seat < 0 || seat >= seats.GetArrayLength()
+            || data.Row("VehicleSeatConfig", (long)(GameData.Number(seats[seat]) ?? 0)) is not { } row) return null;
+        return ((int)GameData.Int(interaction, "_iStatusID"), seat, row);
+    }
 
     /// <summary>
     /// The dungeon message an interaction sends: its NPCInteractConfig _iEXECAction ["210", id, ...]. ActionConfig 210

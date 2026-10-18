@@ -173,6 +173,24 @@ Reconstructed scripted scenes (`Reconstructed/scripted-scenes.json`, same switch
   killed; it has no completing client event. A step's `lines` are said at its start (after `ms`), its `doneLines`
   as it completes, through the same 30404 calls as the story encounters (a type-2 bubble needs its speaker, one of the
   step's actors or monsters). A participant already standing in a new step's region completes it without moving.
+- The vortex passage is a slide and the Deniro a vehicle (`DungeonService.Ride`). A step with `slide` puts its players
+  on the client's own slide (LC_Movement_Controller_Slide, created by the local player's movement on its first slide
+  custom data): 31018 CustomDataChange on the role with Player_SlideSpeed 5400003 (ListLong [side, down] in cm/s)
+  then Player_SlideState 5400001 (Int 1); the client slides downhill, A/D steer (ChatConfig 5300306 says so), walks are
+  reported every 0.1 s, and state 0 at the step's end stops it. Not stored as the role's custom data. 1000201's passage
+  uses the controller's defaults (10 m/s down, 8 to the side) and ends in region 22.
+- In 1000301 'Try to Ride the Deniro' (5300008, no status, buff 5365101) is step 2 and 'Ride the Deniro' (5300005,
+  GameplayStatusConfig 3 vehicle driver, buff 5365401) the last step; they were swapped before. A ride interaction on a
+  vehicle scene actor (NPCConfig _iNPCSubType 103, VehicleConfig seat) seats the player as WorldInteractionService
+  does in the world: 32702 InteractChangeNtf (EType 3, status, interaction, actor uid) and 32704 Change3CNtf (seat
+  _iChange3C 9). Only while the actor carries the buff its condition asks for. The seat's button 26 (32703) or exit
+  interaction 4900025 gets the player off; the step's end (region 31), settlement and leaving do too. 31074 turns the
+  rider.
+- `fallback` completes a step by itself after its time (from its start, or `from: mount`), optionally moving the
+  players to a point: the slide after 120 s, the ride 120 s after getting on, at region 31's point.
+- A won scene with `next` goes straight on to that scene after 3 s *(inferred delay)* instead of the countdown out:
+  1000201 continues into 1000301 (DungeonConfig 1000301 _iSameDupLoadingType 2). When the next scene refuses entry,
+  the players are sent out as usual.
 - The rest of Ant Hell: 1054001 (sc_anthell02_001_pl01, "Ant Hell (story)") is not entered by any task, item or NPC in
   the client data and has no spawn points or stages, and the Ant Hell field quests (10104120-10104280 on map 10540) are
   ordinary field steps the server already plays. The two Anthell dungeons 3120501/3302101 (sc_pm_pve5anthell) are team
@@ -201,7 +219,7 @@ Reconstructed scripted scenes (`Reconstructed/scripted-scenes.json`, same switch
   route of the message that completed it does not reserve the settlement's role locks. Scene actors are room props
   (`InstanceService.AddPropAsync`), removed at settlement and before the room's final cleanup.
 - Guessed (see each scene's "guessed" list): the corridor region that ends 1000201's first stage, Bobo's place there,
-  the jump and the ride as teleports, no exploding ant eggs, no seamless 1000201 to 1000301 transfer, which bell hides
+  the jump as a teleport, the slide's speeds, no exploding ant eggs, which bell hides
   Katie (from both stories), a wrong guess changing nothing, the instrument retrieved within 4 m of mark point 37.
 - `DungeonTests.Scripted` resolves each scene against the client data, plays each one through its client events (wrong
   and premature events included) to a clear, and checks that the story step is delivered and the next one offered.

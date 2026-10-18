@@ -29,6 +29,19 @@ public sealed partial class ReconstructedDungeons
     public sealed record StepLine(int Chat, int By, int Ms);
 
     /// <summary>
+    /// A slide the participants are put on while the step runs (LC_Movement_Controller_Slide): speeds in m/s, sent as
+    /// the client's Player_SlideSpeed (5400003, [side, down] x 100) before Player_SlideState (5400001) 1.
+    /// </summary>
+    public sealed record StepSlide(float Side, float Down);
+
+    /// <summary>
+    /// What ends a step the player cannot otherwise finish: after <paramref name="Ms"/>, counted from the step's start
+    /// or (<paramref name="FromMount"/>) from a participant mounting a vehicle actor, the step completes as if its first
+    /// trigger had come and the participants are moved to the scene-editor point <paramref name="Teleport"/> (0: none).
+    /// </summary>
+    public sealed record StepFallback(int Ms, long Teleport, bool FromMount);
+
+    /// <summary>
     /// One scripted step. <paramref name="Story"/> is a PlotInterpretation id the client plays at the step's start
     /// (0: none); <paramref name="TeleportAfter"/> a scene-editor point the participants are moved to when it
     /// completes (0: none). <paramref name="Goal"/> is the tracker's "(done/total)" while the step runs.
@@ -42,15 +55,19 @@ public sealed partial class ReconstructedDungeons
         public IReadOnlyList<Spawn> Spawns { get; init; } = Spawns ?? [];
         public IReadOnlyList<StepLine> Lines { get; init; } = Lines ?? [];
         public IReadOnlyList<StepLine> DoneLines { get; init; } = DoneLines ?? [];
+        public StepSlide? Slide { get; init; }
+        public StepFallback? Fallback { get; init; }
         public bool Fight => Spawns.Count > 0;
     }
 
     /// <summary>
     /// A scene. <paramref name="Unplayed"/> are DungeonQuestConfig quests of the scene that no step shows: the branch
     /// that shows them cannot be reached in the reconstruction (each has its reason in the json, "unplayed").
+    /// <paramref name="Next"/> is the scene a won run goes straight on to (DungeonConfig _iSameDupLoadingType 2 on it),
+    /// 0 when the players are sent back out.
     /// </summary>
     public sealed record ScriptedScene(long Scene, string Name, string Confidence, IReadOnlyList<ScriptedStep> Steps,
-        IReadOnlyList<int> Unplayed);
+        IReadOnlyList<int> Unplayed, long Next = 0);
 
     private readonly Dictionary<long, ScriptedScene> _scripted = new();
 
@@ -72,7 +89,8 @@ public sealed partial class ReconstructedDungeons
             var unplayed = entry.Value.TryGetProperty("unplayed", out var u)
                 ? u.EnumerateArray().Select(q => q.GetProperty("quest").GetInt32()).ToArray() : [];
             _scripted[scene] = new ScriptedScene(scene, entry.Value.GetProperty("name").GetString() ?? "",
-                entry.Value.GetProperty("confidence").GetString() ?? "", steps, unplayed);
+                entry.Value.GetProperty("confidence").GetString() ?? "", steps, unplayed,
+                entry.Value.TryGetProperty("next", out var next) ? next.GetProperty("scene").GetInt64() : 0);
         }
     }
 
@@ -94,7 +112,15 @@ public sealed partial class ReconstructedDungeons
         return new ScriptedStep(stage, s.GetProperty("quest").GetInt32(), goal, actors,
             s.TryGetProperty("story", out var story) ? story.GetInt64() : 0, complete, Triggers(s, "ignore"),
             s.TryGetProperty("after", out var after) && after.TryGetProperty("teleport", out var to) ? to.GetInt64() : 0,
-            spawns, Lines(s, "lines"), Lines(s, "doneLines"));
+            spawns, Lines(s, "lines"), Lines(s, "doneLines"))
+        {
+            Slide = s.TryGetProperty("slide", out var slide)
+                ? new StepSlide(slide.GetProperty("side").GetSingle(), slide.GetProperty("down").GetSingle()) : null,
+            Fallback = s.TryGetProperty("fallback", out var f)
+                ? new StepFallback(f.GetProperty("ms").GetInt32(), f.TryGetProperty("teleport", out var t) ? t.GetInt64() : 0,
+                    f.TryGetProperty("from", out var from) && from.GetString() == "mount")
+                : null,
+        };
     }
 
     private static StepLine[] Lines(JsonElement step, string field) => step.TryGetProperty(field, out var list)
