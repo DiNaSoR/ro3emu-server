@@ -35,6 +35,7 @@ public sealed class PetTests : IAsyncLifetime
         {
             o.DataDir = _dataDir;
             o.GameDataDir = Path.Combine(RepoRoot(), "data");
+            o.Pets.WorldFollower = true; // these cases cover the optional world follower
             o.HttpPort = http; o.MicroGatePort = micro; o.GameGatePort = game;
         }, _clock);
         await _app.StartAsync();
@@ -326,6 +327,40 @@ public sealed class PetTests : IAsyncLifetime
         await Next(bot, 31037, AoIViewChangeData.Parser, v => v.LeaveAoi.Contains(newUid));
         await Next(viewer, 31037, AoIViewChangeData.Parser, v => v.LeaveAoi.Contains(newUid));
         Assert.Null(Session.PetActor);
+    }
+
+    [ClientDataFact]
+    public async Task MainSlotPetGivesItsMainSkillOnThePetSlotAndCastsItsGuardianRow()
+    {
+        await using var bot = await InWorld();
+        await Unlock();
+        await CombinePet(bot);
+        await Gm("!lvl 33");
+        var wheel = () => _app.Services.GetRequiredService<SkillService>().ClientState(Session).SkillWheel.WhellSkills;
+        Assert.False(wheel().ContainsKey((int)SkillWheelSlotType.SkillWheelPet));
+        await bot.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 2353301 });
+        Assert.Equal(ErrorCodes.SkillNotLearned, (await Next(bot, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
+
+        await bot.SendGameAsync(PetService.StateUpdate, new PetStateUpdateReq { PetId = 10001, Target = (PetStateSource_Type)1, TargetSlotIndex = 1 });
+        Assert.Equal(0, (await Next(bot, PetService.StateUpdate, PetStateUpdateResp.Parser)).Result);
+        Assert.Equal(2353301, wheel()[(int)SkillWheelSlotType.SkillWheelPet].SkillConfigId); // Choco's Swift Trick, star 1
+        Assert.Equal(2353301, Session.PetMainSkillShown);
+
+        await bot.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 2353301 });
+        Assert.Equal(0, (await Next(bot, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
+        var shown = await Next(bot, CombatService.ExtraUseInSkill, UseInSkillInfo.Parser, u => u.SkillID == 2353401);
+        Assert.Equal((10001, RoleId(bot)), (shown.PetConfigId, shown.SrcID));
+        await bot.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 2353301 });
+        Assert.Equal(ErrorCodes.SkillCooldown, (await Next(bot, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
+
+        // Taking the pet out of the Main Slot takes the skill away.
+        await bot.SendGameAsync(PetService.StateUpdate, new PetStateUpdateReq
+        {
+            PetId = 10001, Source = (PetStateSource_Type)1, SourceSlotIndex = 1, Target = (PetStateSource_Type)0,
+        });
+        Assert.Equal(0, (await Next(bot, PetService.StateUpdate, PetStateUpdateResp.Parser)).Result);
+        Assert.Equal(0, Session.PetMainSkillShown);
+        Assert.False(wheel().ContainsKey((int)SkillWheelSlotType.SkillWheelPet));
     }
 
     [ClientDataFact]

@@ -28,12 +28,14 @@ public sealed partial class PetService
     private readonly PetFollowerService follower;
     private readonly TimeProvider clock;
     private readonly SeasonService seasons;
+    private readonly SkillService skills;
     private readonly Dictionary<(int Pet, int Star, int Stage), JsonElement> stars;
     private readonly Dictionary<(int Quality, int Level), JsonElement> levels;
 
     public PetService(GameData data, CharacterService character, FunctionService functions, RoleStore roles,
-        PetFollowerService follower, TimeProvider clock, SeasonService seasons)
+        PetFollowerService follower, TimeProvider clock, SeasonService seasons, SkillService skills)
     {
+        this.skills = skills;
         this.data = data;
         this.character = character;
         this.functions = functions;
@@ -46,6 +48,7 @@ public sealed partial class PetService
         character.ExtraAttributes.Add(Attributes);
         character.SpecialItemUse.Add(TryUseSelfChooseAsync);
         character.RegisterItemAction(AddIncubateRoomExpAction, UseRoomExpItemAsync);
+        skills.PetMainSkill = MainSkill;
     }
 
     /// <summary>5017 before 5056: empty roster, room 1, and five empty plans 0–4 (inferred initial plans/inited).</summary>
@@ -56,6 +59,7 @@ public sealed partial class PetService
         await SyncAsync(s);
         character.Refresh(s);
         await follower.RefreshAsync(s);
+        s.PetMainSkillShown = MainSkill(s)?.SkillId ?? 0; // the login 5025 comes later (RoleSystems, after 5066)
     }
 
     private static DBPetInfo NewState() =>
@@ -104,6 +108,7 @@ public sealed partial class PetService
     {
         await SyncAsync(session);
         await follower.RefreshAsync(session);
+        await RefreshMainSkillAsync(session);
     }
 
     private int Gate(GameSession s, bool incubation = false) => s.Pets == null || !functions.IsOpen(s, 33)
@@ -123,6 +128,7 @@ public sealed partial class PetService
         {
             await character.RefreshStatsAsync(s);
             await follower.RefreshAsync(s);
+            await RefreshMainSkillAsync(s);
             // A committed lineup change: quest targets read it (growth-manual 103034 CheckSetUpPetCount).
             if (!items) foreach (var handler in character.StateChanged) handler(s);
         }

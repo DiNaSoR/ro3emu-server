@@ -257,6 +257,7 @@ public sealed partial class CombatService
         // A Survivor Battle career owns the match skill set (TimedBattleService.Chicken), not the job tree.
         if (MatchSkillRule?.Invoke(s, (int)GameData.Int(row, "_iID")) is { } granted) return granted;
         if (GameData.Int(row, "_iID") == skills.NormalAttack(s)) return true;
+        if (GameData.Int(row, "_iSystemType") == ActiveGuardSkill) return skills.PetMainSkill?.Invoke(s)?.SkillId == GameData.Int(row, "_iID");
         return skills.Level(s.Progress, (int)GameData.Int(row, "_iSkillID")) >= GameData.Int(row, "_iLevel");
     }
 

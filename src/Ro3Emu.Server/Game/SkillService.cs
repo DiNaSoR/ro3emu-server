@@ -29,6 +29,12 @@ public sealed class SkillService
     private Dictionary<(int Group, int Level), int>? _rowIds;
     private Dictionary<int, int>? upgradedGroupByBase;
 
+    /// <summary>
+    /// The main-slot pet's Main Skill (PetService.MainSkill), shown in the wheel's pet slot and castable while it is
+    /// deployed; null without one.
+    /// </summary>
+    public Func<GameSession, PetMainSkill?>? PetMainSkill { get; set; }
+
     /// <summary>Combat-owned dynamic queue eligibility (LC_DynamicParamMgr).</summary>
     public Func<GameSession, int, bool>? QueueEligibility { get; set; }
 
@@ -150,7 +156,7 @@ public sealed class SkillService
     private async Task WeaponChangedAsync(GameSession session)
     {
         if (session.SkillPlans is null || session.Progress is null) return;
-        await CharacterService.SyncAsync(session, SkillDataSync, Build(session));
+        await CharacterService.SyncAsync(session, SkillDataSync, ClientState(session));
     }
 
     internal int Rank(int career) => (int)(data.Row("JobConfig", career) is { } job ? Math.Max(1, GameData.Int(job, "_iJobRank")) : 1);
@@ -460,6 +466,23 @@ public sealed class SkillService
         else session.SkillPlans = next;
     }
 
+    /// <summary>
+    /// 5025 as the client gets it: <see cref="Build"/> plus the pet slot. The pet's Main Skill is not part of the saved
+    /// plans; LC_System_Skill reads the slot map from skillWheel.whellSkills, and JoyStickSkillNormalMixin shows the
+    /// SkillWheelPet (11) button when that slot holds a skill (LC_DunGeon_ClimbTower hides it in the tower).
+    /// </summary>
+    internal DBSkillData ClientState(GameSession session)
+    {
+        var state = Build(session);
+        if (PetMainSkill?.Invoke(session) is { } pet)
+        {
+            var slot = new SkillWheelSlot { SkillConfigId = pet.SkillId, Enable = true };
+            (state.SkillWheel ??= new SkillWheel()).WhellSkills[(int)SkillWheelSlotType.SkillWheelPet] = slot;
+            (state.OriginSkillWheel ??= new SkillWheel()).WhellSkills[(int)SkillWheelSlotType.SkillWheelPet] = slot.Clone();
+        }
+        return state;
+    }
+
     public DBSkillData Build(GameSession session)
     {
         if (session.SkillPlans == null) throw new InvalidOperationException("Skill plans must be loaded before use.");
@@ -553,7 +576,7 @@ public sealed class SkillService
     public async Task SyncAsync(GameSession session)
     {
         if (session.SkillPlans == null) await LoadAsync(session);
-        await CharacterService.SyncAsync(session, SkillDataSync, Build(session));
+        await CharacterService.SyncAsync(session, SkillDataSync, ClientState(session));
     }
 
     /// <summary>Build a role-progress candidate from an owned skill plan before a Build-window switch.</summary>
@@ -969,3 +992,6 @@ public sealed class SkillService
         await session.SendGameAsync(QueueUpdate, new SkillQueueUpdateResp { Result = code, Plan = req.Plan });
     }
 }
+
+/// <summary>A deployed pet's Main Skill: the SkillConfig row the player casts and the pet it belongs to.</summary>
+public readonly record struct PetMainSkill(int SkillId, int PetId);

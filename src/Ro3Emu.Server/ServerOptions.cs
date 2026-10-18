@@ -107,6 +107,9 @@ public sealed class ServerOptions
     /// <summary>Server rates for monster kill rewards (RewardService, docs/guide/rates.md). 1 keeps the client's tables.</summary>
     public RatesOptions Rates { get; set; } = new();
 
+    /// <summary>Pet presentation in the open world (PetFollowerService).</summary>
+    public PetOptions Pets { get; set; } = new();
+
     /// <summary>
     /// Solo-play aids for the Trade Exchange (TradeService.System, docs/guide/exchange.md). Off by default so the tests
     /// keep the player-only market; appsettings.Development.json turns them on for local play.
@@ -213,6 +216,17 @@ public sealed class BossSkillOptions
 
     /// <summary>Life of a summoned minion without a self-destruct born buff.</summary>
     public int SummonLifeMs { get; set; } = 30000;
+}
+
+/// <summary>Pet presentation in the open world.</summary>
+public sealed class PetOptions
+{
+    /// <summary>
+    /// Keep the deployed pet walking beside its master everywhere, as a separate world actor. Off by default: in the
+    /// beta footage a pet shows with its master only in the pet tower, and outside it only appears for the moment it
+    /// performs its Main Skill (the client builds that model itself from 31121.petConfigId).
+    /// </summary>
+    public bool WorldFollower { get; set; }
 }
 
 /// <summary>

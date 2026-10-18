@@ -77,6 +77,7 @@ public sealed partial class CombatService
     /// </summary>
     private static double AttackPower(Fighter a, JsonElement skill, bool magic) => magic ? a.Matk : Script(skill) switch
     {
+        _ when AdaptiveGuardian(skill) => Math.Max(a.Atk, a.Matk),
         "MoJiShu" or "MoJiPao" or "JudexMix1" => a.Matk,
         "SoulDestroyer" => a.Atk + a.Matk,
         _ => a.Atk,

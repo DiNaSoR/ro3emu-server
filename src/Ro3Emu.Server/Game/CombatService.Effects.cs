@@ -48,6 +48,11 @@ public sealed partial class CombatService
             await handler(s, row);
             if (!CurrentCastMap(s, action)) return;
         }
+        if (GameData.Int(row, "_iSystemType") == ActiveGuardSkill)
+        {
+            await PetGuardianAsync(s, action);
+            return;
+        }
         if (Script(row) == "Resurrection")
         {
             var target = FindPlayer(s, action.Request.TargetId, dead: true);
