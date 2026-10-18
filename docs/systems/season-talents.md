@@ -30,8 +30,14 @@ child. So the server, **(inferred)**:
 - on a purchase, sets the node and its large node to level 1, sets the branch point to level 1 (opening the
   ordinary node after it) and clears a different large node already chosen at that branch point in this plan,
   with its small nodes. Each small node of the chosen branch can be taken;
-- charges a job node's `_kCosts` (empty for every exported row), and leaves job nodes and branch points out of
-  the total level that tree and node thresholds count.
+- charges a job node's `_kCosts` (empty for every exported row).
+
+## Total talent level
+
+Tree and node thresholds count the total the talent panel shows (`UI_Sys_Skill_SeasonTalentPanelCtrl._refreshGrade`):
+every node of every tree except the branch points (type 5). That is the selected plan's ordinary and job node levels
+plus the shared oath level. Job nodes must count: the first two trees' ordinary nodes stop at 120 levels, and the third
+tree needs 126. **(inferred)** that the server's gate uses the same number the panel shows.
 
 `_kProfessionID` on large node rows names the schools the select list shows as suited. It is not a restriction.
 
