@@ -664,7 +664,7 @@ public sealed partial class TaskService
             // 5021 is the authoritative season snapshot sent to this session, also used by client previews.
             int? playBook = session.Synced.GetValueOrDefault(SeasonService.SeasonSync) is DBSeasonInfo { Current: { } current }
                 ? (int)current.PlayBookId : null;
-            var plan = awards.Resolve(session, def.Award, playBook);
+            var plan = NovicePassTask(def) ? awards.ResolveDirect(session, def.Award) : awards.Resolve(session, def.Award, playBook);
             var runtime = new TaskRuntimeState { CompletedGuides = session.TaskRuntime.CompletedGuides.ToHashSet(), InCutScene = session.InCutScene || cutScene,
                 Forgotten = session.TaskRuntime.Forgotten is { } forgotten ? new(forgotten) : null };
             int delivery = next.CompleteTaskNum[id] + (session.TaskRuntime.Forgotten?.GetValueOrDefault(id) ?? 0);
