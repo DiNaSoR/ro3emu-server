@@ -63,7 +63,7 @@ public sealed partial class SkillCombatTests
     public async Task ArrowRepelKnocksTheTargetBackWithItsEffect()
     {
         await using var alice = await InWorld("Alice");
-        await Gm("alice", "!job 3100"); await Teach("alice", 13005);
+        await Gm("alice", "!job 3100"); await Teach("alice", 13005); await Wield("alice", 2110120);
         var session = Session("alice");
         var nav = app.Services.GetRequiredService<WorldData>().Map(session.SceneEntry)!.Nav;
         var start = session.Position.Clone();

@@ -211,6 +211,9 @@ public static class ServerHost
         app.Services.GetRequiredService<Diagnostics.ServerMetrics>().Owners = app.Services.GetRequiredService<Game.Ownership.OwnerRegistry>();
         // Mount energy meters (EnergyConfig._iBelongMount): BuffService cannot take MountService (MountService -> SceneService -> BuffService).
         app.Services.GetRequiredService<MountService>().Changed.Add(app.Services.GetRequiredService<BuffService>().MountsChangedAsync);
+        // Riding or leasing a companion grants its buffs and can change the normal attack (CombatService.Companions).
+        app.Services.GetRequiredService<MountService>().Changed.Add(app.Services.GetRequiredService<CombatService>().SyncCompanionsAsync);
+        app.Services.GetRequiredService<CareerSpecialService>().Changed.Add(app.Services.GetRequiredService<CombatService>().SyncCompanionsAsync);
         // A cast dismounts a system-mount rider before the client starts it (MountService.DismountForCastAsync).
         app.Services.GetRequiredService<CombatService>().BeforeCast.Add(app.Services.GetRequiredService<MountService>().DismountForCastAsync);
         app.Use(async (context, next) =>

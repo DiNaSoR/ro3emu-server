@@ -92,6 +92,7 @@ public sealed partial class CombatService
         var row = action.Row;
         if (action.ResetsCooldown) await ResetCooldownAsync(s, (int)GameData.Int(row, "_iSkillID"));
         await CastFromSpellbookAsync(s, action);
+        await WolfAfterCastAsync(s, action);
     }
 
     /// <summary>

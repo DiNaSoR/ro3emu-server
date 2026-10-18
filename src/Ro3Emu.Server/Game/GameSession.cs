@@ -159,6 +159,12 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
     public bool Stealthed { get; set; }
     /// <summary>Hits taken under the current stealth buff (its GUID), toward its "revealed after taking damage N times".</summary>
     internal (long Guid, int Hits) StealthHits { get; set; }
+    /// <summary>Lasting buffs the falcon, wolf or Madogear grant right now (CombatService.Companions).</summary>
+    internal HashSet<int> CompanionBuffs { get; set; } = new();
+    /// <summary>The battle mount ridden when companions were last synced: a change resends the normal attack.</summary>
+    internal long CompanionRide { get; set; }
+    /// <summary>When the following wolf may howl again (Wolf Taming, CombatService.Companions).</summary>
+    internal long WargHowlMs { get; set; }
     /// <summary>EnergyConfig._iBelongMount mounts owned when the meters were last reconciled (BuffService.Energy).</summary>
     public int EnergyMounts { get; set; }
     /// <summary>31134/31135 lethal-hit choice; only an eligible active Osiris buff may create it.</summary>

@@ -33,7 +33,7 @@ public sealed partial class SkillCombatTests
     public async Task CrossRipperThrowsEveryBladeAndResetsItsCooldownAtFour()
     {
         await using var alice = await InWorld("Alice");
-        await Gm("alice", "!job 5400"); await Teach("alice", 15302); await Teach("alice", 15303); await Seasoned("alice");
+        await Gm("alice", "!job 5400"); await Teach("alice", 15302); await Teach("alice", 15303); await Seasoned("alice"); await Wield("alice", 2120120);
         Combat.Rolls = new FixedRolls(9999);
         Assert.Equal(4, await Meter("alice", 540002)); // EnergyConfig 540002 starts full
         var target = await CastAt(alice, "alice", 1530201);
@@ -58,7 +58,7 @@ public sealed partial class SkillCombatTests
     public async Task DarkIllusionRefillsTheBladesAndPowersTheNextThrow()
     {
         await using var alice = await InWorld("Alice");
-        await Gm("alice", "!job 5400"); await Teach("alice", 15301); await Teach("alice", 15302); await Seasoned("alice");
+        await Gm("alice", "!job 5400"); await Teach("alice", 15301); await Teach("alice", 15302); await Seasoned("alice"); await Wield("alice", 2120120);
         Combat.Rolls = new FixedRolls(9999);
         await SetMeter("alice", 540002, 0);
         var target = await CastAt(alice, "alice", 1530101);
@@ -74,7 +74,7 @@ public sealed partial class SkillCombatTests
     public async Task RollingCutterAddsABladeUpToFour()
     {
         await using var alice = await InWorld("Alice");
-        await Gm("alice", "!job 5400"); await Teach("alice", 15303); await Seasoned("alice");
+        await Gm("alice", "!job 5400"); await Teach("alice", 15303); await Seasoned("alice"); await Wield("alice", 2120120);
         await SetMeter("alice", 540002, 3);
         await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1530301, Face = 0 });
         Assert.Equal(0, (await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
@@ -124,7 +124,7 @@ public sealed partial class SkillCombatTests
     public async Task PrecisionThrustTurnsSixHitsIntoAHundredSpearsCharge()
     {
         await using var alice = await InWorld("Alice");
-        await Gm("alice", "!job 1400"); await Teach("alice", 11315); await Seasoned("alice");
+        await Gm("alice", "!job 1400"); await Teach("alice", 11315); await Seasoned("alice"); await Wield("alice", 2050120);
         Combat.Rolls = new FixedRolls(9999);
         await SetMeter("alice", 140001, 5);
         long spears = await Meter("alice", 140002);
@@ -137,7 +137,7 @@ public sealed partial class SkillCombatTests
     public async Task TwentyShieldBashesEnhanceTheNextThree()
     {
         await using var alice = await InWorld("Alice");
-        await Gm("alice", "!job 1410"); await Teach("alice", 11636); await Seasoned("alice");
+        await Gm("alice", "!job 1410"); await Teach("alice", 11636); await Seasoned("alice"); await Wield("alice", 2500120, 2);
         Combat.Rolls = new FixedRolls(9999);
         await SetMeter("alice", 141002, 19);
         var target = await CastAt(alice, "alice", 1163601);
@@ -153,7 +153,7 @@ public sealed partial class SkillCombatTests
     public async Task SonicBurstFillsTheEnhancedSpearCharges()
     {
         await using var alice = await InWorld("Alice");
-        await Gm("alice", "!job 1400"); await Teach("alice", 11316); await Seasoned("alice");
+        await Gm("alice", "!job 1400"); await Teach("alice", 11316); await Seasoned("alice"); await Wield("alice", 2050120);
         await CastAt(alice, "alice", 1131601);
         await Until(s => s.Buffs.Any(b => b.ConfigId == 1132401) && s.Energy[140003].Value == 5, "alice");
     }
@@ -162,7 +162,7 @@ public sealed partial class SkillCombatTests
     public async Task EnhanceCloakingHidesFromMonstersUntilFiveHits()
     {
         await using var alice = await InWorld("Alice");
-        await Gm("alice", "!job 5400"); await Teach("alice", 15304); await Seasoned("alice");
+        await Gm("alice", "!job 5400"); await Teach("alice", 15304); await Seasoned("alice"); await Wield("alice", 2120120);
         await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1530401 });
         Assert.Equal(0, (await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
         await Until(s => s.Stealthed, "alice");
@@ -192,7 +192,7 @@ public sealed partial class SkillCombatTests
     public async Task DealingDamageEndsCloaking()
     {
         await using var alice = await InWorld("Alice");
-        await Gm("alice", "!job 5400"); await Teach("alice", 15304); await Teach("alice", 15303); await Seasoned("alice");
+        await Gm("alice", "!job 5400"); await Teach("alice", 15304); await Teach("alice", 15303); await Seasoned("alice"); await Wield("alice", 2120120);
         await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1530401 });
         Assert.Equal(0, (await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
         await Until(s => s.Stealthed, "alice");

@@ -216,7 +216,11 @@ public sealed class CareerSpecialService
         if (mountSlot) await mounts.PublishAsync(s);
         if (!shown.SequenceEqual(s.CareerPendants)) await PendantsAsync(s, shown);
         foreach (var handler in character.StateChanged) handler(s);
+        foreach (var handler in Changed) await handler(s);
     }
+
+    /// <summary>After a published lease change: CombatService grants or ends the companion buffs.</summary>
+    public List<Func<GameSession, Task>> Changed { get; } = new();
 
     /// <summary>
     /// 31015 PendantUpdate. LC_Pendant_Manager.UpdatePendantList skips a nil map, and lua-protobuf decodes an empty map

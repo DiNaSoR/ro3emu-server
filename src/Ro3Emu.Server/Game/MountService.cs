@@ -130,6 +130,11 @@ public sealed class MountService : IGameTicker
     public static long Rider(GameSession s) => s.MountState.QuestMount != 0 ? s.MountState.QuestMount
         : s.Mounts?.MountIds.OrderBy(p => p.Key).FirstOrDefault(p => p.Value.IsRiding).Value?.MountId ?? 0;
 
+    /// <summary>LC_MountHelper.GetCurRidingBattleMountId: the Battle slot (2) mount while it is ridden, else 0. The
+    /// skill conditions [2003/2004, id] and the mounted JobAttackConfig rows read this.</summary>
+    public static long RidingBattle(GameSession s) =>
+        s.Mounts?.MountIds.TryGetValue(2, out var battle) == true && battle.IsRiding ? battle.MountId : 0;
+
     private IEnumerable<(long Id, double Value)> Attributes(GameSession s) =>
         Config((int)Rider(s)) is { } row ? GameData.Pairs(row, "_kAttr") : [];
 
