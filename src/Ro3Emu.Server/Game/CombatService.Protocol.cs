@@ -79,6 +79,7 @@ public sealed partial class CombatService
         foreach (var (_, row) in LearnedPassiveRows(session))
             foreach (var pair in GameData.Pairs(row, "_kAttri")) yield return pair;
         foreach (var pair in PassiveBuffAttributes(session)) yield return pair;
+        foreach (var pair in PassiveConditionalAttributes(session)) yield return pair;
     }
 
     /// <summary>Reconcile actual buff/energy-derived parameters and wheel replacements after login/skill/buff changes.</summary>
