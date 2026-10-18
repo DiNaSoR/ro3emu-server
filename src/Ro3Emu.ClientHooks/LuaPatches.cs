@@ -36,6 +36,7 @@ namespace Ro3Emu.ClientHooks
     /// <item>Profile cards without stickers parse (LC_DAL_Personal.ParsePersonalInfo walks a nil list; PersonalCards).</item>
     /// <item>The server's custom content (quests, NPCs, dialogue, texts) is added to the client's config tables
     /// (CustomContent).</item>
+    /// <item>The "Don't just stand there" idle prompt (tutorial guide 199) no longer shows (IdlePrompt).</item>
     /// </list>
     /// </summary>
     public static class LuaPatches
@@ -120,6 +121,7 @@ namespace Ro3Emu.ClientHooks
                 PersonalCards.Install((Obf_R.Obf_Cf)env, Module(manager, global, "lc_dal_personal"));
                 BoundCrystals.Install(global.Obf_RuA<Obf_R.Obf_ff>("LC_ItemHelper") ?? Module(manager, global, "lc_itemhelper"));
                 PayManager.Install(Module(manager, global, "lua_sdk_paymgr"));
+                IdlePrompt.Install(Module(manager, global, "lc_guidemanager")); // the class: GlobalRequire keeps its instance elsewhere
                 Debug.Log("[Ro3Emu.LuaPatches] lc_itemshowfunc: " + added + " card show-func method(s) added; stall name limit "
                     + (param != null ? StallNameMaxLength.ToString() : "not set (publicparamconfig missing)"));
             }
