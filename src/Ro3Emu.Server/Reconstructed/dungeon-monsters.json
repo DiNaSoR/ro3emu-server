@@ -280,7 +280,7 @@
     "1021301": {
       "name": "Southern Payon (portal waves)",
       "confidence": "low",
-      "skipped": "The arrow points (箭头) are guides. Which monsters each original wave held is unknown; the waves use the base map pay_fild03's monsters, strongest last.",
+      "skipped": "The arrow points (箭头) are guides. Which monster each portal held per wave is unknown; the waves use the dungeon's own level-15 monsters.",
       "waves": [
         {
           "stage": "Wave 1",
@@ -288,17 +288,17 @@
           "spawns": [
             {
               "point": 25,
-              "npc": 5000035,
-              "why": "stage 'Defeat three waves of attacking monsters' at 传送门1-3 'portal'; Pupa, the base map's most common monster"
+              "npc": 5001046,
+              "why": "stage 'Defeat three waves of attacking monsters' at 传送门1-3 'portal'; NPCConfig 5001046-5001049 are level-15 Poring, Fabre, Boa and Poring sharing born buff 5380201, a set no field map spawns: this dungeon's monsters (inferred). Poring first, weakest"
             },
             {
               "point": 26,
-              "npc": 5000035,
+              "npc": 5001046,
               "why": "portal 2"
             },
             {
               "point": 27,
-              "npc": 5000035,
+              "npc": 5001046,
               "why": "portal 3"
             }
           ]
@@ -309,17 +309,17 @@
           "spawns": [
             {
               "point": 25,
-              "npc": 5000028,
-              "why": "Boa, the base map's second monster"
+              "npc": 5001047,
+              "why": "Fabre of the same set"
             },
             {
               "point": 26,
-              "npc": 5000028,
+              "npc": 5001047,
               "why": "portal 2"
             },
             {
               "point": 27,
-              "npc": 5000028,
+              "npc": 5001047,
               "why": "portal 3"
             }
           ]
@@ -330,17 +330,17 @@
           "spawns": [
             {
               "point": 25,
-              "npc": 5000007,
-              "why": "Willow, the base map's third monster"
+              "npc": 5001048,
+              "why": "Boa of the same set, last: Boya's next line is 'where were you when those snakes surrounded us?'"
             },
             {
               "point": 26,
-              "npc": 5000007,
-              "why": "portal 2"
+              "npc": 5001049,
+              "why": "the card Poring: its only drop is DropGroupConfig 144, Card: Poring limited to quest 10102100 (this dungeon's quest), which Boya's dialogue 1010211001 says the player picked up and guide 26 then slots"
             },
             {
               "point": 27,
-              "npc": 5000007,
+              "npc": 5001048,
               "why": "portal 3"
             }
           ]

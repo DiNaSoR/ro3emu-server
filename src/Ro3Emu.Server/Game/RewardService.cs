@@ -265,14 +265,21 @@ public sealed class RewardService
     private void RollPools(JsonElement row, GameSession player, List<(int, int)> drops, int monsterLevel, double chanceRate = 1)
     {
         foreach (var p in row.EnumerateObject().Where(p => p.Name.StartsWith("_iDropPool", StringComparison.Ordinal)))
-            if (GameData.Number(p.Value) is { } poolId) RollPool((long)poolId, player.Progress!, drops, null, monsterLevel, chanceRate);
+            if (GameData.Number(p.Value) is { } poolId)
+                RollPool((long)poolId, player.Progress!, drops, null, monsterLevel, chanceRate, task => QuestActive(player, task));
     }
+
+    /// <summary>DropGroupConfig._iQuestLimit: the row drops only while the killer has that quest accepted and not yet
+    /// handed in (TaskConfig 10102100 "The Fate of an Egg Thief" drops the Card: Poring its next quest's card guide uses).
+    /// Finished counts too: the kill that completes the quest's objective still rolls its quest drop.</summary>
+    internal static bool QuestActive(GameSession player, long task) =>
+        player.Tasks?.Infos.TryGetValue(task, out var info) == true && info.Status is TaskState.Running or TaskState.Finish;
 
     private void RollPool(long poolId, GameSession player, List<(int, int)> drops, List<(int Entry, int Count, int Bind)>? bound = null)
         => RollPool(poolId, player.Progress!, drops, bound);
 
     private void RollPool(long poolId, RoleProgress progress, List<(int, int)> drops, List<(int Entry, int Count, int Bind)>? bound = null,
-        int monsterLevel = DropAttenuation.NoMonster, double chanceRate = 1)
+        int monsterLevel = DropAttenuation.NoMonster, double chanceRate = 1, Func<long, bool>? questActive = null)
     {
         if (data.Row("DropPoolConfig", poolId) is not { } pool) return;
         for (int slot = 1; slot <= 16; slot++)
@@ -286,7 +293,7 @@ public sealed class RewardService
             for (int r = 0; r < rolls; r++)
             {
                 if (_random.NextDouble() * 1_000_000 >= chance) continue;
-                PickFromGroup(group, progress, drops, bound, monsterLevel, picks);
+                PickFromGroup(group, progress, drops, bound, monsterLevel, picks, questActive);
             }
         }
     }
@@ -355,15 +362,17 @@ public sealed class RewardService
     private void PickFromGroup(long group, GameSession player, List<(int, int)> drops, List<(int Entry, int Count, int Bind)>? bound = null)
         => PickFromGroup(group, player.Progress!, drops, bound);
 
-    /// <summary>Draws <paramref name="picks"/> distinct eligible rows of a group (<see cref="DropPicks"/>).</summary>
+    /// <summary>Draws <paramref name="picks"/> distinct eligible rows of a group (<see cref="DropPicks"/>). A row with
+    /// _iQuestLimit is eligible only when <paramref name="questActive"/> says that quest is running (kills only).</summary>
     internal void PickFromGroup(long group, RoleProgress progress, List<(int, int)> drops, List<(int Entry, int Count, int Bind)>? bound = null,
-        int monsterLevel = DropAttenuation.NoMonster, int picks = 1)
+        int monsterLevel = DropAttenuation.NoMonster, int picks = 1, Func<long, bool>? questActive = null)
     {
         if (data.Row("DropGroupConfig", group) is not { ValueKind: JsonValueKind.Array } rows) return;
         var p = progress;
         var candidates = rows.EnumerateArray().Where(r =>
         {
-            if (GameData.Int(r, "_iWeights") <= 0 || GameData.Int(r, "_iQuestLimit") != 0 || GameData.Int(r, "_iActivityid") != 0) return false;
+            if (GameData.Int(r, "_iWeights") <= 0 || GameData.Int(r, "_iActivityid") != 0) return false;
+            if (GameData.Int(r, "_iQuestLimit") is var quest and not 0 && questActive?.Invoke(quest) != true) return false;
             long min = GameData.Int(r, "_iMinLevelLimit"), max = GameData.Int(r, "_iMaxLevelLimit");
             if (p.Level < min || max > 0 && p.Level > max) return false;
             return !r.TryGetProperty("_iJobLimit", out var jobs) || jobs.ValueKind != JsonValueKind.Array || jobs.GetArrayLength() == 0
