@@ -167,7 +167,9 @@ Reconstructed scripted scenes without a fight (`Reconstructed/scripted-scenes.js
   a kept actor). In 1000301 the five interactions are gated by five different buffs, so exactly one is open per step.
 - Stories: dungeon var 100020016 (`DungeonVariableFunctionConfig`, start function PlayCutSceneStory) with [plot] plays
   a PlotInterpretation run-time story; at its end (also when skipped) action 601 sends 84011 and action 150 sends 84012
-  (PlotActingTrigger); either completes the step, neither is answered (fire-and-forget in the client). The var is sent
+  (PlotActingTrigger); either completes the step, neither is answered (fire-and-forget in the client). While the story
+  plays, every participant has cutscene protection (`GameSession.CutsceneProtected`): no damage lands and monsters hold
+  their swing until 84011/84012/32709, the player's own cast, a scene change, or 120 s *(inferred)*. The var is sent
   once in a 30404 var-change event and
   never kept in 30401 (the client calls the function on every push). Louie's game plays stories 1013 and 1014 (plots
   140010 and 140020), which no task triggers and which show this Culvert, Louie's gang and dialogues 1010627001-004.

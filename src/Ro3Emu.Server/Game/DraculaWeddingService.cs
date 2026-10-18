@@ -218,7 +218,11 @@ public sealed class DraculaWeddingService : IGameTicker
     {
         if (Current(run.Guild) != run || home.RoomOf(run.Guild) is not { } room) return;
         run.StoryStarted = true;
-        foreach (var s in InHome(room)) await SendQuietAsync(s, DungeonService.Event, Story(home.Scene, StoryId(0)));
+        foreach (var s in InHome(room))
+        {
+            s.BeginCutscene();
+            await SendQuietAsync(s, DungeonService.Event, Story(home.Scene, StoryId(0)));
+        }
     }
 
     /// <summary>
@@ -236,7 +240,11 @@ public sealed class DraculaWeddingService : IGameTicker
         if (!home.InHome(s, out long guild) || Current(guild) is not { } run || !Eligible(s)) return;
         await SendQuietAsync(s, DungeonService.Event, VarsEvent(home.Scene, [Var(VarEndTime, run.End * 1000), Var(VarOpen, 1)]));
         await SendQuietAsync(s, WeddingState, State(run));
-        if (run.StoryStarted) await SendQuietAsync(s, DungeonService.Event, Story(home.Scene, StoryId(0)));
+        if (run.StoryStarted)
+        {
+            s.BeginCutscene();
+            await SendQuietAsync(s, DungeonService.Event, Story(home.Scene, StoryId(0)));
+        }
     }
 
     /// <summary>The occurrence is over: a running lair fails, and the home's event state is cleared (inferred).</summary>
@@ -303,6 +311,7 @@ public sealed class DraculaWeddingService : IGameTicker
             {
                 // LC_DunGeon_Dracula.PlayStory adds the bride from 83641's entity, so it comes first.
                 await SendQuietAsync(s, WeddingState, State(a.Dracula!));
+                s.BeginCutscene();
                 await SendQuietAsync(s, DungeonService.Event, Story(Lair, StoryId(1)));
             }
         foreach (var s in members) await tasks.SyncTasksAsync(s);

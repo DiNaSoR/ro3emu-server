@@ -23,11 +23,17 @@ public sealed partial class TaskService
         return GameData.Int(row, "_iEXECHost") is 1 or 2 ? op : 0;
     }
 
+    /// <summary>
+    /// An action that puts the player in a cutscene: the client-host story players 41 OpenVideoEditor, 56 StartStory and
+    /// 98 PlayStoryWithDynamicModel (ActionConfig _iFunctionName), or the server's 621 EnterCutSceneState.
+    /// </summary>
+    internal static bool StartsCutscene(string[] action) => action is ["41" or "56" or "98", ..] or ["621"];
+
     private bool AcceptActionsSupported(TaskDef def) => def.AcceptActions.All(a => ServerOpcode(a) is 0 or 621);
 
     /// <summary>
     /// Host-1 effects. 20's [item,count] is an inferred inventory cost, committed with delivery.
-    /// 621 tracks cutscene state; no invented packet, invulnerability or movement rule. The resource semantics of
+    /// 621 tracks cutscene state (and starts GameSession cutscene protection); no invented packet or movement rule. The resource semantics of
     /// 54/412 stage mount ride/recycle state with the same award transaction; other unsupported actions hold delivery.
     /// This method only builds a plan, so a refusal cannot mutate action state or consume inventory.
     /// </summary>
@@ -100,6 +106,7 @@ public sealed partial class TaskService
         using var gate = await LockTasksAsync(session);
         if (BeforeProgress is { } before) await before(session);
         session.InCutScene = false;
+        session.EndCutscene();
         Save(session);
     }
 
@@ -111,6 +118,7 @@ public sealed partial class TaskService
         if (session.Tasks == null || !Active(session, req.TaskId) || !Defs().TryGetValue(req.TaskId, out var def)) return;
         foreach (var action in def.Track)
             if (ServerOpcode(action) == 621 && action.Length == 1) session.InCutScene = true;
+        if (def.Track.Any(StartsCutscene)) session.BeginCutscene();
         Save(session);
     }
 

@@ -194,6 +194,24 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
     public TaskRuntimeState TaskRuntime { get; set; } = new();
     public bool InCutScene { get => TaskRuntime.InCutScene; set => TaskRuntime.InCutScene = value; }
 
+    /// <summary>
+    /// Cutscene protection (runtime only, never saved): while it holds, monsters neither pick nor hit this player and no
+    /// damage lands (CombatService.CommitPlayerDamageAsync, MonsterService.Fight). The client sends nothing when a story
+    /// starts (LC_CutSceneManager.PlayStory), so the server begins it where it knows a story plays: task actions that
+    /// play one, 621 EnterCutSceneState, an area trigger story (PlotInterpretation _kTrigger) and dungeon story pushes.
+    /// It ends on the client's end reports (32709, 84011, 84012), the player's own cast, a scene change, or after
+    /// <see cref="CutsceneProtectionMs"/> (inferred cap, so a missed end report cannot leave a player immune).
+    /// </summary>
+    public long CutsceneProtectedUntilMs { get; private set; }
+
+    public const long CutsceneProtectionMs = 120_000;
+
+    public bool CutsceneProtected => CutsceneProtectedUntilMs > MonsterService.NowMs;
+
+    public void BeginCutscene() => CutsceneProtectedUntilMs = MonsterService.NowMs + CutsceneProtectionMs;
+
+    public void EndCutscene() => CutsceneProtectedUntilMs = 0;
+
     /// <summary>Serializes quest transitions and source replay independently of the inventory transaction lock.</summary>
     public SemaphoreSlim TaskLock { get; } = new(1, 1);
 

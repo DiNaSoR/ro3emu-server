@@ -46,6 +46,7 @@ public sealed partial class CombatService
     /// </summary>
     public async Task CastAsync(GameSession s, CastSkillReq request)
     {
+        s.EndCutscene(); // a player who acts is out of the story; no attacking while immune
         LegacyOwnerScope? admission = null;
         OwnerNotices? notices = null;
         if (s.Owners is { } owners && s.Role is { } role)

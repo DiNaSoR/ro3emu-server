@@ -367,10 +367,15 @@ public sealed class QuestEngineTests : IAsyncLifetime
         await Accept(cutsceneTask);
         await Gm($"!quest done {cutsceneTask}");
         Assert.True(await Read(s => s.InCutScene));
+        // While the story plays, nothing hurts the player; its end report lifts the protection.
+        Assert.True(await Read(s => s.CutsceneProtected));
+        Assert.Equal(0, await Service<GameLoop>().InvokeAsync(() => Service<CombatService>().EnvironmentDamageAsync(Alice, 10)));
         await Accept(10101020);
         await bot.SendGameAsync(TaskService.ExitCutSceneState, new ExitCutSceneStateReq());
         await Barrier(bot);
         Assert.False(await Read(s => s.InCutScene));
+        Assert.False(await Read(s => s.CutsceneProtected));
+        Assert.Equal(10, await Service<GameLoop>().InvokeAsync(() => Service<CombatService>().EnvironmentDamageAsync(Alice, 10)));
         Assert.Equal(0, (await State(10101020)).CompleteNum[0]);
     }
 

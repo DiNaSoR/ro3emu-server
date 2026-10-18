@@ -335,7 +335,7 @@ public sealed class MonsterService : MonsterBrain, IGameTicker
         float best = float.MaxValue;
         foreach (var p in m.Viewers)
         {
-            if (p.Role == null || p.Dead) continue;
+            if (p.Role == null || p.Dead || p.CutsceneProtected) continue;
             float d = Distance(m, p);
             if (d <= m.Template.ViewRange && d < best) { best = d; near = p; }
         }
@@ -581,6 +581,18 @@ public sealed class MonsterService : MonsterBrain, IGameTicker
         if (lost)
         {
             Disengage(m, map);
+            return;
+        }
+        if (target.CutsceneProtected)
+        {
+            // The player is in a story: a field monster lets go; an instance monster (a wave or a scripted boss, which
+            // never looks for a new target) waits where it is and resumes when the story ends (inferred).
+            if (m.InstanceId == 0) Disengage(m, map);
+            else if (m.Moving)
+            {
+                m.Moving = false;
+                SendStop(m, now);
+            }
             return;
         }
         float dist = Distance(m, target);
