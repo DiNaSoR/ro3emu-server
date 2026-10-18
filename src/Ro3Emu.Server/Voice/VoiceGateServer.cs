@@ -182,7 +182,7 @@ public sealed class VoiceGateServer(IOptions<ServerOptions> options, VoiceTicket
         string? account = tickets.Consume(roleId, token);
         if (account == null) return false;
         bool alive = await loop.InvokeAsync(() => Task.FromResult(sessions.All().Any(s =>
-            string.Equals(s.Account, account, StringComparison.OrdinalIgnoreCase) && s.Role?.Id == roleId)));
+            string.Equals(s.Account, account, StringComparison.Ordinal) && s.Role?.Id == roleId)));
         if (!alive) return false;
         var previous = rooms.Authenticate(account, roleId, connection);
         if (previous != null)
