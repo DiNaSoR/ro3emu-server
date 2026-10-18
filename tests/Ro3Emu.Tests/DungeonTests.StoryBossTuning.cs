@@ -14,7 +14,8 @@ namespace Ro3Emu.Tests;
 /// </summary>
 public sealed partial class DungeonTests
 {
-    private static readonly int[] StoryBosses = [5300001, 5300002, 5300003, 5300006, 5300010, 5300018, 5300082];
+    // Eddga (5300001) fights beside his story companions again (DungeonTests.Encounter), so his HP is not solo-tuned.
+    private static readonly int[] StoryBosses = [5300002, 5300003, 5300006, 5300010, 5300018, 5300082];
 
     private async Task<GameSession> ReferencePlayer(string name, int level)
     {

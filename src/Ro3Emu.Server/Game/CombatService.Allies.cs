@@ -75,7 +75,7 @@ public sealed partial class CombatService
         GameSession? credit = NonPlayerKillCredit.Select(f => f(target)).FirstOrDefault(c => c != null);
         if (credit?.Role == null)
         {
-            target.Hp = Math.Max(1, target.Hp - damage); // nobody to settle a kill for
+            target.Hp = Math.Max(1, target.HpAfter(target.Hp, damage)); // nobody to settle a kill for
             hit.Dsts.Add(new DamageInfo { DstID = target.Uid, Damage = damage, HitResult = result, DstElement = target.Template.Element });
             await world.ToUnitViewersAsync(target, SkillHit, hit);
             await world.ToUnitViewersAsync(target, AoiAttrChange, MonsterService.Hp(target));
@@ -86,7 +86,7 @@ public sealed partial class CombatService
         long generation = credit.SceneGeneration;
         bool Current() => ReferenceEquals(credit.Role, role) && ReferenceEquals(credit.Attachment, attachment)
             && !credit.SceneLoading && credit.SceneGeneration == generation && credit.WorldScene == target.WorldScene;
-        target.Hp = Math.Max(0, target.Hp - damage);
+        target.Hp = target.HpAfter(target.Hp, damage);
         bool lethal = target.Hp == 0;
         try
         {

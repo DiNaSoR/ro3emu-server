@@ -141,7 +141,9 @@ Story encounters (`Reconstructed/story-encounters.json`, same switch; `DungeonSe
 - Lines go out as 30404 EventType 6: `ShowShoutingChatBubble(chat, speaker uid)` for type-2 bubbles, `Shouting(chat)`
   otherwise. Unverified live: whether the bubble's second argument is the speaker, and whether a cast shows a
   telegraph. `!encounter` shows the stage and HPs; `!encounter next` starts the next stage (test aid).
-- Eddga keeps his solo `soloTuning`; with fourteen companions the fight is now easier than the band above (open).
+- Eddga cannot fall in stage 1: hits stop at 60% of his HP until stage 2 starts (`MonsterUnit.HpFloor`). His HP
+  is the client's again (`soloTuning` hp 10000; attack keeps the solo 1500): the twelve adventurers take about 300 HP/s
+  off him, so stage 2 lasts about a minute.
 - `DungeonTests.Encounter` checks every named row, the hit shapes, and the Eddga run: companions, lines, both stages
   and a companion kill settling the win.
 

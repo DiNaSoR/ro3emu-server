@@ -157,6 +157,7 @@ public sealed partial class DungeonTests : IAsyncLifetime
             // A revive can leave this actor returning home. Engage through the owner before the
             // controlled HP setup, so the next return-completion tick cannot restore full health.
             Service<MonsterService>().Engage(actor, Session(bot));
+            actor.HpFloor = 0; // a story boss held by its encounter's stage (DungeonService.Encounter)
             actor.Hp = 1;
             // A swing still in flight from an earlier kill would refuse this press: a Normal Attack never breaks itself.
             var role = Session(bot);

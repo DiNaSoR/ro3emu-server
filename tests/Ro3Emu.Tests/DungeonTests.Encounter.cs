@@ -84,6 +84,9 @@ public sealed partial class DungeonTests
         var boya = await BossIn(instance, Boya);
         var wule = await BossIn(instance, Wule);
         Assert.True(boya.ScriptedTargeting && wule.ScriptedTargeting && boss.ScriptedTargeting);
+        // Eddga cannot fall in stage 1: hits stop at 60% until the adventurers arrive.
+        Assert.Equal(boss.Template.MaxHp * 60 / 100, boss.HpFloor);
+        Assert.Equal(boss.HpFloor, boss.HpAfter(boss.HpFloor + 10, 1_000_000));
 
         // Stage 1: the tracker shows "Cover Boya and Wule"; Boya's first line is her own bubble.
         await Next(alice, DungeonService.BaseInfo, DungeonBaseInfoNotify.Parser,
@@ -106,6 +109,7 @@ public sealed partial class DungeonTests
             .Where(m => m.InstanceId == instance && m.Template.NpcId is >= 5300007 and <= 5300009 or >= 5300070 and <= 5300078)
             .ToArray()));
         Assert.Equal(12, party.Length);
+        Assert.Equal(0, boss.HpFloor); // the last stage can be won
         var uids = party.Select(m => m.Uid).ToHashSet();
         await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser,
             hit => uids.Contains(hit.SrcID) && hit.Dsts.Any(d => d.DstID == boss.Uid && d.Damage > 0));

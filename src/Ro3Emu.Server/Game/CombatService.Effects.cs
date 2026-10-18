@@ -225,7 +225,7 @@ public sealed partial class CombatService
                     _doubleAttackHits = 0;
                 }
                 long beforeHp = target.Hp;
-                target.Hp = Math.Max(0, beforeHp - amount);
+                target.Hp = target.HpAfter(beforeHp, amount);
                 long effective = beforeHp - target.Hp;
                 if (target.Hp == 0) killed.Add(target); // reserve before awaited damage callbacks
                 await SettleMonsterHitAsync(s, target, beforeHp, amount);
