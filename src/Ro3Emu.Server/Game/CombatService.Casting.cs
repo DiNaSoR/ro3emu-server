@@ -44,7 +44,12 @@ public sealed class ActiveSkillCast
     internal long ProcFixedDamage { get; init; }
     /// <summary>Monsters a status of this cast already reached (Tetra Vortex's "at least 1" guarantee).</summary>
     internal HashSet<long> StatusLanded { get; } = new();
+    /// <summary>The cooldowns this cast started on accept, handed back if it is cancelled before its hit.</summary>
+    internal IReadOnlyList<CooldownStamp>? Cooldowns { get; set; }
 }
+
+/// <summary>One cooldown a cast set: its end, and what the group/mode held before (0 = none).</summary>
+internal readonly record struct CooldownStamp(int Group, int Mode, bool Shared, long End, long PreviousMode, long PreviousShared);
 
 public sealed partial class CombatService
 {
@@ -161,8 +166,8 @@ public sealed partial class CombatService
             eventAttacks[s] = new EventAttack(playerTarget, loopSkill,
                 Now + SkillMs(s, row.Value) + Math.Max(0, GameData.Int(row.Value, "_iChantFix") + GameData.Int(row.Value, "_iChantVar")) + 1,
                 s.Position.X, s.Position.Z);
-        await StartCooldownAsync(s, row.Value);
-        await StartCastAsync(s, row.Value, req, id, owned, chanted ? costs : null, arrival);
+        var cooldowns = await StartCooldownAsync(s, row.Value);
+        await StartCastAsync(s, row.Value, req, id, owned, chanted ? costs : null, arrival, cooldowns);
     }
 
     /// <summary>The distance the client's stop right after a cast may land from where the server had it (in-game 11.10).</summary>
@@ -184,14 +189,32 @@ public sealed partial class CombatService
                 return GameData.Int(next, "_iSkillID") != GameData.Int(active.Row, "_iSkillID")
                     || active.Resolved && !TargetAlive(active.WorldScene, active.Request.TargetId);
             case 2:
-                var template = data.SkillTemplate(GameData.Int(active.Row, "_iScriptShow"));
-                if (template is not { } t || !t.TryGetProperty("m_fInterruptTime", out var value)
-                    || GameData.Number(value) is not double point || point <= 0) return false;
-                return Now >= active.StartMs + Math.Max(active.ChantMs, ImpactOffset(template, point, active.ChantMs, active.ActionMs));
+                return InterruptPointPassed(active);
             default:
                 return false;
         }
     }
+
+    /// <summary>Type 2's interrupt point (the template's m_fInterruptTime, never inside the chant) has passed.</summary>
+    private bool InterruptPointPassed(ActiveSkillCast active)
+    {
+        var template = data.SkillTemplate(GameData.Int(active.Row, "_iScriptShow"));
+        if (template is not { } t || !t.TryGetProperty("m_fInterruptTime", out var value)
+            || GameData.Number(value) is not double point || point <= 0) return false;
+        return Now >= active.StartMs + Math.Max(active.ChantMs, ImpactOffset(template, point, active.ChantMs, active.ActionMs));
+    }
+
+    /// <summary>
+    /// Whether move input breaks a live cast. While the server forbids walking, the client turns a move key or a
+    /// ground click into a bare 31124 (LC_UnitChecker.CheckClearCacheSkill: Skill state, a cached skill and
+    /// IsSkillBlockMove) and stays in the skill unless the server agrees (LC_Scene_Sync._skillInterrupt). The click
+    /// that places a ground skill could arrive that way, so granting every one dropped the spell after its cooldown
+    /// started. A cast breaks like it yields to a new skill (_iInterruptedType 1 at once, 2 after its interrupt point),
+    /// and any cast once its hit has landed, when the client lets a move break it by itself (inferred for the rest:
+    /// it holds, as classic RO's chant roots the caster).
+    /// </summary>
+    private bool MoveBreaksCast(ActiveSkillCast active) => active.Resolved || active.Launched
+        || GameData.Int(active.Row, "_iInterruptedType") switch { 1 => true, 2 => InterruptPointPassed(active), _ => false };
 
     private bool TargetAlive(long sceneId, long uid) => uid != 0 && (FindMonster(sceneId, uid) != null
         || world.PlayersIn(sceneId).Any(p => p.Role?.Id == uid && !p.Dead));
@@ -404,18 +427,21 @@ public sealed partial class CombatService
         return false;
     }
 
-    private async Task StartCooldownAsync(GameSession s, JsonElement row)
+    private async Task<IReadOnlyList<CooldownStamp>?> StartCooldownAsync(GameSession s, JsonElement row)
     {
-        if (s.GmNoCooldown) return; // GM panel GmNoCD
+        if (s.GmNoCooldown) return null; // GM panel GmNoCD
         int group = (int)GameData.Int(row, "_iSkillID"), mode = (int)GameData.Int(row, "_iMode");
         long now = Now, cd = GameData.Int(row, "_iCD");
         var notice = new SkillCdNotify { Uuid = s.Role!.Id };
+        var stamps = new List<CooldownStamp>();
         void Set(int g, int m, long duration, bool shared)
         {
             if (duration <= 0) return;
             long end = now + duration;
-            s.SkillModeCds[(g, m)] = Math.Max(end, s.SkillModeCds.GetValueOrDefault((g, m)));
-            if (shared) s.SkillCds[g] = Math.Max(end, s.SkillCds.GetValueOrDefault(g));
+            long previousMode = s.SkillModeCds.GetValueOrDefault((g, m)), previousShared = s.SkillCds.GetValueOrDefault(g);
+            s.SkillModeCds[(g, m)] = Math.Max(end, previousMode);
+            if (shared) s.SkillCds[g] = Math.Max(end, previousShared);
+            stamps.Add(new CooldownStamp(g, m, shared, end, previousMode, previousShared));
             notice.Infos.Add(new SkillCdInfo { SkillId = g, SkillMode = m, CdStartTimestampMs = now, CdEndTimestampMs = end });
         }
         Set(group, mode, cd, GameData.Int(row, "_iCdModeGroup") < 0);
@@ -427,6 +453,41 @@ public sealed partial class CombatService
             int sibling = (int)groups[i];
             if (data.Row("SkillConfig", sibling) is { } siblingRow) sibling = (int)GameData.Int(siblingRow, "_iSkillID");
             if (sibling > 0) Set(sibling, 0, (long)shared[i], true);
+        }
+        if (notice.Infos.Count > 0) await s.SendGameAsync(SkillCdUpdate, notice);
+        return stamps;
+    }
+
+    /// <summary>
+    /// A cast cancelled before its hit did nothing, so it gives back the cooldowns it started on accept (classic RO
+    /// starts them only when the cast lands, rAthena skill_castend). A group whose cooldown something else raised since
+    /// keeps that later one. Items and energy stay spent, as on accept.
+    /// </summary>
+    private async Task RefundCooldownsAsync(GameSession s, ActiveSkillCast action)
+    {
+        if (action.Cooldowns is not { Count: > 0 } stamps || s.Role == null) return;
+        action.Cooldowns = null;
+        long now = Now;
+        var notice = new SkillCdNotify { Uuid = s.Role.Id, NotPlayCdRefreshEffect = true };
+        foreach (var stamp in stamps.Reverse()) // undo in reverse: a later stamp may have raised an earlier one's group
+        {
+            bool changed = false;
+            if (s.SkillModeCds.GetValueOrDefault((stamp.Group, stamp.Mode)) == stamp.End)
+            {
+                if (stamp.PreviousMode > now) s.SkillModeCds[(stamp.Group, stamp.Mode)] = stamp.PreviousMode;
+                else s.SkillModeCds.Remove((stamp.Group, stamp.Mode));
+                changed = true;
+            }
+            if (stamp.Shared && s.SkillCds.GetValueOrDefault(stamp.Group) == stamp.End)
+            {
+                if (stamp.PreviousShared > now) s.SkillCds[stamp.Group] = stamp.PreviousShared;
+                else s.SkillCds.Remove(stamp.Group);
+                changed = true;
+            }
+            if (!changed) continue;
+            long end = Math.Max(now, Math.Max(s.SkillModeCds.GetValueOrDefault((stamp.Group, stamp.Mode)),
+                stamp.Shared ? s.SkillCds.GetValueOrDefault(stamp.Group) : 0));
+            notice.Infos.Add(new SkillCdInfo { SkillId = stamp.Group, SkillMode = stamp.Mode, CdStartTimestampMs = now, CdEndTimestampMs = end });
         }
         if (notice.Infos.Count > 0) await s.SendGameAsync(SkillCdUpdate, notice);
     }
@@ -467,7 +528,7 @@ public sealed partial class CombatService
         return Current();
     }
 
-    private async Task StartCastAsync(GameSession s, JsonElement row, CastSkillReq req, long id, SkillObject? actor = null, CastCosts? chantCosts = null, float? arrivalSlack = null)
+    private async Task StartCastAsync(GameSession s, JsonElement row, CastSkillReq req, long id, SkillObject? actor = null, CastCosts? chantCosts = null, float? arrivalSlack = null, IReadOnlyList<CooldownStamp>? cooldowns = null)
     {
         var origin = actor?.Pos ?? s.Position.Clone();
         var target = FindMonster(s.WorldScene, req.TargetId);
@@ -477,6 +538,7 @@ public sealed partial class CombatService
             Id = id, OwnerId = s.Role!.Id, WorldScene = s.WorldScene, SceneGeneration = s.SceneGeneration,
             Attachment = s.Attachment, Request = req, Row = row, Origin = origin, StartedWalking = actor == null && s.Walking, WalkStart = origin.Clone(), ArrivalSlack = arrivalSlack ?? ArrivalSlack(s),
             StartMs = Now, ChantMs = (int)Math.Max(0, GameData.Int(row, "_iChantFix") + GameData.Int(row, "_iChantVar")), ActionMs = SkillMs(s, row), Operator = actor,
+            Cooldowns = cooldowns,
         };
         if (chantCosts is { } owed) action.ChantCost = () => PayChantCostAsync(s, action, owed);
         s.SkillCast = action;
@@ -561,6 +623,9 @@ public sealed partial class CombatService
     {
         bool valid = req == null || req.InterruptSkillId == 0 || req.InterruptSkillId == s.SkillCast?.Request.SkillId
             || req.InterruptSkillId == s.Attack?.SkillId || eventAttacks.TryGetValue(s, out var eventAttack) && req.InterruptSkillId == eventAttack.SkillId;
+        // A bare request is move input (see MoveBreaksCast): a cast that holds against it carries on.
+        if (valid && req is { InterruptSkillId: 0, NxtSkill: null } && s.SkillCast is { Cancelled: false } live
+            && Now < live.StartMs + live.ChantMs + live.ActionMs && !MoveBreaksCast(live)) valid = false;
         bool interrupted = valid && (s.SkillCast != null || s.Attack != null || eventAttacks.ContainsKey(s));
         if (interrupted)
         {
@@ -579,6 +644,7 @@ public sealed partial class CombatService
         action.Cancelled = true;
         s.SkillCast = null;
         await ReleaseCastMovementAsync(s, action.Id);
+        if (!action.Resolved && !action.Launched) await RefundCooldownsAsync(s, action);
         await ToPlayerAndViewersAsync(s, SkillEnd, new SkillEndNotify
         {
             SrcID = action.SourceId, SessionId = action.Id, Type = SkillEndNotify.Types.SkillEndType.Interrupted,
