@@ -35,6 +35,9 @@ public sealed partial class GroupContentTests : IAsyncLifetime
             o.DataDir = dataDir;
             o.GameDataDir = Path.Combine(ClientData.RepoRoot, "data");
             o.SeasonStart = "2026-10-08";
+            // These tests finish bosses at 1 HP; a boss opening its last phase there (BossSkills) could down the bot
+            // first. Boss specials have their own tests.
+            o.BossSkills.Enabled = false;
             o.OpenContent.Enabled = true;
             o.HttpPort = httpPort;
             o.MicroGatePort = microPort;
