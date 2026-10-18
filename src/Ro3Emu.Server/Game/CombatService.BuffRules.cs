@@ -219,6 +219,7 @@ public sealed partial class CombatService
         var rule = effect.Rule;
         var stats = character.Stats(p);
         long amount = rule.HealFlat + (rule.HealRatioBp != 0 && rule.HealAttr > 0 ? stats[rule.HealAttr] * rule.HealRatioBp / 10000 : 0);
+        if (rule.RatioBp > 0 && effect.Source is { } source) amount += (rule.Magic ? source.Matk : source.Atk) * rule.RatioBp / 10000;
         amount *= Math.Max(1, buff.PileCount);
         long actual = Math.Min(amount, Math.Max(0, stats[101] - stats[2000]));
         if (actual <= 0) return;

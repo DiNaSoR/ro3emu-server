@@ -171,6 +171,12 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
     public ImmuneDeathOffer? ImmuneDeathOffer { get; set; }
     public Dictionary<long, long> BuffEffectCds { get; } = new();
     public long ImmuneRecoveryUntilMs { get; set; }
+    /// <summary>Hits deal nothing until then (Wood Spirit's Blessing's "Tree Spirit's Blessing Trigger: Invincible.").</summary>
+    internal long InvincibleUntilMs { get; set; }
+    /// <summary>Wood Spirit's Blessing can save a lethal hit again from then (its 【Withered】 lockout).</summary>
+    internal long WoodSpiritReadyMs { get; set; }
+    /// <summary>Emergency Treatment can trigger again from then.</summary>
+    internal long EmergencyTreatmentReadyMs { get; set; }
     public int ImmuneRecoveryPercent { get; set; }
     public Dictionary<int, long> SkillCds { get; } = new();
     public Dictionary<int, long> ItemCds { get; } = new();

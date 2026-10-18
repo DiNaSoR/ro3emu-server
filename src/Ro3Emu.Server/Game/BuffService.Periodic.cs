@@ -44,7 +44,8 @@ public sealed partial class BuffService
     {
         if (!Rules.Periodic.TryGetValue(buff.ConfigId, out var rule)) return;
         long scene = player?.WorldScene ?? unit!.WorldScene;
-        var source = rule.Kind == BuffRuleTables.PeriodicKind.Damage ? ResolvePeriodicSource?.Invoke(buff.SourceId, scene) : null;
+        var source = rule.Kind == BuffRuleTables.PeriodicKind.Damage || rule.RatioBp > 0
+            ? ResolvePeriodicSource?.Invoke(buff.SourceId, scene) : null;
         if (_periodicByGuid.TryGetValue(buff.Guid, out var existing))
         {
             if (source != null) existing.Source = source; // a refresh by another applier hurts with its numbers

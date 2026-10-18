@@ -73,11 +73,16 @@ public sealed partial class CombatService
     /// (Max Life +10%, PATK +5%) and 1162405 (Max Life +5%, PATK +10%), the second "when wielding a two-handed spear";
     /// only the one matching the weapon is granted (before, both landed and the second overwrote the first).
     /// </summary>
-    internal IEnumerable<JsonElement> Buff1(GameSession s, JsonElement row, string script)
+    /// Adrenaline Rush's second buff (16108xx, "an Extra 10% Attack Speed") goes only to a recipient of the Blacksmith
+    /// class (<see cref="BlacksmithLine"/>).
+    internal IEnumerable<JsonElement> Buff1(GameSession s, JsonElement row, string script, GameSession? recipient = null)
     {
         var tuples = Tuples(row, "_kBuff1").ToArray();
         if (script == "Inspiration" && tuples.Length == 2)
             return [tuples[skills.Weapon(s).SubType == TwoHandedSpear ? 1 : 0]];
+        if (script.StartsWith("AdrenalineRush", StringComparison.Ordinal) && tuples.Length == 2
+            && !BlacksmithLine(recipient ?? s))
+            return [tuples[0]];
         return tuples;
     }
 
