@@ -61,7 +61,10 @@ public static partial class EconomySnapshotReader
     // Top Up: role.shop ShopState.Recharged counts the Top Up tiers bought (RechargeConfig id -> times), only to know
     // which tier still pays its first-purchase double. A counter, no balance and no asset: the crystals come with the
     // cd13a/shop-topup receipt that also saves it.
-    public const string ExpectedFormatManifestHash = "54A463DB8491CCCD0BBB853B2D66217214A7C3FC2AD4A6A41FE94BE1A7B5F084";
+    // Quests: role.task_runtime TaskRuntimeState.Forgotten counts deliveries a GM !quest drop/reset forgot (task id ->
+    // deliveries), only so the quest-award ledger key of a later hand-in is new. A counter, no balance and no asset; absent
+    // unless a GM dropped a delivered quest.
+    public const string ExpectedFormatManifestHash = "300E5AF763FF05E0E9368118F78C7F9C0BE260570AAF755FABCD3A5E93B96003";
     public static string FormatManifestHash => State.FormatManifestHash;
 
     private sealed partial class State

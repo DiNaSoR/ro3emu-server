@@ -574,4 +574,11 @@ public sealed class TaskRuntimeState
 {
     public HashSet<long> CompletedGuides { get; set; } = new();
     public bool InCutScene { get; set; }
+
+    /// <summary>
+    /// Deliveries a GM drop or reset forgot, per task. A delivery's reward ledger key counts the task's deliveries
+    /// (CompleteTaskNum + this), so handing a dropped quest in again is a new reward, not a replay of the old one.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<long, int>? Forgotten { get; set; }
 }

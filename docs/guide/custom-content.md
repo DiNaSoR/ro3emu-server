@@ -102,11 +102,10 @@ like it does to a client one, and the NPC shows on the minimap. Place a given NP
 
 ## Testing a quest again
 
-As a GM, `!quest drop <taskId>` forgets a quest (running or done; a running one leaves the quest log as if given
-up) and `!quest` lists the running ones. Drop a chain
-from its last quest back to its first; a first quest with no `_kPreTask` is offered again at once. For the prototype:
-`!quest drop 90000003`, `!quest drop 90000002`, `!quest drop 90000001`. `!quest finish <taskId>` completes the
-current quest's objectives, `!quest done <taskId>` hands it in.
+As a GM, `!quest drop <taskId>` forgets a quest and every later quest of its chain (running ones leave the quest log
+as if given up), and `!quest` lists the running ones. Drop the first quest to play a chain again: a first quest with
+no `_kPreTask` is offered again at once. For the prototype: `!quest drop 90000001`. Handing a quest in again pays
+its reward again. `!quest finish <taskId>` completes the current quest's objectives, `!quest done <taskId>` hands it in.
 
 ## Limits
 

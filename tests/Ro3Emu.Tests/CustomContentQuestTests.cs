@@ -117,5 +117,16 @@ public sealed class CustomContentQuestTests : IAsyncLifetime
         await Barrier(bot);
         Assert.Equal(TaskState.Delivery, (await State(Report))!.Status);
         Assert.True(await Read(s => s.Progress!.Level) > level || await Read(s => s.Progress!.Exp) > exp, "the report pays its EXP");
+
+        // Dropping the first quest restarts the chain: the later quests go too, and only the first is offered again.
+        await Gm($"!quest drop {Talk}");
+        await Barrier(bot);
+        Assert.Equal(TaskState.Running, (await State(Talk))!.Status);
+        Assert.Null(await State(Kill));
+        Assert.Null(await State(Report));
+        await bot.SendGameAsync(SceneService.ClientNpcInteract, new ClientNpcInteractReq { NpcUid = npc.Uid, DialogID = 900000201 });
+        await Barrier(bot);
+        Assert.Equal(TaskState.Delivery, (await State(Talk))!.Status);
+        Assert.Equal(TaskState.Running, (await State(Kill))!.Status);
     }
 }
