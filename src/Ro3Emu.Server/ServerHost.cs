@@ -99,6 +99,7 @@ public static class ServerHost
         builder.Services.AddSingleton<ItemBoxService>();
         builder.Services.AddSingleton<MountService>();
         builder.Services.AddSingleton<ItemAutoUseService>();
+        builder.Services.AddSingleton<GearPromptService>();
         builder.Services.AddSingleton<CareerSpecialService>();
         builder.Services.AddSingleton<WardrobeService>();
         builder.Services.AddSingleton<TotemEffects>();
