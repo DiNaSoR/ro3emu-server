@@ -387,6 +387,7 @@ public sealed partial class CombatService
 
     private async Task StartCooldownAsync(GameSession s, JsonElement row)
     {
+        if (s.GmNoCooldown) return; // GM panel GmNoCD
         int group = (int)GameData.Int(row, "_iSkillID"), mode = (int)GameData.Int(row, "_iMode");
         long now = Now, cd = GameData.Int(row, "_iCD");
         var notice = new SkillCdNotify { Uuid = s.Role!.Id };

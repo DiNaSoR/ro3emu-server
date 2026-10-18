@@ -175,6 +175,47 @@ public sealed partial class EquipmentService
     }
 
     /// <summary>
+    /// GM panel GmOpStrengthen / GmOpRefine: set the grids' strengthen or refine level at once, free, capped at the
+    /// highest level the tables have. Each grid gets the ordinary reply (31404 / 31405) so the panels redraw.
+    /// </summary>
+    public async Task<string> GmSetLevelAsync(GameSession session, IReadOnlyList<int> grids, int level, bool refine)
+    {
+        var done = new List<string>();
+        using (await CharacterService.Lock(session))
+        {
+            var next = CopyLevels(session.EquipLevels);
+            foreach (int grid in grids)
+            {
+                int target = Math.Max(0, level);
+                while (target > 0 && (refine ? character.RefineRow(grid, target) : character.StrengthenRow(grid, target)) == null) target--;
+                (refine ? next.Refine : next.Strength)[grid] = target;
+                if (refine) next.Luck.Remove(grid);
+                done.Add($"grid {grid} +{target}");
+            }
+            var tx = roles.NewTransaction();
+            tx.RoleBlob(session.Role!.Id, "equip_levels", JsonSerializer.SerializeToUtf8Bytes(next));
+            await roles.CommitAsync(tx, refine ? "gm/equipment-refine" : "gm/equipment-strengthen", _ => session.EquipLevels = next);
+            foreach (int grid in grids)
+            {
+                if (refine)
+                    await session.SendGameAsync(Refine, new RefineEquipmentRsp
+                    {
+                        EquipPos = (EquipGridType)grid, RefineLv = next.Refine.GetValueOrDefault(grid),
+                        RefineEffectLv = character.Resonance(session, "RefiningEffectTable"),
+                    });
+                else
+                    await session.SendGameAsync(Strengthen, new StrengthenEquipmentRsp
+                    {
+                        EquipPos = (EquipGridType)grid, StrengthenLv = next.Strength.GetValueOrDefault(grid),
+                        StrengthenEffectLv = character.Resonance(session, "StrengthenEffectTable"),
+                    });
+            }
+            await character.EquipLevelsChangedAsync(session, persist: false);
+        }
+        return (refine ? "Refine " : "Strengthen ") + string.Join(", ", done);
+    }
+
+    /// <summary>
     /// After a strengthen / refine reply: the paid bag (5009), then the grid levels (5007) and properties. Both after
     /// the reply: LC_DAL_Equipment plays success only for a level above the stored one (an earlier 5007 would have
     /// raised it), and the refine panel redraws on the currency change (UI_Sys_StrengthenRefineInfoWidgetCtrl binds

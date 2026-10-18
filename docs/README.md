@@ -2,7 +2,7 @@
 
 ## Guides: running a server
 
-- [GM access](guide/gm-access.md): who may use GM commands (`Ro3Emu:GmAccounts`)
+- [GM access](guide/gm-access.md): who may use GM commands (`Ro3Emu:GmAccounts`) and what the client's GM panel can do
 - [Open content](guide/open-content.md): every feature the client can show is playable (`Ro3Emu:OpenContent`)
 - [Rates](guide/rates.md): Base/Job EXP, item drop and currency drop multipliers for monster kills (`Ro3Emu:Rates`)
 - [Trade Exchange for solo play](guide/exchange.md): a built-in seller that stocks the exchange and buys cheap listings back (`Ro3Emu:Exchange`)

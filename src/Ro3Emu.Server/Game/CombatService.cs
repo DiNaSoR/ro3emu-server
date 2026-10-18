@@ -562,7 +562,7 @@ public sealed partial class CombatService : IGameTicker
             || valid?.Invoke() == false) return null;
         if (target.CutsceneProtected) return null; // nothing lands while a story plays (GameSession.CutsceneProtected)
         // A missed/fully absorbed hit must not spend a finite Safety Wall charge.
-        if (damage > 0 && (buffs.HasForbidden(target, 9) || await GroundProtectsAsync(target, row))) damage = 0;
+        if (damage > 0 && (target.GmInvincible || buffs.HasForbidden(target, 9) || await GroundProtectsAsync(target, row))) damage = 0;
         // (inferred) Support damage reductions precede the finite shield and lethal-hit handling.
         damage = ApplyPetSupportResistance(damage, target.Buffs.Where(b => b.ExpireMs > Now
                 && b.SourceId is >= (1L << 51) and < (1L << 52))
@@ -611,7 +611,7 @@ public sealed partial class CombatService : IGameTicker
         // A skill that never misses (_iSkillHit 10000) draws no hit roll, as before.
         if (GameData.Int(skill, "_iSkillHit") < 10000 && Rolls.Hit() >= HitRate(a, b, skill)) return (0, DamageHitResult.Miss);
         double dmg = BaseDamage(a, b, skill, branch, out bool magic);
-        dmg *= 0.97 + Rolls.DamageFloat() * 0.06; // DamageFloat [9700, 10300]
+        dmg *= 0.97 + DamageFloatRoll() * 0.06; // DamageFloat [9700, 10300]
         var result = DamageHitResult.Normal;
         if (!magic && Rolls.Crit() < CritRate(a, b, skill))
         {
