@@ -10,12 +10,14 @@ namespace Ro3Emu.ClientHooks
     /// _iActivityName "Movement of the God of Nature · II"), and its level rewards (BattlePassRewardConfig 920100-920159)
     /// are AwardConfig ids with no MultiverseGroupConfig row, through which the pass view reads every reward
     /// (UI_Sys_Season_PassListWidgetBaseCtrl._refreshRewardList, GetSeasonAwardPreviewForComItem), so it showed empty
-    /// slots. The server pays them from AwardConfig directly. Injected with the pass challenge rows (PassChallenges).
+    /// slots. Its daily quest 9201101 "Reach 60 Activity" names the next id, AwardConfig 920160 (2000 novice pass EXP), the
+    /// same way, so task previews (Lua_CFG_TaskConfig.GetTaskAward) get its row too. The server pays them from
+    /// AwardConfig directly. Injected with the pass challenge rows (PassChallenges).
     /// </summary>
     internal static class NovicePass
     {
         private const long ActivityId = 9201;
-        private const long FirstReward = 920100, LastReward = 920159;
+        private const long FirstReward = 920100, LastReward = 920160;
         private const long TextBase = 99_130_000_900;
         private const string Subtitle = "The First Steps";
 

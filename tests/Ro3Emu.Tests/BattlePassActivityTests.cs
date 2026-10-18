@@ -86,6 +86,24 @@ public sealed class BattlePassActivityTests : IAsyncLifetime
         return await Next(bot, NewActivityService.Common, CommonActivityRes.Parser, r => r.RequestId == req.RequestId);
     }
 
+    /// <summary>
+    /// The novice pass's daily quest 9201101 "Reach 60 Activity" pays AwardConfig 920160 (2000 novice pass EXP, one
+    /// level) directly: MultiverseGroupConfig has no 920160 row, so routing it there held the quest forever.
+    /// </summary>
+    [ClientDataFact]
+    public async Task NovicePassDailyQuestPaysItsAwardConfigReward()
+    {
+        var alice = await InWorld("Alice");
+        await Gm(alice, "!lvl 10");
+        await Reconcile(alice);
+        await QuestProbe.AtAsync(app, "alice", 9201101, 0);
+        await Gm(alice, "!item 5 60");
+        await QuestProbe.WaitAsync(app, "alice", 9201101, i => i.Status == TaskState.Delivery, "delivered");
+        Assert.Equal(2000, Service<CharacterService>().CountOf(Session(alice), 920132));
+        await Reconcile(alice);
+        Assert.Equal(1, Session(alice).NewActivities!.ActivityInfo[9201].ActivityParam.BattlePass.Level);
+    }
+
     [ClientDataFact]
     public async Task PassRequiresEarnedLevelAndPremiumEntitlementAndPersistsClaims()
     {

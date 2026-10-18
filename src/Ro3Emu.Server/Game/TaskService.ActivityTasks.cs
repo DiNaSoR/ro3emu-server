@@ -59,6 +59,16 @@ public sealed partial class TaskService
         return accepted;
     }
 
+    /// <summary>
+    /// The novice pass's (activity 9201) own tasks name AwardConfig directly, as its BattlePassRewardConfig levels do:
+    /// 9201101 "Reach 60 Activity" pays _iAward 920160 = AwardConfig [[920132, 2000, 1]] (one level of novice pass
+    /// EXP), right after the level rewards 920100-920159, and MultiverseGroupConfig has no row 920160.
+    /// </summary>
+    private bool NovicePassTask(TaskDef def) =>
+        def.Type == SeasonTreasureType && ActivityTasks().GetValueOrDefault(def.Id) == NovicePassSon;
+
+    private const int NovicePassSon = 9201;
+
     /// <summary>A finished activity task without a delivery mode is claimed in its activity's panel (31205).</summary>
     private bool ActivityClaim(GameSession session, TaskDef def) =>
         def.Type == SeasonTreasureType && def.Deliver == 0 && ActivityTaskOpen(session, def.Id);
