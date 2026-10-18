@@ -1,0 +1,109 @@
+using System.Text.Json;
+using Ro3Emu.Server.Data;
+using Ro3Emu.Server.Maps;
+
+namespace Ro3Emu.Server.Game;
+
+/// <summary>
+/// The secondary stats in the damage and heal formulas. The original formula lists its terms in PBEnumDefine
+/// DubugDamageFormulaEnum (Formula_RaceAttr, Formula_EleDmgAttr, Formula_EleMonsterDmgAttr, Formula_BodyAttr,
+/// Formula_DmgAttr, Formula_AtkDmgAttr, Formula_MeleeOrRangeAttr, Formula_MagicDmgAttr, Formula_SkillDmgAttr,
+/// Formula_CriDmg, Formula_CureAttr ...). Each pair is the attacker's "+X% damage" stat against the defender's matching
+/// "-X% damage taken" stat. (inferred) Every pair is one factor <c>1 + deal - taken</c> (basis points, floored at 0)
+/// and the factors multiply; the client names the terms but not how they combine.
+/// </summary>
+public sealed partial class CombatService
+{
+    /// <summary>Players' race (NPCConfig race 2, Demi-Human: "Damage to Demi-Human Race %" is the PvP race stat) and
+    /// size (Medium, inferred: classic RO players are Medium).</summary>
+    internal const int PlayerRace = 2, PlayerSize = 2;
+
+    /// <summary>Set by TotemEffects: the part of a stat its own multipliers already apply, so it is not counted twice.</summary>
+    public Func<GameSession, int, double>? CoveredBonus { get; set; }
+
+    private static double S(Fighter f, int id) => f.Stats is { } s ? s[id] - (f.Covered?.Invoke(id) ?? 0) : 0;
+
+    private static double Pair(double deal, double taken) => Math.Max(0, 1 + (deal - taken) / 10000);
+
+    /// <summary>
+    /// The product of the secondary-stat factors for one hit (attribute ids from AttributeConfig):
+    /// race 401-410 against 411-420; element 301-310 against 311-320 by the attack element; element vs monsters
+    /// 321-330 by the monster's element and 331-340 against a monster attacker's element; size 501/503/505 and
+    /// 502/504/506; boss 601/602 and non-boss 603/604; Damage% 215/216; Physical 211/212 or Magic 213/214; melee or
+    /// ranged (skill _iDistanceType 2) Physical 227/228 and 229/230, Magic 1250/1251 and 1252/1253; Skill Damage%
+    /// 225/226 for everything but the normal attack (_iIsNormalAtk).
+    /// </summary>
+    internal static double BonusFactor(Fighter a, Fighter b, JsonElement skill, bool magic, int element)
+    {
+        if (a.Stats == null && b.Stats == null) return 1;
+        double f = 1;
+        f *= Pair(b.Race is >= 1 and <= 10 ? S(a, 400 + b.Race) : 0, a.Race is >= 1 and <= 10 ? S(b, 410 + a.Race) : 0);
+        if (element is >= 1 and <= 10) f *= Pair(S(a, 300 + element), S(b, 310 + element));
+        f *= Pair(b.IsMonster && b.Element is >= 1 and <= 10 ? S(a, 320 + b.Element) : 0,
+            a.IsMonster && a.Element is >= 1 and <= 10 ? S(b, 330 + a.Element) : 0);
+        f *= Pair(b.IsMonster && b.Size is >= 1 and <= 3 ? S(a, 499 + 2 * b.Size) : 0,
+            a.IsMonster && a.Size is >= 1 and <= 3 ? S(b, 500 + 2 * a.Size) : 0);
+        f *= Pair(b.IsMonster ? S(a, b.Boss ? 601 : 603) : 0, a.IsMonster ? S(b, a.Boss ? 602 : 604) : 0);
+        f *= Pair(S(a, 215), S(b, 216));
+        f *= magic ? Pair(S(a, 213), S(b, 214)) : Pair(S(a, 211), S(b, 212));
+        bool ranged = GameData.Int(skill, "_iDistanceType") == 2;
+        f *= magic
+            ? ranged ? Pair(S(a, 1252), S(b, 1253)) : Pair(S(a, 1250), S(b, 1251))
+            : ranged ? Pair(S(a, 229), S(b, 230)) : Pair(S(a, 227), S(b, 228));
+        if (GameData.Int(skill, "_iIsNormalAtk") == 0) f *= Pair(S(a, 225), S(b, 226));
+        return f;
+    }
+
+    /// <summary>A critical hit: FormulaParamCriDmg 15000 plus Crit Damage% 209, minus Crit Damage Reduction% 210.</summary>
+    internal static double CritFactor(Fighter a, Fighter b) => Math.Max(0, 15000 + S(a, 209) - S(b, 210)) / 10000;
+
+    /// <summary>A heal: Healing Done% 207 and Global Healing Effect% 241 of the healer, Healing Taken% 208 and Global
+    /// Healing Received% 242 of the recipient (inferred: two factors, like the damage pairs).</summary>
+    internal static double HealFactor(Fighter healer, Fighter recipient) =>
+        Math.Max(0, 1 + (S(healer, 207) + S(healer, 241)) / 10000) * Math.Max(0, 1 + (S(recipient, 208) + S(recipient, 242)) / 10000);
+
+    /// <summary>A player attacking, with its secondary stats.</summary>
+    private Fighter PlayerAttacker(GameSession s, StatSheet stats) =>
+        new(stats[103], stats[104], stats[109], stats[111], s.Progress!.Level, 1)
+        {
+            Stats = stats, Race = PlayerRace, Size = PlayerSize, Covered = Covered(s),
+        };
+
+    /// <summary>A player taking a hit, with its defenses and secondary stats.</summary>
+    private Fighter PlayerDefender(GameSession p, StatSheet stats) =>
+        new(0, 0, 0, 0, p.Progress!.Level, 1)
+        {
+            Def = stats[105], Mdef = stats[106], Flee = stats[110], ResCri = stats[112],
+            Stats = stats, Race = PlayerRace, Size = PlayerSize, Covered = Covered(p),
+        };
+
+    private Func<int, double>? Covered(GameSession s) => CoveredBonus is { } covered ? id => covered(s, id) : null;
+
+    /// <summary>The monster side of the formula: race, size, element and boss from its template.</summary>
+    private Fighter AsMonster(Fighter f, MonsterTemplate t, StatSheet? stats) => f with
+    {
+        Stats = stats, Race = t.Race, Size = t.Size, IsMonster = true, Boss = IsBoss(t.NpcId),
+    };
+
+    private readonly Dictionary<int, bool> _bosses = new();
+
+    /// <summary>(inferred) A boss is a monster with the large boss HP bar (NPCConfig _iMonsterHPBarDisplay 1 or 2:
+    /// Baphomet, Moonlight Flower, Golden Thief Bug, the dungeon bosses; ordinary field monsters are 0).</summary>
+    internal bool IsBoss(int npcId)
+    {
+        if (_bosses.TryGetValue(npcId, out bool boss)) return boss;
+        return _bosses[npcId] = data.Row("NPCConfig", npcId) is { } row && GameData.Int(row, "_iMonsterHPBarDisplay") != 0;
+    }
+
+    /// <summary>A monster's live buff attributes as a stat sheet (Lex Aeterna-style taken% debuffs and the like).</summary>
+    private StatSheet? UnitSheet(WorldUnit unit)
+    {
+        StatSheet? sheet = null;
+        foreach (var (id, value) in buffs.UnitAttributes(unit))
+        {
+            sheet ??= new StatSheet();
+            sheet[(int)id] += (long)Math.Round(value);
+        }
+        return sheet;
+    }
+}

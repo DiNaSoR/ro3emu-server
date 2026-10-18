@@ -42,8 +42,22 @@ public sealed class MonsterUnit : WorldUnit
     /// <summary>Temporary strongest movement slow (basis points), with an absolute server-millisecond expiry.</summary>
     public int SlowMovementBp { get; set; }
     public long SlowMovementExpireMs { get; set; }
-    public int SpeedCm(long nowMs) => SlowMovementExpireMs > nowMs
-        ? (int)Math.Max(1, Template.SpeedCm * (10000L - SlowMovementBp) / 10000L) : Template.SpeedCm;
+    /// <summary>Movement speed change of live buffs (attribute 1131, basis points; negative slows), BuffService's.</summary>
+    public int BuffSpeedBp { get; set; }
+    public int SpeedCm(long nowMs)
+    {
+        long bp = 10000L + BuffSpeedBp - (SlowMovementExpireMs > nowMs ? SlowMovementBp : 0);
+        return bp == 10000 ? Template.SpeedCm : (int)Math.Max(1, Template.SpeedCm * Math.Max(1000, bp) / 10000L);
+    }
+
+    /// <summary>Actions its live control buffs forbid: bit n = SpecialStatusConfig._kForbidden ordinal n (3 walk,
+    /// 4 cast, 5 normal attack), kept by BuffService.</summary>
+    public long ForbiddenOrdinals { get; set; }
+    /// <summary>The <see cref="StatusBits"/> that come from buffs, and the client masks published with them.</summary>
+    public long BuffStatusBits { get; set; }
+    public ulong ForbiddenBits { get; set; }
+    public ulong StaggerBits { get; set; }
+    public bool Forbids(int ordinal) => ordinal is > 0 and < 64 && (ForbiddenOrdinals & (1L << ordinal)) != 0;
 
     // Walk segment in progress: from (FromX, FromZ) to (ToX, ToZ) over [StartMs, EndMs].
     public bool Moving { get; set; }
@@ -142,6 +156,12 @@ public sealed class MonsterUnit : WorldUnit
                  })
             entity.Property.Add(new AoIProperty { Idx = idx, Data = value, BaseData = value });
         if (CustomData.Count > 0) entity.CustomDatas.Add(CustomData.Select(c => c.Clone()));
+        if (BuffStatusBits != 0)
+        {
+            entity.ObjState = new AoiObjStateInfo { Data = new CommonBigMask { Values = { (ulong)StatusBits } } };
+            entity.ObjForbid = new AoiObjForbidInfo { Data = new CommonBigMask { Values = { ForbiddenBits } } };
+            entity.ObjStagger = new AoiObjStaggerInfo { StaggerMask = StaggerBits };
+        }
         EntityExtras?.Invoke(entity);
         return entity;
     }

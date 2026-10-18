@@ -193,7 +193,7 @@ public sealed partial class CombatService
             }
         }
         var stats = character.Stats(s);
-        var attacker = new Fighter(stats[103], stats[104], stats[109], stats[111], s.Progress!.Level, 1);
+        var attacker = PlayerAttacker(s, stats);
         var hit = new SkillHitInfo
         {
             SrcID = field?.Uid ?? action.SourceId, SkillId = action.Request.SkillId, SessionId = action.Id,
@@ -214,7 +214,7 @@ public sealed partial class CombatService
             processed.Add(target);
             if (damage)
             {
-                var defender = AsDefender(target.Template);
+                var defender = AsDefender(target);
                 var (amount, result) = Damage(attacker, defender, row, script == "Heal" ? 1 : 0);
                 if (amount > 0)
                 {
@@ -259,27 +259,24 @@ public sealed partial class CombatService
             if (!CanApplyMoreEffects()) break;
             if (field == null)
                 foreach (var tuple in Tuples(row, "_kBuff1"))
-                    if (CanApplyMoreEffects() && RollBuff(tuple, out int id, out int duration)) await buffs.AddAsync(recipient, id, duration, castingRole.Id);
+                    if (CanApplyMoreEffects() && RollBuff(tuple, out int id, out int duration)) await GrantSkillBuffAsync(s, recipient, id, duration);
             if (friendly && damage)
             {
                 double multiplier = Numbers(row, "_kDamageParam1").FirstOrDefault(), flat = Numbers(row, "_kDamageParam2").FirstOrDefault();
                 // Heal's friendly branch is P1[0]/P2[0]; its enemy branch is [1] (description + select race mask).
-                long amount = (long)Math.Max(0, Math.Round(stats[104] * multiplier / 10000 + flat));
-                foreach (var modifier in ExtraHeal) amount = modifier(s, amount);
                 var before = character.Stats(recipient);
+                long amount = (long)Math.Max(0, Math.Round((stats[104] * multiplier / 10000 + flat)
+                    * HealFactor(attacker, PlayerDefender(recipient, before))));
+                foreach (var modifier in ExtraHeal) amount = modifier(s, amount);
                 long actual = Math.Min(amount, Math.Max(0, before[101] - before[2000]));
                 await character.SetHpSpAsync(recipient, before[2000] + amount, null);
                 hit.Dsts.Add(new DamageInfo { DstID = recipient.Role!.Id, Damage = actual, DamageType = DamageType.Heal, DstElement = 1 });
                 foreach (var handler in Healed) handler(s, actual);
                 foreach (var handler in HealedAsync) await handler(s, actual);
             }
-            if (script is "Detoxify" or "HealingSkills")
-            {
-                // (inferred) cleanse exact described groups rather than removing every beneficial/hostile status.
-                int[] groups = script == "Detoxify" ? [9030] : [9023, 9025];
-                foreach (var buff in recipient.Buffs.Where(b => data.Row("BuffConfig", b.ConfigId) is { } br && groups.Contains((int)GameData.Int(br, "_iBuffID"))).ToArray())
+            if (CleanseTargets(row) is { Length: > 0 } cleansed)
+                foreach (var buff in recipient.Buffs.Where(b => data.Row("BuffConfig", b.ConfigId) is { } br && Cleanses(cleansed, br)).ToArray())
                     await buffs.RemoveAsync(recipient, buff);
-            }
         }
         if (hit.Dsts.Count > 0)
         {
@@ -338,6 +335,61 @@ public sealed partial class CombatService
         }
     }
 
+    /// <summary>
+    /// A skill's _kBuff1 on its caster or an ally. A shield buff (_kBuffCategory 30: Kyrie Eleison, Radiant Holy Light,
+    /// Rift Impact, Royal Guard's stacks; every category-30 row with a formula is described as a shield) gets its
+    /// absorb amount: _kData1 x the caster's PATK (_iDmgType 1) or MATK (2) / 10000 ("absorbs damage equal to Magic ATK x
+    /// 80%"), else the T_AXadd0_etc attribute formula of _kDamageParamExtra ("a shield equal to 10% of Max Life",
+    /// PetCombatRules.AttributeAmount). Other buffs are added as before.
+    /// </summary>
+    private async Task GrantSkillBuffAsync(GameSession caster, GameSession recipient, int id, int durationMs)
+    {
+        long shield = data.Row("BuffConfig", id) is { } row ? ShieldAmount(row, character.Stats(caster), character.Stats(recipient)) : 0;
+        if (shield > 0) await buffs.AddSupportAsync(recipient, id, durationMs, caster.Role!.Id, shield);
+        else await buffs.AddAsync(recipient, id, durationMs, caster.Role!.Id);
+    }
+
+    internal static long ShieldAmount(JsonElement buff, StatSheet caster, StatSheet recipient)
+    {
+        if (!(buff.TryGetProperty("_kBuffCategory", out var c) && c.ValueKind == JsonValueKind.Array
+              && c.EnumerateArray().Any(v => GameData.Number(v) == 30))) return 0;
+        int dmgType = (int)GameData.Int(buff, "_iDmgType");
+        double ratio = Numbers(buff, "_kData1").FirstOrDefault();
+        if (ratio > 0 && dmgType is 1 or 2) return (long)Math.Floor((dmgType == 2 ? caster[104] : caster[103]) * ratio / 10000);
+        return PetCombatRules.AttributeAmount(buff, caster, recipient);
+    }
+
+    /// <summary>
+    /// What a cleansing skill removes. Healing Skills/Recovery (Cleanse, Cleanse2) list status kinds in _kLogicData,
+    /// the first _kBuffCategory entry of the status (6 Silence, 5 Blind, 13 Stun, 9 Frozen, 10 Petrify, matching their
+    /// descriptions); Thief Detoxify (PoisonBoom) lists the Poisoned group 9030; Guillotine Cross Antidote (jieduji)
+    /// has no data and cures Poisoned by its description (inferred).
+    /// </summary>
+    internal static int[] CleanseTargets(JsonElement row) => Script(row) switch
+    {
+        "Cleanse" or "Cleanse2" or "PoisonBoom" or "Detoxify" or "HealingSkills" => Numbers(row, "_kLogicData").Select(v => (int)v).ToArray(),
+        "jieduji" => [9030],
+        _ => [],
+    };
+
+    /// <summary>A buff matches a cleanse id when it is that BuffConfig group (ids of 1000 and up) or a debuff whose kind
+    /// (first category, also in its monster and PvP copies at +50/+79) is that id. Poisoned 9030 also covers its copies
+    /// 9072/9091, whose kind is 1 + 50/79.</summary>
+    internal static bool Cleanses(int[] ids, JsonElement buff)
+    {
+        if (GameData.Int(buff, "_iType") != 2) return false;
+        int group = (int)GameData.Int(buff, "_iBuffID");
+        int kind = buff.TryGetProperty("_kBuffCategory", out var c) && c.ValueKind == JsonValueKind.Array && c.GetArrayLength() > 0
+            ? (int)(GameData.Number(c[0]) ?? 0) : 0;
+        foreach (int id in ids)
+        {
+            int wantKind = id >= 1000 ? (id == 9030 ? 1 : -1) : id;
+            if (id >= 1000 && group == id) return true;
+            if (wantKind > 0 && (kind == wantKind || kind == wantKind + 50 || kind == wantKind + 79)) return true;
+        }
+        return false;
+    }
+
     private bool RollBuff(JsonElement tuple, out int id, out int duration)
     {
         id = duration = 0;
@@ -347,7 +399,7 @@ public sealed partial class CombatService
         return id > 0 && Rolls.Proc(10000) < (GameData.Number(tuple[1]) ?? 0);
     }
 
-    internal enum DisplaceKind { CasterForward, CasterBack, TargetPush, TargetPull }
+    internal enum DisplaceKind { CasterForward, CasterBack, TargetPush, TargetPull, CasterToTarget, CasterToPoint }
 
     /// <summary>
     /// Skills whose show has a displacement EffectData (m_kPoint.m_bMovement) and whose description names the
@@ -368,6 +420,13 @@ public sealed partial class CombatService
             ["ArrowRepel"] = (DisplaceKind.TargetPush, 3),
             ["PileBunker"] = (DisplaceKind.TargetPush, 5),
             ["PhantomThrust"] = (DisplaceKind.TargetPull, -1),
+            // "knocking them back ${4} m" (Jupitel Thunder 1210210 is its 击退 effect).
+            ["Jupitel_Thunder"] = (DisplaceKind.TargetPush, 3),
+            // "Charge at a designated enemy" (1111203): the caster ends next to the target.
+            ["Charge_Attack"] = (DisplaceKind.CasterToTarget, -1),
+            // "Dives toward a designated location" (Rift Impact 1130109), "Leap to a selected area" (Twilight 1160707).
+            ["IgnitionBreak"] = (DisplaceKind.CasterToPoint, -1),
+            ["HesperusLit"] = (DisplaceKind.CasterToPoint, -1),
         };
 
     private readonly System.Collections.Concurrent.ConcurrentDictionary<long, (int Id, int Ms)> _movementEffects = new();
@@ -400,17 +459,39 @@ public sealed partial class CombatService
         if (!Displacements.TryGetValue(Script(row), out var rule)) return null;
         var (effect, ms) = MovementEffect(GameData.Int(row, "_iScriptShow"));
         if (effect == 0) return null;
-        float distance = rule.DescIndex < 0 ? 1 // (inferred) "pulling them in front of you": 1 m ahead of the caster
-            : (float)Numbers(row, "_kDescData").ElementAtOrDefault(rule.DescIndex);
+        // (inferred) "pulling them in front of you": 1 m ahead of the caster; a charge also stops 1 m short.
+        float distance = rule.DescIndex < 0 ? 1 : (float)Numbers(row, "_kDescData").ElementAtOrDefault(rule.DescIndex);
         return distance > 0 ? (rule.Kind, distance, effect, ms) : null;
     }
 
     private async Task MoveCasterAsync(GameSession s, ActiveSkillCast action)
     {
-        if (Displacement(action.Row) is not { Kind: DisplaceKind.CasterForward or DisplaceKind.CasterBack } move) return;
-        float face = action.Request.Face + (move.Kind == DisplaceKind.CasterBack ? 180 : 0);
-        double angle = face * Math.PI / 180;
-        var end = WalkableEnd(s.SceneEntry, s.Position, (float)Math.Sin(angle) * move.Distance, (float)Math.Cos(angle) * move.Distance);
+        if (Displacement(action.Row) is not { Kind: DisplaceKind.CasterForward or DisplaceKind.CasterBack
+                or DisplaceKind.CasterToTarget or DisplaceKind.CasterToPoint } move) return;
+        float dx, dz;
+        if (move.Kind == DisplaceKind.CasterToTarget)
+        {
+            // Stop the given distance short of the locked target, along the line to it.
+            if (FindMonster(s.WorldScene, action.Request.TargetId) is not { } target) return;
+            float tx = target.X - s.Position.X, tz = target.Z - s.Position.Z, length = MathF.Sqrt(tx * tx + tz * tz);
+            if (length <= move.Distance) return;
+            dx = tx / length * (length - move.Distance);
+            dz = tz / length * (length - move.Distance);
+        }
+        else if (move.Kind == DisplaceKind.CasterToPoint)
+        {
+            if (action.Request.TargetPos is not { } point) return;
+            dx = point.X - s.Position.X;
+            dz = point.Z - s.Position.Z;
+        }
+        else
+        {
+            float face = action.Request.Face + (move.Kind == DisplaceKind.CasterBack ? 180 : 0);
+            double angle = face * Math.PI / 180;
+            dx = (float)Math.Sin(angle) * move.Distance;
+            dz = (float)Math.Cos(angle) * move.Distance;
+        }
+        var end = WalkableEnd(s.SceneEntry, s.Position, dx, dz);
         var start = s.Position.Clone();
         await ToPlayerAndViewersAsync(s, SkillMove, new SkillStartMoveNotify
         {
@@ -481,7 +562,10 @@ public sealed partial class CombatService
                 npc = (int)logic[0]; interval = (int)logic[1]; duration = (int)logic[2]; break;
             case "Safety_Wall" or "Pneuma" when logic.Length >= 8:
                 npc = (int)logic[5]; duration = (int)logic[2]; radius = (float)(logic[7] / 100);
-                protection = script == "Safety_Wall" ? 1 : 2; charges = script == "Safety_Wall" ? (int)logic[1] : int.MaxValue; break;
+                protection = script == "Safety_Wall" ? 1 : 2;
+                // [?, ?, ms, hits, buff, npc, ?, radius cm]: index 3 is the hits it blocks, rising with the level
+                // like the description's count (Safety Wall Lv1-5: 1-5, Pneuma: 2). Index 1 is 1 at every level.
+                charges = Math.Max(1, (int)logic[3]); break;
             case "LandMine": npc = 22000016; trap = true; break;
             case "ClaymoreTrap": npc = 22000017; trap = true; break;
             case "FreezingTrap": npc = 22000018; trap = true; break;
@@ -516,7 +600,7 @@ public sealed partial class CombatService
         await world.AddUnitAsync(unit);
         if (!CurrentCastMap(s, action)) { await RemoveSkillObjectAsync(unit); return true; }
         foreach (var tuple in Tuples(row, "_kBuff1"))
-            if (RollBuff(tuple, out int buffId, out int buffDuration)) await buffs.AddAsync(s, buffId, buffDuration, s.Role.Id);
+            if (RollBuff(tuple, out int buffId, out int buffDuration)) await GrantSkillBuffAsync(s, s, buffId, buffDuration);
         return true;
     }
 

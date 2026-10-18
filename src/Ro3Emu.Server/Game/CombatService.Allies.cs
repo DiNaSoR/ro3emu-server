@@ -46,13 +46,13 @@ public sealed partial class CombatService
         long scaleBp = 10000)
     {
         if (source.Dead || source.Hp <= 0 || target.Dead || target.Hp <= 0) return 0;
-        var attacker = new Fighter(source.Template.Atk, source.Template.Matk, source.Template.Hit, source.Template.Cri,
-            source.Template.Level, source.Template.Element);
+        var attacker = AsMonster(new Fighter(source.Template.Atk, source.Template.Matk, source.Template.Hit, source.Template.Cri,
+            source.Template.Level, source.Template.Element), source.Template, UnitSheet(source));
         bool ally = IsAlly(target);
         var defender = ally
             ? new Fighter(0, 0, 0, 0, target.Template.Level, target.Template.Element)
                 { Def = target.Template.Def, Mdef = target.Template.Mdef, Flee = target.Template.Flee }
-            : AsDefender(target.Template);
+            : AsDefender(target);
         var (damage, result) = Damage(attacker, defender, row);
         damage = ScaleMonsterDamage(damage, source.DamageRatio);
         if (scaleBp != 10000 && damage > 0) damage = Math.Max(1, damage * scaleBp / 10000);

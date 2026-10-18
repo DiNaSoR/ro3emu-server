@@ -142,7 +142,7 @@ public sealed partial class MvpService
                 loop.TrackRuntimeDetached("MVP back in combat", () => EnterCombatAsync(boss));
             }
             st.LastFightMs = now;
-            if (st.SkillsStopped || now < st.NextCastMs || boss.BusyUntilMs > now) return;
+            if (st.SkillsStopped || now < st.NextCastMs || boss.BusyUntilMs > now || boss.Forbids(4)) return; // stunned, frozen, silenced
             var plan = now < boss.NextSpecialMs ? null : Plans(st.Def.NpcId).FirstOrDefault(p => now >= st.SkillReadyMs.GetValueOrDefault(p.Skill));
             if (plan == null)
             {

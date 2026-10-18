@@ -43,7 +43,7 @@ public sealed partial class MonsterService
 
     private bool TryBossSkill(MonsterUnit m, GameSession? player, TowerPetUnit? pet, float dist, long now)
     {
-        if (CastBossSkill == null || m.Template.Skills is not { } book) return false;
+        if (CastBossSkill == null || m.Template.Skills is not { } book || m.Forbids(4)) return false; // stunned, frozen, silenced
         var rt = m.BossSkills;
         if (rt == null) m.BossSkills = rt = new BossSkillRuntime(book);
         if (!rt.Engaged)

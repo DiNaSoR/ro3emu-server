@@ -215,7 +215,7 @@ public sealed partial class DungeonService
                 }
             }
         }
-        if (now < run.BossNextCastMs) return;
+        if (now < run.BossNextCastMs || run.Boss.Forbids(4)) return; // a stunned or silenced boss holds its skills
         (float X, float Z)? aim = boss.Target is { } p ? (p.Position.X, p.Position.Z)
             : boss.MonsterTarget is { } m ? (m.X, m.Z) : null;
         if (aim is not { } at) return;

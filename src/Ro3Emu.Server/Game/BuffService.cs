@@ -50,14 +50,6 @@ public sealed partial class BuffService : IGameTicker
         world.UnitRemoved.Add(unit => { _unitBuffs.Remove(unit.Uid); return Task.CompletedTask; });
     }
 
-    // Inferred: these exact buff groups are named Stun/Sleep/Silence/Freeze/Invincible; matching
-    // SpecialStatusConfig rows specify forbidden actions. No general category interpreter was recovered.
-    private static int StateFor(int buffGroup) => buffGroup switch
-    {
-        9016 => 18, 9022 => 19, 9023 => 20, 12003 => 11, 9034 => 25,
-        _ => 0,
-    };
-
     /// <summary>Place or refresh a validated buff. Zero-time source rows retain the previous 60s fallback (inferred).</summary>
     public Task AddAsync(GameSession p, int configId, int durationMs, long sourceId) =>
         AddCoreAsync(p, configId, durationMs, sourceId, null);
@@ -78,6 +70,7 @@ public sealed partial class BuffService : IGameTicker
         if (p.Role == null || data.Row("BuffConfig", configId) is not { } row || GameData.Int(row, "_iBuffID") <= 0) return;
         if (durationMs <= 0) durationMs = (int)GameData.Int(row, "_iTime");
         if (durationMs <= 0) durationMs = 60000;
+        if (sourceId != p.Role.Id && Blocks(CategoriesOf(p), row)) return;
         if (sourceId != p.Role.Id && !ApplyDecay(p.Role.Id, p.SceneEntry, configId, ref durationMs)) return;
         long now = MonsterService.NowMs;
         int group = (int)GameData.Int(row, "_iBuffID");
@@ -91,7 +84,7 @@ public sealed partial class BuffService : IGameTicker
             ? Math.Min(maxStack, existing.PileCount + 1) : 1);
         var changes = GameData.Pairs(row, "_kChangeAttri").Select(c => (c.Id, c.Value * pile)).ToList();
         var buff = new ActiveBuff(existing?.Guid ?? Interlocked.Increment(ref _guids), configId,
-            now + durationMs, durationMs, changes, sourceId, pile, StateOrdinal: StateFor(group),
+            now + durationMs, durationMs, changes, sourceId, pile, StateOrdinal: StateFor(row),
             ShieldRemaining: Math.Max(0, shieldAmount));
         if (existing != null) p.Buffs.Remove(existing);
         p.Buffs.Add(buff);
@@ -188,7 +181,10 @@ public sealed partial class BuffService : IGameTicker
         if (data.Row("BuffConfig", configId) is not { } row || GameData.Int(row, "_iBuffID") <= 0) return;
         if (durationMs <= 0) durationMs = (int)GameData.Int(row, "_iTime");
         if (durationMs <= 0) durationMs = 60000;
+        if (sourceId != unit.Uid && Blocks(CategoriesOf(unit), row)) return;
         if (sourceId != unit.Uid && !ApplyDecay(unit.Uid, unit.SceneEntry, configId, ref durationMs)) return;
+        // Late viewers get the icons and shield too, not only MVPs (MvpService sets this for its bosses already).
+        if (unit is MonsterUnit { EntityExtras: null } monster) monster.EntityExtras = entity => PopulateEntity(monster, entity);
         if (!_unitBuffs.TryGetValue(unit.Uid, out var list)) _unitBuffs[unit.Uid] = list = new();
         int group = (int)GameData.Int(row, "_iBuffID");
         bool multiSource = GameData.Int(row, "_iMultiSource") != 0;
@@ -202,7 +198,7 @@ public sealed partial class BuffService : IGameTicker
         var buff = new ActiveBuff(existing?.Guid ?? Interlocked.Increment(ref _guids), configId,
             MonsterService.NowMs + durationMs, durationMs,
             GameData.Pairs(row, "_kChangeAttri").Select(c => (c.Id, c.Value * pile)).ToArray(), sourceId, pile,
-            ShieldRemaining: Math.Max(0, shieldAmount));
+            StateOrdinal: StateFor(row), ShieldRemaining: Math.Max(0, shieldAmount));
         if (existing != null) list.Remove(existing);
         list.Add(buff);
         TrackPeriodic(null, unit, buff);
@@ -212,6 +208,8 @@ public sealed partial class BuffService : IGameTicker
         if (buff.ShieldRemaining > 0 || existing?.ShieldRemaining > 0)
             changed.Property.Add(new AoIProperty { Idx = 2003, Data = ShieldAmount(unit) });
         await world.ToUnitViewersAsync(unit, AoiAttrChange, changed);
+        if (buff.StateOrdinal != 0 || existing?.StateOrdinal > 0 || buff.Changes.Count > 0 || existing?.Changes.Count > 0)
+            await RefreshUnitControlAsync(unit);
         if (buff.Changes.Count > 0 || existing?.Changes.Count > 0)
             foreach (var handler in UnitChanged) await handler(unit);
     }

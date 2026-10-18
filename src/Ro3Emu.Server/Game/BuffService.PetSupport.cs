@@ -120,6 +120,7 @@ public sealed partial class BuffService
         if (buff.ShieldRemaining > 0)
             changed.Property.Add(new AoIProperty { Idx = 2003, Data = ShieldAmount(unit) });
         await world.ToUnitViewersAsync(unit, AoiAttrChange, changed);
+        if (buff.StateOrdinal != 0 || buff.Changes.Count > 0) await RefreshUnitControlAsync(unit);
         if (buff.Changes.Count > 0)
             foreach (var handler in UnitChanged) await handler(unit);
     }

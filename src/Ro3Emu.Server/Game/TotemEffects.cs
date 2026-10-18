@@ -55,6 +55,7 @@ public sealed class TotemEffects : IGameTicker
         this.monsters = monsters; this.sessions = sessions;
         this.loop = loop;
         character.DynamicProperties.Add(ShieldProperties);
+        combat.CoveredBonus = CoveredBonus;
         combat.CastLanded.Add(OnCastAsync);
         combat.DamageAdjusters.Add(AdjustDamage);
         combat.ExtraHitDamage.Add(ExtraDamage);
@@ -186,6 +187,10 @@ public sealed class TotemEffects : IGameTicker
             .SelectMany(b => b.Changes).Where(c => c.Attr == id).Sum(c => c.Value);
         return skills + temporary;
     }
+
+    /// <summary>The stats this class's own multipliers already apply from deployed totems (Outgoing, Incoming and
+    /// Healing below). Totem attributes also reach the stat sheet, so CombatService leaves these parts out.</summary>
+    public double CoveredBonus(GameSession s, int id) => id is 207 or 209 or 210 or 211 or 213 or 216 or 227 or 229 ? Bonus(s, id) : 0;
 
     /// <summary>Only deployed-totem bonus components; base ATK/MATK, defense, and CRIT chance already enter Damage().</summary>
     public double OutgoingMultiplier(GameSession s, JsonElement skillRow, DamageHitResult result)
