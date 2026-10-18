@@ -74,6 +74,14 @@ With `TopUp:Free` off (the default, which keeps the original's refusals), 2001-2
 
 Both have `_iSingleLimit` 999999 and open at base level 20. This is not a payment, so it is served whatever `TopUp:Free` says.
 
+## No store SDK
+
+`Lua_SDK_Factory.GetPayMgr` builds the pay manager on first use and caches it only after `Init` returns. `Init` asks
+the store SDK for its prices, and without one (this client has no SDK proxy) the answer comes back at once through
+`GameLogic.OnSkuInfoResult`, which calls `GetPayMgr` again. That loops until Lua's stack overflows, so every Top Up
+pack and month card Quick Buy froze the client and sent nothing. The client hook `PayManager` makes `Init` a no-op;
+the price list only ever reached a log line.
+
 ## Bound crystals
 
 A crystal price (item 3) takes bound crystals (item 16) first and regular crystals for the rest (`ShopService.Payment`,
