@@ -81,7 +81,7 @@ public sealed partial class CombatService
     /// Moving or casting again after launch no longer cancels it; caster death, a scene change or a new
     /// attachment still does (ApplyEffectsAsync's own checks).
     /// </summary>
-    private async Task LaunchBulletAsync(GameSession s, ActiveSkillCast action, (int Effect, int FlightMs, float Speed) bullet)
+    private async Task LaunchBulletAsync(GameSession s, ActiveSkillCast action, (int Effect, int FlightMs, float Speed, int IntervalMs) bullet)
     {
         var row = action.Row;
         var center = action.Request.TargetPos ?? action.Origin;
@@ -105,12 +105,31 @@ public sealed partial class CombatService
         }
         // Loop timers fire on the next 50 ms tick, so a timer set for the full flight lands up to a tick after the
         // bolt; one tick early keeps the hit inside the bolt's last tick.
-        var land = TimeSpan.FromMilliseconds(Math.Max(0, landMs - GameLoop.TickInterval.TotalMilliseconds));
-        ScheduleRuntime(action.WorldScene, land, async () =>
+        // The client emits the split bolts m_fBulletHatchInterval apart (LC_BulletEmit_Mgr: Fire Bolt 100 ms, Jupitel
+        // Thunder 250 ms). Fire Bolt's hit effect 1200404 spreads one split hit's numbers over the bolts itself
+        // (m_isPlayShow_Multistage, m_fDisplayInterval 0.1 s); Jupitel Thunder's 1210203 does not (interval 0), so its
+        // numbers all showed with the first bolt. Such a skill lands each bolt as its own hit with its share of the
+        // damage (inferred).
+        int bolts = bullet.IntervalMs > 0 && split > 1 && !SpreadsSplitNumbers(HitEffect(GameData.Int(row, "_iScriptShow"))) ? split : 1;
+        for (int i = 0; i < bolts; i++)
         {
-            if (CurrentCastMap(s, action)) await ApplyEffectsAsync(s, action, center);
-        });
+            int bolt = i;
+            var land = TimeSpan.FromMilliseconds(Math.Max(0, landMs + bolt * bullet.IntervalMs - GameLoop.TickInterval.TotalMilliseconds));
+            ScheduleRuntime(action.WorldScene, land, async () =>
+            {
+                if (CurrentCastMap(s, action)) await ApplyEffectsAsync(s, action, center, bolt: bolt, bolts: bolts);
+            });
+        }
     }
+
+    /// <summary>The hit effect shows a split hit's numbers one by one (m_kActionDamge m_isPlayShow_Multistage with a
+    /// positive m_fDisplayInterval).</summary>
+    private bool SpreadsSplitNumbers(int hitEffect) =>
+        data.SkillTemplateTable("Lua_Config_EffectData").TryGetValue(hitEffect.ToString(), out var e)
+        && e.TryGetProperty("m_kDamage", out var damage) && damage.ValueKind == JsonValueKind.Object
+        && damage.TryGetProperty("m_kActionDamge", out var action) && action.ValueKind == JsonValueKind.Object
+        && action.TryGetProperty("m_isPlayShow_Multistage", out var multi) && multi.ValueKind == JsonValueKind.True
+        && action.TryGetProperty("m_fDisplayInterval", out var interval) && interval.TryGetDouble(out double ms) && ms > 0;
 
     /// <summary>A damaging follow-up always hits enemies: some name their trigger's self-cast visual (Death Bound's 11381
     /// selects the caster), so the visual's selector does not decide its targets.</summary>
@@ -147,7 +166,7 @@ public sealed partial class CombatService
             .OrderBy(m => Distance(center, m.Pos)).ThenBy(m => m.Uid).Take(max).ToList();
     }
 
-    private async Task ApplyEffectsAsync(GameSession s, ActiveSkillCast action, Vec3 center, SkillObject? field = null)
+    private async Task ApplyEffectsAsync(GameSession s, ActiveSkillCast action, Vec3 center, SkillObject? field = null, int bolt = 0, int bolts = 1)
     {
         if (s.Dead || s.Role?.Id != action.OwnerId || s.WorldScene != action.WorldScene || s.SceneLoading
             || s.SceneGeneration != action.SceneGeneration || field?.Removing == true
@@ -207,7 +226,9 @@ public sealed partial class CombatService
             RootCtxGuid = action.Id, ComboIndex = action.Request.ComboIndex, ShowPoint = HitEffect(GameData.Int(row, "_iScriptShow")),
             SrcElement = (int)Math.Max(1, GameData.Int(row, "_iEleType")),
         };
-        int shownHits = ShowHits(row);
+        // One bolt of several is one number; its buffs, procs and pushes come with the first bolt only.
+        int shownHits = bolts > 1 ? 1 : ShowHits(row);
+        bool firstBolt = bolt == 0;
         if (shownHits > 1) hit.Split = shownHits;
         var killed = new List<MonsterUnit>();
         var processed = new List<MonsterUnit>();
@@ -227,6 +248,7 @@ public sealed partial class CombatService
                 var (amount, result) = Damage(attacker, defender, row, DamageBranch(s, script));
                 if (action.ProcFixedDamage > 0 && result != DamageHitResult.Miss) amount = action.ProcFixedDamage;
                 else if (amount > 0 && action.ProcScale != 1) amount = Math.Max(1, (long)Math.Round(amount * action.ProcScale));
+                if (amount > 0 && bolts > 1) amount = amount / bolts + (bolt < amount % bolts ? 1 : 0);
                 if (amount > 0)
                 {
                     foreach (var modifier in DamageAdjusters) amount = Math.Max(0, modifier(s, target, row, result, amount));
@@ -263,18 +285,18 @@ public sealed partial class CombatService
                     }
                 hit.Dsts.Add(new DamageInfo { DstID = target.Uid, Damage = amount, HitResult = result, DstElement = target.Template.Element, IsDead = target.Hp == 0 });
             }
-            if (CanApplyMoreEffects())
+            if (CanApplyMoreEffects() && firstBolt)
                 foreach (var tuple in Tuples(row, "_kBuff2"))
                     if (CanApplyMoreEffects() && RollHostileBuff(tuple, s, null, null, target, out int id, out int duration))
                         await buffs.ShowOnUnitAsync(target, id, duration, castingRole.Id);
             if (CanApplyMoreEffects() && script is ("Provoke" or "Taunt")) monsters.Engage(target, s);
-            if (CanApplyMoreEffects() && !target.Dead && target.Hp > 0) await DisplaceTargetAsync(s, action, target);
+            if (CanApplyMoreEffects() && firstBolt && !target.Dead && target.Hp > 0) await DisplaceTargetAsync(s, action, target);
         }
         // Buff1 is self for hostile selectors, but actual friend recipients for ally selectors (Detoxify, Blessing).
         foreach (var recipient in friendly ? allies : new List<GameSession> { s })
         {
             if (!CanApplyMoreEffects()) break;
-            if (field == null)
+            if (field == null && firstBolt)
                 foreach (var tuple in Buff1(s, row, script))
                     if (CanApplyMoreEffects() && RollBuff(tuple, out int id, out int duration)) await GrantSkillBuffAsync(s, recipient, id, duration);
             if (friendly && damage)
@@ -306,7 +328,7 @@ public sealed partial class CombatService
                     DamageBeShield = result.SheildDamage, DamageType = result.DamageType, HitResult = result.HitResult, SkillId = hit.SkillId,
                 });
             }
-            if (CurrentCaster() && hit.Dsts.Any(d => d.HitResult != DamageHitResult.Miss)) await buffs.RecoverEnergyOnHitAsync(s, row);
+            if (CurrentCaster() && firstBolt && hit.Dsts.Any(d => d.HitResult != DamageHitResult.Miss)) await buffs.RecoverEnergyOnHitAsync(s, row);
             var sourceViewers = CurrentCaster() ? world.Viewers(s).Append(s) : Enumerable.Empty<GameSession>();
             foreach (var viewer in processed.SelectMany(t => t.Viewers).Concat(sourceViewers).Distinct()) await viewer.SendGameAsync(SkillHit, hit);
             if (CurrentCaster() && field?.Trap == true)
@@ -350,7 +372,7 @@ public sealed partial class CombatService
                 await FinalizeLethalPublicationAsync(target);
             }
         }
-        if (!action.Proc && landed.Count > 0 && CanApplyMoreEffects()) await RunOutgoingProcsAsync(s, action, landed, CanApplyMoreEffects);
+        if (!action.Proc && firstBolt && landed.Count > 0 && CanApplyMoreEffects()) await RunOutgoingProcsAsync(s, action, landed, CanApplyMoreEffects);
     }
 
     /// <summary>
