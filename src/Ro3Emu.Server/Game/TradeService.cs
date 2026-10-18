@@ -14,7 +14,8 @@ namespace Ro3Emu.Server.Game;
 /// </summary>
 public sealed partial class TradeService(
     GameData data, CharacterService character, FunctionService functions, RoleStore roles,
-    SeasonService seasons, MarketStore market, SessionRegistry sessions, TimeProvider clock, ILogger<TradeService> log)
+    SeasonService seasons, MarketStore market, SessionRegistry sessions, TimeProvider clock, ILogger<TradeService> log,
+    Microsoft.Extensions.Options.IOptions<ServerOptions> options)
 {
     public const uint TradeSync = 5033;
     public const uint QueryProduct = 32602, QueryInventory = 32603, FindPrice = 32604, BuyHistory = 32605,

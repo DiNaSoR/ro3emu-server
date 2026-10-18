@@ -181,6 +181,7 @@ public sealed partial class StallsService
         {
             await RefreshWorldMaintenanceAsync();
             await trade.TickMaintenanceAsync();
+            await trade.TickSystemAsync();
         }
         finally { loop.ScheduleRuntime(TimeSpan.FromSeconds(1), MaintainAsync); }
     }
