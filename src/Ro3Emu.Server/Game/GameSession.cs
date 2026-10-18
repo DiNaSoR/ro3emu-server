@@ -468,9 +468,13 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
     private bool CanPresent() => Owners?.AllowsPresentation(this) != false
         && (Owners?.Current?.CanPresent(this) ?? true);
 
+    /// <summary>Sees every presented game message before it is serialized (GearPromptService); may amend it.</summary>
+    internal Action<uint, IMessage>? BeforeGameSend { get; set; }
+
     public Task SendGameAsync(uint msgId, IMessage body)
     {
         if (!CanPresent()) return Task.CompletedTask;
+        BeforeGameSend?.Invoke(msgId, body);
         var bytes = body.ToByteArray();
         traffic?.ServerToClient(Account, msgId, body.Descriptor, bytes);
         return SendGameBytesAsync(msgId, bytes);

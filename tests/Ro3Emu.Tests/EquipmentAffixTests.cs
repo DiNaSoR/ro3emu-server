@@ -237,6 +237,89 @@ public sealed class EquipmentAffixTests : IAsyncLifetime
         Assert.Equal(6, Session.Items.Count(i => i.Entry == Purple));
     }
 
+    /// <summary>The 31322 row the quick-equip prompt reads (LC_EquipmentHelper.CanFastEquip) for one new instance.</summary>
+    private static async Task<ItemBaseInfo> PromptRow(BotClient bot, long guid)
+    {
+        // One notice can carry several instances, so look through every 31322, consumed or not.
+        var deadline = DateTime.UtcNow + Wait;
+        while (true)
+        {
+            var row = bot.Inbox.Snapshot().Where(e => e.IsGame(CharacterService.GetRewardNotify))
+                .SelectMany(e => GetRewardNotify.Parser.ParseFrom(e.Body).Rewards).FirstOrDefault(r => r.ItemGuid == guid);
+            if (row != null) return row;
+            if (DateTime.UtcNow > deadline) throw new TimeoutException($"no quick-equip row for {guid}");
+            await Task.Delay(50);
+        }
+    }
+
+    private static void AssertPrompt(ItemBaseInfo row, int entry)
+    {
+        Assert.Equal(entry, row.ItemEntry);
+        Assert.Equal(1, row.ItemInfos[3].LongVal);
+        Assert.True(row.ItemInfos[2].LongVal > 0);
+    }
+
+    [ClientDataFact]
+    public async Task EveryWayGearReachesTheBagSendsTheQuickEquipRow()
+    {
+        await using var bot = await InWorld();
+        var kit = Session.Items.Where(i => i.Guid > 0).Select(i => i.Guid).ToHashSet();
+        // GM give: no reward notice of its own, so the bag sync's follow-up 31322 carries it.
+        var gm = Assert.Single(await Give(bot, Purple));
+        AssertPrompt(await PromptRow(bot, gm.ItemGuid), Purple);
+        // A plain grant (GrantAsync: loot, scripts).
+        foreach (var item in await Granted(bot, Purple, () => OnLoop(s => Service<CharacterService>().GrantAsync(s, [(Purple, 2)]))))
+            AssertPrompt(await PromptRow(bot, item.ItemGuid), Purple);
+        // Crafting (31404 answers with its own response, no 31322).
+        await Gm("!quest done 10103020");
+        await Gm("!item 1254001 1");
+        await Gm("!item 1200704 2");
+        await bot.SendGameAsync(EquipmentService.Craft, new EquipCraftReq { Rank = 2, Subtype = 1 });
+        var craft = await Next(bot, EquipmentService.Craft, EquipCraftResp.Parser);
+        Assert.Equal(0, craft.Result);
+        AssertPrompt(await PromptRow(bot, craft.Item.ItemGuid), Purple);
+        // Shop purchase and combine (exchanges).
+        SetRow("ShopCommodityConfig", 118, ChangedRow("ShopCommodityConfig", 118, ("_iItemId", Purple)));
+        SetRow("ItemConfig", Purple, ChangedRow("ItemConfig", Purple, ("_kCombine", new[] { new[] { 1200000, 5 } })));
+        await Gm("!lvl 20");
+        var bought = Assert.Single(await Granted(bot, Purple, async () =>
+        {
+            await bot.SendGameAsync(ShopService.BuyCommodity, new BuyCommodityReq { CommodityId = 118, Count = 1, Price = 100 });
+            Assert.Equal(0, (await Next(bot, ShopService.BuyCommodity, BuyCommodityResp.Parser)).Result);
+        }));
+        AssertPrompt(await PromptRow(bot, bought.ItemGuid), Purple);
+        await Gm("!item 1200000 5");
+        var combined = Assert.Single(await Granted(bot, Purple, async () =>
+        {
+            await bot.SendGameAsync(EquipmentService.ItemCombine, new ItemCombineReq { ItemId = Purple, ItemCount = 1, CostItem = { [1200000] = 5 } });
+            Assert.Equal(0, (await Next(bot, EquipmentService.ItemCombine, ItemCombineResp.Parser)).Result);
+        }));
+        AssertPrompt(await PromptRow(bot, combined.ItemGuid), Purple);
+        // Mail attachment claim.
+        var mailed = await Granted(bot, Purple, async () =>
+        {
+            string id = await Service<GameLoop>().InvokeAsync(() => Service<MailService>().SendRawAsync(Session.Role!.Id, "gear", "gear",
+                [new MailService.Attachment(Purple, 1)]));
+            await bot.SendGameAsync(MailService.ClaimMail, new ClaimMailReq { MailUid = { id } });
+            Assert.Equal(0, (await Next(bot, MailService.ClaimMail, ClaimMailRsp.Parser)).Result);
+        });
+        AssertPrompt(await PromptRow(bot, Assert.Single(mailed).ItemGuid), Purple);
+
+        // Gear that was already there is never offered: the starter kit at login, and gear taken off.
+        var weapon = Session.Items.First(i => kit.Contains(i.Guid) && i.Entry == 2010121);
+        if (weapon.Grid == 0) await Wear(bot, weapon.Guid);
+        await Wear(bot, weapon.Guid, remove: true);
+        await Task.Delay(GearPromptService.FlushDelay * 3);
+        Assert.DoesNotContain(bot.Inbox.Snapshot().Where(e => e.IsGame(CharacterService.GetRewardNotify)),
+            e => GetRewardNotify.Parser.ParseFrom(e.Body).Rewards.Any(r => kit.Contains(r.ItemGuid)));
+        // Each new instance was offered once.
+        var offered = bot.Inbox.Snapshot().Where(e => e.IsGame(CharacterService.GetRewardNotify))
+            .SelectMany(e => GetRewardNotify.Parser.ParseFrom(e.Body).Rewards).Where(r => r.ItemGuid > 0)
+            .GroupBy(r => r.ItemGuid).ToList();
+        Assert.All(offered, g => Assert.Single(g));
+        Assert.Equal(7, offered.Count);
+    }
+
     [ClientDataFact]
     public async Task RedAppraisalCarriesOnlyConfiguredStuntsAndDistinctValidEntries()
     {
