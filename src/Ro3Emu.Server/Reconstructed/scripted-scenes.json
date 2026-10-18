@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "about": "Reconstructed scripted story scenes (no fight). The original server drove their stages with an encounter script the client does not ship. Each scene is a sequence of steps; a step names the DungeonQuestConfig quest the tracker shows (var 10001) and its goal counter (var 10003), the scene actors the server shows during it (client NPCConfig ids at scene-editor points, with the buffs that open their interactions), an optional story the client plays (dungeon var 100020016), the client events that complete it, and an optional teleport after it. A quest of the scene that only a branch the reconstruction cannot reach would show is listed under \"unplayed\" with its reason. Every decision carries its reason and the scene its confidence; what is guessed is listed per scene. Switch: Ro3Emu:ReconstructedDungeons. Never mixed into client data.",
+  "about": "Reconstructed scripted story scenes (no fight, or a fight followed by scripted stages). The original server drove their stages with an encounter script the client does not ship. Each scene is a sequence of steps; a step names the DungeonQuestConfig quest the tracker shows (var 10001) and its goal counter (var 10003), the scene actors the server shows during it (client NPCConfig ids at scene-editor points, with the buffs that open their interactions), an optional story the client plays (dungeon var 100020016), the client events that complete it, and an optional teleport after it. A fight step instead names its monsters (\"spawns\": client NPCConfig templates at server spawn points) and completes when they are all killed. A step may say ChatConfig story lines (\"lines\" at its start, \"doneLines\" when it completes; a type-2 bubble names its speaker, one of the step's actors or monsters). A quest of the scene that only a branch the reconstruction cannot reach would show is listed under \"unplayed\" with its reason. Every decision carries its reason and the scene its confidence; what is guessed is listed per scene. Switch: Ro3Emu:ReconstructedDungeons. Never mixed into client data.",
   "contract": {
     "interaction": "32700 NpcInteractionReq {npc_uid, interaction_id} on a scene actor: the client sends it from LC_DAL_Interact.SendNPCInteractionReq when the player presses the interaction's skill button (InteractMode 3 ClickSkillIcon), walks into range (2 AutoInteractWhenInRange) or a dialogue option runs action 211 TriggerNpcInteract (LC_InteractActions.lua:5672-5698). The interaction must be one of the actor's NPCConfig _iInteractID; the server answers 32700 with the request echoed (LC_InteractManager._onInteractResponse then runs the client-hosted actions, e.g. 53 NPCInteractDialogue).",
     "message": "The NPCInteractConfig _iEXECAction [\"210\", id, ...] of that interaction: ActionConfig 210 SendDungeonMessage is server-hosted (_iEXECHost 1), so the client never runs it; it is the dungeon script's own message id (LC_InteractManager.lua:1975-2030 runs only client/all-hosted actions).",
@@ -132,6 +132,131 @@
             { "region": 31, "why": "the 'end region' (regionType 2) where the riding guide 36 ends" }
           ],
           "after": { "teleport": 31, "why": "the ride itself is not reproduced: the player arrives at the end region" }
+        }
+      ]
+    },
+    "1000401": {
+      "name": "Ant Queen's Nest: Maya, the Professor and the chest",
+      "confidence": "medium",
+      "evidence": [
+        "DungeonQuestConfig 5300016-5300020: 1 Encounter Maya (Defeat Maya), 2 Find the Professor (Venture deeper into the cave to find the Professor), 3 Free the Ant Egg (Rescue the Professor from the ant egg), 4 Help the Professor Up (Help the Weak Professor walk), 5 Maya's Secret Treasure (Open the treasured chest).",
+        "Editor sc_plot_yhcx_003_dg01 server spawn points: 21 'ant queen spawn point' (蚁后刷怪点), 26 'professor spawn point' (教授刷新点), 32 'professor egg spawn point' (教授卵刷新点), 34 'chest spawn point' (宝箱刷怪点); guide point 33 'chest guide' runs from beside point 26 to the chest. Regions 30, 29 and 28 'dialogue region 1/2/3' (对话区域, 5 m circles) lie in that order on the way from Maya's arena (patrol 22 runs from (188, 210) to (207, 239)) to the Professor (region 28 at (200.1, 262.7), 6 m from point 26).",
+        "Maya is the story template 5300006 (L30, MainStory_Maya), as in the previous wave reconstruction of this scene (dungeon-monsters.json).",
+        "NPC 5300056 (unit 5300017 'the egg trapping the professor', 困住教授的卵) has interaction 5300021 (skill 5362201, dungeon message 5300022); the Professor 5300026 (unit 5300020 教授) has 5300022 (skill 5362301 MainStory_SaveJiaoShou, message 5300023); the Precious Treasure Chest 5300052 (unit 5300016 宝箱) has 5300023 (skill 5362401, message 5300024). All three are gated by conditions 7100022-7100024: 1004 CheckHaveBuff group 53014 (BuffConfig 5301401), the same gate as 'Rescue Bobo' in 1000301.",
+        "ChatConfig 5300501-5300511 and 5300601-5300603 are this scene's lines, in this order: Bobo spots Maya (501, 502), Maya beaten and the search starts (503-505), worrying about the Professor (506, 507), the ant eggs and armour (508), 'Help me... Help me...' (509, a bubble) and 'That's the professor's voice!' (510), the Professor's sore back (511, a bubble), his coat check (601, a bubble, 'Professor Ryan'), 'Look! There's a treasure chest up ahead!' (602) and 'We're rich! What a haul!' (603)."
+      ],
+      "guessed": [
+        "Each line's moment: the order is the ChatConfig order; which step says it and the delays are chosen. The three dialogue regions are where 504-508 are said (their names say they start dialogue; their own 'actions' are empty, so the client does nothing there).",
+        "A walk into a later dialogue region also completes an earlier dialogue step, so a player who misses one region is never stuck.",
+        "The egg is shown from the start of the search and becomes interactable when the player reaches dialogue region 3; 'Help me...' is said from the egg (the Professor is inside it).",
+        "Freeing the egg removes it and shows the Professor at his own spawn point 26; helping him up is not animated (no walk, no follow) and he stays there to the end.",
+        "The chest grants no item of its own: no reward is named by the client data for it. The clear itself is the dungeon's usual settlement.",
+        "Maya keeps the solo tuning of dungeon-monsters.json (soloTuning 5300006) and the borrowed normal attack; her skill kit and the 'ants rescue Maya' beats are not reproduced."
+      ],
+      "steps": [
+        {
+          "quest": 1,
+          "stage": "Encounter Maya: defeat Maya",
+          "spawns": [
+            { "npc": 5300006, "point": 21, "why": "label 蚁后刷怪点 'ant queen spawn point' and stage 1 'Defeat Maya'; story Maya template 5300006 (L30)" }
+          ],
+          "lines": [
+            { "chat": 5300501, "ms": 500 },
+            { "chat": 5300502, "ms": 3500 }
+          ],
+          "doneLines": [
+            { "chat": 5300503 }
+          ]
+        },
+        {
+          "quest": 2,
+          "stage": "Find the Professor: go deeper (dialogue region 1)",
+          "actors": [
+            { "npc": 5300056, "point": 32, "why": "the egg trapping the Professor at 'professor egg spawn point', not yet interactable" }
+          ],
+          "lines": [
+            { "chat": 5300504, "ms": 3000 },
+            { "chat": 5300505, "ms": 6000 }
+          ],
+          "complete": [
+            { "region": 30, "why": "dialogue region 1, the first on the way from Maya's arena" },
+            { "region": 29, "why": "a later dialogue region also counts" },
+            { "region": 28, "why": "a later dialogue region also counts" }
+          ]
+        },
+        {
+          "quest": 2,
+          "stage": "Find the Professor: go deeper (dialogue region 2)",
+          "actors": [
+            { "npc": 5300056, "point": 32, "why": "the egg" }
+          ],
+          "lines": [
+            { "chat": 5300506 },
+            { "chat": 5300507, "ms": 3000 }
+          ],
+          "complete": [
+            { "region": 29, "why": "dialogue region 2" },
+            { "region": 28, "why": "a later dialogue region also counts" }
+          ]
+        },
+        {
+          "quest": 2,
+          "stage": "Find the Professor: reach him (dialogue region 3)",
+          "actors": [
+            { "npc": 5300056, "point": 32, "why": "the egg" }
+          ],
+          "lines": [
+            { "chat": 5300508 }
+          ],
+          "complete": [
+            { "region": 28, "why": "dialogue region 3, beside the Professor's spawn point" },
+            { "point": 32, "radius": 8, "why": "or close to the egg itself" }
+          ]
+        },
+        {
+          "quest": 3,
+          "stage": "Free the Ant Egg: rescue the Professor from the egg",
+          "actors": [
+            { "npc": 5300056, "point": 32, "buffs": [5301401], "why": "buff group 53014 opens the egg's interaction 5300021" }
+          ],
+          "lines": [
+            { "chat": 5300509, "by": 5300056 },
+            { "chat": 5300510, "ms": 2500 }
+          ],
+          "complete": [
+            { "message": 5300022, "why": "interaction 5300021 sends dungeon message 5300022" }
+          ]
+        },
+        {
+          "quest": 4,
+          "stage": "Help the Professor up",
+          "actors": [
+            { "npc": 5300026, "point": 26, "buffs": [5301401], "why": "the Professor at 'professor spawn point'; buff group 53014 opens 'MainStory_SaveJiaoShou' (5300022)" }
+          ],
+          "lines": [
+            { "chat": 5300511, "by": 5300026, "ms": 1000 }
+          ],
+          "complete": [
+            { "message": 5300023, "why": "interaction 5300022 sends dungeon message 5300023" }
+          ]
+        },
+        {
+          "quest": 5,
+          "stage": "Maya's secret treasure: open the chest",
+          "actors": [
+            { "npc": 5300026, "point": 26, "why": "the Professor, helped up" },
+            { "npc": 5300052, "point": 34, "buffs": [5301401], "why": "the Precious Treasure Chest at 'chest spawn point'; buff group 53014 opens 5300023" }
+          ],
+          "lines": [
+            { "chat": 5300601, "by": 5300026 },
+            { "chat": 5300602, "ms": 2500 }
+          ],
+          "complete": [
+            { "message": 5300024, "why": "interaction 5300023 sends dungeon message 5300024" }
+          ],
+          "doneLines": [
+            { "chat": 5300603 }
+          ]
         }
       ]
     },

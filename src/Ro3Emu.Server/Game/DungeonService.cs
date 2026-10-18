@@ -429,7 +429,7 @@ public sealed partial class DungeonService
         if (a.Wave >= a.Plan.Waves.Count || CurrentQuest(a) <= 0) return null;
         int size = a.Plan.Waves[a.Wave].Spawns.Count;
         var v = new DungeonVar { VarId = 10003 };
-        if (Step(a) is { } step)
+        if (Step(a) is { Fight: false } step)
         {
             v.Vi64.Add([step.Goal.Done, step.Goal.Total]); // a scripted step: its configured counter (inferred)
             return v;
@@ -509,9 +509,16 @@ public sealed partial class DungeonService
         if (Step(a) is { } step)
         {
             await BeginStepAsync(a, step);
-            a.Spawning = false;
-            await AdvanceAsync(a); // waits for the step's client event
-            return;
+            if (!step.Fight)
+            {
+                a.Spawning = false;
+                await AdvanceAsync(a); // waits for the step's client event
+                // A participant already standing in the step's region (or near its point) completes it without moving.
+                foreach (var member in Present(a).Where(m => a.Loaded.Contains(m) && !m.SceneLoading).ToArray())
+                    await PlayerMovedAsync(member);
+                return;
+            }
+            // A fight step spawns its monsters below and completes when they are all killed.
         }
         foreach (var spawn in a.Plan.Waves[a.Wave].Spawns)
         {
@@ -563,6 +570,7 @@ public sealed partial class DungeonService
         if (a.Settled || a.Spawning || a.Precounted.Count != 0 || a.Killed.Count != a.Spawned || a.Advancing) return;
         if (Step(a) != null && !a.StepDone) return;
         a.Advancing = true;
+        if (Step(a) is { DoneLines.Count: > 0 } ended) await SayStepLinesAsync(a, ended.DoneLines);
         if (loop.Now - a.StartedAt >= TimeSpan.FromMilliseconds(a.Plan.DurationMs)) await SettleAsync(a, false);
         else if (a.Wave + 1 == a.Plan.Waves.Count) await SettleAsync(a, true);
         else { a.Wave++; await SpawnWaveAsync(a); }

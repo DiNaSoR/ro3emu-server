@@ -9,9 +9,9 @@ using Ro3Emu.Bot;
 namespace Ro3Emu.Tests;
 
 /// <summary>
-/// Scripted story scenes without a fight (Reconstructed/scripted-scenes.json, DungeonService.Scripted): each scene is
-/// entered, played through the events its client sends (32700 on the scene actors, walks into server regions, 84011
-/// at a story's end), settles as a clear, and the clear counts for its story step so the next one is offered.
+/// Scripted story scenes (Reconstructed/scripted-scenes.json, DungeonService.Scripted): each scene is entered, played
+/// through the events its client sends (32700 on the scene actors, walks into server regions, 84011 at a story's end)
+/// and the kills of its fight steps, settles as a clear, and the clear counts for its story step so the next one is offered.
 /// </summary>
 public sealed partial class DungeonTests
 {
@@ -26,7 +26,8 @@ public sealed partial class DungeonTests
         var plan = Service<DungeonCatalog>().Resolve(new EnterDungeonReq { SceneEntry = scene });
         Assert.NotNull(plan); // every actor, point, region, buff, plot, interaction and message resolved
         Assert.Equal(scripted.Steps.Count, plan.Waves.Count);
-        Assert.All(plan.Waves, w => Assert.Empty(w.Spawns));
+        // A step spawns monsters only when it is a fight step, and then exactly its own.
+        Assert.All(plan.Waves, w => Assert.Equal(w.Step!.Spawns.Select(x => x.NpcId), w.Spawns.Select(x => x.NpcId)));
         Assert.Equal(scripted.Steps, plan.Waves.Select(w => w.Step!));
         // The tracker walks the scene's configured DungeonQuestConfig quests in order, each of them but the unplayed.
         var quests = Service<GameData>().Table("DungeonQuestConfig").Values
@@ -131,6 +132,69 @@ public sealed partial class DungeonTests
         var end = Service<WorldData>().Map(scene)!.Points[31]; // the ride ends in the end region
         Assert.True(MonsterService.Distance(Session(alice).Position.X, Session(alice).Position.Z, end.X, end.Z) < 1);
         await StoryMovesOn(alice, 10104300, 10104310);
+    }
+
+    [ClientDataFact]
+    public async Task MayasNestGoesFromTheMayaFightThroughTheProfessorsRescueToTheChest()
+    {
+        const long scene = 1000401;
+        await using var alice = await InWorld("Alice");
+        await Gm(alice, "!quest accept 10104310"); // Maya's nest: [101018, 1000401, 1]
+        Assert.Equal(0, await Enter(alice, new EnterDungeonReq { SceneEntry = scene }));
+        long instance = await Load(alice, scene);
+
+        // Encounter Maya: a fight step. The tracker counts the kill; nothing is interactable yet.
+        var stage = await Stage(alice, 1, quest: 1);
+        Assert.Equal([0, 1], stage.Vars.Single(v => v.VarId == 10003).Vi64);
+        var maya = await BossIn(instance, 5300006);
+        await ActorsIn(alice, 0);
+        await Next(alice, DungeonService.Event, DungeonEventNotify.Parser, // Bobo spots Maya
+            e => e.CliFuncname == "Shouting" && e.Params[0].IntParams.Single() == 5300501);
+        await Kill(alice, maya);
+        await Next(alice, DungeonService.Event, DungeonEventNotify.Parser,
+            e => e.CliFuncname == "Shouting" && e.Params[0].IntParams.Single() == 5300503);
+
+        // Find the Professor: the three dialogue regions on the way, the egg shown but closed.
+        var map = Service<WorldData>().Map(scene)!;
+        await Stage(alice, 2, quest: 2);
+        var egg = Assert.Single(await ActorsIn(alice, 1, a => a.NpcId == 5300056));
+        Assert.Empty(egg.Buffs);
+        await WalkInto(alice, map.Regions[30]);
+        await Stage(alice, 3, quest: 2);
+        await WalkInto(alice, map.Regions[28]); // region 29 skipped: a later region also counts
+        await Stage(alice, 4, quest: 2);
+        await WalkInto(alice, map.Regions[28]);
+
+        // Free the egg: buff group 53014 opens its interaction, and the Professor calls out from inside.
+        await Stage(alice, 5, quest: 3);
+        egg = (await ActorsWhen(alice, all => all.Count == 1 && all[0].Buffs.Count == 1)).Single();
+        Assert.Equal((5300056, 5301401), (egg.NpcId, egg.Buffs.Single().ConfigId));
+        await Next(alice, DungeonService.Event, DungeonEventNotify.Parser, e => e.CliFuncname == "ShowShoutingChatBubble"
+            && e.Params[0].IntParams.Single() == 5300509 && e.Params[1].IntParams.Single() == egg.Uid);
+        await Beside(alice, egg.X, egg.Y, egg.Z);
+        Assert.Equal(0, await Interact(alice, egg, 5300021));
+
+        // Help the Professor up: the egg is gone, the Professor stands at his spawn point.
+        await Stage(alice, 6, quest: 4);
+        var professor = (await ActorsWhen(alice, all => all.Count == 1 && all[0].NpcId == 5300026)).Single();
+        Assert.Equal(26, professor.Point);
+        Assert.Equal([5301401], professor.Buffs.Select(b => b.ConfigId));
+        await Beside(alice, professor.X, professor.Y, professor.Z);
+        Assert.Equal(0, await Interact(alice, professor, 5300022));
+
+        // Maya's secret treasure: only the chest is open now.
+        await Stage(alice, 7, quest: 5);
+        var shown = await ActorsWhen(alice, all => all.Count == 2 && all.Any(a => a.NpcId == 5300052 && a.Buffs.Count == 1));
+        Assert.Empty(shown.Single(a => a.NpcId == 5300026).Buffs);
+        var chest = shown.Single(a => a.NpcId == 5300052);
+        Assert.Equal(ErrorCodes.NpcParameter, await Interact(alice, chest, 5300022)); // not the chest's interaction
+        await Beside(alice, chest.X, chest.Y, chest.Z);
+        Assert.Equal(0, await Interact(alice, chest, 5300023));
+        await Next(alice, DungeonService.Event, DungeonEventNotify.Parser,
+            e => e.CliFuncname == "Shouting" && e.Params[0].IntParams.Single() == 5300603);
+        var result = await Next(alice, DungeonService.Result, DungeonResNotify.Parser);
+        Assert.Equal((DungeonRes)1, result.Res);
+        await StoryMovesOn(alice, 10104310, 10104320);
     }
 
     [ClientDataFact]

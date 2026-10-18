@@ -299,10 +299,12 @@ public sealed class DungeonCatalog(GameData data, WorldData worldData, MonsterSe
     }
 
     /// <summary>
-    /// A scripted scene's steps (ReconstructedDungeons.Scripted): one wave without monsters per step. Every reference
+    /// A scripted scene's steps (ReconstructedDungeons.Scripted): one wave per step, without monsters unless it is a
+    /// fight step. Every reference
     /// must resolve in the client data and the scene's map, or the scene is refused like any unresolved encounter:
     /// the quests the tracker shows, the actors' NPCConfig rows, points and buffs, the stories, regions and points,
-    /// and the interactions and dungeon messages the step's actors can actually send.
+    /// the interactions and dungeon messages the step's actors can actually send, a fight step's monsters and points, and
+    /// every line with its speaker among the step's actors or monsters.
     /// </summary>
     private IReadOnlyList<Wave> ScriptedWaves(ReconstructedDungeons.ScriptedScene scene, MapWorld map)
     {
@@ -330,7 +332,16 @@ public sealed class DungeonCatalog(GameData data, WorldData worldData, MonsterSe
                 };
                 if (!known) return [];
             }
-            waves.Add(new Wave(waves.Count + 1, [], step.Quest, step));
+            // A fight step: its monsters, at server spawn points of the scene, with a template the server knows.
+            var spawns = new List<Spawn>();
+            foreach (var spawn in step.Spawns)
+            {
+                if (monsters.Template(spawn.NpcId) == null || !map.Points.TryGetValue(spawn.Point, out var at)) return [];
+                spawns.Add(new Spawn(spawn.NpcId, at));
+            }
+            if (step.Lines.Concat(step.DoneLines).Any(l => data.Row("ChatConfig", l.Chat) == null
+                    || l.By != 0 && step.Actors.All(x => x.NpcId != l.By) && step.Spawns.All(x => x.NpcId != l.By))) return [];
+            waves.Add(new Wave(waves.Count + 1, spawns, step.Quest, step));
         }
         // An unplayed quest is one of the scene's own quests that no step shows.
         if (scene.Unplayed.Any(q => scene.Steps.Any(s => s.Quest == q) || !data.Table("DungeonQuestConfig").Values.Any(r =>
