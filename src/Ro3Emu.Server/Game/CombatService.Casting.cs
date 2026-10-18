@@ -42,6 +42,8 @@ public sealed class ActiveSkillCast
     internal double ProcScale { get; init; } = 1;
     /// <summary>A follow-up that deals a set amount instead of the formula (Death Bound's reflected damage).</summary>
     internal long ProcFixedDamage { get; init; }
+    /// <summary>Monsters a status of this cast already reached (Tetra Vortex's "at least 1" guarantee).</summary>
+    internal HashSet<long> StatusLanded { get; } = new();
 }
 
 public sealed partial class CombatService

@@ -69,18 +69,6 @@ public sealed partial class CombatService
         Math.Max(0, 1 + (S(healer, 207) + S(healer, 241)) / 10000) * Math.Max(0, 1 + (S(recipient, 208) + S(recipient, 242)) / 10000);
 
     /// <summary>
-    /// Which _kDamageParam1/2 entry a hit uses. Heal's enemy branch is [1]; Holy Cross's [1] is its two-handed spear
-    /// branch ("When the caster has a two-handed spear equipped, the damage multiplier is increased by an Extra 5%":
-    /// [5500, 5775] at Lv5).
-    /// </summary>
-    internal int DamageBranch(GameSession s, string script) => script switch
-    {
-        "Heal" => 1,
-        "HolyCross" => skills.Weapon(s).SubType == TwoHandedSpear ? 1 : 0,
-        _ => 0,
-    };
-
-    /// <summary>
     /// A skill's _kBuff1 tuples for this caster. Divine Insight ("Inspiration") lists both of its buffs: 1162305
     /// (Max Life +10%, PATK +5%) and 1162405 (Max Life +5%, PATK +10%), the second "when wielding a two-handed spear";
     /// only the one matching the weapon is granted (before, both landed and the second overwrote the first).

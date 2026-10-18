@@ -74,7 +74,15 @@ public sealed partial class CombatService
             return;
         }
         if (Script(row) == "Counter_Attack") ScheduleAutoCounter(s, action);
-        await ApplyEffectsAsync(s, action, action.Request.TargetPos ?? action.Origin);
+        var center = action.Request.TargetPos ?? action.Origin;
+        if (HitPlan(row) is { } plan)
+        {
+            await ApplyStagedEffectsAsync(s, action, center, plan);
+            return;
+        }
+        var bounceFrom = Script(row) == "PoisonBlade" ? FindMonster(s.WorldScene, action.Request.TargetId) : null;
+        await ApplyEffectsAsync(s, action, center);
+        if (bounceFrom != null && CurrentCastMap(s, action)) ScheduleBounces(s, action, bounceFrom);
     }
 
     /// <summary>
@@ -139,12 +147,13 @@ public sealed partial class CombatService
 
     private bool Hostile(ActiveSkillCast action, MonsterUnit m) => HostileProc(action) || Relation(action.Row, false, race: m.Template.Race);
 
-    private List<MonsterUnit> SelectEnemies(GameSession s, ActiveSkillCast action, Vec3 center, float? radiusOverride = null)
+    private List<MonsterUnit> SelectEnemies(GameSession s, ActiveSkillCast action, Vec3 center, float? radiusOverride = null, bool area = false)
     {
         var row = action.Row;
         int max = (int)Math.Max(1, GameData.Int(row, "_iTargetMax"));
-        if (GameData.Int(row, "_iRangeType") != 2 && radiusOverride == null && !action.AreaProc)
+        if (GameData.Int(row, "_iRangeType") != 2 && radiusOverride == null && !action.AreaProc && !area)
         {
+            if (SelectAroundTarget(s, action) is { } around) return around;
             var target = FindMonster(s.WorldScene, action.Request.TargetId);
             return target != null && target.Hp > 0 && CanHitMonster(s, target) && Hostile(action, target) ? [target] : [];
         }
@@ -168,7 +177,8 @@ public sealed partial class CombatService
             .OrderBy(m => Distance(center, m.Pos)).ThenBy(m => m.Uid).Take(max).ToList();
     }
 
-    private async Task ApplyEffectsAsync(GameSession s, ActiveSkillCast action, Vec3 center, SkillObject? field = null, int bolt = 0, int bolts = 1)
+    private async Task ApplyEffectsAsync(GameSession s, ActiveSkillCast action, Vec3 center, SkillObject? field = null, int bolt = 0, int bolts = 1,
+        HitStage? stage = null, MonsterUnit? only = null)
     {
         if (s.Dead || s.Role?.Id != action.OwnerId || s.WorldScene != action.WorldScene || s.SceneLoading
             || s.SceneGeneration != action.SceneGeneration || field?.Removing == true
@@ -187,8 +197,11 @@ public sealed partial class CombatService
             && ReferenceEquals(s.Attachment, action.Attachment)
             && sessions.All().Contains(s);
         string script = Script(row);
-        var targets = SelectEnemies(s, action, center, field?.Trap == true ? field.Radius : null);
-        var playerTargets = GameData.Int(row, "_iRangeType") == 2 ? EventAreaTargets(s, row)
+        var targets = only != null
+            ? only.Hp > 0 && !only.Dead && CanHitMonster(s, only) && Hostile(action, only) ? [only] : new List<MonsterUnit>()
+            : SelectEnemies(s, action, center, field?.Trap == true ? field.Radius : null);
+        var playerTargets = only != null || stage is { First: false } ? []
+            : GameData.Int(row, "_iRangeType") == 2 ? EventAreaTargets(s, row)
             : EventTarget(s, action.Request.TargetId) is { } eventTarget
                 && PlayerDistance(s, eventTarget) <= Range(row) + 1.5f ? new[] { eventTarget } : [];
         if (playerTargets.Length > 0)
@@ -226,11 +239,11 @@ public sealed partial class CombatService
         {
             SrcID = field?.Uid ?? action.SourceId, SkillId = action.Request.SkillId, SessionId = action.Id,
             RootCtxGuid = action.Id, ComboIndex = action.Request.ComboIndex, ShowPoint = HitEffect(GameData.Int(row, "_iScriptShow")),
-            SrcElement = (int)Math.Max(1, GameData.Int(row, "_iEleType")),
+            SrcElement = stage is { Element: > 0 } ? stage.Element : (int)Math.Max(1, GameData.Int(row, "_iEleType")),
         };
-        // One bolt of several is one number; its buffs, procs and pushes come with the first bolt only.
-        int shownHits = bolts > 1 ? 1 : ShowHits(row);
-        bool firstBolt = bolt == 0;
+        // One bolt (or one packet) of several is one number; its buffs, procs and pushes come with the first one only.
+        int shownHits = stage is { Split: > 0 } ? stage.Split : bolts > 1 ? 1 : ShowHits(row);
+        bool firstBolt = bolt == 0 && stage?.First != false;
         if (shownHits > 1) hit.Split = shownHits;
         var killed = new List<MonsterUnit>();
         var processed = new List<MonsterUnit>();
@@ -247,7 +260,7 @@ public sealed partial class CombatService
             if (damage)
             {
                 var defender = AsDefender(target);
-                var (amount, result) = Damage(attacker, defender, row, DamageBranch(s, script));
+                var (amount, result) = Damage(attacker, defender, row, stage?.Branch ?? DamageBranch(s, row, target), stage?.Element ?? 0);
                 if (action.ProcFixedDamage > 0 && result != DamageHitResult.Miss) amount = action.ProcFixedDamage;
                 else if (amount > 0 && action.ProcScale != 1) amount = Math.Max(1, (long)Math.Round(amount * action.ProcScale));
                 if (amount > 0 && bolts > 1) amount = amount / bolts + (bolt < amount % bolts ? 1 : 0);
@@ -287,10 +300,21 @@ public sealed partial class CombatService
                     }
                 hit.Dsts.Add(new DamageInfo { DstID = target.Uid, Damage = amount, HitResult = result, DstElement = target.Template.Element, IsDead = target.Hp == 0 });
             }
-            if (CanApplyMoreEffects() && firstBolt)
-                foreach (var tuple in Tuples(row, "_kBuff2"))
+            if (CanApplyMoreEffects() && (firstBolt || stage is { Buff2: >= 0 } || only != null))
+            {
+                var tuples = Tuples(row, "_kBuff2").ToArray();
+                var rolled = stage is { Buff2: >= 0 } ? tuples.Skip(stage.Buff2).Take(1) : stage?.Fallback >= 0 ? tuples.Take(stage.Fallback) : tuples;
+                foreach (var tuple in rolled)
                     if (CanApplyMoreEffects() && RollHostileBuff(tuple, s, null, null, target, out int id, out int duration))
+                    {
                         await buffs.ShowOnUnitAsync(target, id, duration, castingRole.Id);
+                        action.StatusLanded.Add(target.Uid);
+                    }
+                // "guaranteed to inflict at least 1 of these Status Effects": the last packet's fallback tuple.
+                if (stage is { Last: true, Fallback: >= 0 } && stage.Fallback < tuples.Length && !action.StatusLanded.Contains(target.Uid)
+                    && CanApplyMoreEffects() && RollHostileBuff(tuples[stage.Fallback], s, null, null, target, out int fid, out int fduration))
+                    await buffs.ShowOnUnitAsync(target, fid, fduration, castingRole.Id);
+            }
             if (CanApplyMoreEffects() && script is ("Provoke" or "Taunt")) monsters.Engage(target, s);
             if (CanApplyMoreEffects() && firstBolt && !target.Dead && target.Hp > 0) await DisplaceTargetAsync(s, action, target);
         }
@@ -307,7 +331,7 @@ public sealed partial class CombatService
                 // Heal's friendly branch is P1[0]/P2[0]; its enemy branch is [1] (description + select race mask).
                 var before = character.Stats(recipient);
                 long amount = (long)Math.Max(0, Math.Round((stats[104] * multiplier / 10000 + flat)
-                    * HealFactor(attacker, PlayerDefender(recipient, before))));
+                    * FormulaFactor(attacker, row, 0, heal: true) * HealFactor(attacker, PlayerDefender(recipient, before))));
                 foreach (var modifier in ExtraHeal) amount = modifier(s, amount);
                 long actual = Math.Min(amount, Math.Max(0, before[101] - before[2000]));
                 await character.SetHpSpAsync(recipient, before[2000] + amount, null);
