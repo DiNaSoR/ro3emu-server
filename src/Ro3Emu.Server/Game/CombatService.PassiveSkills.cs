@@ -70,17 +70,90 @@ public sealed partial class CombatService
     {
         var p = session.Progress;
         if (p == null) return;
-        long signature = unchecked(p.Career * 1_000_003L + p.Level);
+        long signature = unchecked(p.Career * 1_000_003L + p.Level + skills.Weapon(session).SubType * 7_368_787L);
         foreach (var (group, level) in p.Skills) signature = unchecked(signature + (group * 7919L + level) * 104_729L);
         if (session.PassiveSkillSignature == signature) return;
         var result = new List<SkillParameterRules.Modifier>();
         foreach (var (group, row) in LearnedPassiveRows(session))
+        {
             if (!ConditionalPassiveGroups.Contains(group))
                 if (PassiveBuffRow(group, row) is var buff and > 0) result.AddRange(SkillParameterRules.BuffModifiers(data, buff));
+            // [21, weapon subtype or 0, scope 0, group, type, operation, value]: a skill change while that weapon is held
+            // (Mace Mastery's Normal Attack crit with a mace), read like a talent's opcode 21 (SeasonTalentEffects).
+            foreach (var op in SpecialEffectOps(row))
+                if (op.Length >= 7 && op[0] == 21 && op[2] == 0 && op[3] > 0 && (op[1] == 0 || op[1] == skills.Weapon(session).SubType))
+                    result.Add(new SkillParameterRules.Modifier((int)op[3], (int)op[4], (int)op[5], op[6], op.Length > 7 ? (int)op[7] : 0));
+        }
         session.PassiveSkillSignature = signature;
         if (result.SequenceEqual(session.PassiveSkillModifiers)) return;
         session.PassiveSkillModifiers = result;
         session.PassiveSkillModifierVersion++;
+    }
+
+    /// <summary>The SpecialEffectConfig tuples a passive level row names in _iSpecialEffect (one id or a list).</summary>
+    private IEnumerable<long[]> SpecialEffectOps(System.Text.Json.JsonElement row)
+    {
+        if (!row.TryGetProperty("_iSpecialEffect", out var field)) yield break;
+        var ids = field.ValueKind == System.Text.Json.JsonValueKind.Array
+            ? field.EnumerateArray().Select(v => (long)(GameData.Number(v) ?? 0)).ToArray()
+            : [(long)(GameData.Number(field) ?? 0)];
+        foreach (long id in ids)
+            if (id > 0 && data.Row("SpecialEffectConfig", id) is { } effect)
+                foreach (var op in EquipmentAffixes.Rows(effect, "_kSpecialEffect")) yield return op;
+    }
+
+    /// <summary>
+    /// Weapon and mount masteries: [16, weapon subtype, attribute, value] while the main hand holds that weapon type
+    /// (Sword Mastery [16,2,103,10] and [16,3,103,10]: PATK +10 with a one- or two-handed sword) and
+    /// [17, mount type, attribute, value] while riding that mount (Riding [17,2,1131,500]: +5% move speed on a Peco).
+    /// The mount type is the ridden Battle mount's CartRemouldTable _iSubType (2 Peco Peco, 4 wolf, 5 Madogear,
+    /// 6 dragon, 7 gryphon); the same reading as the talents' opcode 16 (SeasonTalentService.Attributes), inferred.
+    /// </summary>
+    private IEnumerable<(long Id, double Value)> PassiveConditionalAttributes(GameSession session)
+    {
+        int? weapon = null, mount = null;
+        foreach (var (_, row) in LearnedPassiveRows(session))
+            foreach (var op in SpecialEffectOps(row))
+                switch (op)
+                {
+                    case [16, var sub, var attr, var value]:
+                        if ((weapon ??= skills.Weapon(session).SubType) == sub) yield return (attr, value);
+                        break;
+                    case [17, var type, var attr, var value]:
+                        if ((mount ??= RiddenMountType(session)) == type) yield return (attr, value);
+                        break;
+                }
+    }
+
+    /// <summary>The ridden Battle mount's CartRemouldTable _iSubType; 0 on foot or on an ordinary mount.</summary>
+    internal int RiddenMountType(GameSession session) =>
+        MountService.Rider(session) is var id and not 0 && data.Row("CartRemouldTable", id) is { } row
+            && GameData.Int(row, "_iType") == 2 ? (int)GameData.Int(row, "_iSubType") : 0;
+
+    /// <summary>Weapon subtype 5 (Knight Spear, ItemConfig _iEquipPart 1 two-handed; subtype 4 Halberd is one-handed).</summary>
+    internal const int TwoHandedSpear = 5;
+
+    /// <summary>Shields are off-hand ItemConfig subtype 50 (_iEquipPart 3).</summary>
+    internal const int ShieldSubType = 50;
+
+    /// <summary>
+    /// Monster Resistance 11421 (30%), Advanced Monster Resistance 11508 (40%) and 11637 (50%): "damage reduction from
+    /// monsters +X% while a shield is equipped. Does not stack with other monster damage reduction effects". The rows
+    /// carry the percentage only in _kDescData; the best learned one applies, in basis points (inferred: not stacking).
+    /// </summary>
+    private static readonly int[] MonsterResistanceGroups = [11421, 11508, 11637];
+
+    internal int MonsterResistanceBp(GameSession session)
+    {
+        if (session.Progress == null || !skills.HoldsShield(session)) return 0;
+        int best = 0;
+        foreach (int group in MonsterResistanceGroups)
+            if (skills.Level(session.Progress, group) is var level and > 0
+                && data.Row("SkillConfig", skills.RealId(group, level)) is { } row
+                && row.TryGetProperty("_kDescData", out var desc) && desc.ValueKind == System.Text.Json.JsonValueKind.Array
+                && desc.GetArrayLength() > 0 && GameData.Number(desc[0]) is { } pct)
+                best = Math.Max(best, (int)Math.Round(pct * 100));
+        return best;
     }
 
     /// <summary>The <see cref="BuffStatGroups"/> passives' same-id buff attributes.</summary>

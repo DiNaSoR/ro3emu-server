@@ -612,6 +612,10 @@ public sealed partial class CombatService : IGameTicker
         public bool Boss { get; init; }
         /// <summary>The part of a stat another system already applies (deployed totems' own multipliers).</summary>
         public Func<int, double>? Covered { get; init; }
+        /// <summary>A cut to every monster hit on this side, in basis points (Monster Resistance with a shield).</summary>
+        public int MonsterDamageCutBp { get; init; }
+        /// <summary>The element of this side's normal attacks when a buff changes it (Aspersio: Holy); 0 for none.</summary>
+        public int NormalAttackElement { get; init; }
     }
 
     /// <summary>
@@ -693,7 +697,8 @@ public sealed partial class CombatService : IGameTicker
         var flats = Numbers(skill, "_kDamageParam2");
         double p1 = ratios.Length > branch ? ratios[branch] : 10000, p2 = flats.Length > branch ? flats[branch] : 0;
         double dmg = (magic ? a.Matk : a.Atk) * p1 / 10000 + p2;
-        int element = (int)GameData.Int(skill, "_iEleType") is var se and > 1 ? se : a.Element;
+        int element = (int)GameData.Int(skill, "_iEleType") is var se and > 1 ? se
+            : a.NormalAttackElement > 0 && GameData.Int(skill, "_iIsNormalAtk") == 1 ? a.NormalAttackElement : a.Element;
         return Mitigated(b, dmg, magic, element) * BonusFactor(a, b, skill, magic, element);
     }
 
