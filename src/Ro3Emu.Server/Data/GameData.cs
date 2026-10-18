@@ -91,12 +91,16 @@ public sealed class GameData(IOptions<ServerOptions> options, ILogger<GameData> 
         Parallel.ForEach(files, f =>
         {
             var table = f.Config ? LoadConfig(f.Path) : LoadObject(f.Path);
-            if (f.Config) custom.Overlay(f.Key, table, log);
+            // TaskConfig waits for the other tables: its kill steps look up MapConfig and the scene editor
+            // (KillTrackTarget) to point the tracker at the monsters.
+            if (f.Config && f.Key != "TaskConfig") custom.Overlay(f.Key, table, log);
             loaded[f.Key] = table;
         });
         lock (_sync)
         {
             foreach (var (key, table) in loaded) _tables.TryAdd(key, table);
+            if (loaded.TryGetValue("TaskConfig", out var tasks) && _tables["TaskConfig"] == tasks)
+                custom.Overlay("TaskConfig", tasks, log, KillTrackTarget);
             _frozen = _tables.ToFrozenDictionary();
         }
         Text(0); // builds the text index
