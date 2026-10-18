@@ -31,7 +31,10 @@ public sealed partial class CombatService
     /// 321-330 by the monster's element and 331-340 against a monster attacker's element; size 501/503/505 and
     /// 502/504/506; boss 601/602 and non-boss 603/604; Damage% 215/216; Physical 211/212 or Magic 213/214; melee or
     /// ranged (skill _iDistanceType 2) Physical 227/228 and 229/230, Magic 1250/1251 and 1252/1253; Skill Damage%
-    /// 225/226 for everything but the normal attack (_iIsNormalAtk).
+    /// 225/226 for everything but the normal attack (_iIsNormalAtk). The 12xx copies (1215/1216 Damage Increase/Reduction,
+    /// 1211-1214 Physical/Magic, 1227-1230 melee/ranged Physical: True Sight, Divine Blessing, Lex Aeterna's 1216 -2000,
+    /// Prison's 1212/1214 -500) are their own factors beside the 2xx ones (inferred: the client lists them as separate
+    /// attributes; "from the target" is not limited to the buff's source).
     /// </summary>
     internal static double BonusFactor(Fighter a, Fighter b, JsonElement skill, bool magic, int element)
     {
@@ -44,12 +47,14 @@ public sealed partial class CombatService
         f *= Pair(b.IsMonster && b.Size is >= 1 and <= 3 ? S(a, 499 + 2 * b.Size) : 0,
             a.IsMonster && a.Size is >= 1 and <= 3 ? S(b, 500 + 2 * a.Size) : 0);
         f *= Pair(b.IsMonster ? S(a, b.Boss ? 601 : 603) : 0, a.IsMonster ? S(b, a.Boss ? 602 : 604) : 0);
-        f *= Pair(S(a, 215), S(b, 216));
-        f *= magic ? Pair(S(a, 213), S(b, 214)) : Pair(S(a, 211), S(b, 212));
+        f *= Pair(S(a, 215), S(b, 216)) * Pair(S(a, 1215), S(b, 1216));
+        f *= magic ? Pair(S(a, 213), S(b, 214)) * Pair(S(a, 1213), S(b, 1214))
+            : Pair(S(a, 211), S(b, 212)) * Pair(S(a, 1211), S(b, 1212));
         bool ranged = GameData.Int(skill, "_iDistanceType") == 2;
         f *= magic
             ? ranged ? Pair(S(a, 1252), S(b, 1253)) : Pair(S(a, 1250), S(b, 1251))
-            : ranged ? Pair(S(a, 229), S(b, 230)) : Pair(S(a, 227), S(b, 228));
+            : ranged ? Pair(S(a, 229), S(b, 230)) * Pair(S(a, 1229), S(b, 1230))
+                : Pair(S(a, 227), S(b, 228)) * Pair(S(a, 1227), S(b, 1228));
         if (GameData.Int(skill, "_iIsNormalAtk") == 0) f *= Pair(S(a, 225), S(b, 226));
         if (a.IsMonster && b.MonsterDamageCutBp > 0) f *= Math.Max(0, 1 - b.MonsterDamageCutBp / 10000.0);
         return f;
@@ -93,7 +98,7 @@ public sealed partial class CombatService
         new(stats[103], stats[104], stats[109], stats[111], s.Progress!.Level, 1)
         {
             Stats = stats, Race = PlayerRace, Size = PlayerSize, Covered = Covered(s),
-            NormalAttackElement = HasBuffGroup(s, AspersioGroup) ? HolyElement : 0,
+            NormalAttackElement = HasBuffGroup(s, AspersioGroup) ? HolyElement : PoisonsNormalAttack(s) ? PoisonElement : 0,
         };
 
     /// <summary>A player taking a hit, with its defenses and secondary stats.</summary>
@@ -101,9 +106,21 @@ public sealed partial class CombatService
         new(0, 0, 0, 0, p.Progress!.Level, 1)
         {
             Def = stats[105], Mdef = stats[106], Flee = stats[110], ResCri = stats[112],
-            Stats = stats, Race = PlayerRace, Size = PlayerSize, Covered = Covered(p),
+            Stats = stats, Race = PlayerRace, Size = PlayerSize, Covered = DefenderCovered(p),
             MonsterDamageCutBp = MonsterResistanceBp(p),
         };
+
+    /// <summary>A defender's covered parts: the totems', plus the tower pets' support reductions (1216, 1230, 315), which
+    /// ApplyPetSupportResistance already applies to the committed hit.</summary>
+    private Func<int, double>? DefenderCovered(GameSession p)
+    {
+        var totem = Covered(p);
+        var pet = p.Buffs.Where(b => b.ExpireMs > MonsterService.NowMs && b.SourceId is >= (1L << 51) and < (1L << 52))
+            .SelectMany(b => b.Changes).Where(c => c.Attr is 1216 or 1230 or 315)
+            .GroupBy(c => (int)c.Attr).ToDictionary(g => g.Key, g => g.Sum(c => (double)c.Value));
+        if (pet.Count == 0) return totem;
+        return id => (totem?.Invoke(id) ?? 0) + pet.GetValueOrDefault(id);
+    }
 
     /// <summary>Aspersio 14113: "Changes your Basic Attack element to Holy" (EleConfig row 7). Its buff 1411301 carries
     /// _kLogicData [4, 4701], which no other buff uses and the server does not decode; the element is from the

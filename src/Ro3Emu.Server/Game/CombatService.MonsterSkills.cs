@@ -66,6 +66,7 @@ public sealed partial class CombatService
                     await PlayerDiesAsync(p);
                     continue;
                 }
+                if (Current()) await ReactToMonsterHitAsync(caster, p, row, damage);
                 foreach (var tuple in Tuples(row, "_kBuff2"))
                     if (Current() && (!bossDebuffsOnly || BossDebuff(tuple)) && RollHostileBuff(tuple, null, caster, p, null, out int buff, out int ms)) await buffs.AddAsync(p, buff, ms, caster.Uid);
             }

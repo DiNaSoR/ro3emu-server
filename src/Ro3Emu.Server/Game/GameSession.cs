@@ -417,6 +417,10 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
     internal long PassiveSkillModifierVersion { get; set; }
     internal long PassiveSkillSignature { get; set; } = long.MinValue;
 
+    /// <summary>Proc state (CombatService.Procs): each proc's internal cooldown end by skill group, and a parry's
+    /// "took a hit" mark. Session-local.</summary>
+    internal Dictionary<int, long> ProcState { get; } = new();
+
     public EquipLevels EquipLevels { get; set; } = new();
 
     /// <summary>5007 plan references/names/current index; instances remain exclusively in Items.</summary>

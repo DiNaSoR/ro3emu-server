@@ -556,6 +556,7 @@ public sealed partial class CombatService : IGameTicker
             await FightingAsync(p);
             await FightingAsync(m);
             if (hp == 0) await PlayerDiesAsync(p);
+            else await ReactToMonsterHitAsync(m, p, row, damage);
             }
             finally { if (hp == 0) ReleaseDeathPublication(p); }
         });
