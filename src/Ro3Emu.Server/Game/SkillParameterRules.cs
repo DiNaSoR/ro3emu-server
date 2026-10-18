@@ -55,6 +55,9 @@ internal static class SkillParameterRules
         }
     }
 
+    /// <summary>A BuffConfig row's parsed tuples without the buff being live (learned passive skills).</summary>
+    internal static IReadOnlyList<Modifier> BuffModifiers(GameData data, int configId) => ParsedFor(data, configId);
+
     internal static Modifier? Parse(JsonElement item)
     {
         if (item.ValueKind != JsonValueKind.Array || item.GetArrayLength() < 5
@@ -87,9 +90,12 @@ internal static class SkillParameterRules
         foreach (var buff in session.Buffs)
             signature = unchecked(((signature * 31 + buff.Guid) * 31 + buff.ConfigId) * 31 + buff.PileCount * 2 + (buff.ExpireMs > now ? 1 : 0));
         signature = unchecked(signature * 31 + session.ExtraSkillModifierVersion);
+        signature = unchecked(signature * 31 + session.PassiveSkillModifierVersion);
         if (cache.Signature == signature && ReferenceEquals(cache.Data, data)) return cache;
-        // Non-buff sources (season talent SpecialEffectConfig opcode 21) come first; buffs follow in buff order.
-        var result = new List<Modifier>(session.ExtraSkillModifiers);
+        // Non-buff sources (learned passive skills, season talent SpecialEffectConfig opcode 21) come first;
+        // buffs follow in buff order.
+        var result = new List<Modifier>(session.PassiveSkillModifiers);
+        result.AddRange(session.ExtraSkillModifiers);
         foreach (var buff in session.Buffs)
         {
             if (buff.ExpireMs <= now) continue;

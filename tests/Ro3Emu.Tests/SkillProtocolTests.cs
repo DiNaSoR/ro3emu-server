@@ -116,6 +116,35 @@ public sealed class SkillProtocolTests : IAsyncLifetime
     }
 
     [ClientDataFact]
+    public async Task LearnedPassiveSkillChangesAnotherSkillUntilUnlearned()
+    {
+        await using var alice = await InWorld("Alice");
+        await Gm("alice", "!job 1100");
+        var session = Session("alice");
+        var combat = _app.Services.GetRequiredService<CombatService>();
+
+        // Fatal Blow 11003 (needs Bash 5): its same-id BuffConfig row 1100301 is [0,11001,29,5,500], +5% on Bash.
+        await Run(() =>
+        {
+            session.Progress!.Skills[11001] = 5;
+            session.Progress.Skills[11003] = 1;
+            return combat.RefreshSkillParametersAsync(session);
+        });
+        var affected = await Next(alice, CombatService.SkillAffectedEx, SkillBeAffectedParamExNotify.Parser,
+            m => m.AffectParamDict.ContainsKey(11001));
+        Assert.Equal(5250, affected.AffectParamDict[11001].AffectParam[29].AffectValueList[0]);
+        Assert.Equal(5250, combat.EffectiveSkillRow(session, 1100105)!.Value.GetProperty("_kDamageParam1")[0].GetInt64());
+        Assert.DoesNotContain(session.Buffs, b => b.ConfigId == 1100301); // no buff instance or icon
+
+        await Run(() =>
+        {
+            session.Progress!.Skills.Remove(11003);
+            return combat.RefreshSkillParametersAsync(session);
+        });
+        Assert.Equal(5000, combat.EffectiveSkillRow(session, 1100105)!.Value.GetProperty("_kDamageParam1")[0].GetInt64());
+    }
+
+    [ClientDataFact]
     public async Task TrainingPauseGatesRealStatisticsAndInvalidBossRequestIsRefused()
     {
         await using var alice = await InWorld("Alice");
