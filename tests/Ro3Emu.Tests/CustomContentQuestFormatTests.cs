@@ -203,6 +203,34 @@ public sealed class CustomContentQuestFormatTests : IDisposable
         Assert.Equal(3, problems.Count);
     }
 
+    [Fact]
+    public void PreloadedTablesKeepTheKillStepWalk()
+    {
+        // The server preloads every table at startup; the kill step's tracker target must survive that path too.
+        var game = Path.Combine(_dir, "game");
+        Directory.CreateDirectory(Path.Combine(game, "config"));
+        Directory.CreateDirectory(Path.Combine(game, "sceneeditor"));
+        File.WriteAllText(Path.Combine(game, "config", "MapConfig.json"),
+            """{"10111": {"_iID": 10111, "_kResSceneEditorName": "sc_test_sceneeditor"}}""");
+        File.WriteAllText(Path.Combine(game, "config", "TaskConfig.json"),
+            """{"10101050": {"_iID": 10101050, "_kTrack": [["142", "1", "1", "-1"]]}}""");
+        File.WriteAllText(Path.Combine(game, "sceneeditor", "sc_test_sceneeditor.json"), """
+            {"m_kWorldMonsterSpawnPoints": {"7": {"Id": 7, "m_kConfigIds": [5000001], "position": {"x": 10, "z": 20}}},
+             "m_kRegins": {"1010105001": {"center": {"x": 12, "z": 21}}}}
+            """);
+        var content = Path.Combine(_dir, "content");
+        Directory.CreateDirectory(content);
+        File.WriteAllText(Path.Combine(content, "q.json"), """
+            {"quests": [{"id": 91000070, "steps": [
+              {"name": "A", "description": "B", "objective": "C", "kill": 5000001, "count": 5, "map": 10111}]}]}
+            """);
+        var data = new GameData(Options.Create(new ServerOptions { GameDataDir = game, CustomContentDir = content }),
+            NullLogger<GameData>.Instance);
+        data.Preload();
+        Assert.Equal("""[["142","10111","1010105001","-1"]]""", data.Row("TaskConfig", 91000070)!.Value.GetProperty("_kTrack").GetRawText());
+        Assert.Empty(data.Custom.Warnings);
+    }
+
     [ClientDataFact]
     public void ShippedContentHasNoProblems()
     {
