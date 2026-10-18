@@ -394,7 +394,8 @@ public sealed partial class TaskService
 
     // ---- GM ----
 
-    /// <summary>GM: "accept|finish|done|drop &lt;id&gt;" or "reset" (back to a fresh Novice story).</summary>
+    /// <summary>GM: "accept|finish|done|drop &lt;id&gt;" or "reset" (back to a fresh Novice story). drop forgets the quest and
+    /// every later quest of its chain.</summary>
     public async Task<string> GmAsync(GameSession session, string op, long id)
     {
         using var gate = await LockTasksAsync(session);
@@ -404,23 +405,40 @@ public sealed partial class TaskService
         switch (op)
         {
             case "reset":
+                foreach (var (task, count) in session.Tasks.CompleteTaskNum) Forget(session, task, count);
                 session.Tasks = new DBTaskInfo();
                 Accept(session, FirstTask);
                 session.Tasks.CompleteTaskNum[FirstTask] = 0;
                 break;
             case "drop":
-                bool shown = Active(session, id);
-                session.Tasks.Infos.Remove(id);
-                session.Tasks.CompleteTaskNum.Remove(id);
-                if (shown)
+            {
+                // The quest and every quest after it in its chain: a later quest left delivered (or running) would
+                // offer the next ones again at once, without their pre-task.
+                var chain = new List<long>();
+                var queue = new Queue<long>([id]);
+                while (queue.TryDequeue(out long next))
                 {
+                    if (chain.Contains(next)) continue;
+                    chain.Add(next);
+                    foreach (long child in _children!.GetValueOrDefault(next) ?? []) queue.Enqueue(child);
+                }
+                bool shown = false;
+                foreach (long task in chain)
+                {
+                    if (!Active(session, task) && !session.Tasks.Infos.ContainsKey(task) && !session.Tasks.CompleteTaskNum.ContainsKey(task)) continue;
+                    bool active = Active(session, task);
+                    Forget(session, task, session.Tasks.CompleteTaskNum.GetValueOrDefault(task));
+                    session.Tasks.Infos.Remove(task);
+                    session.Tasks.CompleteTaskNum.Remove(task);
                     // The quest log and tracker drop a quest only on 31203 (LC_DAL_Task TaskGiveUpResp ->
                     // TaskGiveUpEvent -> LC_System_Task.CancelOrRsetTask), as for the player's own give-up; the
-                    // dataset's del alone leaves it on screen. Synced before settling, which may offer it again.
-                    await session.SendGameAsync(TaskGiveUp, new TaskGiveUpResp { Result = 0, Id = id });
-                    await FlushAsync(session);
+                    // dataset's del alone leaves it on screen.
+                    if (active) await session.SendGameAsync(TaskGiveUp, new TaskGiveUpResp { Result = 0, Id = task });
+                    shown |= active;
                 }
+                if (shown) await FlushAsync(session); // synced before settling, which may offer the first one again
                 break;
+            }
             case "accept" when defs.ContainsKey(id):
                 Accept(session, id);
                 break;
@@ -438,6 +456,13 @@ public sealed partial class TaskService
         }
         await SettleAsync(session);
         return $"{op} {id}: {Describe(session)}";
+    }
+
+    private static void Forget(GameSession session, long task, int deliveries)
+    {
+        if (deliveries <= 0) return;
+        var forgotten = session.TaskRuntime.Forgotten ??= new();
+        forgotten[task] = forgotten.GetValueOrDefault(task) + deliveries;
     }
 
     public string Describe(GameSession session) => session.Tasks == null ? "-" :
@@ -600,15 +625,17 @@ public sealed partial class TaskService
             int? playBook = session.Synced.GetValueOrDefault(SeasonService.SeasonSync) is DBSeasonInfo { Current: { } current }
                 ? (int)current.PlayBookId : null;
             var plan = awards.Resolve(session, def.Award, playBook);
-            var runtime = new TaskRuntimeState { CompletedGuides = session.TaskRuntime.CompletedGuides.ToHashSet(), InCutScene = session.InCutScene || cutScene };
-            string awardSource = $"task/{session.Role!.Id}/{id}/{next.CompleteTaskNum[id]}/" +
+            var runtime = new TaskRuntimeState { CompletedGuides = session.TaskRuntime.CompletedGuides.ToHashSet(), InCutScene = session.InCutScene || cutScene,
+                Forgotten = session.TaskRuntime.Forgotten is { } forgotten ? new(forgotten) : null };
+            int delivery = next.CompleteTaskNum[id] + (session.TaskRuntime.Forgotten?.GetValueOrDefault(id) ?? 0);
+            string awardSource = $"task/{session.Role!.Id}/{id}/{delivery}/" +
                 $"{session.Daily?.DailyEpoch ?? 0}/{session.Daily?.WeeklyEpoch ?? 0}";
             if (!await character.ApplyAwardAsync(session, plan, def.Exp, costs, next.ToByteArray(),
                 JsonSerializer.SerializeToUtf8Bytes(runtime), expectedDaily: daily?.Before, nextDaily: daily?.After,
                 expectedTasks: expectedTasks, persist: questMount is { } ride ? tx => mounts.PersistQuestRide(session, ride, tx) : null,
                 committed: questMount is { } appliedRide ? () => mounts.ApplyQuestRideCore(session, context, appliedRide) : null,
                 ownedAward: new CharacterService.OwnedAwardSource("cd13e/quest-award", awardSource,
-                    new { Version = 1, Task = id, Count = next.CompleteTaskNum[id], plan.AwardId })))
+                    new { Version = 1, Task = id, Count = delivery, plan.AwardId })))
                 return daily == null ? ErrorCodes.ItemsShort : ErrorCodes.Unknown;
             session.TaskRuntime = runtime;
             deliveredPlan = plan;
