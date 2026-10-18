@@ -13,7 +13,8 @@ namespace Ro3Emu.Server.Data;
 /// may name "_base": an existing row id of the same table, copied first; its own fields then replace the copy's
 /// top-level fields, and the base's id fields (_iID, _i*ID equal to the base id) take the new id. A row may also be an
 /// array of row objects (DialogueConfig keeps one array per dialogue id);</item>
-/// <item>"npcs": [ { "map", "npc", "x", "z", "y"?, "face"? } ], server NPCs placed on a map (WorldData).</item>
+/// <item>"npcs": [ { "map", "npc", "x", "z", "y"?, "face"? } ], server NPCs placed on a map (WorldData) and added to
+/// the client's scene-editor NPC list of that map (<see cref="SceneEditorEntry"/>), so the quest tracker can walk to them.</item>
 /// </list>
 /// GameData overlays the rows on the tables it loads, so the server reads them like client data; the client gets the
 /// same rows and texts at role login (CustomContentService, game message 77020) and Ro3Emu.ClientHooks.CustomContent
@@ -91,6 +92,21 @@ public sealed class CustomContent
             }
     }
 
+    /// <summary>
+    /// The scene-editor kNpcList entry of a custom NPC, as the client's own server NPCs have (Alphonse, 200014, in
+    /// sc_prontera_001_sceneeditor). Its key and Id are the NPCConfig id: the quest tracker's walk-to-NPC actions
+    /// (ActionConfig 142/143, LC_InteractActions.GetPosByTargetID) look the target up as kNpcList[id] of the map's
+    /// scene-editor module, so the client hook adds this entry there. "CustomContent" names the file (server only).
+    /// </summary>
+    public static JsonObject SceneEditorEntry(Npc npc, float y) => new()
+    {
+        ["AIConfigName"] = "", ["AiId"] = 0, ["AreaID"] = 0, ["CreateCondition"] = "Time", ["CreateTimeConfig"] = new JsonObject(),
+        ["CreateType"] = "AutoCreate", ["FaceDirection"] = npc.Face, ["FaceDirectionType"] = 0, ["Id"] = npc.NpcId,
+        ["IsServerNpc"] = true, ["NpcId"] = npc.NpcId, ["NpcTag"] = 2, ["PatrolPathId"] = 0, ["SceneModelId"] = 0,
+        ["ShowInMap"] = true, ["TalkPositions"] = new JsonObject(), ["eulerAnglesX"] = 0, ["eulerAnglesY"] = npc.Face,
+        ["eulerAnglesZ"] = 0, ["x"] = npc.X, ["y"] = y, ["z"] = npc.Z, ["CustomContent"] = npc.Source,
+    };
+
     private static double? Num(JsonObject o, string key) =>
         o[key] is JsonValue v && v.TryGetValue<double>(out var d) ? d : null;
 
@@ -144,10 +160,12 @@ public sealed class CustomContent
     }
 
     /// <summary>
-    /// What the client needs, as UTF-8 JSON: {"texts": {id: text}, "rows": {Table: {id: row}}} with every row resolved
-    /// (rows come from <paramref name="table"/>, i.e. GameData after the overlay).
+    /// What the client needs, as UTF-8 JSON: {"texts": {id: text}, "rows": {Table: {id: row}}, "npcs": [{"module":
+    /// scene-editor module, "entry": kNpcList entry}]} with every row resolved (rows come from <paramref name="table"/>,
+    /// i.e. GameData after the overlay; NPC entries from WorldData, which knows the ground height).
     /// </summary>
-    public byte[] ClientPayload(Func<string, IReadOnlyDictionary<string, JsonElement>> table)
+    public byte[] ClientPayload(Func<string, IReadOnlyDictionary<string, JsonElement>> table,
+        IEnumerable<(string Module, JsonObject Entry)>? npcs = null)
     {
         var texts = new JsonObject();
         foreach (var (id, text) in _texts.OrderBy(t => t.Key)) texts[id.ToString(System.Globalization.CultureInfo.InvariantCulture)] = text;
@@ -160,6 +178,13 @@ public sealed class CustomContent
                 if (loaded.TryGetValue(id, out var row)) outRows[id] = JsonNode.Parse(row.GetRawText());
             rows[name] = outRows;
         }
-        return Encoding.UTF8.GetBytes(new JsonObject { ["texts"] = texts, ["rows"] = rows }.ToJsonString());
+        var npcList = new JsonArray();
+        foreach (var (module, entry) in npcs ?? [])
+        {
+            var copy = (JsonObject)entry.DeepClone();
+            copy.Remove("CustomContent");
+            npcList.Add(new JsonObject { ["module"] = module, ["entry"] = copy });
+        }
+        return Encoding.UTF8.GetBytes(new JsonObject { ["texts"] = texts, ["rows"] = rows, ["npcs"] = npcList }.ToJsonString());
     }
 }

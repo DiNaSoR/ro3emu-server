@@ -251,11 +251,7 @@ public sealed partial class WorldData(IOptions<ServerOptions> options, GameData 
                 continue;
             }
             float y = custom.Y ?? map.Nav?.WalkHeight(custom.X, custom.Z, 0f) ?? 0f;
-            var entry = JsonSerializer.SerializeToElement(new
-            {
-                Id = 0, NpcId = custom.NpcId, NpcTag = (int)WorldNpcKind.Npc, IsServerNpc = true,
-                x = custom.X, y, z = custom.Z, FaceDirection = custom.Face, CustomContent = custom.Source,
-            });
+            var entry = JsonSerializer.SerializeToElement(CustomContent.SceneEditorEntry(custom, y));
             npcs.Add(new WorldNpc(NpcUidBase | sceneEntry << 16 | (long)npcs.Count, sceneEntry, WorldNpcKind.Npc, custom.NpcId,
                 data.TextOf(npcRow, "_kName"), (int)GameData.Int(npcRow, "_iCamp"), custom.X, y, custom.Z, custom.Face, entry));
         }

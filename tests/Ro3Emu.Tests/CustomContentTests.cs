@@ -122,5 +122,8 @@ public sealed class CustomContentTests : IDisposable
         Assert.Equal("Elias", placed.Name);
         Assert.Same(placed, world.Npc(placed.Uid));
         Assert.InRange(placed.Y, -2f, 3f); // on Prontera's ground
+        // The tracker's walk target ("143", map, kNpcList key) is the NPC id, which keys Elias's scene-editor entry.
+        var track = data.Row("TaskConfig", 90000001)!.Value.GetProperty("_kTrack")[0];
+        Assert.Equal(track[2].GetString(), placed.Entry.GetProperty("Id").GetInt64().ToString());
     }
 }

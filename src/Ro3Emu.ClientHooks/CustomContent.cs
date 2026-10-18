@@ -20,6 +20,10 @@ namespace Ro3Emu.ClientHooks
     /// {Table: {id: row}}}) at role login, before the quest and NPC data; it is applied at once when it arrives on the
     /// main thread, else on the next tick, and kept in &lt;client&gt;/ro3emu/custom-content.json so the next start has it
     /// before login.</item>
+    /// <item>Custom NPCs come as scene-editor kNpcList entries, added to the map's scene-editor module (required like
+    /// LC_InteractActions does): the quest tracker's walk-to-NPC actions (ActionConfig 142/143) find their target as
+    /// kNpcList[id] there (LC_InteractActions.GetPosByTargetID), and the minimap lists it. IsServerNpc is set, so the
+    /// client does not spawn its own copy; the server spawns the NPC.</item>
     /// <item>Every LuaPatches tick checks one row per table and sets them again when it is gone (Lua_DBManager.ReLoadAllCfg
     /// and Language.Load replace the tables). A table's cached id list (m_kAllIDList) is cleared so lists include the new
     /// ids.</item>
@@ -35,6 +39,8 @@ namespace Ro3Emu.ClientHooks
         {
             public readonly Dictionary<long, string> Texts = new Dictionary<long, string>();
             public readonly Dictionary<string, Dictionary<long, object>> Rows = new Dictionary<string, Dictionary<long, object>>();
+            /// <summary>Scene-editor module name -> kNpcList key -> entry.</summary>
+            public readonly Dictionary<string, Dictionary<long, object>> Npcs = new Dictionary<string, Dictionary<long, object>>();
             public byte[] Raw;
         }
 
@@ -145,6 +151,18 @@ namespace Ro3Emu.ClientHooks
                     if (instance != null) rawset.Obf_HuA(instance, "m_kAllIDList", null);
                     Note(table.Key + ": " + table.Value.Count + " row(s) set (" + added + " new)");
                 }
+                if (content.Npcs.Count > 0)
+                {
+                    var manager = HappyEngine.Base.SingletonMonoBehaviour<LA_LuaManager>.Instance;
+                    foreach (var module in content.Npcs)
+                    {
+                        var list = manager == null ? null : LuaPatches.Module(manager, global, module.Key)?.Obf_RuA<Obf_R.Obf_ff>("kNpcList");
+                        if (list == null) { Once("scene editor " + module.Key + " has no kNpcList"); continue; }
+                        if (!force && !Missing(rawget, list, First(module.Value.Keys))) continue;
+                        foreach (var npc in module.Value) rawset.Obf_HuA(list, npc.Key, ToLua(npc.Value, pack, rawset));
+                        Note(module.Key + ": " + module.Value.Count + " NPC(s) set in kNpcList");
+                    }
+                }
             }
             catch (Exception e)
             {
@@ -240,6 +258,15 @@ namespace Ro3Emu.ClientHooks
                             byId[id] = row.Value;
                     if (byId.Count > 0) content.Rows[table.Key] = byId;
                 }
+            if (root.TryGetValue("npcs", out var n) && n is List<object> npcs)
+                foreach (var item in npcs)
+                {
+                    if (!(item is Dictionary<string, object> npc) || !(npc.TryGetValue("module", out var m) && m is string module && module.Length > 0)
+                        || !(npc.TryGetValue("entry", out var e) && e is Dictionary<string, object> entry)
+                        || !(entry.TryGetValue("Id", out var id) && id is long key)) continue;
+                    if (!content.Npcs.TryGetValue(module, out var byKey)) content.Npcs[module] = byKey = new Dictionary<long, object>();
+                    byKey[key] = entry;
+                }
             return content;
         }
 
@@ -247,6 +274,7 @@ namespace Ro3Emu.ClientHooks
         {
             var parts = new List<string> { content.Texts.Count + " text(s)" };
             foreach (var table in content.Rows) parts.Add(table.Key + " " + table.Value.Count);
+            foreach (var module in content.Npcs) parts.Add(module.Key + " NPCs " + module.Value.Count);
             return string.Join(", ", parts.ToArray());
         }
 

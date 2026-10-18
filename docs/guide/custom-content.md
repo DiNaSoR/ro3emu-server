@@ -92,9 +92,12 @@ A custom NPC is an NPCConfig row (usually `_base` of an existing NPC, with a new
 via `_iUnitID`) plus an `npcs` entry. Clicking it runs its `_iInteractID` rows in NPCInteractConfig; action
 `["53", dialog]` opens a dialogue. Models, animations and portraits must already exist in the client.
 
+The hooks also add each placed NPC to its map's scene-editor NPC list (`kNpcList`, keyed by the NPC id), where the
+client looks up walk targets. So a quest's `_kTrack` of `["143", map, npc, "9", dialog]` auto-walks to a custom NPC
+like it does to a client one, and the NPC shows on the minimap. Place a given NPC id once per map.
+
 ## Limits
 
 - Only existing art: no new models, maps, music, voice or images.
-- The quest tracker cannot auto-walk to a custom NPC yet (navigation reads the client's scene-editor NPC list).
 - On the first login after a content change the rows arrive with the login itself. If a quest shows up before its
   text does, relog once: the hooks keep a copy, so every later start has the rows from the beginning.

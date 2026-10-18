@@ -77,6 +77,14 @@ public sealed class CustomContentQuestTests : IAsyncLifetime
         {
             Assert.Equal(Talk, doc.RootElement.GetProperty("rows").GetProperty("TaskConfig").GetProperty("90000001").GetProperty("_iTaskID").GetInt64());
             Assert.Equal("Elias", doc.RootElement.GetProperty("texts").GetProperty("99000000001").GetString());
+            // Elias's scene-editor entry, which the quest tracker's walk-to-NPC (track action 143) looks up by NPC id.
+            var placed = Assert.Single(doc.RootElement.GetProperty("npcs").EnumerateArray());
+            Assert.Equal("sc_prontera_001_sceneeditor", placed.GetProperty("module").GetString());
+            var entry = placed.GetProperty("entry");
+            Assert.Equal(Elias, entry.GetProperty("Id").GetInt64());
+            Assert.Equal(Elias, entry.GetProperty("NpcId").GetInt64());
+            Assert.True(entry.GetProperty("IsServerNpc").GetBoolean());
+            Assert.False(entry.TryGetProperty("CustomContent", out var source), source.ToString());
         }
         await Barrier(bot);
         Assert.Equal(TaskState.Running, (await State(Talk))!.Status);
