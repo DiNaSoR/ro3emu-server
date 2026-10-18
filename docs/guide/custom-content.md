@@ -43,8 +43,12 @@ row with the same id. `//` comments and trailing commas are allowed. A file with
 ```
 
 - **texts**: text id → English text. They become `Localization_en` rows, so any `[textId]` field can use them.
-  Rich text works as in the client's own strings: `^{1}highlighted^{2}`, and `@{1}` is replaced by the field's
-  next value (`"_iTaskDescribe": [99000000202, "5"]`).
+  Placeholders work as in the client's own strings: `^{n}` and `@{n}` are replaced by the field's n-th value after
+  the text id. For coloured text put the tags there: text `"Defeat ^{1}5 Porings^{2}"` with
+  `"_iText": [99000000113, "<color=#CC762A>", "</color>"]`; for a number, `"_iTaskDescribe": [99000000202, "5"]`
+  with `@{1}` in the text. A placeholder with no value shows as written.
+- **Objective text** (`_iTargetDescribe`): the quest log splits it at `|` into one line per objective, and a line
+  ending in `*` shows the progress counter (5/5). Without the `*` the kills still count, but the log shows no number.
 - **rows**: table name (as in `data/config`) → id → row. `"_base": <id>` copies an existing row of the same table
   first; the fields you write replace the copy's top-level fields, and the copy's id fields (`_iID` or another
   `_i…ID` equal to the base id) take the new id. Without `_base` the row must be complete. A row may also be an

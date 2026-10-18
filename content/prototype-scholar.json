@@ -15,7 +15,7 @@
 
     "99000000201": "Jelly Samples",
     "99000000202": "Defeat @{1} Porings at the Prontera South Gate for Elias",
-    "99000000203": "Defeat Porings at the South Gate",
+    "99000000203": "Defeat Porings at the South Gate*",
 
     "99000000301": "Back to the Scholar",
     "99000000302": "Bring the jelly samples back to Elias in Prontera.",
@@ -49,7 +49,7 @@
           "_iIcon": "npcdialog_icon_chat.png", "_iText": [99000000112], "_iEXECAction": [["7", "900000202"]] }
       ],
       "900000202": [
-        { "_iID": 900000202, "_iNPCID": 90000001, "_iTalkNPCID": 90000001, "_iText": [99000000113], "_iEXECAction": [["17", "900000201"]] }
+        { "_iID": 900000202, "_iNPCID": 90000001, "_iTalkNPCID": 90000001, "_iText": [99000000113, "<color=#CC762A>", "</color>"], "_iEXECAction": [["17", "900000201"]] }
       ],
       "900000301": [
         { "_iID": 900000301, "_iNPCID": 90000001, "_iTalkNPCID": 90000001, "_iText": [99000000311], "_iEXECAction": [["17", "900000301"]] }
