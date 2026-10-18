@@ -265,6 +265,26 @@ public sealed class AwardTests : IAsyncLifetime
     }
 
     [ClientDataFact]
+    public async Task AwardedGearRowCarriesTheCommittedGuidForTheQuickEquipPrompt()
+    {
+        // LC_EquipmentHelper.CanFastEquip reads the GetRewardNotify row itself: itemGuid, appraised (3) and score (2).
+        // Quest awards stage gear before the commit assigns GUIDs, so the row must be built after it.
+        await using var bot = await InWorld("GearAlice");
+        await Next(bot, CharacterService.ItemsSync, DBItemsInfoIncrement.Parser);
+        var session = _app.Services.GetRequiredService<SessionRegistry>().All().Single(s => s.Role?.Name == "GearAlice");
+        var loop = _app.Services.GetRequiredService<GameLoop>();
+        var character = _app.Services.GetRequiredService<CharacterService>();
+        Assert.True(await loop.InvokeAsync(() => character.ApplyAwardAsync(session,
+            new AwardPlan(0, 0, [new AwardGrant(2010120, 2), new AwardGrant(1000000, 1)]))));
+        var notify = await Next(bot, CharacterService.GetRewardNotify, GetRewardNotify.Parser, m => m.Rewards.Count > 0);
+        var gear = session.Items.Where(i => i.Entry == 2010120).Select(i => i.Guid).Order().ToList();
+        var rows = notify.Rewards.Where(r => r.ItemEntry == 2010120).ToList();
+        Assert.Equal(gear, rows.Select(r => r.ItemGuid).Order().ToList());
+        Assert.All(rows, r => { Assert.True(r.ItemGuid > 0); Assert.Equal(1, r.ItemInfos[3].LongVal); Assert.True(r.ItemInfos[2].LongVal > 0); });
+        Assert.Equal(0, Assert.Single(notify.Rewards, r => r.ItemEntry == 1000000).ItemGuid);
+    }
+
+    [ClientDataFact]
     public async Task FirstGearInAnUnsentPackResendsTheWholeBag()
     {
         // Once the starter weapon and shirt are worn, a later login's 5009 has no equipment pack (2). The client
