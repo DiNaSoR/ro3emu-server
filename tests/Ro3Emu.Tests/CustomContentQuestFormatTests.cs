@@ -30,6 +30,8 @@ public sealed class CustomContentQuestFormatTests : IDisposable
 
     private static JsonObject Obj(CustomContent c, string table, long id) => c.Rows[table][id.ToString()].AsObject();
     private static JsonArray Arr(CustomContent c, string table, long id) => c.Rows[table][id.ToString()].AsArray();
+    private static (long, string) Tag(JsonObject task) =>
+        (task["_iShowTag"]![0]!.GetValue<long>(), task["_iShowTag"]![1]!.GetValue<string>());
     private static string Text(CustomContent c, JsonNode? field) => c.Texts[field![0]!.GetValue<long>()];
 
     [Fact]
@@ -97,6 +99,10 @@ public sealed class CustomContentQuestFormatTests : IDisposable
         Assert.Equal(31105, kill["_iAward"]!.GetValue<long>());
 
         var report = Obj(c, "TaskConfig", 91000012);
+        // No "type": a side quest, with the blue tag and the blue bubble over Mira.
+        Assert.Equal(2, report["_iTaskType"]!.GetValue<int>());
+        Assert.Equal((13150300008, "<color=#6890d2>"), Tag(report));
+        Assert.Equal("task_icon_npc_blue02.png", report["_kNPCProgressMark"]!.GetValue<string>());
         Assert.Equal("[91000011]", report["_kPreTask"]!.ToJsonString());
         Assert.Equal("[1,500]", report["_kEXP"]!.ToJsonString());
         Assert.Equal(0, report["_iShowOnMap"]!.GetValue<int>());
@@ -113,6 +119,37 @@ public sealed class CustomContentQuestFormatTests : IDisposable
         var task = Obj(c, "TaskConfig", 91000020);
         Assert.Equal("[10101130]", task["_kPreTask"]!.ToJsonString());
         Assert.False(task.ContainsKey("_iCondition"));
+    }
+
+    [Theory]
+    [InlineData("main", 1, 13150300005, "#ec8c2f", "task_icon_npc_yellew02.png")]
+    [InlineData("Side", 2, 13150300008, "#6890d2", "task_icon_npc_blue02.png")]
+    [InlineData("guide", 3, 13150300010, "#62af51", "task_icon_npc_green02.png")]
+    public void QuestTypeSetsTheTagAndTheNpcBubble(string type, int taskType, long tag, string colour, string mark)
+    {
+        var c = Load(Npc, $$"""
+            {"quests": [{"id": 91000050, "type": "{{type}}", "steps": [
+              {"name": "A", "description": "B", "objective": "C", "talk": 91000005, "dialog": ["Hi"]},
+              {"name": "D", "description": "E", "objective": "F", "kill": 5000001, "count": 1}
+            ]}]}
+            """);
+        Assert.Empty(c.Errors);
+        foreach (long id in new[] { 91000050L, 91000051L })
+        {
+            var task = Obj(c, "TaskConfig", id);
+            Assert.Equal(taskType, task["_iTaskType"]!.GetValue<int>());
+            Assert.Equal((tag, $"<color={colour}>"), Tag(task));
+            Assert.Equal(mark, task["_kNPCProgressMark"]!.GetValue<string>());
+        }
+    }
+
+    [Fact]
+    public void UnknownQuestTypeIsSkippedWithAReason()
+    {
+        var c = Load("""
+            {"quests": [{"id": 91000060, "type": "daily", "steps": [{"name": "A", "description": "B", "objective": "C", "kill": 5000001, "count": 1}]}]}
+            """);
+        Assert.Contains("\"main\", \"side\" or \"guide\"", Assert.Single(c.Errors));
     }
 
     [Theory]

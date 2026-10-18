@@ -662,6 +662,7 @@ public sealed partial class CombatService
         s.Attack = null;
         if (s.SkillCast is { } cast) cast.Cancelled = true;
         s.SkillCast = null;
+        if (s.CastMoveLockId != 0) { s.CastMoveLockId = 0; await buffs.RefreshCastLockAsync(s); }
         foreach (var unit in s.SkillObjects.ToArray()) await RemoveSkillObjectAsync(unit);
     }
 

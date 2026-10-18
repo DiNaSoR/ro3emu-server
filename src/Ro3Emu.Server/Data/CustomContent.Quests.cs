@@ -26,6 +26,20 @@ public sealed partial class CustomContent
     private const long BaseLevelOneCondition = 2000008;
     private const int TalkTarget = 104001, KillTarget = 104002, PartyKillTarget = 104014;
 
+    /// <summary>
+    /// "type" of a quest: the client's enum_TaskType, the quest log tag (TaskConfig._iShowTag, as the client's own
+    /// quests of that type carry it) and the bubble over the NPC a talk step names (_kNPCProgressMark, shown by
+    /// LC_System_TaskTag while the step runs; the client's main quests use the orange one, side quests the blue one,
+    /// and the green one is the same bubble in the Guide tag's colour).
+    /// </summary>
+    private static readonly Dictionary<string, (int Type, long Tag, string Colour, string Mark)> QuestTypes =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["main"] = (1, 13150300005, "#ec8c2f", "task_icon_npc_yellew02.png"),
+            ["side"] = (2, 13150300008, "#6890d2", "task_icon_npc_blue02.png"),
+            ["guide"] = (3, 13150300010, "#62af51", "task_icon_npc_green02.png"),
+        };
+
     private readonly List<(JsonObject Quest, string File)> _quests = new();
     /// <summary>Custom NPC id -> the map it is placed on, for talk steps that name no map.</summary>
     private readonly Dictionary<long, long> _npcMaps = new();
@@ -110,7 +124,7 @@ public sealed partial class CustomContent
     }
 
     /// <summary>
-    /// { "id", "after"?, "steps": [ { "name", "description", "objective", and either "talk" (NPC id) + "dialog"
+    /// { "id", "after"?, "type"? ("main", "side" (default) or "guide"), "steps": [ { "name", "description", "objective", and either "talk" (NPC id) + "dialog"
     /// (+ "map" for a client NPC) or "kill" (monster id or ids) + "count" (+ "map", "solo"); "exp"?, "award"?,
     /// "track"?, "fields"? } ] }. Step n takes TaskConfig id + n and follows step n - 1.
     /// </summary>
@@ -119,6 +133,9 @@ public sealed partial class CustomContent
         long first = Id(q, "id", "quests");
         if (q["steps"] is not JsonArray { Count: > 0 } steps) throw new InvalidDataException("needs \"steps\": [ ... ]");
         long? after = q.ContainsKey("after") ? Id(q, "after", "quests") : null;
+        string typeName = Str(q, "type") ?? "side";
+        if (!QuestTypes.TryGetValue(typeName, out var type))
+            throw new InvalidDataException($"\"type\" is \"{typeName}\"; use \"main\", \"side\" or \"guide\"");
         for (int i = 0; i < steps.Count; i++)
         {
             long id = first + i;
@@ -133,8 +150,9 @@ public sealed partial class CustomContent
             var row = new JsonObject
             {
                 ["_base"] = talk ? TalkQuestBase : KillQuestBase,
-                ["_iTaskType"] = 2,
-                ["_iShowTag"] = new JsonArray(13150300008, "<color=#6890d2>", "</color>"),
+                ["_iTaskType"] = type.Type,
+                ["_iShowTag"] = new JsonArray(type.Tag, $"<color={type.Colour}>", "</color>"),
+                ["_kNPCProgressMark"] = type.Mark,
                 ["_iTaskRank"] = id,
                 ["_iName"] = texts.Field(Need(step, "name", where)),
                 ["_iTaskDescribe"] = texts.Field(description),

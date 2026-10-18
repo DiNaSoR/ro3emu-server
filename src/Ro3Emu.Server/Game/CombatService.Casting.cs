@@ -19,6 +19,8 @@ public sealed class ActiveSkillCast
     public required Vec3 Origin { get; set; }
     /// <summary>Accepted while the caster still walked (WalkSlack): its stop right after is where it cast from.</summary>
     public bool StartedWalking { get; set; }
+    /// <summary>Where the server had the caster at the request: its steps until the stop are measured from here.</summary>
+    public Vec3? WalkStart { get; init; }
     /// <summary>How far that stop may land from the origin: the walk speed at the request, before a cast dismount slowed it.</summary>
     public float ArrivalSlack { get; init; }
     public required long StartMs { get; init; }
@@ -358,6 +360,7 @@ public sealed partial class CombatService
                 default: result.Invalid = true; break; // reject an unsupported cost rather than grant a free cast.
             }
         }
+        if (result.Attrs.TryGetValue(2001, out long sp)) result.Attrs[2001] = SpAfterDeduction(stats, sp);
         return result;
     }
 
@@ -443,7 +446,14 @@ public sealed partial class CombatService
     private async Task<bool> AdmitAutomaticCostAsync(GameSession s, JsonElement row, CastSkillReq request, long id)
     {
         var costs = ResolveCosts(s, row);
-        if (costs.Items.Count == 0) return true;
+        if (costs.Items.Count == 0)
+        {
+            // No item receipt to admit, but HP/SP still apply: Sacrifice's basic-attack modes cost 30 HP a swing.
+            if (costs.Attrs.Count == 0 && costs.Buffs.Count == 0) return true;
+            if (ValidateCosts(s, costs).Error != 0) return false;
+            await PayCostsAsync(s, costs);
+            return true;
+        }
         if (ValidateCosts(s, costs).Error != 0 || !buffs.CanSpendEnergy(s, row)) return false;
         var lease = s.Attachment;
         long scene = s.SceneGeneration, worldScene = s.WorldScene;
@@ -463,11 +473,16 @@ public sealed partial class CombatService
         var action = new ActiveSkillCast
         {
             Id = id, OwnerId = s.Role!.Id, WorldScene = s.WorldScene, SceneGeneration = s.SceneGeneration,
-            Attachment = s.Attachment, Request = req, Row = row, Origin = origin, StartedWalking = actor == null && s.Walking, ArrivalSlack = arrivalSlack ?? ArrivalSlack(s),
+            Attachment = s.Attachment, Request = req, Row = row, Origin = origin, StartedWalking = actor == null && s.Walking, WalkStart = origin.Clone(), ArrivalSlack = arrivalSlack ?? ArrivalSlack(s),
             StartMs = Now, ChantMs = (int)Math.Max(0, GameData.Int(row, "_iChantFix") + GameData.Int(row, "_iChantVar")), ActionMs = SkillMs(s, row), Operator = actor,
         };
         if (chantCosts is { } owed) action.ChantCost = () => PayChantCostAsync(s, action, owed);
         s.SkillCast = action;
+        // A Lock skill (_bMovement 0) roots the caster until its hit. The client asks to cast while still walking
+        // (LC_Skill_ActionPreCheck.CheckSkillSendServer sends its position, then USE_SKILL_REQ, without stopping) and
+        // keeps walking unless the server forbids it: its joystick and path controllers stop only on StatusForbidden
+        // Walk (LC_Unit_Player.IsSkillBlockMove). Without it the next step cancelled the cast as a move.
+        if (actor == null && GameData.Int(row, "_bMovement") == 0) await LockCastMovementAsync(s, id);
         s.WorldState.ResurrectionCastId = Script(row) == "Resurrection" ? id : 0;
         s.Face = face;
         req.Face = face;
@@ -491,13 +506,29 @@ public sealed partial class CombatService
             // An impact on the chant boundary can run before the chant-end callback: settle the cost first.
             if (action.ChantCost is { } pay && !await pay()) return;
             action.Resolved = true;
+            // Past its hit the client lets a move break the skill (LC_State_Unit_Skill ReadyToEnd + IsCanMoveBreak).
+            await ReleaseCastMovementAsync(s, action.Id);
             await ResolveCastAsync(s, action);
         });
-        ScheduleRuntime(action.WorldScene, TimeSpan.FromMilliseconds(Math.Max(at, action.ChantMs + action.ActionMs) + 1), () =>
+        ScheduleRuntime(action.WorldScene, TimeSpan.FromMilliseconds(Math.Max(at, action.ChantMs + action.ActionMs) + 1), async () =>
         {
             if (ReferenceEquals(s.SkillCast, action)) s.SkillCast = null;
-            return Task.CompletedTask;
+            await ReleaseCastMovementAsync(s, action.Id); // a cast that never reached its hit (death, refused chant cost)
         });
+    }
+
+    private async Task LockCastMovementAsync(GameSession s, long castId)
+    {
+        s.CastMoveLockId = castId;
+        await buffs.RefreshCastLockAsync(s);
+    }
+
+    /// <summary>Lifts the cast's movement lock; a newer cast's lock stays.</summary>
+    private async Task ReleaseCastMovementAsync(GameSession s, long castId)
+    {
+        if (s.CastMoveLockId != castId || castId == 0) return;
+        s.CastMoveLockId = 0;
+        await buffs.RefreshCastLockAsync(s);
     }
 
     /// <summary>Piecewise template time mapping; same scale as LC_Skill_RunTimeContext (inferred for attack points).</summary>
@@ -545,6 +576,7 @@ public sealed partial class CombatService
         if (s.SkillCast is not { } action) return;
         action.Cancelled = true;
         s.SkillCast = null;
+        await ReleaseCastMovementAsync(s, action.Id);
         await ToPlayerAndViewersAsync(s, SkillEnd, new SkillEndNotify
         {
             SrcID = action.SourceId, SessionId = action.Id, Type = SkillEndNotify.Types.SkillEndType.Interrupted,
@@ -570,13 +602,14 @@ public sealed partial class CombatService
             else s.Attack = null;
         }
         if (s.SkillCast is not { } cast || Distance(cast.Origin, s.Position) <= 0.1f || GameData.Int(cast.Row, "_bMovement") != 0) return;
-        // The client casts on reaching range and stops 1 ms later (in-game 11.10): that first stop is the cast's real
-        // origin, within the distance the walk can have covered, not a move that interrupts it.
-        if (cast.StartedWalking && !s.Walking && Now - cast.StartMs <= 300
-            && Distance(cast.Origin, s.Position) <= cast.ArrivalSlack)
+        // The client casts while it still walks and stops only once it hears of the cast (in-game 11.10: 1 ms later on
+        // reaching range; a cast pressed mid-walk stops on the movement lock). Its steps until that stop are the cast's
+        // real origin, within the distance the walk can have covered, not a move that interrupts it.
+        if (cast.StartedWalking && Now - cast.StartMs <= 300
+            && Distance(cast.WalkStart ?? cast.Origin, s.Position) <= cast.ArrivalSlack)
         {
             cast.Origin = s.Position.Clone();
-            cast.StartedWalking = false;
+            if (!s.Walking) cast.StartedWalking = false;
             return;
         }
         loop.TrackRuntimeDetached("cast movement cancellation", () => CancelCastAsync(s, SkillInterruptedInfo.Types.SkillInterruptType.Move));

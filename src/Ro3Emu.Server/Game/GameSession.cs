@@ -148,6 +148,8 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
     /// <summary>Buff-owned portions of 2701/2702/2711; 2701 also contains CombatService's fighting bit.</summary>
     public ulong BuffStatusBits { get; set; }
     public ulong ForbiddenBits { get; set; }
+    /// <summary>The cast (ActiveSkillCast.Id) that holds the caster still: BuffService adds Walk to ForbiddenBits while set.</summary>
+    public long CastMoveLockId { get; set; }
     public ulong StaggerBits { get; set; }
     public HashSet<int> ForbiddenOrdinals { get; } = new();
     /// <summary>Transient configured energy meters; BuffService sends each change as 31334.</summary>

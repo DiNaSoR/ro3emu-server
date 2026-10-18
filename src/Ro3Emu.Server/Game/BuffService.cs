@@ -341,6 +341,9 @@ public sealed partial class BuffService : IGameTicker
         || (p.ImmuneDeathOffer != null && ordinal == 9)
         || (p.ImmuneRecoveryUntilMs > MonsterService.NowMs && ordinal is 3 or 4 or 5 or 9);
 
+    /// <summary>Sends the caster's forbid mask after CombatService took or released its cast movement lock.</summary>
+    public Task RefreshCastLockAsync(GameSession p) => RefreshControlAsync(p);
+
     private async Task RefreshControlAsync(GameSession p)
     {
         if (p.Role == null) return;
@@ -385,6 +388,10 @@ public sealed partial class BuffService : IGameTicker
             status |= (1UL << 24) | (1UL << 8) | (1UL << 9); // Invincible/CanNotMove/CanNotSkill.
             forbidden |= ForbiddenMask(3) | ForbiddenMask(4) | ForbiddenMask(5) | ForbiddenMask(9);
         }
+        // A Lock cast (SkillConfig._bMovement 0) holds the caster still. The client stops its own walk only on this bit
+        // (LC_Unit_Player.IsSkillBlockMove reads StatusForbidden & Walk); walk requests stay accepted (HasForbidden
+        // reads ordinals), so steps already in flight still place the caster.
+        if (p.CastMoveLockId != 0) forbidden |= ForbiddenMask(3);
         p.StatusBits = (long)(((ulong)p.StatusBits & ~p.BuffStatusBits) | status);
         p.BuffStatusBits = status;
         p.ForbiddenBits = forbidden;
