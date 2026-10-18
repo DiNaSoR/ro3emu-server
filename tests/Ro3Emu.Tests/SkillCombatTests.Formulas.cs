@@ -19,6 +19,27 @@ public sealed partial class SkillCombatTests
     }
 
     /// <summary>A level 60 caster with full SP (Tetra Vortex Lv1 costs 55 SP, more than a new character has).</summary>
+    /// <summary>Puts a weapon or shield in a worn grid without a stat refresh, for skills whose _iSkillCondition names an
+    /// equipped subtype: Dagger 2010120 (1), Spear 2050120 (5), Bow 2110120 (11), Katar 2120120 (12), Shield 2500120 (50).
+    /// A level-up's item commit may still replace the item list after the GM reply, so it is re-checked a moment later.</summary>
+    private async Task Wield(string name, int entry, int grid = 1)
+    {
+        for (int attempt = 0; attempt < 10; attempt++)
+        {
+            await Loop.InvokeAsync(() =>
+            {
+                var s = Session(name);
+                if (s.Items.Any(i => i.Grid == grid && i.Entry == entry)) return Task.CompletedTask;
+                s.Items.RemoveAll(i => i.Grid == grid);
+                s.Items.Add(new InvItem { Guid = 9_000_100 + grid, Entry = entry, Stack = 1, Pack = 1, Grid = grid });
+                return Task.CompletedTask;
+            });
+            await Task.Delay(150);
+            if (await Loop.InvokeAsync(() => Task.FromResult(Session(name).Items.Any(i => i.Grid == grid && i.Entry == entry)))) return;
+        }
+        Assert.Fail("weapon not kept");
+    }
+
     private async Task Seasoned(string name)
     {
         await Gm(name, "!lvl 60");
@@ -82,7 +103,7 @@ public sealed partial class SkillCombatTests
     public async Task EnvenomedBladeBouncesToThreeMoreEnemies()
     {
         await using var alice = await InWorld("Alice");
-        await Gm("alice", "!job 5200"); await Teach("alice", 15105);
+        await Gm("alice", "!job 5200"); await Teach("alice", 15105); await Wield("alice", 2010120);
         Combat.Rolls = new FixedRolls(0);
         var others = new[] { await Target("alice", stationary: true), await Target("alice", stationary: true), await Target("alice", stationary: true) };
         var target = await CastAt(alice, "alice", 1510501);

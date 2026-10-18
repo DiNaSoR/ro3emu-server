@@ -209,7 +209,7 @@ public sealed partial class SkillCombatTests
     public async Task FocusedArrowStrikeSendsTheWargEveryFewSeconds()
     {
         await using var alice = await InWorld("Alice");
-        await Gm("alice", "!job 3400"); await Teach("alice", 13305); await Teach("alice", 13312);
+        await Gm("alice", "!job 3400"); await Teach("alice", 13305); await Teach("alice", 13312); await Wield("alice", 2110120);
         var target = await CastAt(alice, "alice", 1330501);
         var warg = await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser, h => h.SkillId == 1331201);
         Assert.Contains(warg.Dsts, d => d.DstID == target.Uid);

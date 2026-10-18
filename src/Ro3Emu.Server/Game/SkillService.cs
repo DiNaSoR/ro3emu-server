@@ -69,13 +69,16 @@ public sealed class SkillService
     /// (ATK x 50% + 45), with a Katar 1005101, with two Daggers 1005201, otherwise 1500001 "Normal Attack" (ATK x 50%);
     /// a Swordman with 1001001, a Knight or Crusader with 1001101. All of a career's rows count as learned, because the
     /// skill window shows GetNormalSkillID's group in the Novice tree's Normal Attack cell
-    /// (UI_Sys_Skill_AddBitWidgetBaseCtrl). Battle-mount rows are not applied (inferred: unmounted rows only).
+    /// (UI_Sys_Skill_AddBitWidgetBaseCtrl). Each row also names the battle mount it applies on (_iMountID, 0 on foot):
+    /// _getData reads ActivationMounts[Battle] while it is ridden, so a Ranger on the Demonic Wolf attacks with Warg Strike
+    /// 1003201, a Mechanic in the Madogear with Normal Punch 1631001 and on foot with Basic Attack 1600001, a Rune Knight
+    /// on the dragon with 1100001; a row without that mount falls back to the weapon's on-foot row.
     /// </summary>
     public int NormalAttack(GameSession session)
     {
         int career = session.Progress!.Career;
         var (subType, dual) = Weapon(session);
-        return JobAttack(career, subType * 10 + (dual ? 1 : 0)) is int id && data.Row("SkillConfig", id) != null
+        return JobAttack(career, subType * 10 + (dual ? 1 : 0), MountService.RidingBattle(session)) is int id && data.Row("SkillConfig", id) != null
             ? id : NormalAttack(career);
     }
 
@@ -100,37 +103,39 @@ public sealed class SkillService
     private int SubType(int entry) =>
         entry > 0 && data.Row("ItemConfig", entry) is { } row ? (int)GameData.Int(row, "_iSubType") : 0;
 
-    private Dictionary<int, Dictionary<int, int>>? _jobAttacks;
+    private Dictionary<int, Dictionary<int, Dictionary<long, int>>>? _jobAttacks;
 
-    /// <summary>JobAttackConfig keyed as Lua_CFG_JobAttackConfig.ctor: job -> weapon key -> row (unmounted rows only).</summary>
-    private Dictionary<int, Dictionary<int, int>> JobAttacks => _jobAttacks ??= BuildJobAttacks();
+    /// <summary>JobAttackConfig keyed as Lua_CFG_JobAttackConfig.ctor: job -> weapon key -> battle mount (0 on foot) -> row.</summary>
+    private Dictionary<int, Dictionary<int, Dictionary<long, int>>> JobAttacks => _jobAttacks ??= BuildJobAttacks();
 
-    private Dictionary<int, Dictionary<int, int>> BuildJobAttacks()
+    private Dictionary<int, Dictionary<int, Dictionary<long, int>>> BuildJobAttacks()
     {
-        var map = new Dictionary<int, Dictionary<int, int>>();
+        var map = new Dictionary<int, Dictionary<int, Dictionary<long, int>>>();
         foreach (var row in data.Table("JobAttackConfig").Values)
         {
-            if (GameData.Int(row, "_iMountID") != 0) continue;
             int[] weapon = row.TryGetProperty("_kWeaponType", out var w) && w.ValueKind == JsonValueKind.Array
                 ? w.EnumerateArray().Select(v => (int)(GameData.Number(v) ?? 0)).ToArray() : [];
             int key = weapon.Length == 0 ? -1 : weapon[0] * 10 + (weapon.Length > 1 ? weapon[1] : 0);
             int job = (int)GameData.Int(row, "_iJobID");
             if (!map.TryGetValue(job, out var byWeapon)) map[job] = byWeapon = new();
-            byWeapon[key] = (int)GameData.Int(row, "_iSkillID");
+            if (!byWeapon.TryGetValue(key, out var byMount)) byWeapon[key] = byMount = new();
+            byMount[GameData.Int(row, "_iMountID")] = (int)GameData.Int(row, "_iSkillID");
         }
         return map;
     }
 
-    /// <summary>Lua_CFG_JobAttackConfig._getData: the weapon's row, else the job's any-weapon row.</summary>
-    private int? JobAttack(int career, int weaponKey) =>
+    /// <summary>Lua_CFG_JobAttackConfig._getData: the weapon's rows, else the job's any-weapon rows; of those, the ridden
+    /// battle mount's row, else the on-foot row.</summary>
+    private int? JobAttack(int career, int weaponKey, long mount = 0) =>
         JobAttacks.TryGetValue(career, out var byWeapon)
-            && (byWeapon.TryGetValue(weaponKey, out int id) || byWeapon.TryGetValue(-1, out id)) ? id : null;
+            && (byWeapon.TryGetValue(weaponKey, out var byMount) || byWeapon.TryGetValue(-1, out byMount))
+            && (byMount.TryGetValue(mount, out int id) || byMount.TryGetValue(0, out id)) ? id : null;
 
     private readonly System.Collections.Concurrent.ConcurrentDictionary<int, HashSet<int>> _normalGroups = new();
 
-    /// <summary>Every normal attack group a career can hold (any weapon, and JobConfig's): all count as learned.</summary>
+    /// <summary>Every normal attack group a career can hold (any weapon or battle mount, and JobConfig's): all count as learned.</summary>
     internal HashSet<int> NormalGroups(int career) => _normalGroups.GetOrAdd(career, c =>
-        JobAttacks.GetValueOrDefault(c)?.Values.Append(NormalAttack(c)).Distinct()
+        JobAttacks.GetValueOrDefault(c)?.Values.SelectMany(byMount => byMount.Values).Append(NormalAttack(c)).Distinct()
             .Select(id => data.Row("SkillConfig", id) is { } row ? (int)GameData.Int(row, "_iSkillID") : 0)
             .Where(g => g > 0).ToHashSet()
         ?? (data.Row("SkillConfig", NormalAttack(c)) is { } only ? [(int)GameData.Int(only, "_iSkillID")] : []));
@@ -146,8 +151,9 @@ public sealed class SkillService
         p.Career != 1000 && atkGroup > 0 && (NormalGroups(1000).Contains(group) || NormalGroups(p.Career).Contains(group))
             ? atkGroup : group;
 
-    /// <summary>A weapon change can change the normal attack: resend 5025 (atkSkillId, the learned attack group).</summary>
-    private async Task WeaponChangedAsync(GameSession session)
+    /// <summary>A weapon change or mounting a battle mount can change the normal attack: resend 5025 (atkSkillId, the
+    /// learned attack group).</summary>
+    internal async Task WeaponChangedAsync(GameSession session)
     {
         if (session.SkillPlans is null || session.Progress is null) return;
         await CharacterService.SyncAsync(session, SkillDataSync, Build(session));
