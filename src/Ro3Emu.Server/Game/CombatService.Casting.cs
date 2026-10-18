@@ -350,6 +350,7 @@ public sealed partial class CombatService
                 default: result.Invalid = true; break; // reject an unsupported cost rather than grant a free cast.
             }
         }
+        if (result.Attrs.TryGetValue(2001, out long sp)) result.Attrs[2001] = SpAfterDeduction(stats, sp);
         return result;
     }
 
@@ -435,7 +436,14 @@ public sealed partial class CombatService
     private async Task<bool> AdmitAutomaticCostAsync(GameSession s, JsonElement row, CastSkillReq request, long id)
     {
         var costs = ResolveCosts(s, row);
-        if (costs.Items.Count == 0) return true;
+        if (costs.Items.Count == 0)
+        {
+            // No item receipt to admit, but HP/SP still apply: Sacrifice's basic-attack modes cost 30 HP a swing.
+            if (costs.Attrs.Count == 0 && costs.Buffs.Count == 0) return true;
+            if (ValidateCosts(s, costs).Error != 0) return false;
+            await PayCostsAsync(s, costs);
+            return true;
+        }
         if (ValidateCosts(s, costs).Error != 0 || !buffs.CanSpendEnergy(s, row)) return false;
         var lease = s.Attachment;
         long scene = s.SceneGeneration, worldScene = s.WorldScene;

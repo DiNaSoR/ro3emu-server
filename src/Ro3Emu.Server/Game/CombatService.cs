@@ -282,6 +282,7 @@ public sealed partial class CombatService : IGameTicker
         skills.Learned.Add(character.RefreshStatsAsync);
         character.JobChanged.Add(RefreshSkillParametersAsync); // a job change can change which passives apply
         buffs.Changed.Add(RefreshSkillParametersAsync);
+        character.EquipmentChanged.Add(RefreshSkillParametersAsync); // cards and gear can carry per_sp_dedution
         scene.Loaded.Add(RefreshSkillParametersAsync);
         scene.Leaving.Add(ClearSceneSkillProtocolAsync);
         skills.QueueEligibility = CanQueueSkill;

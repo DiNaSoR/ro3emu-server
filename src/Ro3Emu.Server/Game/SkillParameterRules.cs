@@ -15,15 +15,17 @@ namespace Ro3Emu.Server.Game;
 /// Blade buffs 1130301-1130305 are [1,-1,29,1,1500..3500]: +15..35 damage-ratio points on every skill.
 /// The operation arithmetic (1 add, 2 set, 5 basis-point multiplier) is inferred from the exported buff pairs, not
 /// recovered original-server code. Only the fields <see cref="Field"/> names are applied;
-/// the list-valued types 33-38 (SkillBuff1, SkillBuff2, SkillCost, SkillRange, SkillDamageParamExtra,
-/// SkillStageStates; 163 scope-1 tuples) have no recovered list arithmetic and are skipped, as are 5/9/10/22/28/31/32/39.
+/// type 35 (SkillCost) edits one number of a _kCost tuple. The other list-valued types 33-38 (SkillBuff1, SkillBuff2,
+/// SkillRange, SkillDamageParamExtra, SkillStageStates) have no recovered list arithmetic and are skipped, as are
+/// 5/9/10/22/28/31/32/39.
 /// </summary>
 internal static class SkillParameterRules
 {
     /// <summary>One tuple. Scope 0: <paramref name="Group"/> is the skill group. Scope 1: <paramref name="Group"/> is 0
-    /// and the tags select (null = every skill; <paramref name="AllTags"/> requires every tag, else any).</summary>
+    /// and the tags select (null = every skill; <paramref name="AllTags"/> requires every tag, else any).
+    /// <paramref name="Element"/> is the optional seventh entry: for type 35 the position inside the chosen _kCost tuple.</summary>
     internal readonly record struct Modifier(int Group, int Type, int Operation, long Value, int Index,
-        int Scope = 0, int[]? Tags = null, bool AllTags = false);
+        int Scope = 0, int[]? Tags = null, bool AllTags = false, int Element = -1);
 
     private static readonly ConditionalWeakTable<GameData, Dictionary<int, Modifier[]>> Parsed = new();
     private static readonly ConditionalWeakTable<GameData, Dictionary<int, int[]>> Categories = new();
@@ -64,18 +66,21 @@ internal static class SkillParameterRules
             || GameData.Number(item[0]) is not { } scope || GameData.Number(item[2]) is not { } type
             || GameData.Number(item[3]) is not { } op || GameData.Number(item[4]) is not { } value) return null;
         int index = item.GetArrayLength() > 5 && GameData.Number(item[5]) is { } n ? (int)n : 0;
+        int element = item.GetArrayLength() > 6 && GameData.Number(item[6]) is { } e ? (int)e : -1;
+        // Scope 0 with group -1 is skipped: its only type-35 user, Mana Recharge 14204, also grants per_sp_dedution
+        // 1232 by the same percent, which CombatService.SpCost applies to every SP cost (taking both would double it).
         if (scope == 0)
             return GameData.Number(item[1]) is { } group && group > 0
-                ? new Modifier((int)group, (int)type, (int)op, (long)value, index) : null;
+                ? new Modifier((int)group, (int)type, (int)op, (long)value, index, Element: element) : null;
         if (scope != 1) return null;
         string selector = item[1].ValueKind == JsonValueKind.String ? item[1].GetString()! : item[1].GetRawText();
-        if (selector.Trim() == "-1") return new Modifier(0, (int)type, (int)op, (long)value, index, 1);
+        if (selector.Trim() == "-1") return new Modifier(0, (int)type, (int)op, (long)value, index, 1, Element: element);
         bool all = selector.Contains("and", StringComparison.Ordinal);
         var parts = selector.Split(all ? "and" : "or", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         var tags = new int[parts.Length];
         for (int i = 0; i < parts.Length; i++)
             if (!int.TryParse(parts[i], NumberStyles.Integer, CultureInfo.InvariantCulture, out tags[i])) return null;
-        return tags.Length == 0 ? null : new Modifier(0, (int)type, (int)op, (long)value, index, 1, tags, all);
+        return tags.Length == 0 ? null : new Modifier(0, (int)type, (int)op, (long)value, index, 1, tags, all, element);
     }
 
     /// <summary>The live modifiers of a session, once per pile, in buff order.</summary>
@@ -158,7 +163,7 @@ internal static class SkillParameterRules
     {
         0 => "_iCD", 21 => "_iActionTime", 23 => "_iChantFix", 24 => "_iChantVar",
         25 => "_iDistanceMin", 26 => "_iDistanceMax", 27 => "_iTargetMax",
-        29 => "_kDamageParam1", 30 => "_kDamageParam2",
+        29 => "_kDamageParam1", 30 => "_kDamageParam2", 35 => "_kCost",
         _ => null,
     };
 
@@ -182,7 +187,22 @@ internal static class SkillParameterRules
         foreach (var mod in relevant)
         {
             string field = Field(mod.Type)!;
-            if (mod.Type is 29 or 30)
+            if (mod.Type == 35)
+            {
+                // [scope, selector, 35, op, value, costIndex, position]: costIndex picks a _kCost tuple (-1 every one)
+                // and position the number inside it, e.g. 3 = the flat amount of [1, 2001, ratio, flat] (inferred from
+                // the export: every type-35 tuple names position 3).
+                if (json[field] is not JsonArray costs || mod.Element < 0) continue;
+                int from = mod.Index < 0 ? 0 : mod.Index;
+                int to = mod.Index < 0 ? costs.Count : Math.Min(costs.Count, from + 1);
+                for (int i = from; i < to; i++)
+                {
+                    if (costs[i] is not JsonArray cost || mod.Element >= cost.Count) continue;
+                    if (!long.TryParse(cost[mod.Element]?.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out long old)) continue;
+                    cost[mod.Element] = Math.Max(0, Apply(old, mod));
+                }
+            }
+            else if (mod.Type is 29 or 30)
             {
                 if (json[field] is not JsonArray arr) continue;
                 // Index -1 in exported damage modifiers targets the full vector (inferred).
