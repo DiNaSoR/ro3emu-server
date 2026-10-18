@@ -326,8 +326,11 @@ public sealed partial class CombatService
         if (d < GameData.Int(row, "_iDistanceMin") / 100f - slack || d > Range(row) + 0.5f + slack) return ErrorCodes.SkillDistance;
         float height = GameData.Int(row, "_iHeightRange") / 100f;
         if (height > 0 && MathF.Abs(origin.Y - targetPosition.Y) > height) return ErrorCodes.SkillHeight;
-        if (GameData.Int(row, "_iPassBlock") == 2 && worldData.Map(s.SceneEntry)?.Nav is { } nav
-            && !nav.CanWalk(origin.X, origin.Y, origin.Z, targetPosition.X, targetPosition.Z)
+        // Same test as the client's own pre-cast check (LC_Skill_Function.CheckPosIsCanInputSkill), so a cast the client
+        // lets through is never refused here: neither manual casts nor Auto Battle reposition on 3026, and Auto Battle
+        // (LC_AutoAttack_AttackSubState) never runs the check at all, so a stricter server test loops it forever.
+        if (worldData.Map(s.SceneEntry)?.Nav is { } nav
+            && !nav.CanPass(origin.X, origin.Z, targetPosition.X, targetPosition.Z, (int)GameData.Int(row, "_iPassBlock"))
             && (release != 1 || monster == null
                 || BlockedMonsterEndpointAllowed?.Invoke(s, monster, origin, targetPosition) != true))
             return ErrorCodes.SkillBlocked;
