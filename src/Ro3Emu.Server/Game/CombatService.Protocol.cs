@@ -42,6 +42,7 @@ public sealed partial class CombatService
     public JsonElement? EffectiveSkillRow(GameSession session, int requestedRowId)
     {
         if (session.Progress == null || data.Row("SkillConfig", requestedRowId) is not { } requested) return null;
+        SyncPassiveSkillModifiers(session);
         int group = (int)GameData.Int(requested, "_iSkillID"), level = (int)GameData.Int(requested, "_iLevel");
         int mode = SkillParameterRules.Mode(group, SkillParameterRules.CategoriesOf(data, requested), SkillParameterRules.Active(session, data));
         int requestedMode = (int)GameData.Int(requested, "_iMode");
@@ -61,6 +62,7 @@ public sealed partial class CombatService
     public bool CanQueueSkill(GameSession session, int group)
     {
         if (session.Progress == null || skills.Level(session.Progress, group) is not > 0) return false;
+        SyncPassiveSkillModifiers(session);
         int rowId = skills.RealId(group, skills.Level(session.Progress, group));
         if (data.Row("SkillConfig", rowId) is not { } row) return false;
         long allowed = GameData.Int(row, "_iQueue");
@@ -70,27 +72,20 @@ public sealed partial class CombatService
         return allowed != 0;
     }
 
-    /// <summary>Direct _kAttri on the learned mode-0 passive row; no duplicate stacking of its lower levels.</summary>
+    /// <summary>Direct _kAttri on the learned mode-0 passive row; no duplicate stacking of its lower levels.
+    /// Plus the few passives whose same-id buff attributes apply (CombatService.PassiveSkills).</summary>
     public IEnumerable<(long Id, double Value)> PassiveAttributes(GameSession session)
     {
-        if (session.Progress == null) yield break;
-        _passiveGroups ??= data.Table("SkillConfig").Values
-            .Where(r => GameData.Int(r, "_iBasicType") == 0 && GameData.Int(r, "_iMode") == 0
-                && GameData.Int(r, "_iInitialLevel") > 0)
-            .Select(r => (int)GameData.Int(r, "_iSkillID")).Where(g => g > 0).Distinct().ToArray();
-        foreach (int group in session.Progress.Skills.Keys.Concat(_passiveGroups).Distinct())
-        {
-            int level = skills.Level(session.Progress, group);
-            if (level <= 0 || data.Row("SkillConfig", skills.RealId(group, level)) is not { } row
-                || GameData.Int(row, "_iBasicType") != 0) continue;
+        foreach (var (_, row) in LearnedPassiveRows(session))
             foreach (var pair in GameData.Pairs(row, "_kAttri")) yield return pair;
-        }
+        foreach (var pair in PassiveBuffAttributes(session)) yield return pair;
     }
 
     /// <summary>Reconcile actual buff/energy-derived parameters and wheel replacements after login/skill/buff changes.</summary>
     public async Task RefreshSkillParametersAsync(GameSession session)
     {
         if (session.Role == null || session.Progress == null) return;
+        SyncPassiveSkillModifiers(session);
         var mods = SkillParameterRules.Active(session, data);
         var update = new SkillBeAffectedParamExNotify { IsAll = true, Uuid = session.Role.Id };
         // Scope 0 names its group; a scope-1 tag selector reaches every learned skill whose row carries its tags.

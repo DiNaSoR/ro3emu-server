@@ -275,6 +275,7 @@ public sealed partial class CombatService : IGameTicker
         world.UnitRemoved.Add(unit => { if (unit is MonsterUnit m) _fightingMonsters.Remove(m); return Task.CompletedTask; });
         skills.Learned.Add(RefreshSkillParametersAsync);
         skills.Learned.Add(character.RefreshStatsAsync);
+        character.JobChanged.Add(RefreshSkillParametersAsync); // a job change can change which passives apply
         buffs.Changed.Add(RefreshSkillParametersAsync);
         scene.Loaded.Add(RefreshSkillParametersAsync);
         scene.Leaving.Add(ClearSceneSkillProtocolAsync);

@@ -403,6 +403,12 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
     internal IReadOnlyList<SkillParameterRules.Modifier> ExtraSkillModifiers { get; set; } = [];
     internal long ExtraSkillModifierVersion { get; set; }
 
+    /// <summary>Learned passive skills' modifiers (CombatService.PassiveSkills); the signature is of the learned
+    /// levels they were computed from.</summary>
+    internal IReadOnlyList<SkillParameterRules.Modifier> PassiveSkillModifiers { get; set; } = [];
+    internal long PassiveSkillModifierVersion { get; set; }
+    internal long PassiveSkillSignature { get; set; } = long.MinValue;
+
     public EquipLevels EquipLevels { get; set; } = new();
 
     /// <summary>5007 plan references/names/current index; instances remain exclusively in Items.</summary>
