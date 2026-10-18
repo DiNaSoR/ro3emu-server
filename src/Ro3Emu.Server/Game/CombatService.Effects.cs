@@ -351,8 +351,13 @@ public sealed partial class CombatService
         {
             if (!CanApplyMoreEffects()) break;
             if (field == null && firstBolt)
+            {
                 foreach (var tuple in Buff1(s, row, script, recipient))
                     if (CanApplyMoreEffects() && RollBuff(tuple, out int id, out int duration)) await GrantSkillBuffAsync(s, recipient, id, duration);
+                if (script == "Sacrifice" && recipient != s)
+                    foreach (var tuple in Buff1(s, row, script))
+                        if (CanApplyMoreEffects() && RollBuff(tuple, out int id, out int duration)) await GrantSkillBuffAsync(s, s, id, duration);
+            }
             if (friendly && damage)
             {
                 double multiplier = Numbers(row, "_kDamageParam1").FirstOrDefault(), flat = Numbers(row, "_kDamageParam2").FirstOrDefault();
@@ -370,7 +375,7 @@ public sealed partial class CombatService
             if (CleanseTargets(row) is { Length: > 0 } cleansed)
                 foreach (var buff in recipient.Buffs.Where(b => data.Row("BuffConfig", b.ConfigId) is { } br && Cleanses(cleansed, br)).ToArray())
                     await buffs.RemoveAsync(recipient, buff);
-            if (CleansedCategories(row) is { Length: > 0 } categories)
+            if (CleansedCategories(row, recipient == s) is { Length: > 0 } categories)
                 foreach (var buff in recipient.Buffs.Where(b => data.Row("BuffConfig", b.ConfigId) is { } br && HasCategory(br, categories)).ToArray())
                     await buffs.RemoveAsync(recipient, buff);
         }

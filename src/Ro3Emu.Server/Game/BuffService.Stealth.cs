@@ -63,6 +63,12 @@ public sealed partial class BuffService
         if (hits >= stealth.Hits) await RevealAsync(p, stealth.Buff);
     }
 
+    /// <summary>Sight, Sight Sprout or Ruwach found the hidden player: the stealth ends (CombatService.Guard).</summary>
+    public async Task UncoverAsync(GameSession p)
+    {
+        if (p.Stealthed && LiveStealth(p) is { } stealth) await RevealAsync(p, stealth.Buff);
+    }
+
     /// <summary>Damage dealt from hiding reveals the player when the buff says so.</summary>
     public async Task StealthDealtAsync(GameSession p)
     {

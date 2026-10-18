@@ -80,6 +80,9 @@ public sealed partial class CombatService
         var tuples = Tuples(row, "_kBuff1").ToArray();
         if (script == "Inspiration" && tuples.Length == 2)
             return [tuples[skills.Weapon(s).SubType == TwoHandedSpear ? 1 : 0]];
+        // King's Grace's two auras are the Crusader's own; Devotion's "Self-Link" marks the Crusader, not the ally.
+        if (script == "KingsGrace" && recipient != null && recipient != s) return [];
+        if (script == "Sacrifice" && tuples.Length == 2) return [tuples[recipient == null || recipient == s ? 1 : 0]];
         if (script.StartsWith("AdrenalineRush", StringComparison.Ordinal) && tuples.Length == 2
             && !BlacksmithLine(recipient ?? s))
             return [tuples[0]];

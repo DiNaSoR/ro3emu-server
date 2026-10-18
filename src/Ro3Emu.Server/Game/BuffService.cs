@@ -84,7 +84,7 @@ public sealed partial class BuffService : IGameTicker
             if (durationMs <= 0) durationMs = (int)GameData.Int(row, "_iTime");
             if (durationMs <= 0) durationMs = 60000;
         }
-        if (sourceId != p.Role.Id && Blocks(CategoriesOf(p), row)) return;
+        if (sourceId != p.Role.Id && await ImmuneAsync(p, row)) return;
         if (!lasting && sourceId != p.Role.Id && !ApplyDecay(p.Role.Id, p.SceneEntry, configId, ref durationMs)) return;
         long now = MonsterService.NowMs;
         int group = (int)GameData.Int(row, "_iBuffID");

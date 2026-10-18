@@ -302,6 +302,7 @@ public sealed partial class CombatService : IGameTicker
         WireBuffRules();
         WireBossSkills();
         WireSupportSkills();
+        WireGuardSkills();
     }
 
     private static long Now => MonsterService.NowMs;
@@ -577,7 +578,7 @@ public sealed partial class CombatService : IGameTicker
 
     /// <summary>One protected HP transition for monster and event hits; reserve lethal state before publication.</summary>
     private async Task<(long Damage, long Hp, long Effective, long ShieldDamage)?> CommitPlayerDamageAsync(GameSession target, long damage, JsonElement? row,
-        Func<bool>? valid = null, int sourceElement = 1)
+        Func<bool>? valid = null, int sourceElement = 1, bool shared = false)
     {
         var targetRole = target.Role;
         using var held = await CharacterService.Lock(target);
@@ -590,12 +591,16 @@ public sealed partial class CombatService : IGameTicker
         damage = ApplyPetSupportResistance(damage, target.Buffs.Where(b => b.ExpireMs > Now
                 && b.SourceId is >= (1L << 51) and < (1L << 52))
             .SelectMany(b => b.Changes).Select(c => (c.Attr, c.Value)), row, sourceElement);
+        // Devotion / King's Grace pass their share to the Crusader (CombatService.Guard); a passed share is not passed again.
+        if (!shared) damage = await ShareDamageAsync(target, damage);
         long beforeShield = damage;
         damage = await buffs.AbsorbAsync(target, damage);
         if (!ReferenceEquals(target.Role, targetRole) || target.SceneLoading || valid?.Invoke() == false) return null;
         long before = character.Stats(target)[2000];
         long hp = Math.Max(0, before - damage);
         if (hp == 0 && await buffs.TryPreventLethalAsync(target)) hp = character.Stats(target)[2000];
+        else if (hp > 0 && KingsGraceRecovery(target, damage) is var recovered and > 0)
+            hp = Math.Min(character.Stats(target)[101], hp + recovered);
         if (!ReferenceEquals(target.Role, targetRole) || target.SceneLoading || valid?.Invoke() == false) return null;
         target.CurrentHp = hp;
         if (hp == 0)
@@ -964,6 +969,11 @@ public sealed partial class CombatService : IGameTicker
         foreach (var s in sessions.All())
         {
             if (s.Role == null || s.Progress == null) continue;
+            if (now >= s.GuardTickMs)
+            {
+                s.GuardTickMs = now + 500;
+                loop.TrackRuntimeDetached("guard tick", () => GuardTickAsync(s));
+            }
             if (s.SkillObjects.Count > 0)
         foreach (var unit in s.SkillObjects.ToArray()) loop.TrackRuntimeDetached("skill object tick", () => TickSkillObjectAsync(unit));
             if (s.Attack is { } a && !s.Dead && now >= a.NextSwingMs)

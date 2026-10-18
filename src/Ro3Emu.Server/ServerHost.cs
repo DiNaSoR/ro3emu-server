@@ -216,6 +216,7 @@ public static class ServerHost
         app.Services.GetRequiredService<CareerSpecialService>().Changed.Add(app.Services.GetRequiredService<CombatService>().SyncCompanionsAsync);
         // A cast dismounts a system-mount rider before the client starts it (MountService.DismountForCastAsync).
         app.Services.GetRequiredService<CombatService>().BeforeCast.Add(app.Services.GetRequiredService<MountService>().DismountForCastAsync);
+        app.Services.GetRequiredService<CombatService>().TeamMembers = app.Services.GetRequiredService<TeamService>().MembersOf;
         app.Use(async (context, next) =>
         {
             if (HttpMethods.IsPost(context.Request.Method) && app.Services.GetRequiredService<GameLoop>().Phase != GameLoopPhase.Accepting)

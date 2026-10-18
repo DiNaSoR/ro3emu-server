@@ -106,8 +106,10 @@ public sealed partial class CombatService
 
     /// <summary>Hymn of the Lamb (Praefatio) "removing [Status Effect] and [Movement Restriction] effects": its
     /// _kLogicData [37, 33] are those BuffConfig categories (Stun, Frozen, Silence ... carry 37; Frozen and Sluggish 33).</summary>
-    private static int[] CleansedCategories(JsonElement row) =>
-        Script(row).StartsWith("Praefatio", StringComparison.Ordinal) ? Numbers(row, "_kLogicData").Select(v => (int)v).ToArray() : [];
+    /// King's Grace removes "all Control effects from you" (category 25, the caster only).
+    private static int[] CleansedCategories(JsonElement row, bool self) =>
+        Script(row).StartsWith("Praefatio", StringComparison.Ordinal) ? Numbers(row, "_kLogicData").Select(v => (int)v).ToArray()
+        : Script(row) == "KingsGrace" && self ? [ControlCategory] : [];
 
     /// <summary>A debuff (_iType 2) with any of these _kBuffCategory entries.</summary>
     private static bool HasCategory(JsonElement buff, int[] categories) =>

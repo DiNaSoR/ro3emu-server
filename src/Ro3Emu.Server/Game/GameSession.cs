@@ -177,6 +177,11 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
     internal long WoodSpiritReadyMs { get; set; }
     /// <summary>Emergency Treatment can trigger again from then.</summary>
     internal long EmergencyTreatmentReadyMs { get; set; }
+    /// <summary>Chances left on a charged immunity buff (Hymn of the Lamb), by buff guid (BuffService.Immunity).</summary>
+    internal Dictionary<long, int> ImmunityCharges { get; } = new();
+    /// <summary>Next support check (Union stacks, Sight reveals: CombatService.Guard) and the Union piles last given.</summary>
+    internal long GuardTickMs { get; set; }
+    internal int UnionPiles { get; set; }
     public int ImmuneRecoveryPercent { get; set; }
     public Dictionary<int, long> SkillCds { get; } = new();
     public Dictionary<int, long> ItemCds { get; } = new();
