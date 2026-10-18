@@ -141,6 +141,10 @@ public sealed partial class DungeonService
         public bool StepDone { get; set; }
         /// <summary>The scripted scene actors shown now (also tracked by the room for cleanup).</summary>
         internal List<SceneActorUnit> SceneActors { get; } = new();
+        /// <summary>Participants a scripted step put on a slide (DungeonService.Ride).</summary>
+        internal HashSet<GameSession> Sliding { get; } = new();
+        /// <summary>Participants riding a scene actor (DungeonService.Ride).</summary>
+        internal Dictionary<GameSession, Ride> Riders { get; } = new();
         internal GuildChallengeService.Run? GuildChallenge { get; set; }
         /// <summary>Dracula's Lair: DraculaWeddingService owns admission, the bride, the key and the settlement.</summary>
         internal DraculaWeddingService.Run? Dracula { get; set; }
@@ -429,7 +433,7 @@ public sealed partial class DungeonService
         if (a.Wave >= a.Plan.Waves.Count || CurrentQuest(a) <= 0) return null;
         int size = a.Plan.Waves[a.Wave].Spawns.Count;
         var v = new DungeonVar { VarId = 10003 };
-        if (Step(a) is { } step)
+        if (Step(a) is { Fight: false } step)
         {
             v.Vi64.Add([step.Goal.Done, step.Goal.Total]); // a scripted step: its configured counter (inferred)
             return v;
@@ -509,9 +513,16 @@ public sealed partial class DungeonService
         if (Step(a) is { } step)
         {
             await BeginStepAsync(a, step);
-            a.Spawning = false;
-            await AdvanceAsync(a); // waits for the step's client event
-            return;
+            if (!step.Fight)
+            {
+                a.Spawning = false;
+                await AdvanceAsync(a); // waits for the step's client event
+                // A participant already standing in the step's region (or near its point) completes it without moving.
+                foreach (var member in Present(a).Where(m => a.Loaded.Contains(m) && !m.SceneLoading).ToArray())
+                    await PlayerMovedAsync(member);
+                return;
+            }
+            // A fight step spawns its monsters below and completes when they are all killed.
         }
         foreach (var spawn in a.Plan.Waves[a.Wave].Spawns)
         {
@@ -563,6 +574,7 @@ public sealed partial class DungeonService
         if (a.Settled || a.Spawning || a.Precounted.Count != 0 || a.Killed.Count != a.Spawned || a.Advancing) return;
         if (Step(a) != null && !a.StepDone) return;
         a.Advancing = true;
+        if (Step(a) is { DoneLines.Count: > 0 } ended) await SayStepLinesAsync(a, ended.DoneLines);
         if (loop.Now - a.StartedAt >= TimeSpan.FromMilliseconds(a.Plan.DurationMs)) await SettleAsync(a, false);
         else if (a.Wave + 1 == a.Plan.Waves.Count) await SettleAsync(a, true);
         else { a.Wave++; await SpawnWaveAsync(a); }
@@ -739,6 +751,7 @@ public sealed partial class DungeonService
         if (s.DungeonAttempt is not { } a) return;
         s.DungeonAttempt = null; s.Attack = null;
         if (a.Dracula is { } dracula) await dracula.Owner.LeftAsync(a, s);
+        await EndMovementAsync(a, s);
         await ClearBondsAsync(s, a);
         await instances.AbandonAsync(s);
         var remaining = Present(a);
@@ -756,6 +769,7 @@ public sealed partial class DungeonService
     private async Task SettleAsync(Attempt a, bool won)
     {
         if (a.Settled || a.Room.Closed) return;
+        await EndStepMovementAsync(a);
         await EndEncounterAsync(a, won);
         if (a.GuildChallenge is { } challenge)
         {
@@ -880,6 +894,6 @@ public sealed partial class DungeonService
         }
         // A disconnected member's channel must never prevent another participant's committed award.
         foreach (var notify in notifications) await notify();
-        if (won) await ScheduleAutoLeaveAsync(a);
+        if (won && !TryContinue(a)) await ScheduleAutoLeaveAsync(a);
     }
 }

@@ -83,10 +83,10 @@ Reconstructed story encounters (`ReconstructedDungeons`, switch `Ro3Emu:Reconstr
 - [dungeon-inventory.md](dungeon-inventory.md) (generated from the client data) lists every eligible scene with its
   spawn points, labels, quest stages and base map: 28 story scenes, 7 tutorial, 4 minigames, 29 Territory War zones
   and 4 developer test maps. The story scenes' combat templates (2000xxxx) exist only on the original server.
-- `src/Ro3Emu.Server/Reconstructed/dungeon-monsters.json` (embedded) rebuilds 15 of them as waves of client-known
+- `src/Ro3Emu.Server/Reconstructed/dungeon-monsters.json` (embedded) rebuilds 14 of them as waves of client-known
   NPCConfig monsters at authored points, one wave per quest stage, each spawn with its reason (point label, quest
-  text, base map) and each dungeon with a confidence: 8 high, 5 medium, 2 low. Bosses use the client's story
-  templates (530xxxx: Golden Thief Bug, Baphomet, Pharaoh, Maya, the airship's Evil Warriors/Archers/Boss,
+  text, base map) and each dungeon with a confidence: 8 high, 4 medium, 2 low. Bosses use the client's story
+  templates (530xxxx: Golden Thief Bug, Baphomet, Pharaoh, the airship's Evil Warriors/Archers/Boss,
   Elusive Pecopeco); minions use the base map's field monsters. No elite stat scaling, phase or mechanic is invented.
 - Story templates have no normal attack in the client (their server scripts chose skills); `monsterAttacks` names
   the monster whose normal attack each borrows (its field MVP, or a human warrior/archer for the airship crews).
@@ -94,7 +94,8 @@ Reconstructed story encounters (`ReconstructedDungeons`, switch `Ro3Emu:Reconstr
 - Not reconstructed as monster waves (listed in the file): pure scripted scenes without a fight (ant nest
   exploration, Deniro ride, Louie's game, Moonlight Flower's hide-and-seek), the MVP party event, the Ring Test map and
   scenes without points. The first three are rebuilt as scripted scenes (below).
-  Airship cannons, allied NPC companions, the Professor rescue and the Goblin Forest transfer are not reproduced.
+  Airship cannons, allied NPC companions and the Goblin Forest transfer are not reproduced. Maya's nest (1000401) moved
+  to the scripted scenes below, with its Maya fight as a fight step.
 - The task widget: each reconstructed wave names the DungeonQuestConfig quest it plays. 30401 carries var 10001
   `PDungeonQuestIdList` (the scene's quests up to the current one; the widget shows the last one's title and goals)
   and var 10003 `PDungeonQuestGoalParamList` (the wave's kills and size, the goal's "(done/total)"). Seen live: the
@@ -153,12 +154,47 @@ Story encounters (`Reconstructed/story-encounters.json`, same switch; `DungeonSe
 - `DungeonTests.Encounter` checks every named row, the hit shapes, and the Eddga run: companions, lines, both stages
   and a companion kill settling the win.
 
-Reconstructed scripted scenes without a fight (`Reconstructed/scripted-scenes.json`, same switch):
+Reconstructed scripted scenes (`Reconstructed/scripted-scenes.json`, same switch):
 
 - The last three main-story blockers of the story walk: the ant nest vortex and egg passage (1000201, task 10104290),
   Bobo and the Deniro (1000301, task 10104300) and Louie's game in the Culvert (3120402, task 10106270). The original
   scene script is not in the client; each scene is rebuilt as steps, one per stage, every decision with its evidence
   and the scene's guessed parts listed in the file (confidence: medium for all three).
+- Maya's nest (1000401, task 10104310), the last Ant Hell scene: it used to be only the Maya wave, so the run cleared
+  after stage 1 and skipped the Professor. Now: a fight step (Maya 5300006 at point 21, the tracker counting the kill),
+  then the search through the three dialogue regions 30, 29, 28 (a later region also counts, so missing one never
+  strands a player), freeing the Professor from the ant egg 5300056 at point 32 (interaction 5300021, message 5300022),
+  helping him up at point 26 (5300026, interaction 5300022, message 5300023) and opening the Precious Treasure Chest
+  5300052 at point 34 (interaction 5300023, message 5300024). All three interactions are gated by buff group 53014
+  (conditions 7100022-7100024), so only the current step's actor offers one. Bobo's and the Professor's lines
+  (ChatConfig 5300501-5300511, 5300601-5300603) are said at the steps; which step says which line is chosen. The chest
+  gives no item of its own (none is named in the client data); the clear is the usual settlement.
+- A fight step (`spawns`: NPCConfig templates at server spawn points) spawns its monsters and completes when all are
+  killed; it has no completing client event. A step's `lines` are said at its start (after `ms`), its `doneLines`
+  as it completes, through the same 30404 calls as the story encounters (a type-2 bubble needs its speaker, one of the
+  step's actors or monsters). A participant already standing in a new step's region completes it without moving.
+- The vortex passage is a slide and the Deniro a vehicle (`DungeonService.Ride`). A step with `slide` puts its players
+  on the client's own slide (LC_Movement_Controller_Slide, created by the local player's movement on its first slide
+  custom data): 31018 CustomDataChange on the role with Player_SlideSpeed 5400003 (ListLong [side, down] in cm/s)
+  then Player_SlideState 5400001 (Int 1); the client slides downhill, A/D steer (ChatConfig 5300306 says so), walks are
+  reported every 0.1 s, and state 0 at the step's end stops it. Not stored as the role's custom data. 1000201's passage
+  uses the controller's defaults (10 m/s down, 8 to the side) and ends in region 22.
+- In 1000301 'Try to Ride the Deniro' (5300008, no status, buff 5365101) is step 2 and 'Ride the Deniro' (5300005,
+  GameplayStatusConfig 3 vehicle driver, buff 5365401) the last step; they were swapped before. A ride interaction on a
+  vehicle scene actor (NPCConfig _iNPCSubType 103, VehicleConfig seat) seats the player as WorldInteractionService
+  does in the world: 32702 InteractChangeNtf (EType 3, status, interaction, actor uid) and 32704 Change3CNtf (seat
+  _iChange3C 9). Only while the actor carries the buff its condition asks for. The seat's button 26 (32703) or exit
+  interaction 4900025 gets the player off; the step's end (region 31), settlement and leaving do too. 31074 turns the
+  rider.
+- `fallback` completes a step by itself after its time (from its start, or `from: mount`), optionally moving the
+  players to a point: the slide after 120 s, the ride 120 s after getting on, at region 31's point.
+- A won scene with `next` goes straight on to that scene after 3 s *(inferred delay)* instead of the countdown out:
+  1000201 continues into 1000301 (DungeonConfig 1000301 _iSameDupLoadingType 2). When the next scene refuses entry,
+  the players are sent out as usual.
+- The rest of Ant Hell: 1054001 (sc_anthell02_001_pl01, "Ant Hell (story)") is not entered by any task, item or NPC in
+  the client data and has no spawn points or stages, and the Ant Hell field quests (10104120-10104280 on map 10540) are
+  ordinary field steps the server already plays. The two Anthell dungeons 3120501/3302101 (sc_pm_pve5anthell) are team
+  and other gameplay types, not story.
 - A step names the DungeonQuestConfig quest the tracker shows (var 10001) and its goal counter (var 10003), the scene
   actors the server shows (client NPCConfig ids at scene-editor points, entity type 1 or 2 from `_iNPCType`, with the
   buffs that open their interactions), an optional story, the client events that complete it and an optional teleport
@@ -183,11 +219,11 @@ Reconstructed scripted scenes without a fight (`Reconstructed/scripted-scenes.js
   route of the message that completed it does not reserve the settlement's role locks. Scene actors are room props
   (`InstanceService.AddPropAsync`), removed at settlement and before the room's final cleanup.
 - Guessed (see each scene's "guessed" list): the corridor region that ends 1000201's first stage, Bobo's place there,
-  the jump and the ride as teleports, no exploding ant eggs, no seamless 1000201 to 1000301 transfer, which bell hides
+  the jump as a teleport, the slide's speeds, no exploding ant eggs, which bell hides
   Katie (from both stories), a wrong guess changing nothing, the instrument retrieved within 4 m of mark point 37.
 - `DungeonTests.Scripted` resolves each scene against the client data, plays each one through its client events (wrong
   and premature events included) to a clear, and checks that the story step is delivered and the next one offered.
-  The story walk plays the three scenes with the same events and has no known-open blocker left.
+  The story walk plays these scenes with the same events (a fight step by its kills) and has no known-open blocker left.
 - Offering an interaction is the client's own (LC_InteractManager, every 0.2 s from the player's position, so a teleport
   is enough): the unit registers when NPCConfig _iInteractID[1] is set, is in range within its _iInteractDistance (3D;
   Louie's bell rings 2 m, Bobo 2 m, the Deniro 4 m, the fluorescent substance and the vortex 5 m), and of the units in
