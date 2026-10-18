@@ -288,6 +288,7 @@ public sealed partial class CombatService : IGameTicker
         skills.QueueEligibility = CanQueueSkill;
         character.ProgressHandlers.Add(buffs.ReconcileEnergyAsync);
         ExtraHitDamage.Add(DoubleAttackDamage);
+        DamageAdjusters.Add(PreyOnTheWeak);
         monsters.AttackPet = MonsterAttackPetAsync;
         monsters.AttackMonster = MonsterAttackMonsterAsync;
         buffs.UnitChanged.Add(PublishTowerPetStatsAsync);
@@ -673,11 +674,11 @@ public sealed partial class CombatService : IGameTicker
             (long)hit, (long)cri, (long)flee, (long)resCri);
     }
 
-    private (long Damage, DamageHitResult Result) Damage(Fighter a, Fighter b, JsonElement skill, int branch = 0)
+    private (long Damage, DamageHitResult Result) Damage(Fighter a, Fighter b, JsonElement skill, int branch = 0, int element = 0)
     {
         // A skill that never misses (_iSkillHit 10000) draws no hit roll, as before.
         if (GameData.Int(skill, "_iSkillHit") < 10000 && Rolls.Hit() >= HitRate(a, b, skill)) return (0, DamageHitResult.Miss);
-        double dmg = BaseDamage(a, b, skill, branch, out bool magic);
+        double dmg = BaseDamage(a, b, skill, branch, out bool magic, element);
         dmg *= 0.97 + DamageFloatRoll() * 0.06; // DamageFloat [9700, 10300]
         var result = DamageHitResult.Normal;
         if (!magic && Rolls.Crit() < CritRate(a, b, skill))
@@ -696,14 +697,14 @@ public sealed partial class CombatService : IGameTicker
         Math.Max(0, a.Cri - b.ResCri) / 10000.0 * GameData.Int(skill, "_iSkillCri") / 10000.0;
 
     /// <summary>The roll-free part of a hit: skill ratio and flat, defense and element.</summary>
-    private double BaseDamage(Fighter a, Fighter b, JsonElement skill, int branch, out bool magic)
+    private double BaseDamage(Fighter a, Fighter b, JsonElement skill, int branch, out bool magic, int elementOverride = 0)
     {
         magic = GameData.Int(skill, "_iDmgType") == 2;
         var ratios = Numbers(skill, "_kDamageParam1");
         var flats = Numbers(skill, "_kDamageParam2");
         double p1 = ratios.Length > branch ? ratios[branch] : 10000, p2 = flats.Length > branch ? flats[branch] : 0;
-        double dmg = (magic ? a.Matk : a.Atk) * p1 / 10000 + p2;
-        int element = (int)GameData.Int(skill, "_iEleType") is var se and > 1 ? se
+        double dmg = (AttackPower(a, skill, magic) * p1 / 10000 + p2) * FormulaFactor(a, skill, branch, heal: false);
+        int element = elementOverride > 0 ? elementOverride : (int)GameData.Int(skill, "_iEleType") is var se and > 1 ? se
             : a.NormalAttackElement > 0 && GameData.Int(skill, "_iIsNormalAtk") == 1 ? a.NormalAttackElement : a.Element;
         return Mitigated(b, dmg, magic, element) * BonusFactor(a, b, skill, magic, element);
     }

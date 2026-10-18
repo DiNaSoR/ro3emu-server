@@ -128,15 +128,16 @@ public sealed class WeaponPassiveTests : IAsyncLifetime
         await using var bot = await InWorld("Lancer");
         var data = Service<Ro3Emu.Server.Data.GameData>();
         var divine = data.Row("SkillConfig", 1161605)!.Value;
+        var cross = data.Row("SkillConfig", 1141105)!.Value;
         var (crossOneHand, crossTwoHand, buffOneHand, buffTwoHand) = await Run(() =>
         {
             var s = Session("Lancer");
             var combat = Service<CombatService>();
             Hold(s, 1, Halberd);
-            int a = combat.DamageBranch(s, "HolyCross");
+            int a = combat.DamageBranch(s, cross, null);
             int c = combat.Buff1(s, divine, "Inspiration").Single()[0].GetInt32();
             Hold(s, 1, KnightSpear);
-            int b = combat.DamageBranch(s, "HolyCross");
+            int b = combat.DamageBranch(s, cross, null);
             int d = combat.Buff1(s, divine, "Inspiration").Single()[0].GetInt32();
             return (a, b, c, d);
         });
