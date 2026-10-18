@@ -38,17 +38,18 @@ server first; changes to the original rules come after.
 4. Log in with any account name and password: the account is created on first login. Keep the RO3Emu window open
    while you play; press **Q** there (or close it) to stop the server.
 
-**Don't have the game?** RO3Emu.exe downloads it from the official Genesis update servers (about 24 GB) and checks every
+**Don't have the game?** RO3Emu.exe downloads it from the Genesis update servers (about 24 GB) and checks every
 file against the publisher's signature: it offers this when it finds no game folder, or run `RO3Emu.exe install`.
-RO3Emu never hosts game files. Tested with the Genesis client releases of 7 and 16 October 2026.
+RO3Emu never hosts game files. Tested with the Genesis client releases of 7 and 16 October 2026. Genesis is a private
+server, not the official one: the official Ragnarok Online 3 server has not launched yet.
 
 | Command | What it does |
 |---|---|
 | `RO3Emu.exe` | play on your own server (same as `RO3Emu.exe start`) |
 | `RO3Emu.exe join <address>` | play on someone else's server (`host`, `host:port` or `http://host:port`) |
 | `RO3Emu.exe host` | your server, open to friends (`--gm <account>` for GM commands) |
-| `RO3Emu.exe install [folder]` / `update [folder]` | the game from the official servers, every file checked |
-| `RO3Emu.exe restore` | undo the patch: the game talks to the official servers again |
+| `RO3Emu.exe install [folder]` / `update [folder]` | the game from the Genesis update servers, every file checked |
+| `RO3Emu.exe restore` | undo the patch: the game talks to the Genesis servers again |
 | `RO3Emu.exe check` | does this game version fit this RO3Emu? (changes nothing) |
 | `RO3Emu.exe diag` | makes `RO3Emu-diagnostics.zip` for a bug report |
 | `RO3Emu.exe delete-character [address]` | delete one of your characters (the game has no delete button); log out first |
@@ -78,9 +79,15 @@ forward TCP ports `5380`, `20000` and `33100` on your router to the host and sha
 Open TCP `5380`, `20000` and `33100`.
 
 **Good to know**
-- **GM commands** (`!help` in chat) are on for every account when you play on your own PC. A hosted server gives them
-  only to the accounts you name with `--gm` ([GM access](docs/guide/gm-access.md)).
+- **GM commands** (`!help` in chat, and most buttons of the client's GM panel) are on for every account when you play
+  on your own PC. A hosted server gives them only to the accounts you name with `--gm` ([GM access](docs/guide/gm-access.md)).
 - **Bug reports from players:** the Feedback button in the game menu or `/bug <text>` in chat ([feedback](docs/guide/feedback.md)).
+- **Rates:** `Ro3Emu:Rates` multiplies the EXP, item and Zeny that monsters give ([rates](docs/guide/rates.md)).
+- **Free Top Up:** the in-game Top Up and currency exchange work without any payment (`Ro3Emu:TopUp:Free`, on in
+  RO3Emu.exe and `server.sh`; [cash shop](docs/systems/cash-shop.md)).
+- **Solo play:** a built-in Trade Exchange seller and buy-back fill the market when few people play; on for local play,
+  off on a hosted server unless you turn them on ([exchange](docs/guide/exchange.md)).
+- **Custom content:** your own quests, NPCs, dialogue and text from `content/*.json` ([custom content](docs/guide/custom-content.md)).
 - **Backups:** the database is backed up to `data/backups/` at start and every 6 hours (newest 20 kept).
 - **One session per account:** a second login takes over from the first. The client runs one instance per PC;
   `Ro3Emu.BotCli` can stand in for extra players when you test alone.
@@ -109,6 +116,7 @@ show is playable from day one, without season or server-day gates ([details](doc
 
 **Character and combat**
 - skills, buffs and debuffs, damage and healing over time, auras
+- passive skill changes, procs and follow-up hits, weapon and mount conditions, skill cost modifiers
 - crowd-control diminishing returns, energy meters, talents, job resonance
 - level cap 99 with catch-up EXP, character power score
 - PvP and event fights
@@ -124,8 +132,9 @@ show is playable from day one, without season or server-day gates ([details](doc
 
 **Economy and social**
 - trade center, stalls, auctions (guild, world, event), mail
-- NPC, point and guild shops, battle pass
+- NPC, point and guild shops, battle pass, cash shop and Top Up
 - friends and gifts, parties and raids, chat channels and horns
+- party voice chat through the server (off by default, see below)
 - adventure groups
 
 **Guilds**
@@ -135,25 +144,33 @@ show is playable from day one, without season or server-day gates ([details](doc
 - Territory Wars and the castle siege
 
 **Instances and activities**
-- story dungeons and scripted story scenes (reconstructed)
+- story dungeons and scripted story scenes (reconstructed), including the Eddga, Maya's nest and Ant Hell encounters
+- treasure maps: digs, treasure bosses with announcements, Co-op Chests
 - Spirit Tower, Phantom Realm, Valhalla Trials, Realm of the Gods
+  (blessings, Final Trial honors, hall of fame), Hidden Realm
+- bosses cast their special skills, with phases and summons
 - Monster Hunt, Rift Crisis, Survivor Battle, Wedding Crashers,
-  Hunting Challenge, timed events, daily activities, leaderboards
+  Dragon Coffin Island, Mock Battle (40 vs 40), Hunting Challenge,
+  timed events, daily activities, leaderboards
 
 </td></tr>
 </table>
 
 **Not yet**
-- **Bosses' special skills.** Bosses fight with their own normal attacks; field MVP summons and fields work.
-- **Group content extras:** Realm of the Gods blessings and honors, Hidden Realm, the Dragon Island monster layer,
-  Leisure Forty (40 vs 40).
+- **Boss script mechanics:** the special skills are in, but mechanics that lived only in the original server's scripts
+  (bubbles, bells, rhythm stages) are plain area attacks, and knockback does not move players yet.
+- **Mock Battle extras:** the arena's monsters and the 40-player team frame.
 - **War of Emperium extras:** commander tools, siege weapons and vehicles.
 - **Survivor Battle extras:** follow, spectate, shop, Kafra adventure.
 - **Guild extras:** merging, impeachment, group mail.
 - **Smaller missing pieces:** shop gifting, titles, Paragon (Astral Level), and some stages of the story dungeons
   that are still simplified.
-- **Tavern and guild voice:** the rooms are coming without audio. The client's voice service belongs to the publisher,
-  so real voice chat is out of reach.
+- **Tavern and guild voice:** only party voice is implemented.
+
+**Voice.** Party voice goes through a relay in the server instead of the publisher's Tencent GME, and the patched
+client records and plays it through Windows' own winmm. It is off by default: `Voice:Port` turns it on. The voice
+stream is not encrypted yet (only its one-time ticket travels through the encrypted game gate), so the relay listens
+on loopback only unless `Voice:AllowPlaintextOffLoopback` is set.
 
 ## For developers
 
@@ -185,8 +202,8 @@ chunks into standard Lua 5.4 bytecode for any decompiler.
 | `src/Ro3Emu.Server` | the server: HTTP, micro gate, game gate, game loop, services, SQLite stores |
 | `src/Ro3Emu.Setup` | RO3Emu.exe: finds or installs the game, exports data, runs the server, patches the client |
 | `src/Ro3Emu.DataExport` | game data export from the client (Lua VM, file system, nav meshes, English text map) |
-| `src/Ro3Emu.ClientTools` | client patcher (patch, restore, play; the chat redirect and the voice stub) and patch-repository releases |
-| `src/Ro3Emu.ClientHooks` · `src/Ro3Emu.Loc` | code injected into the client: Lua patches and the English text layer |
+| `src/Ro3Emu.ClientTools` | client patcher (patch, restore, play; the chat and voice redirects) and patch-repository releases |
+| `src/Ro3Emu.ClientHooks` · `src/Ro3Emu.Loc` | code injected into the client: Lua patches, party voice and the English text layer |
 | `src/Ro3Emu.Bot` · `src/Ro3Emu.BotCli` | a scripted client speaking the real protocol (tests, load, extra players) |
 | `src/Ro3Emu.LoadTest` | load runner: scenarios S1-S5 with protocol bots |
 | `src/Ro3Emu.Launcher` · `src/Ro3Emu.Patcher` | a player launcher and its content-addressed update engine |
@@ -256,7 +273,8 @@ what to include in a report or a change. Thanks to everyone who has sent fixes s
 
 ## Documentation
 
-- [`docs/guide/`](docs/guide): running a server (GM access, open content, feedback, launcher)
+- [`docs/guide/`](docs/guide): running a server (GM access, open content, rates, starter kit, Trade Exchange, custom
+  content, feedback, launcher)
 - [`docs/systems/`](docs/systems): how each system works and which rules are inferred
 - [`docs/research/`](docs/research): the client evidence behind the protocol and rules
 
