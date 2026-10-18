@@ -257,7 +257,7 @@ public sealed class WorldCoreTests : IAsyncLifetime
         });
         await alice.SendGameAsync(CombatService.UseSkill,new CastSkillReq{SkillId=1411201,TargetId=b.Role!.Id});
         Assert.Equal(0,(await Next(alice,CombatService.UseSkill,CastSkillRsp.Parser)).Result);
-        await alice.SendGameAsync(CombatService.SkillInterrupt,new SkillInterruptReq());
+        await alice.SendGameAsync(CombatService.SkillInterrupt,new SkillInterruptReq{InterruptSkillId=1411201});
         Assert.True((await Next(alice,CombatService.SkillInterrupt,SkillInterruptResp.Parser)).IsInterruptSucc);
         var afterChant=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         await Service<GameLoop>().InvokeAsync(()=>
