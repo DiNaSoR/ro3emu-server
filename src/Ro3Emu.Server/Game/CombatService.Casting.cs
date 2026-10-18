@@ -545,11 +545,32 @@ public sealed partial class CombatService
         };
         if (chantCosts is { } owed) action.ChantCost = () => PayChantCostAsync(s, action, owed);
         s.SkillCast = action;
+        var template = data.SkillTemplate(GameData.Int(row, "_iScriptShow"));
+        var points = template is { } t ? Numbers(t, "m_kAtkPoints") : [];
+        double point = points.FirstOrDefault(0.2);
+        int at = Script(row) == "Resurrection" ? action.ChantMs : ImpactOffset(template, point, action.ChantMs, action.ActionMs);
         // A Lock skill (_bMovement 0) roots the caster until its hit. The client asks to cast while still walking
         // (LC_Skill_ActionPreCheck.CheckSkillSendServer sends its position, then USE_SKILL_REQ, without stopping) and
         // keeps walking unless the server forbids it: its joystick and path controllers stop only on StatusForbidden
         // Walk (LC_Unit_Player.IsSkillBlockMove). Without it the next step cancelled the cast as a move.
-        if (actor == null && GameData.Int(row, "_bMovement") == 0) await LockCastMovementAsync(s, id);
+        // A hit inside the first loop tick (Grimtooth: m_kAtkPoints [0]) has nothing to hold still for, and the lock
+        // flipping on and off around its dash (PerformEffect_Agent.SetBlockInputState shares the same StopRayCastMove /
+        // LJ_BlockMove flags) left the client unable to walk until its next such skill (in game 10.18, inferred cause).
+        bool locked = actor == null && GameData.Int(row, "_bMovement") == 0 && at > GameLoop.TickInterval.TotalMilliseconds;
+        if (locked) await LockCastMovementAsync(s, id);
+        try { await AnnounceAndScheduleCastAsync(s, row, req, action, actor, face, origin, at); }
+        catch
+        {
+            // Nothing is scheduled to lift the lock if the announcement failed.
+            if (locked) await ReleaseCastMovementAsync(s, id);
+            throw;
+        }
+    }
+
+    private async Task AnnounceAndScheduleCastAsync(GameSession s, JsonElement row, CastSkillReq req, ActiveSkillCast action,
+        SkillObject? actor, float face, Vec3 origin, int at)
+    {
+        long id = action.Id;
         s.WorldState.ResurrectionCastId = Script(row) == "Resurrection" ? id : 0;
         s.Face = face;
         req.Face = face;
@@ -558,10 +579,6 @@ public sealed partial class CombatService
             SrcID = action.SourceId, SkillID = req.SkillId, TargetId = req.TargetId, TargetPos = req.TargetPos ?? origin,
             Face = face, SessionId = id, ChantMs = action.ChantMs, SkillMs = action.ActionMs, StartTime = action.StartMs, PlayAct = true,
         }, highLevel: GameData.Int(row, "_iSkillEffectLevel") > 0, extra: actor != null || req.IsExtraSkill);
-        var template = data.SkillTemplate(GameData.Int(row, "_iScriptShow"));
-        var points = template is { } t ? Numbers(t, "m_kAtkPoints") : [];
-        double point = points.FirstOrDefault(0.2);
-        int at = Script(row) == "Resurrection" ? action.ChantMs : ImpactOffset(template, point, action.ChantMs, action.ActionMs);
         if (action.ChantCost != null)
             ScheduleRuntime(action.WorldScene, TimeSpan.FromMilliseconds(Math.Min(at, action.ChantMs)), async () =>
             {
