@@ -21,6 +21,8 @@ public sealed class SkillObject : WorldUnit
     public bool Busy { get; set; }
     public bool Removing { get; set; }
     public int Charges { get; set; }
+    /// <summary>Strikes left for a field with a set number of waves (Meteor Storm); 0 = strike until it expires, -1 = done.</summary>
+    public int WavesLeft { get; set; }
     public int ProtectionDistanceType { get; init; }
     public HashSet<int> Skills { get; } = new();
 
@@ -593,13 +595,17 @@ public sealed partial class CombatService
         var row = action.Row;
         string script = Script(row);
         var logic = Numbers(row, "_kLogicData");
-        int npc = 0, duration = 0, interval = 1000, protection = 0, charges = 0;
+        int npc = 0, duration = 0, interval = 1000, protection = 0, charges = 0, waves = 0;
         bool trap = false;
         float radius = (float)(Numbers(row, "_kRange").FirstOrDefault(150) / 100);
         switch (script)
         {
             case "Fire_Wall" or "Quagmire" or "Fire_Pillar" or "Meteor_Storm" or "Lord_of_Vermilion" or "Storm_Gust" when logic.Length >= 3:
-                npc = (int)logic[0]; interval = (int)logic[1]; duration = (int)logic[2]; break;
+                npc = (int)logic[0]; interval = (int)logic[1]; duration = (int)logic[2];
+                // Meteor Storm [npc, ms between meteors, ms, ?, ?, meteors]: "strikes in ${6} waves" (Lv1 2, Lv10 7), its
+                // NPC named for that count; 1.6 s / 300 ms would otherwise strike 6 times at Lv1.
+                if (script == "Meteor_Storm" && logic.Length >= 6) waves = Math.Max(1, (int)logic[5]);
+                break;
             case "Safety_Wall" or "Pneuma" when logic.Length >= 8:
                 npc = (int)logic[5]; duration = (int)logic[2]; radius = (float)(logic[7] / 100);
                 protection = script == "Safety_Wall" ? 1 : 2;
@@ -633,7 +639,7 @@ public sealed partial class CombatService
             NpcId = npc, EntityType = (int)GameData.Int(npcRow, "_iNPCType"), Cast = action,
             X = point.X, Y = point.Y, Z = point.Z, Face = action.Request.Face, ExpiresMs = Now + Math.Max(1, duration),
             IntervalMs = Math.Max(50, interval), NextTickMs = Now, Radius = radius, Trap = trap,
-            ProtectionDistanceType = protection, Charges = charges,
+            ProtectionDistanceType = protection, Charges = charges, WavesLeft = waves,
         };
         foreach (int skill in Numbers(npcRow, "_kSkills").Select(v => (int)v)) unit.Skills.Add(skill);
         s.SkillObjects.Add(unit);
@@ -660,10 +666,11 @@ public sealed partial class CombatService
             }
             if (Now < unit.NextTickMs) return;
             unit.NextTickMs = Now + unit.IntervalMs;
-            if (unit.ProtectionDistanceType != 0) return;
+            if (unit.ProtectionDistanceType != 0 || unit.WavesLeft < 0) return;
             if (unit.Trap && !world.Map(unit.WorldScene).Near(unit.X, unit.Z, 1.5f).OfType<MonsterUnit>().Any(m => !m.Dead && Distance(m.Pos, unit.Pos) <= 1.5f)) return;
             await ApplyEffectsAsync(owner, unit.Cast, unit.Pos, unit);
             if (unit.Trap) await RemoveSkillObjectAsync(unit);
+            else if (unit.WavesLeft > 0 && --unit.WavesLeft == 0) unit.WavesLeft = -1; // the shower stays until it expires
         }
         finally { unit.Busy = false; }
     }
