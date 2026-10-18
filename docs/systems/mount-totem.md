@@ -29,6 +29,11 @@ separate ownership, selected slot and visible riding. In particular:
 - Ownership, expiry, class, function 27, combat/death/scene-loading and map restrictions are checked.
   `Config/CFG/Lua_CFG_MapConfigBase.lua:497-549` maps `_kRiderForbidden` to battle/system/flying.
   This request changes riding; it does not itself start a separate flight action.
+- An accepted skill (31102) takes the rider off a system mount (slot 1) before the cast reply. The client
+  never asks to dismount for a skill: `LC_State_Unit_Skill` holds a skill while
+  `m_kMountComp.m_bRideSystemMount` is set and drops it once its chant and action time have passed, so a
+  later dismount left the first hit invisible. The riding mount's `_kFlySwitchSkills`, quest rides and
+  battle mounts (slot 2) stay mounted *(inferred)*.
 - All attribute contributions use `MountsConfig`/`CartRemouldTable._kAttr`, including percentage
   movement attribute 1131. Self and viewers receive the same `curRider` and refreshed properties.
 - Item action 201 validates the configured target and consumes the requested GUID together with

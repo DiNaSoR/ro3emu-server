@@ -36,6 +36,9 @@ public sealed partial class CombatService
 {
     public const uint SkillMove = 31112, TrapDamage = 31128;
 
+    /// <summary>Runs under the role lock once a cast is accepted, before the client hears of it (MountService dismounts).</summary>
+    public List<Func<GameSession, int, Task>> BeforeCast { get; } = new();
+
     /// <summary>
     /// 31102: row identity, ownership, selector, mode, all costs and cooldowns are checked before the cast commits.
     /// Target/position come from CastSkillReq; m_kSelectInfo uses relation masks, never _iDmgType as a selector.
@@ -114,6 +117,9 @@ public sealed partial class CombatService
         }
         if (lease?.Cancelled == true || !ReferenceEquals(s.Attachment, lease) ||
             s.SceneGeneration != scene || s.WorldScene != worldScene || s.SceneLoading) return;
+        // Before the 31102 reply: LC_State_Unit_Skill holds a skill while m_bRideSystemMount is set, then drops it once
+        // its time has passed, so a rider dismounted later by the 1 s mount tick swung unseen.
+        foreach (var handler in BeforeCast) await handler(s, req.SkillId);
         await CancelCastAsync(s, SkillInterruptedInfo.Types.SkillInterruptType.Skill);
         eventAttacks.Remove(s);
         // Classic RO rule (rAthena skill_castend): a chanted skill spends HP/SP only when its chant completes,

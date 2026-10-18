@@ -7,6 +7,7 @@ using Ro3Emu.Bot;
 using Ro3Emu.Server;
 using Ro3Emu.Server.Accounts;
 using Ro3Emu.Server.Game;
+using Ro3Emu.Server.Maps;
 
 namespace Ro3Emu.Tests;
 
@@ -81,6 +82,38 @@ public sealed class MountTests : IAsyncLifetime
             Assert.Equal(700, Session("alice").Speed);
             Assert.Equal(0, MountService.Rider(Session("alice")));
         }
+    }
+
+    [ClientDataFact]
+    public async Task AttackingWhileRidingDismountsBeforeTheSwingStarts()
+    {
+        await using var a = await InWorld("Alice");
+        var units = await Next(a, GameAoiSink.SyncAoiView, AoIViewChangeData.Parser, v => v.Bases.Any(b => b.EntityType == 1));
+        await UnlockMount(a, "alice", 1501013);
+        await a.SendGameAsync(32743, new PlayerMountsSetCfgReq { MountId = 60030010 });
+        await Next(a, 32743, PlayerMountsSetCfgResp.Parser);
+        await a.SendGameAsync(32745, new PlayerRiderMountReq { Tp = (eRiderType)1 });
+        Assert.Equal(0, (await Next(a, 32745, PlayerRiderMountResp.Parser)).Result);
+        Assert.Equal(60030010, MountService.Rider(Session("alice")));
+
+        var self = a.Self!;
+        var monster = units.Bases.Where(b => b.EntityType == 1).OrderBy(b =>
+            MathF.Pow(b.MovementInfo.Pos.X - self.MovementInfo.Pos.X, 2) + MathF.Pow(b.MovementInfo.Pos.Z - self.MovementInfo.Pos.Z, 2)).First();
+        await Gm("alice", $"!jump {monster.MovementInfo.Pos.X:0.0} {monster.MovementInfo.Pos.Z + 1:0.0}".Replace(',', '.'));
+        await a.SendGameAsync(CombatService.LockEnemy, new LockEnemyReq { EnemyId = (long)monster.Uuid });
+        await a.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1000001, TargetId = (long)monster.Uuid });
+        Assert.Equal(0, (await Next(a, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
+        await Next(a, CombatService.UseInSkill, UseInSkillInfo.Parser, u => u.SrcID == (long)self.Uuid);
+
+        // LC_State_Unit_Skill holds a skill while the rider is on a system mount and drops it once its time has passed:
+        // the dismount must reach the client before the cast reply and the swing.
+        var events = a.Inbox.Snapshot().ToList();
+        int dismount = events.FindIndex(e => e.IsGame(31049) && EntityBase.Parser.ParseFrom(e.Body) is var b
+            && b.Uuid == self.Uuid && b.NotifyType == EntityBase.Types.NotifyType.Rider && b.CurRider == 0);
+        int reply = events.FindLastIndex(e => e.IsGame(CombatService.UseSkill));
+        Assert.InRange(dismount, 0, reply - 1);
+        Assert.Equal(0, MountService.Rider(Session("alice")));
+        Assert.Equal(60030010, Session("alice").Mounts!.MountIds[1].MountId);
     }
 
     [ClientDataFact]
