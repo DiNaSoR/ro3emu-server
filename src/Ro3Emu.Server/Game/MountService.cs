@@ -226,6 +226,24 @@ public sealed class MountService : IGameTicker
         await s.SendGameAsync(Ride, new PlayerRiderMountResp { Result = error, Tp = tp });
     }
 
+    /// <summary>
+    /// CombatService.BeforeCast: an accepted skill gets the rider off a system mount (slot 1) first. The client never asks
+    /// to dismount for a skill: LC_State_Unit_Skill waits while m_kMountComp.m_bRideSystemMount is set and drops the skill
+    /// once its chant and action time have passed, so the server's change must reach it before the cast does.
+    /// The riding mount's _kFlySwitchSkills (the fly mounts' take-off and landing) are cast mounted. Quest mounts and
+    /// battle mounts (slot 2) stay ridden. Caller holds CharacterService.Lock.
+    /// </summary>
+    internal async Task DismountForCastAsync(GameSession s, int skillId)
+    {
+        if (s.Mounts == null || s.MountState.QuestMount != 0) return;
+        if (!s.Mounts.MountIds.TryGetValue(1, out var system) || !system.IsRiding) return;
+        if (Config(system.MountId) is { } row && row.TryGetProperty("_kFlySwitchSkills", out var fly)
+            && fly.ValueKind == JsonValueKind.Array && fly.EnumerateArray().Any(v => GameData.Number(v) == skillId)) return;
+        var next = s.Mounts.Clone();
+        next.MountIds[1].IsRiding = false;
+        await CommitAsync(s, next, CopyState(s));
+    }
+
     private SavedState CopyState(GameSession s) => JsonSerializer.Deserialize<SavedState>(Encode(s))!;
 
     /// <param name="look">The linked wardrobe change (WardrobeService.Mounts.cs) committed in the same transaction.</param>
