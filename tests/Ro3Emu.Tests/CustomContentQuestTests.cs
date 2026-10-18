@@ -128,5 +128,22 @@ public sealed class CustomContentQuestTests : IAsyncLifetime
         await Barrier(bot);
         Assert.Equal(TaskState.Delivery, (await State(Talk))!.Status);
         Assert.Equal(TaskState.Running, (await State(Kill))!.Status);
+
+        // A drop from before the forgotten count was kept: the saved state has no trace of the paid hand-ins. The next
+        // hand-in skips the paid reward sources instead of failing on them.
+        await Change(s =>
+        {
+            s.Tasks!.Infos.Remove(Kill);
+            s.Tasks.Infos.Remove(Talk);
+            s.Tasks.CompleteTaskNum.Remove(Talk);
+            s.TaskRuntime.Forgotten = null;
+            return Service<TaskService>().RefreshAsync(s);
+        });
+        await Barrier(bot);
+        Assert.Equal(TaskState.Running, (await State(Talk))!.Status);
+        await bot.SendGameAsync(SceneService.ClientNpcInteract, new ClientNpcInteractReq { NpcUid = npc.Uid, DialogID = 900000201 });
+        await Barrier(bot);
+        Assert.Equal(TaskState.Delivery, (await State(Talk))!.Status);
+        Assert.Equal(2, await Read(s => s.TaskRuntime.Forgotten?.GetValueOrDefault(Talk) ?? 0));
     }
 }
