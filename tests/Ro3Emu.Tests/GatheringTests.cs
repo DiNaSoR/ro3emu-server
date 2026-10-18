@@ -270,6 +270,8 @@ public sealed class GatheringTests : IAsyncLifetime
         Assert.Equal(node.Uuid, bobNode.Uuid);
         await LearnMiner(alice);
         await LearnMiner(bob);
+        // The server closes the quarantined connection and its cleanup unregisters the session, so keep it.
+        var aliceSession = await OnLoop("alice", s => s);
         var accounts = _app.Services.GetRequiredService<AccountStore>();
         var failedApply = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         accounts.BeforeOwnedApplyForTest = label =>
@@ -291,7 +293,7 @@ public sealed class GatheringTests : IAsyncLifetime
         Assert.Single(GatherSources());
         await Next(bob, GameAoiSink.SyncAoiView, AoIViewChangeData.Parser, v => v.LeaveAoi.Contains(node.Uuid));
         Assert.Equal(Ro3Emu.Server.Game.Ownership.RoleOwnerState.RecoveryRequired,
-            await OnLoop("alice", s => s.Owner!.State));
+            await _app.Services.GetRequiredService<GameLoop>().InvokeAsync(() => Task.FromResult(aliceSession.Owner!.State)));
         // C/D quarantine deliberately requires process recovery; no stale snapshot is allowed to reconnect/save.
         await alice.DisposeAsync();
         await bob.DisposeAsync();

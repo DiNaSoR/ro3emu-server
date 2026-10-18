@@ -531,9 +531,11 @@ public sealed class TowerTests : IAsyncLifetime
             room = entered.Scene.SceneID;
             await Kill(alice, entered.Monsters[0].Uuid);
             Vec3 position = null!;
+            // The server closes the quarantined connection and its cleanup unregisters the session, so keep it.
+            var session = Session(alice);
             await OnLoop(() =>
             {
-                attempt = Session(alice).TowerAttempt!;
+                attempt = session.TowerAttempt!;
                 final = Service<World>().AllUnits().OfType<MonsterUnit>()
                     .Single(m => m.Uid == (long)entered.Monsters[1].Uuid);
                 final.Hp = 1;
@@ -570,8 +572,8 @@ public sealed class TowerTests : IAsyncLifetime
                 await staged.Task.WaitAsync(Wait);
                 await faulted.Task.WaitAsync(Wait);
                 // The child reward permit aborts first; the parent cast then finalizes the paid death.
-                for (int i = 0; i < 100 && (!Session(alice).Channel.PeerClosed || !final.Dead); i++) await Task.Delay(20);
-                Assert.True(Session(alice).Channel.PeerClosed);
+                for (int i = 0; i < 100 && (!session.Channel.PeerClosed || !final.Dead); i++) await Task.Delay(20);
+                Assert.True(session.Channel.PeerClosed);
             }
             finally { hooks.Remove(failApply); }
             Assert.Equal(1, applyFaults);
@@ -580,7 +582,7 @@ public sealed class TowerTests : IAsyncLifetime
             Assert.True(await Service<CharacterService>().RewardSourceCommittedAsync(final.RewardSettlement.SourceKey));
             Assert.True(attempt.ClearCommitted);
             Assert.DoesNotContain(final.Uid, attempt.Killed);
-            Assert.Equal(RoleOwnerState.RecoveryRequired, Session(alice).Owner!.State);
+            Assert.Equal(RoleOwnerState.RecoveryRequired, session.Owner!.State);
             Assert.Equal(1, DBClimTower.Parser.ParseFrom(Service<RoleStore>().LoadTower(role)!).LayerConfID);
             Assert.Equal(5, Count(alice, 1250709));
             Assert.Equal(9, Count(alice, 1250701));
