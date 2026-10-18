@@ -32,6 +32,7 @@ public static class ServerHost
 
         // First hosted service: everything after it (loop, gates, HTTP) starts with the game data already parsed.
         if (options.PreloadGameData) builder.Services.AddHostedService<Ro3Emu.Server.Data.GameDataPreload>();
+        builder.Services.AddHostedService<Ro3Emu.Server.Data.CustomContentStartupCheck>();
         builder.Services.AddSingleton<Diagnostics.ServerMetrics>();
         builder.Services.AddSingleton<ILoggerProvider, Diagnostics.MetricsLoggerProvider>();
         // Recent log lines for bug reports (FeedbackService); kept out of the pipeline when reports keep no context.

@@ -246,6 +246,7 @@ public sealed class GmCommands(IOptions<ServerOptions> options, GameData data, S
         ["pos"] = ("", Pos),
         ["jump"] = ("<x> <z>", Jump),
         ["finditem"] = ("<name>", FindItem),
+        ["findnpc"] = ("<name> (NPCs and monsters: id, model, level; for custom content)", FindNpc),
         ["item"] = ("<id|name> [count]", Item),
         ["mail"] = ("<title> [item count]", Mail),
         ["delitem"] = ("<id> [count]", (s, a) => Op(s, OpRemoveItem, a)),
@@ -392,6 +393,20 @@ public sealed class GmCommands(IOptions<ServerOptions> options, GameData data, S
     {
         var hits = data.FindItems(string.Join(' ', args)).Take(8).ToList();
         return ReplyAsync(s, hits.Count == 0 ? "No such item." : string.Join("  ", hits.Select(h => $"{h.Id} {h.Name}")));
+    }
+
+    /// <summary>"!findnpc poring": NPCConfig rows (NPCs and monsters) whose name contains the text, with their model
+    /// (_iUnitID, the "model" of a custom NPC) and level, so content authors can find the ids to write.</summary>
+    private Task FindNpc(GameSession s, string[] args)
+    {
+        string name = string.Join(' ', args);
+        if (name.Length == 0) throw new ArgumentException("findnpc <name>");
+        var hits = data.Table("NPCConfig").Values
+            .Select(r => (Id: GameData.Int(r, "_iID"), Name: data.TextOf(r, "_kName"), Model: GameData.Int(r, "_iUnitID"), Level: GameData.Int(r, "_iLevel")))
+            .Where(n => n.Name.Contains(name, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(n => n.Name.Length).ThenBy(n => n.Id).Take(8).ToList();
+        return ReplyAsync(s, hits.Count == 0 ? $"No NPC or monster called '{name}'."
+            : string.Join("  ", hits.Select(h => $"{h.Id} {h.Name} (model {h.Model}, Lv {h.Level})")));
     }
 
     /// <summary>Same-map teleport to x,z (y from the nav grid).</summary>

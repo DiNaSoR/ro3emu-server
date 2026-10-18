@@ -5,6 +5,8 @@ The server reads them like client data, and the client hooks add the same rows t
 custom quest shows in the quest log, a custom NPC has a name and dialogue, and both work with the normal quest engine.
 
 Code: `src/Ro3Emu.Server/Data/CustomContent.cs` (loading and the overlay on GameData),
+`src/Ro3Emu.Server/Data/CustomContent.Quests.cs` (the quest format), `src/Ro3Emu.Server/Data/CustomContentCheck.cs`
+(the checks),
 `src/Ro3Emu.Server/Game/CustomContentService.cs` (sending to the client), `src/Ro3Emu.Server/Maps/WorldData.cs`
 (NPC placement), `src/Ro3Emu.ClientHooks/CustomContent.cs` (the client side).
 Example: [`content/prototype-scholar.json`](../../content/prototype-scholar.json).
@@ -25,7 +27,121 @@ live: `Lua_DBManager.m_kCFG_<Table>` looks rows up in the loaded table's `m_kVal
 
 Adding or changing content needs a server restart and a relog, never a new client.
 
-## File format
+## Writing quests
+
+Most content is an NPC and a quest chain, and both can be written in plain text. The server turns them into the
+client rows described under [Raw rows](#raw-rows) when it loads, so you never write row fields, text ids or
+dialogue ids by hand. The prototype is written this way: [`content/prototype-scholar.json`](../../content/prototype-scholar.json).
+
+```jsonc
+{
+  "npcs": [
+    {
+      "id": 90000001,                 // NPCConfig id, see "Ids" below
+      "name": "Elias",
+      "title": "Wandering Scholar",   // optional, shown under the name
+      "model": 100079,                // optional, an existing model (UnitConfig id); !findnpc shows the models of existing NPCs
+      "map": 10100, "x": 150.4, "z": 193.05, "face": 180,   // optional placement; !pos shows where you stand
+      "greeting": "So many curious creatures around Prontera...",
+      "goodbye": "Goodbye"            // optional, the button that closes the greeting
+    }
+  ],
+  "quests": [
+    {
+      "id": 90000001,                 // the first step's quest id; step 2 is 90000002, and so on
+      "after": 10101130,              // optional: only offered once this quest is handed in
+      "steps": [
+        {
+          "name": "A Scholar's Request",
+          "description": "A scholar named Elias is looking for help in Prontera.",
+          "objective": "Talk to Elias in Prontera",
+          "talk": 90000001,
+          "dialog": [
+            { "say": "Ah, a traveler! I'm Elias.", "reply": "How can I help?" },
+            "Could you defeat <color=#CC762A>5 Porings</color> for me?"
+          ]
+        },
+        {
+          "name": "Jelly Samples",
+          "description": "Defeat 5 Porings at the Prontera South Gate for Elias",
+          "objective": "Defeat Porings at the South Gate",
+          "kill": 5000001, "count": 5, "map": 10111
+        },
+        {
+          "name": "Back to the Scholar",
+          "description": "Bring the jelly samples back to Elias in Prontera.",
+          "objective": "Report to Elias in Prontera",
+          "talk": 90000001,
+          "dialog": [ "This jelly is perfect. Thank you, adventurer." ],
+          "exp": 2000
+        }
+      ]
+    }
+  ]
+}
+```
+
+**NPCs** (`npcs` entries with a `name`): `id`, `name` and `greeting` are needed. Clicking the NPC shows the
+greeting with a goodbye button. The NPC copies Alphonse (200014) for everything you leave out; `copy` names another
+NPC to copy instead. Without `model` it keeps that NPC's look. `icon` sets the dialogue portrait, which is
+`temphead_npc_<model>.png` by default. Leave out `map` to define the NPC without placing it.
+
+**Quests**: each step is one quest in the quest log, offered when the step before it is handed in. The first step is
+offered to every character at once, or after the quest named in `after`. Every step needs a `name`, a `description`
+(shown in the quest log) and an `objective` (the tracker line), and then one of:
+
+- **talk**: the NPC's id and its `dialog`. Each page is the NPC's line, either as text or as
+  `{ "say": ..., "reply": ... }`. Every page but the last gets a reply button (`Continue` unless you write one) that
+  opens the next page, and closing the last page completes the step. A talk step to a client NPC (one that no custom
+  file places) also needs the `map` it stands on. The tracker walks to the NPC.
+- **kill**: a monster id, or a list of them, and the `count`. Party kills count, unless you add `"solo": true`. Give
+  the `map` where they spawn and the tracker walks to the spawn. The objective gets the `*` that shows the counter.
+
+Optional on any step: `exp` (Base EXP when handed in; Job EXP follows at 20%), `award` (an AwardConfig item
+package), `track` (a raw `_kTrack` entry, replacing the one the server picks), and `fields` (any TaskConfig fields,
+written over the generated row).
+
+Text can carry colour tags like `<color=#CC762A>5 Porings</color>`. Write the whole text, numbers included: there are
+no placeholders to fill in this format.
+
+## Checking your content
+
+The server checks every custom file when it starts and logs what it finds as warnings: a quest that names a
+monster, NPC, map, model, reward or dialogue that does not exist, a kill step with no spawn on its map, or a file or
+quest that was skipped and why. To check without starting the server, run the built server with `--check-content`
+from the folder you start the server in (the repository root for `tools/run-server.ps1`):
+
+```
+src\Ro3Emu.Server\bin\Release\net10.0\Ro3Emu.Server.exe --check-content
+```
+
+It reads `content/` the way the server does, lists every problem and exits with code 1 if there are any.
+
+## Finding ids
+
+As a GM in game:
+
+- `!findnpc <name>` lists NPCs and monsters whose name contains the text, with their id, model and level.
+  Monsters are NPCConfig rows too, so `!findnpc poring` gives the id for a kill step.
+- `!finditem <name>` finds items.
+- `!pos` shows your map and position; `!where` names the map.
+
+## Ids
+
+Pick ids far from the client's own so they never collide. Only NPC and quest ids are yours to choose, and they must
+stay the same once players have the quest, because saved characters keep them. The prototype uses 90000001 and up for
+both. The server makes the text and dialogue ids from the NPC or quest id, using its last six digits. So two NPCs, or
+two quest steps, whose ids end in the same six digits clash, and the second one is skipped with an error.
+
+| What | Range | Note |
+| --- | --- | --- |
+| TaskConfig, NPCConfig, NPCInteractConfig | 90000001… | chosen by you |
+| DialogueConfig | 900000000… (quests), 1000000000… (NPCs) | made by the server |
+| Texts | 98000000000… (quests), 97000000000… (NPCs) | made by the server; hand-written texts can use 99000000001… |
+
+## Raw rows
+
+Anything the quest format does not cover can be written as client rows directly, in the same files.
 
 Every `*.json` under `content/` (subfolders too) is read in name order; a later file replaces an earlier file's
 row with the same id. `//` comments and trailing commas are allowed. A file with an error is skipped and logged.
@@ -53,31 +169,23 @@ row with the same id. `//` comments and trailing commas are allowed. A file with
   first; the fields you write replace the copy's top-level fields, and the copy's id fields (`_iID` or another
   `_i…ID` equal to the base id) take the new id. Without `_base` the row must be complete. A row may also be an
   array of row objects (DialogueConfig keeps one array per dialogue id).
-- **npcs**: server NPCs to place. `map` is the MapConfig id, `npc` the NPCConfig id, `x`/`z` the position (stand
-  there and type `!pos` in chat as a GM to read yours), `y` optional (the ground height by default), `face` the facing in degrees.
+- **npcs**: server NPCs to place (entries without a `name`). `map` is the MapConfig id, `npc` the NPCConfig id,
+  `x`/`z` the position (stand there and type `!pos` in chat as a GM to read yours), `y` optional (the ground height
+  by default), `face` the facing in degrees.
 
-### Ids
+### What the quest format makes
 
-Pick ids far from the client's own so they never collide. The prototype uses:
+Each step is a Side quest (blue tag) that copies a client quest: 10101130 for a talk step, 10101050 for a kill step.
 
-| What | Range | Note |
-| --- | --- | --- |
-| TaskConfig, NPCConfig, NPCInteractConfig | 90000001… | |
-| DialogueConfig | 900000101… | must fit a 32-bit int (the dialog id travels in 31208) |
-| Texts | 99000000001… | 11 digits, like the client's |
-
-## A quest, step by step
-
-The prototype is three Side quests (blue tag) given by Elias, a new NPC next to Alphonse in Prontera:
-
-1. **Talk** (90000001): `_kProgressTarget [[104001, npc, map, dialog]]`. Auto-accepted for every character because
-   it has no `_kPreTask` and an `_iCondition` (2000008 = base level 1). The dialogue's last row carries action
+1. **Talk**: `_kProgressTarget [[104001, npc, map, dialog]]`. A first step with no pre-task gets `_iCondition`
+   2000008 (base level 1), which auto-accepts it for every character. The dialogue's last row carries action
    `["17", dialog]`, which tells the server the talk is done.
-2. **Kill** (90000002): `_kPreTask [90000001]`, target `[104014, 5000001, 5]` (5 Porings, party kills count).
-   `_kTrack` points the quest tracker at the South Gate spawn.
-3. **Report** (90000003): talk again; `_kEXP [1, 2000]` pays 2000 Base EXP (Job EXP follows at 20%).
+2. **Kill**: `_kPreTask [previous step]`, target `[104014, monster…, count]` (104002 with `solo`). `_kTrack`
+   `["142", map, id, "-1"]` points the tracker at a scene-editor region next to a spawn of the monster.
+3. **Rewards**: `_kEXP [1, n]` pays n Base EXP, `_iAward` an AwardConfig package.
 
-Useful target types (the first number of a `_kProgressTarget` entry; all supported by `TaskService`):
+Useful target types (the first number of a `_kProgressTarget` entry; all supported by `TaskService`), for steps
+written as raw rows or through `fields`:
 
 | Target | Fields | Meaning |
 | --- | --- | --- |
@@ -87,18 +195,11 @@ Useful target types (the first number of a `_kProgressTarget` entry; all support
 | 101002 | level | reach a base level |
 | 104003 | map, area | enter a scene-editor area |
 
-Copy a client quest with `_base` (10101130 is a talk quest, 10101050 a kill quest) and change what differs.
-Rewards: `_kEXP [1, n]` for Base EXP, `_iAward` for an AwardConfig item package.
-
-## NPCs
-
-A custom NPC is an NPCConfig row (usually `_base` of an existing NPC, with a new `_kName`, `_kTitle` and a model
-via `_iUnitID`) plus an `npcs` entry. Clicking it runs its `_iInteractID` rows in NPCInteractConfig; action
-`["53", dialog]` opens a dialogue. Models, animations and portraits must already exist in the client.
-
-The hooks also add each placed NPC to its map's scene-editor NPC list (`kNpcList`, keyed by the NPC id), where the
-client looks up walk targets. So a quest's `_kTrack` of `["143", map, npc, "9", dialog]` auto-walks to a custom NPC
-like it does to a client one, and the NPC shows on the minimap. Place a given NPC id once per map.
+A custom NPC clicked in game runs its `_iInteractID` rows in NPCInteractConfig; action `["53", dialog]` opens a
+dialogue. Models, animations and portraits must already exist in the client. The hooks also add each placed NPC to
+its map's scene-editor NPC list (`kNpcList`, keyed by the NPC id), where the client looks up walk targets, so a
+`_kTrack` of `["143", map, npc, "9", dialog]` auto-walks to a custom NPC and the NPC shows on the minimap. Place a
+given NPC id once per map.
 
 ## Testing a quest again
 

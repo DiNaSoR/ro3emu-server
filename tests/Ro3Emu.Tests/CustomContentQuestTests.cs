@@ -14,6 +14,8 @@ namespace Ro3Emu.Tests;
 public sealed class CustomContentQuestTests : IAsyncLifetime
 {
     private const long Talk = 90000001, Kill = 90000002, Report = 90000003, Elias = 90000001;
+    // The quests' first dialogue pages: CustomContent.QuestDialogBase + (quest id % 1,000,000) * 100 + 1.
+    private const int TalkDialog = 900000101, ReportDialog = 900000301;
     private readonly string _dataDir = Path.Combine(Path.GetTempPath(), "ro3emu-custom-quest-" + Guid.NewGuid().ToString("N"));
     private static readonly TimeSpan Wait = TimeSpan.FromSeconds(10);
     private WebApplication _app = null!;
@@ -76,7 +78,7 @@ public sealed class CustomContentQuestTests : IAsyncLifetime
         using (var doc = JsonDocument.Parse(Encoding.UTF8.GetString(payload)))
         {
             Assert.Equal(Talk, doc.RootElement.GetProperty("rows").GetProperty("TaskConfig").GetProperty("90000001").GetProperty("_iTaskID").GetInt64());
-            Assert.Equal("Elias", doc.RootElement.GetProperty("texts").GetProperty("99000000001").GetString());
+            Assert.Equal("Elias", doc.RootElement.GetProperty("texts").GetProperty("97000000101").GetString());
             // Elias's scene-editor entry, which the quest tracker's walk-to-NPC (track action 143) looks up by NPC id.
             var placed = Assert.Single(doc.RootElement.GetProperty("npcs").EnumerateArray());
             Assert.Equal("sc_prontera_001_sceneeditor", placed.GetProperty("module").GetString());
@@ -101,7 +103,7 @@ public sealed class CustomContentQuestTests : IAsyncLifetime
         var arrival = await Next(bot, MsgId.SwitchSceneLine, SwitchSceneLineResp.Parser);
         await bot.SendGameAsync(MsgId.SceneLoaded, new SceneLoadedReq { SceneId = arrival.SceneEntry });
         await Next(bot, MsgId.EntitySelf, EntitySelf.Parser);
-        await bot.SendGameAsync(SceneService.ClientNpcInteract, new ClientNpcInteractReq { NpcUid = npc.Uid, DialogID = 900000201 });
+        await bot.SendGameAsync(SceneService.ClientNpcInteract, new ClientNpcInteractReq { NpcUid = npc.Uid, DialogID = TalkDialog });
         await Barrier(bot);
         Assert.Equal(TaskState.Delivery, (await State(Talk))!.Status);
         Assert.Equal(TaskState.Running, (await State(Kill))!.Status);
@@ -113,7 +115,7 @@ public sealed class CustomContentQuestTests : IAsyncLifetime
         Assert.Equal(TaskState.Running, (await State(Report))!.Status);
 
         long exp = await Read(s => s.Progress!.Exp), level = await Read(s => (long)s.Progress!.Level);
-        await bot.SendGameAsync(SceneService.ClientNpcInteract, new ClientNpcInteractReq { NpcUid = npc.Uid, DialogID = 900000301 });
+        await bot.SendGameAsync(SceneService.ClientNpcInteract, new ClientNpcInteractReq { NpcUid = npc.Uid, DialogID = ReportDialog });
         await Barrier(bot);
         Assert.Equal(TaskState.Delivery, (await State(Report))!.Status);
         Assert.True(await Read(s => s.Progress!.Level) > level || await Read(s => s.Progress!.Exp) > exp, "the report pays its EXP");
@@ -124,7 +126,7 @@ public sealed class CustomContentQuestTests : IAsyncLifetime
         Assert.Equal(TaskState.Running, (await State(Talk))!.Status);
         Assert.Null(await State(Kill));
         Assert.Null(await State(Report));
-        await bot.SendGameAsync(SceneService.ClientNpcInteract, new ClientNpcInteractReq { NpcUid = npc.Uid, DialogID = 900000201 });
+        await bot.SendGameAsync(SceneService.ClientNpcInteract, new ClientNpcInteractReq { NpcUid = npc.Uid, DialogID = TalkDialog });
         await Barrier(bot);
         Assert.Equal(TaskState.Delivery, (await State(Talk))!.Status);
         Assert.Equal(TaskState.Running, (await State(Kill))!.Status);
@@ -141,7 +143,7 @@ public sealed class CustomContentQuestTests : IAsyncLifetime
         });
         await Barrier(bot);
         Assert.Equal(TaskState.Running, (await State(Talk))!.Status);
-        await bot.SendGameAsync(SceneService.ClientNpcInteract, new ClientNpcInteractReq { NpcUid = npc.Uid, DialogID = 900000201 });
+        await bot.SendGameAsync(SceneService.ClientNpcInteract, new ClientNpcInteractReq { NpcUid = npc.Uid, DialogID = TalkDialog });
         await Barrier(bot);
         Assert.Equal(TaskState.Delivery, (await State(Talk))!.Status);
         Assert.Equal(2, await Read(s => s.TaskRuntime.Forgotten?.GetValueOrDefault(Talk) ?? 0));
