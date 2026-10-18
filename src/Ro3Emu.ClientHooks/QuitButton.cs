@@ -12,6 +12,9 @@ namespace Ro3Emu.ClientHooks
     /// the original only quits through Settings → Log Out → Exit. The Settings entry (button, icon, label) is cloned,
     /// placed one step above Support at the Support → Settings spacing, relabelled, given a power icon of our own,
     /// its own click handlers removed, and a click quits.
+    /// The clone is taken as soon as the menu exists, while Lua may still be loading the gear (FunctionConfig icon path,
+    /// loaded asynchronously): the copied Image can then be disabled or transparent, or get a sprite assigned after the
+    /// copy. So the icon is kept up every frame: our sprite, and the gear's enabled state and colour.
     /// </summary>
     public static class QuitButton
     {
@@ -21,6 +24,9 @@ namespace Ro3Emu.ClientHooks
         private const float IconScale = 0.72f;
 
         private static TMP_Text _label, _settingsLabel;
+        private static Image _icon, _settingsIcon;
+        private static Sprite _iconSprite;
+        private static bool _iconReported;
 
         public static void Tick()
         {
@@ -30,6 +36,7 @@ namespace Ro3Emu.ClientHooks
                 if (_label.color != _settingsLabel.color) _label.color = _settingsLabel.color;
                 if (_label.alpha != _settingsLabel.alpha) _label.alpha = _settingsLabel.alpha;
             }
+            KeepIcon();
             var menu = GameObject.Find(Menu);
             if (menu == null) return;
             var all = menu.GetComponentsInChildren<Transform>(true);
@@ -57,22 +64,47 @@ namespace Ro3Emu.ClientHooks
             _label = quit.GetComponentsInChildren<TMP_Text>(true).FirstOrDefault(t => t.name == "SetName_TTxt");
             _settingsLabel = settings.GetComponentsInChildren<TMP_Text>(true).FirstOrDefault(t => t.name == "SetName_TTxt");
             if (_label != null) _label.text = "Quit";
-            foreach (var image in quit.GetComponentsInChildren<Image>(true))
+            _icon = quit.GetComponentsInChildren<Image>(true).FirstOrDefault(i => i.name == "SetListIcon_Img");
+            _settingsIcon = settings.GetComponentsInChildren<Image>(true).FirstOrDefault(i => i.name == "SetListIcon_Img");
+            _iconSprite = null;
+            _iconReported = false;
+            string gear = _settingsIcon == null ? "none"
+                : (_settingsIcon.sprite != null ? _settingsIcon.sprite.name : "no sprite") + " enabled=" + _settingsIcon.enabled + " color=" + _settingsIcon.color;
+            if (_icon != null)
             {
-                if (image.name != "SetListIcon_Img") continue;
-                var icon = TextureSwap.Custom(Icon, image.sprite);
-                if (icon == null) continue;
-                image.sprite = icon;
-                // The symbol fills its canvas edge to edge, the gear does not: at the same rect it drew 43 px wide
-                // against the gear's 31 and touched the label. Scaled to the gear's size and gap.
-                image.rectTransform.localScale *= IconScale;
+                _iconSprite = TextureSwap.Custom(Icon, _icon.sprite);
+                if (_iconSprite == null) Debug.LogWarning("[Ro3Emu.QuitButton] " + Icon + " not embedded or not decodable: the button keeps the gear");
+                else
+                {
+                    // The symbol fills its canvas edge to edge, the gear does not: at the same rect it drew 43 px wide
+                    // against the gear's 31 and touched the label. Scaled to the gear's size and gap.
+                    _icon.rectTransform.localScale *= IconScale;
+                }
             }
+            KeepIcon();
             // Function 41 (Feedback) is open on our server since FeedbackButton: its slot is logged to check it against quit.
             var feedback = Button(all, "Feedback");
             Debug.Log("[Ro3Emu.QuitButton] added: support=" + support.position + " settings=" + settings.position + " quit=" + quit.transform.position
                 + " feedback=" + (feedback != null ? feedback.position.ToString() : "none")
                 + " label=" + (_label != null ? _label.color + "/" + _label.alpha + " enabled=" + _label.enabled : "none")
-                + " settingsLabel=" + (_settingsLabel != null ? _settingsLabel.color.ToString() : "none"));
+                + " settingsLabel=" + (_settingsLabel != null ? _settingsLabel.color.ToString() : "none")
+                + " gear=" + gear + " icon=" + (_icon == null ? "none" : _iconSprite != null ? "ours" : "gear"));
+        }
+
+        /// <summary>The quit icon shows our sprite, on whenever the gear is on, in the gear's colour (the menu fades it in).</summary>
+        private static void KeepIcon()
+        {
+            if (_icon == null) return;
+            if (_iconSprite != null && _icon.sprite != _iconSprite)
+            {
+                if (!_iconReported && _icon.sprite != null)
+                    Debug.Log("[Ro3Emu.QuitButton] icon sprite replaced by " + _icon.sprite.name + "; set back");
+                _iconReported = true;
+                _icon.sprite = _iconSprite;
+            }
+            bool on = _settingsIcon == null || _settingsIcon.enabled;
+            if (_icon.enabled != on) _icon.enabled = on;
+            if (_settingsIcon != null && _icon.color != _settingsIcon.color) _icon.color = _settingsIcon.color;
         }
 
         /// <summary>The visible "&lt;key&gt;_Btn" (the prefab also holds inactive copies of the column for other layouts).</summary>
