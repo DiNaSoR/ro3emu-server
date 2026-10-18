@@ -306,6 +306,9 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
     /// <summary>Transient deployed actor; visibility is owned by World, never persisted with the roster.</summary>
     public PetFollowerActor? PetActor { get; set; }
 
+    /// <summary>The pet Main Skill the last 5025 showed (PetService.RefreshMainSkillAsync); 0 for none.</summary>
+    public int PetMainSkillShown { get; set; }
+
     /// <summary>Card collection (AUTO_SYNC 5057), loaded at login by CardService.</summary>
     public Romsg.DBLibraryInfo? Library { get; set; }
     /// <summary>Persisted card socket selections (AUTO_SYNC 5026).</summary>

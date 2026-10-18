@@ -33,7 +33,7 @@ public sealed partial class CombatService
     /// No cost, cooldown or cast lock. A row with a multi-part hit (<see cref="HitPlan"/>) lands its packets as a cast does.
     /// </summary>
     internal async Task ProcCastAsync(GameSession s, JsonElement row, MonsterUnit? target, float? face = null, bool area = false,
-        double scale = 1, long fixedDamage = 0, Vec3? at = null)
+        double scale = 1, long fixedDamage = 0, Vec3? at = null, int petId = 0)
     {
         if (s.Role == null || s.Dead || s.SceneLoading || target is { Dead: true } || target?.Hp <= 0) return;
         long id = ++_sessionIds;
@@ -53,7 +53,7 @@ public sealed partial class CombatService
         await SendCastTimelineAsync(s, new UseInSkillInfo
         {
             SrcID = s.Role.Id, SkillID = request.SkillId, TargetId = request.TargetId, TargetPos = request.TargetPos, Face = facing,
-            SessionId = id, SkillMs = action.ActionMs, StartTime = action.StartMs,
+            SessionId = id, SkillMs = action.ActionMs, StartTime = action.StartMs, PetConfigId = petId,
         }, highLevel: GameData.Int(row, "_iSkillEffectLevel") > 0, extra: true);
         if (HitPlan(row) is { } plan) await ApplyStagedEffectsAsync(s, action, request.TargetPos, plan);
         else await ApplyEffectsAsync(s, action, request.TargetPos);

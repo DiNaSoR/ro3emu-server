@@ -26,7 +26,7 @@ public sealed class TowerPetTests : IAsyncLifetime
         var (httpPort, microPort, gamePort) = TestPorts.FreePorts();
         app = ServerHost.Create([], o =>
         {
-            o.DataDir = dataDir; o.GameDataDir = Path.Combine(RepoRoot(), "data");
+            o.DataDir = dataDir; o.GameDataDir = Path.Combine(RepoRoot(), "data"); o.Pets.WorldFollower = true;
             o.HttpPort = httpPort; o.MicroGatePort = microPort; o.GameGatePort = gamePort;
         });
         Service<SeasonService>().SetPlayBook(101);
