@@ -89,6 +89,12 @@ public sealed class CustomContentQuestTests : IAsyncLifetime
         await Barrier(bot);
         Assert.Equal(TaskState.Running, (await State(Talk))!.Status);
 
+        // !quest drop takes it off the client's log (31203, as a give-up) and, a condition root, it is offered again.
+        await Gm($"!quest drop {Talk}");
+        Assert.Equal(Talk, (await Next(bot, TaskService.TaskGiveUp, TaskGiveUpResp.Parser)).Id);
+        await Barrier(bot);
+        Assert.Equal(TaskState.Running, (await State(Talk))!.Status);
+
         // Talk to Elias in Prontera.
         var npc = Service<WorldData>().Map(10100)!.Npcs.Single(n => n.NpcId == Elias);
         await Gm($"!warp 10100 {npc.X + 1} {npc.Z}");
