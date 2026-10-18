@@ -47,6 +47,8 @@ public sealed partial class BuffService : IGameTicker
         character.GiveBuff = (p, buff, ms) => AddAsync(p, buff, ms, p.Role!.Id);
         character.IsItemUseForbidden = p => HasForbidden(p, 12);
         character.DynamicProperties.Add(SupportShieldProperties);
+        character.DynamicProperties.Add(StealthProperties);
+        Changed.Add(SyncStealthAsync);
         world.UnitRemoved.Add(unit => { _unitBuffs.Remove(unit.Uid); return Task.CompletedTask; });
     }
 
@@ -64,14 +66,26 @@ public sealed partial class BuffService : IGameTicker
     public Task AddSupportAsync(GameSession p, int configId, int durationMs, long sourceId, long shieldAmount = 0) =>
         AddCoreAsync(p, configId, durationMs, sourceId, null, shieldAmount);
 
+    /// <summary>
+    /// A buff that stays until something removes it (death, a scene change, its own end rule): a class skill's _kBuff1
+    /// duration -1 on a BuffConfig row without a time (Reading Spellbook until Stop Reading, inferred). It shows no
+    /// countdown (expire time 0, like a passive).
+    /// </summary>
+    public Task AddLastingAsync(GameSession p, int configId, long sourceId, int? pileCount = null) =>
+        AddCoreAsync(p, configId, 0, sourceId, pileCount is { } n ? Math.Max(1, n) : null, lasting: true);
+
     private async Task AddCoreAsync(GameSession p, int configId, int durationMs, long sourceId, int? explicitPileCount,
-        long shieldAmount = 0)
+        long shieldAmount = 0, bool lasting = false)
     {
         if (p.Role == null || data.Row("BuffConfig", configId) is not { } row || GameData.Int(row, "_iBuffID") <= 0) return;
-        if (durationMs <= 0) durationMs = (int)GameData.Int(row, "_iTime");
-        if (durationMs <= 0) durationMs = 60000;
+        if (lasting) durationMs = 0;
+        else
+        {
+            if (durationMs <= 0) durationMs = (int)GameData.Int(row, "_iTime");
+            if (durationMs <= 0) durationMs = 60000;
+        }
         if (sourceId != p.Role.Id && Blocks(CategoriesOf(p), row)) return;
-        if (sourceId != p.Role.Id && !ApplyDecay(p.Role.Id, p.SceneEntry, configId, ref durationMs)) return;
+        if (!lasting && sourceId != p.Role.Id && !ApplyDecay(p.Role.Id, p.SceneEntry, configId, ref durationMs)) return;
         long now = MonsterService.NowMs;
         int group = (int)GameData.Int(row, "_iBuffID");
         bool multiSource = GameData.Int(row, "_iMultiSource") != 0;
@@ -84,7 +98,7 @@ public sealed partial class BuffService : IGameTicker
             ? Math.Min(maxStack, existing.PileCount + 1) : 1);
         var changes = GameData.Pairs(row, "_kChangeAttri").Select(c => (c.Id, c.Value * pile)).ToList();
         var buff = new ActiveBuff(existing?.Guid ?? Interlocked.Increment(ref _guids), configId,
-            now + durationMs, durationMs, changes, sourceId, pile, StateOrdinal: StateFor(row),
+            lasting ? long.MaxValue : now + durationMs, durationMs, changes, sourceId, pile, StateOrdinal: StateFor(row),
             ShieldRemaining: Math.Max(0, shieldAmount));
         if (existing != null) p.Buffs.Remove(existing);
         p.Buffs.Add(buff);
@@ -413,7 +427,7 @@ public sealed partial class BuffService : IGameTicker
 
     private static BuffInfo Wire(ActiveBuff buff) => new()
     {
-        BuffGuid = buff.Guid, ConfigId = buff.ConfigId, ExpireTime = buff.IsPassive ? 0 : buff.ExpireMs,
+        BuffGuid = buff.Guid, ConfigId = buff.ConfigId, ExpireTime = buff.IsPassive || buff.ExpireMs == long.MaxValue ? 0 : buff.ExpireMs,
         Duration = buff.DurationMs, PileCount = buff.PileCount, IsTotalTime = true, SourceId = buff.SourceId,
     };
 

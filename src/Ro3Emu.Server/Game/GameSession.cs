@@ -155,6 +155,10 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
     /// <summary>Transient configured energy meters; BuffService sends each change as 31334.</summary>
     public Dictionary<int, PlayerEnergyState> Energy { get; } = new();
     public int EnergyCareer { get; set; }
+    /// <summary>A live stealth buff (BuffConfig category 31) hides the player from monsters (BuffService.Stealth).</summary>
+    public bool Stealthed { get; set; }
+    /// <summary>Hits taken under the current stealth buff (its GUID), toward its "revealed after taking damage N times".</summary>
+    internal (long Guid, int Hits) StealthHits { get; set; }
     /// <summary>EnergyConfig._iBelongMount mounts owned when the meters were last reconciled (BuffService.Energy).</summary>
     public int EnergyMounts { get; set; }
     /// <summary>31134/31135 lethal-hit choice; only an eligible active Osiris buff may create it.</summary>

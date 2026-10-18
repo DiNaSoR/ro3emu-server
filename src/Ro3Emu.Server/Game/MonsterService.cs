@@ -334,13 +334,17 @@ public sealed partial class MonsterService : MonsterBrain, IGameTicker
         loop.TrackRuntimeDetached("monster speed", () => world.ToUnitViewersAsync(m, CombatService.AoiAttrChange, SpeedChange(m, now)));
     private void SendHealth(MonsterUnit m) => loop.TrackRuntimeDetached("monster health", () => world.ToUnitViewersAsync(m, CombatService.AoiAttrChange, Hp(m)));
 
+    /// <summary>Classic RO: bosses and the Insect (9) and Demon (3) races see through Hiding and Cloaking (inferred;
+    /// the client data names no detector). A boss here is a monster with its own skill book.</summary>
+    internal static bool DetectsStealth(MonsterUnit m) => m.Template.Skills != null || m.Template.Race is 3 or 9;
+
     private static GameSession? NearestTarget(MonsterUnit m)
     {
         GameSession? near = null;
         float best = float.MaxValue;
         foreach (var p in m.Viewers)
         {
-            if (p.Role == null || p.Dead || p.CutsceneProtected) continue;
+            if (p.Role == null || p.Dead || p.CutsceneProtected || p.Stealthed && !DetectsStealth(m)) continue;
             float d = Distance(m, p);
             if (d <= m.Template.ViewRange && d < best) { best = d; near = p; }
         }
@@ -480,6 +484,7 @@ public sealed partial class MonsterService : MonsterBrain, IGameTicker
     public void Engage(MonsterUnit m, GameSession target)
     {
         if (m.Dead || m.WorldScene != target.WorldScene || m.Template.SpeedCm == 0 && m.Template.AttackRange <= 0) return;
+        if (target.Stealthed && !DetectsStealth(m)) return;
         if (m.ScriptedTargeting && (m.Target != null || m.MonsterTarget != null)) return;
         if (m.Target == null) m.NextSwingMs = NowMs + 300;
         SetTarget(m, target);
@@ -618,7 +623,8 @@ public sealed partial class MonsterService : MonsterBrain, IGameTicker
     {
         var target = m.Target!;
         bool lost = target.Role == null || target.Dead || target.SceneLoading || target.WorldScene != m.WorldScene
-                    || Distance(m.Home.X, m.Home.Z, target.Position.X, target.Position.Z) > m.Template.LeashDistance;
+                    || Distance(m.Home.X, m.Home.Z, target.Position.X, target.Position.Z) > m.Template.LeashDistance
+                    || target.Stealthed && !DetectsStealth(m) && !m.ScriptedTargeting;
         if (lost)
         {
             Disengage(m, map);

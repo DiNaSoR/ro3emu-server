@@ -38,12 +38,14 @@ public sealed class ActiveSkillCast
     internal bool Proc { get; init; }
     /// <summary>A follow-up hits the row's area even when its _iRangeType names one target (Auto Counter's front box).</summary>
     internal bool AreaProc { get; init; }
-    /// <summary>A follow-up's damage multiplier (Auto Counter +50% after a parried hit).</summary>
-    internal double ProcScale { get; init; } = 1;
+    /// <summary>A damage multiplier: a follow-up's (Auto Counter +50% after a parried hit), or Cross Ripper's blade count.</summary>
+    internal double ProcScale { get; set; } = 1;
     /// <summary>A follow-up that deals a set amount instead of the formula (Death Bound's reflected damage).</summary>
     internal long ProcFixedDamage { get; init; }
     /// <summary>Monsters a status of this cast already reached (Tetra Vortex's "at least 1" guarantee).</summary>
     internal HashSet<long> StatusLanded { get; } = new();
+    /// <summary>This cast's own cooldown ends once it lands (Cross Ripper thrown with every blade).</summary>
+    internal bool ResetsCooldown { get; set; }
     /// <summary>The cooldowns this cast started on accept, handed back if it is cancelled before its hit.</summary>
     internal IReadOnlyList<CooldownStamp>? Cooldowns { get; set; }
 }

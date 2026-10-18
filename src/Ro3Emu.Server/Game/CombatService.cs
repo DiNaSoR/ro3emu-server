@@ -289,6 +289,8 @@ public sealed partial class CombatService : IGameTicker
         character.ProgressHandlers.Add(buffs.ReconcileEnergyAsync);
         ExtraHitDamage.Add(DoubleAttackDamage);
         DamageAdjusters.Add(PreyOnTheWeak);
+        TakenAsync.Add((_, p, amount) => amount > 0 ? buffs.StealthHitAsync(p) : Task.CompletedTask);
+        DealtAsync.Add((s, _, _, amount) => amount > 0 ? buffs.StealthDealtAsync(s) : Task.CompletedTask);
         monsters.AttackPet = MonsterAttackPetAsync;
         monsters.AttackMonster = MonsterAttackMonsterAsync;
         buffs.UnitChanged.Add(PublishTowerPetStatsAsync);

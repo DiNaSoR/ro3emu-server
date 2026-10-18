@@ -29,10 +29,11 @@ public sealed partial class CombatService
 
     /// <summary>
     /// A server-started follow-up of <paramref name="row"/> from the player at <paramref name="target"/> (or, for an
-    /// area follow-up, around the player facing <paramref name="face"/>). No cost, cooldown or cast lock.
+    /// area follow-up, around the player facing <paramref name="face"/>; a ground follow-up centred at <paramref name="at"/>).
+    /// No cost, cooldown or cast lock. A row with a multi-part hit (<see cref="HitPlan"/>) lands its packets as a cast does.
     /// </summary>
     internal async Task ProcCastAsync(GameSession s, JsonElement row, MonsterUnit? target, float? face = null, bool area = false,
-        double scale = 1, long fixedDamage = 0)
+        double scale = 1, long fixedDamage = 0, Vec3? at = null)
     {
         if (s.Role == null || s.Dead || s.SceneLoading || target is { Dead: true } || target?.Hp <= 0) return;
         long id = ++_sessionIds;
@@ -41,7 +42,7 @@ public sealed partial class CombatService
         var request = new CastSkillReq
         {
             SkillId = (int)GameData.Int(row, "_iID"), TargetId = target?.Uid ?? 0,
-            TargetPos = (target?.Pos ?? origin).Clone(), Face = facing,
+            TargetPos = (at ?? target?.Pos ?? origin).Clone(), Face = facing,
         };
         var action = new ActiveSkillCast
         {
@@ -54,7 +55,8 @@ public sealed partial class CombatService
             SrcID = s.Role.Id, SkillID = request.SkillId, TargetId = request.TargetId, TargetPos = request.TargetPos, Face = facing,
             SessionId = id, SkillMs = action.ActionMs, StartTime = action.StartMs,
         }, highLevel: GameData.Int(row, "_iSkillEffectLevel") > 0, extra: true);
-        await ApplyEffectsAsync(s, action, request.TargetPos);
+        if (HitPlan(row) is { } plan) await ApplyStagedEffectsAsync(s, action, request.TargetPos, plan);
+        else await ApplyEffectsAsync(s, action, request.TargetPos);
     }
 
     /// <summary>
