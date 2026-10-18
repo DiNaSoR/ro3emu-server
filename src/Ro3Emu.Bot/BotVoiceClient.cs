@@ -116,6 +116,7 @@ public sealed record BotVoiceEchoEnd(BotVoiceEchoEndKind Kind, byte KickCode = 0
 public static class BotVoiceEcho
 {
     private static readonly TimeSpan PingEvery = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan StatsEvery = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan ReplyTimeout = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan InvitePoll = TimeSpan.FromMinutes(1);
 
@@ -165,14 +166,16 @@ public static class BotVoiceEcho
             var setup = await SetupAsync(voice, teamId, log, live.Token);
             if (setup != null) return setup;
             var echoes = Channel.CreateUnbounded<(long DueMs, byte[] Opus)>(new UnboundedChannelOptions { SingleReader = true });
-            var writer = EchoWriterAsync(voice, echoes.Reader, live.Token);
+            var stats = new EchoStats();
+            var writer = EchoWriterAsync(voice, echoes.Reader, stats, live.Token);
             var pinger = PingLoopAsync(voice, live.Token);
-            try { return await ReadLoopAsync(voice, roleId, (long)delay.TotalMilliseconds, echoes.Writer, log, live.Token); }
+            var reporter = StatsLoopAsync(stats, log, live.Token);
+            try { return await ReadLoopAsync(voice, roleId, (long)delay.TotalMilliseconds, echoes.Writer, stats, log, live.Token); }
             finally
             {
                 live.Cancel();
                 echoes.Writer.TryComplete();
-                await Task.WhenAll(Quiet(writer), Quiet(pinger));
+                await Task.WhenAll(Quiet(writer), Quiet(pinger), Quiet(reporter));
             }
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { return new(BotVoiceEchoEndKind.Cancelled); }
@@ -210,7 +213,7 @@ public static class BotVoiceEcho
     }
 
     private static async Task<BotVoiceEchoEnd> ReadLoopAsync(BotVoiceClient voice, long roleId, long delayMs,
-        ChannelWriter<(long DueMs, byte[] Opus)> echoes, Action<string> log, CancellationToken ct)
+        ChannelWriter<(long DueMs, byte[] Opus)> echoes, EchoStats stats, Action<string> log, CancellationToken ct)
     {
         while (true)
         {
@@ -219,7 +222,9 @@ public static class BotVoiceEcho
             {
                 case VoiceDown.Audio when payload.Length >= 10:
                     long speaker = BinaryPrimitives.ReadInt64LittleEndian(payload.AsSpan(0, 8));
-                    if (speaker != roleId) echoes.TryWrite((Environment.TickCount64 + delayMs, payload[10..]));
+                    if (speaker == roleId) break;
+                    stats.Received(Environment.TickCount64);
+                    echoes.TryWrite((Environment.TickCount64 + delayMs, payload[10..]));
                     break;
                 case VoiceDown.MemberChange when payload.Length >= 9:
                     log($"member {BinaryPrimitives.ReadInt64LittleEndian(payload.AsSpan(0, 8))} {(payload[8] != 0 ? "joined" : "left")} the voice room");
@@ -234,7 +239,7 @@ public static class BotVoiceEcho
 
     /// <summary>Sends the queued echoes in arrival order, each once its due time is reached, under the bot's own
     /// sequence numbers.</summary>
-    private static async Task EchoWriterAsync(BotVoiceClient voice, ChannelReader<(long DueMs, byte[] Opus)> echoes, CancellationToken ct)
+    private static async Task EchoWriterAsync(BotVoiceClient voice, ChannelReader<(long DueMs, byte[] Opus)> echoes, EchoStats stats, CancellationToken ct)
     {
         ushort seq = 0;
         await foreach (var (dueMs, opus) in echoes.ReadAllAsync(ct))
@@ -242,6 +247,50 @@ public static class BotVoiceEcho
             long wait = dueMs - Environment.TickCount64;
             if (wait > 0) await Task.Delay(TimeSpan.FromMilliseconds(wait), ct);
             await voice.SendAudioAsync(seq++, opus, ct);
+            stats.Sent(Environment.TickCount64 - dueMs);
+        }
+    }
+
+    /// <summary>One line every 10 s while audio flows: frames heard and echoed, the longest gap between heard frames
+    /// (a gap means the sender's audio stalled before it reached the bot), and how late echoes went out.</summary>
+    private static async Task StatsLoopAsync(EchoStats stats, Action<string> log, CancellationToken ct)
+    {
+        using var timer = new PeriodicTimer(StatsEvery);
+        while (await timer.WaitForNextTickAsync(ct))
+            if (stats.Take() is { } line) log(line);
+    }
+
+    private sealed class EchoStats
+    {
+        private readonly object _sync = new();
+        private int _received, _sent;
+        private long _lastAt, _maxGap, _maxLate;
+
+        public void Received(long now)
+        {
+            lock (_sync)
+            {
+                if (_lastAt != 0) _maxGap = Math.Max(_maxGap, now - _lastAt);
+                _lastAt = now;
+                _received++;
+            }
+        }
+
+        public void Sent(long lateMs)
+        {
+            lock (_sync) { _sent++; _maxLate = Math.Max(_maxLate, lateMs); }
+        }
+
+        public string? Take()
+        {
+            lock (_sync)
+            {
+                if (_received == 0 && _sent == 0) return null;
+                var line = $"stats 10s: heard {_received} frames (expect ~500), echoed {_sent}, longest gap {_maxGap} ms, echo late up to {_maxLate} ms";
+                _received = _sent = 0;
+                _maxGap = _maxLate = 0;
+                return line;
+            }
         }
     }
 

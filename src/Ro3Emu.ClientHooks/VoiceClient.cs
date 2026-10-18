@@ -55,6 +55,10 @@ namespace Ro3Emu.ClientHooks
         private static volatile Link _audioLink;
         private static int _audioSeq;
         private static long _selfId; // also read by the reader thread: Interlocked
+        private const long StatsEveryMs = 10000;
+        private static long _lastStats;
+        // 10 s stats line while joined (Interlocked: capture, writer and reader threads count).
+        private static int _captured, _peak, _linkDropped, _heard;
         private static string _lastNote;
 
         // ---- Called by the patched VoiceCallAdapter (main thread). Nothing may throw back into the game. ----
@@ -150,6 +154,8 @@ namespace Ro3Emu.ClientHooks
                 try { action(); }
                 catch (Exception e) { Debug.LogError("[Ro3Emu.Voice] " + e); }
             }
+            if (_joined != null) VoiceSettings.Poll(Clock.ElapsedMilliseconds);
+            if (_joined != null && Clock.ElapsedMilliseconds - _lastStats >= StatsEveryMs) LogStats();
             var link = _link;
             if (link != null && link.Authed && Clock.ElapsedMilliseconds - _lastPing >= PingEveryMs)
             {
@@ -278,6 +284,9 @@ namespace Ro3Emu.ClientHooks
         {
             var link = _audioLink;
             if (link == null) return;
+            Interlocked.Increment(ref _captured);
+            int peak = VoiceAudio.Agc.Process(pcm); // raw peak, before the automatic gain
+            if (peak > _peak) Interlocked.Exchange(ref _peak, peak); // racy max is fine for a log line
             MuLaw.Encode(pcm, pcm.Length, Encoded, 0);
             link.SendAudio(VoiceProtocol.AudioFrame((ushort)Interlocked.Increment(ref _audioSeq), VoiceProtocol.CodecMuLaw, Encoded, Encoded.Length));
         }
@@ -288,10 +297,26 @@ namespace Ro3Emu.ClientHooks
             if (!VoiceProtocol.ParseAudio(payload, out long speaker, out _, out byte codec, out int at) || speaker == Interlocked.Read(ref _selfId)) return;
             if (codec != VoiceProtocol.CodecMuLaw) { Post(() => Note("unknown audio codec " + codec)); return; }
             if (payload.Length - at != VoiceAudio.FrameSamples) return;
+            Interlocked.Increment(ref _heard);
             VoiceAudio.Push(speaker, MuLaw.Decode(payload, at, VoiceAudio.FrameSamples));
         }
 
         // ---- Helpers. ----
+
+        /// <summary>One line per 10 s while joined, for diagnosing choppy or late audio: frames the mic produced and its
+        /// loudest sample (0..32767; under ~300 the mic hears almost nothing), frames dropped before sending, frames
+        /// heard, and playback buffers that ran dry or overflowed. Expect about 500 frames per 10 s each way.</summary>
+        private static void LogStats()
+        {
+            _lastStats = Clock.ElapsedMilliseconds;
+            int captured = Interlocked.Exchange(ref _captured, 0), peak = Interlocked.Exchange(ref _peak, 0);
+            int dropped = Interlocked.Exchange(ref _linkDropped, 0), heard = Interlocked.Exchange(ref _heard, 0);
+            int dry = Interlocked.Exchange(ref VoiceAudio.Underruns, 0), over = Interlocked.Exchange(ref VoiceAudio.Overflows, 0);
+            if (captured == 0 && heard == 0 && dry == 0) return;
+            Debug.Log("[Ro3Emu.Voice] stats 10s: mic " + captured + " frames (peak " + peak + ", auto gain x"
+                + VoiceAudio.Agc.Gain.ToString("0.0", CultureInfo.InvariantCulture) + "), not sent " + dropped + ", heard " + heard
+                + ", playback ran dry " + dry + "x, overflow " + over + ", volume " + (int)(VoiceAudio.OutputScale * 100) + "%");
+        }
 
         /// <summary>Queues work for the main thread; false (nothing queued) once <see cref="MaxPending"/> wait.</summary>
         private static bool Post(Action action)
@@ -391,7 +416,7 @@ namespace Ro3Emu.ClientHooks
                 lock (_queue)
                 {
                     if (_closed) return;
-                    if (_audio.Count >= MaxAudio) _audio.Dequeue();
+                    if (_audio.Count >= MaxAudio) { _audio.Dequeue(); Interlocked.Increment(ref _linkDropped); }
                     _audio.Enqueue(frame);
                     Monitor.Pulse(_queue);
                 }

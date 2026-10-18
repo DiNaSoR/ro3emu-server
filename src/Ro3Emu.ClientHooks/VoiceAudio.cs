@@ -20,6 +20,12 @@ namespace Ro3Emu.ClientHooks
         /// <summary>Gains from the client's volume sliders (GME scale: 100 = unchanged); set from the main thread.</summary>
         public static volatile float MicGain = 1f, SpeakerGain = 1f;
 
+        /// <summary>The game's Master volume (0..1, 0 when muted or minimized with "Mute When Minimized"; VoiceSettings).</summary>
+        public static volatile float OutputScale = 1f;
+
+        /// <summary>Counters for the 10 s stats line (VoiceClient): a speaker's buffer ran dry while playing / overflowed.</summary>
+        public static int Underruns, Overflows;
+
         /// <summary>The longest a capture or playback thread sleeps without a buffer-done signal (a lost signal costs at most this).</summary>
         private const int WakeMs = 10;
 
@@ -62,6 +68,44 @@ namespace Ro3Emu.ClientHooks
         /// <summary>Drops one speaker's buffer (it left the room).</summary>
         public static void Forget(long speaker) => _playback?.Mixer.Remove(speaker);
 
+        /// <summary>
+        /// Automatic gain for the microphone (capture thread only): many PC mics deliver speech far below full scale
+        /// (peaks of a few percent), which plays back too quiet to follow. The gain rises slowly towards a level where
+        /// speech peaks reach <see cref="Target"/>, at most <see cref="MaxGain"/>, falls at once when a frame would clip,
+        /// and does not rise on frames quieter than <see cref="Gate"/> (background noise), which are also turned down.
+        /// </summary>
+        internal static class Agc
+        {
+            private const float Target = 12000f;
+            private const float MaxGain = 12f;     // about +22 dB
+            private const int Gate = 80;           // raw peak below this counts as silence
+            private const float GateLevel = 0.3f;  // silence frames are played at this share of the gain
+            private const float Release = 0.97f;   // the peak envelope halves in about 0.5 s
+            private const float Rise = 0.05f;      // per frame, towards the target gain
+
+            private static float _gain = 1f, _envelope;
+
+            public static float Gain => _gain;
+
+            /// <summary>Scales <paramref name="pcm"/> in place; returns the frame's raw peak (before the gain).</summary>
+            public static int Process(short[] pcm)
+            {
+                int peak = 0;
+                foreach (short v in pcm) peak = Math.Max(peak, Math.Abs((int)v));
+                _envelope = Math.Max(peak, _envelope * Release);
+                if (_envelope >= Gate)
+                {
+                    float target = Math.Max(1f, Math.Min(MaxGain, Target / _envelope));
+                    _gain = target < _gain ? target : _gain + (target - _gain) * Rise;
+                }
+                if (peak > 0 && peak * _gain > 30000f) _gain = 30000f / peak; // never clip
+                float applied = peak < Gate ? _gain * GateLevel : _gain;
+                if (Math.Abs(applied - 1f) < 0.01f) return peak;
+                for (int i = 0; i < pcm.Length; i++) pcm[i] = Clamp((int)(pcm[i] * applied));
+                return peak;
+            }
+        }
+
         internal static short Clamp(int sample) => (short)(sample > short.MaxValue ? short.MaxValue : sample < short.MinValue ? short.MinValue : sample);
 
         /// <summary>Per-speaker jitter buffers mixed into one output frame.</summary>
@@ -91,7 +135,7 @@ namespace Ro3Emu.ClientHooks
                         _speakers[id] = speaker = new Speaker();
                     }
                     speaker.Frames.Enqueue(pcm);
-                    while (speaker.Frames.Count > MaxFrames) speaker.Frames.Dequeue();
+                    while (speaker.Frames.Count > MaxFrames) { speaker.Frames.Dequeue(); Interlocked.Increment(ref Overflows); }
                 }
             }
 
@@ -109,14 +153,14 @@ namespace Ro3Emu.ClientHooks
             public void Mix(short[] output)
             {
                 Array.Clear(_sum, 0, _sum.Length);
-                float gain = SpeakerGain;
+                float gain = SpeakerGain * OutputScale;
                 lock (_speakers)
                 {
                     foreach (var speaker in _speakers.Values)
                     {
                         if (!speaker.Playing && speaker.Frames.Count >= StartFrames) speaker.Playing = true;
                         if (!speaker.Playing) continue;
-                        if (speaker.Frames.Count == 0) { speaker.Playing = false; continue; } // ran dry: buffer again
+                        if (speaker.Frames.Count == 0) { speaker.Playing = false; Interlocked.Increment(ref Underruns); continue; } // ran dry: buffer again
                         var frame = speaker.Frames.Dequeue();
                         for (int i = 0; i < FrameSamples; i++) _sum[i] += frame[i];
                     }
