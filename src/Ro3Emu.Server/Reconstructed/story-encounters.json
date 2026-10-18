@@ -1,0 +1,111 @@
+{
+  "version": 1,
+  "about": "Story boss encounters rebuilt from what the client holds (docs/systems/dungeon.md, 'Story encounters'). The original server's encounter scripts and boss behaviour trees (NPCConfig _iAISpecial MainStory_*) are not in the client. What is real: the boss and companion templates (NPCConfig), their skill kits (SkillConfig, named by _kScriptLogic), the skill timelines (data/skills, m_kShows effects and timings), the dialogue (ChatConfig 53xxxxx), the scene-editor points and the quest stages (DungeonQuestConfig). What is chosen here and marked as such: which skills a boss uses and in which order, every hit area and hit time, the stage triggers, the companions' rotations (except the priest, whose tree MainStory_MuShi ships) and when each line is said.",
+  "encounters": {
+    "1022001": {
+      "name": "Payon Forest: Eddga",
+      "confidence": "medium",
+      "boss": 5300001,
+      "bossSkillGapMs": 6000,
+      "retargetMs": 8000,
+      "why": "Scene 1022001 (sc_pay_fild10_001_pl01): boss point 20 (boss位置, NpcLevelPointRespawnConfig 5300001 Eddga), Wule at 21 (唔勒), Boya at 23 (保亚), two groups of six adventurer points 24 and 40 labelled 战 猎 奶 商 刺 法 (swordman, hunter, priest, merchant, thief, mage). Two DungeonQuestConfig stages: 1 'Cover Boya and Wule', 2 'Join the Adventurers and defeat Eddga'. The client has two sets of six story adventurers (5300007-09 + 5300070-72, and the '2' variants 5300073-78) and the fighting Wule/Boya templates 5300086/87 with their own skills.",
+      "bossSkills": [
+        {
+          "skill": 5300201,
+          "why": "MainStory_HuWangSkill1, timeline 53002: Skill1_1 animation, fx_eddga_skill01_flame_xuli charge at 2.5 s. A flame claw in front; the 120 degree, 6 m cone and the hit at 2.6 s are chosen.",
+          "hits": [ { "ms": 2600, "shape": "cone", "radius": 6, "angle": 120 } ],
+          "line": 5300006
+        },
+        {
+          "skill": 5300501,
+          "why": "MainStory_HuWangSkill4, timeline 53005: fx_eddga_skill_impact_xuli at 1.67 s, fx_eddga_skill_impact 4 m in front (scale 2) and a camera shake at 3.33 s: the jump and landing. A 5 m circle centred 4 m in front at 3.33 s (chosen from that offset).",
+          "hits": [ { "ms": 3333, "shape": "circle", "radius": 5, "forward": 4 } ],
+          "line": 5300007
+        },
+        {
+          "skill": 5300301,
+          "why": "MainStory_HuWangSkill2, timeline 53003: fx_eddga_skill_shootfire_xuli then fx_eddga_skill_shootfire from the head, two hit marks: a fire breath. A 12 x 4 m strip in front, hit at 3.2 s and 4.4 s, half the damage each (chosen).",
+          "hits": [
+            { "ms": 3200, "shape": "rect", "length": 12, "width": 4, "share": 5000 },
+            { "ms": 4400, "shape": "rect", "length": 12, "width": 4, "share": 5000 }
+          ]
+        },
+        {
+          "skill": 5300401,
+          "why": "MainStory_HuWangSkill3, timeline 53004: Skill1_6 three times, fx_eddga_skill_groundflame_xuli at 2.83 s, mark groups at 0, 2.52 and 5.1 s: ground flames around Eddga. A 7 m circle at 2.9, 5.4 and 7.6 s, a third of the damage each (chosen).",
+          "hits": [
+            { "ms": 2900, "shape": "circle", "radius": 7, "share": 3333 },
+            { "ms": 5400, "shape": "circle", "radius": 7, "share": 3333 },
+            { "ms": 7600, "shape": "circle", "radius": 7, "share": 3334 }
+          ],
+          "line": 5300009
+        },
+        {
+          "skill": 5300701,
+          "why": "MainStory_HuWangShouting, timeline 53007: fx_mainstoryeddga_buff_roar at 1.5 s and a camera shake. An 8 m roar around Eddga at 1.5 s (chosen); 240% of ATK.",
+          "hits": [ { "ms": 1500, "shape": "circle", "radius": 8 } ]
+        }
+      ],
+      "kits": {
+        "5300007": { "skills": [5330101, 5330201, 5330301, 5330401], "why": "MainStory_ZhanShi: the swordman kit AttackSword, Bash, Magnum Break, Provoke (SkillConfig 53301xx-53304xx)." },
+        "5300073": { "skills": [5330101, 5330201, 5330301, 5330401], "why": "MainStory_ZhanShi2: same swordman kit." },
+        "5300008": { "skills": [5330901, 5331001, 5331101, 5331201], "why": "MainStory_FaShi: the mage kit Attack, Fire/Lightning/Cold Bolt. Safety Wall 5331301 is left out (no ground protection for monsters here)." },
+        "5300074": { "skills": [5330901, 5331001, 5331101, 5331201], "why": "MainStory_FaShi2: same mage kit." },
+        "5300009": { "skills": [5330501, 5330601, 5330701, 5330801], "support": true, "why": "MainStory_MuShi: behaviour tree 10803 ships in the client: Blessing 5330501, Increase AGI 5330601, then Sanctuary 5330701 / Heal 5330801 on camp-1 allies below 95% HP." },
+        "5300075": { "skills": [5330501, 5330601, 5330701, 5330801], "support": true, "why": "MainStory_MuShi2: same priest kit and rules." },
+        "5300070": { "skills": [5331401, 5331501, 5331601, 5331701], "why": "MainStory_LieRen: the hunter kit HunterAttack, Double Strafe, Arrow Shower, Wind Walker." },
+        "5300076": { "skills": [5331401, 5331501, 5331601, 5331701], "why": "MainStory_LieRen2: same hunter kit." },
+        "5300071": { "skills": [5332201, 5332301, 5332401, 5332501], "why": "MainStory_DaoZei: the thief kit ThiefAttack, Sonic Blow, Envenom, Enchant Poison." },
+        "5300077": { "skills": [5332201, 5332301, 5332401, 5332501], "why": "MainStory_DaoZei2: same thief kit." },
+        "5300072": { "skills": [5331801, 5331901, 5332001, 5332101], "why": "MainStory_ShangRen: the merchant kit NormalAttack, Cart Revolution, Adrenaline Rush, Power Thrust." },
+        "5300078": { "skills": [5331801, 5331901, 5332001, 5332101], "why": "MainStory_ShangRen2: same merchant kit." },
+        "5300086": { "skills": [5353601, 5353901], "why": "Wule: NPCConfig _kSkills [5353901 MainStory_WuLe, 5353601 swing]." },
+        "5300087": { "skills": [5353701, 5354001], "why": "Boya: NPCConfig _kSkills [5354001 MainStory_BaoYa, 5353701 swing]." }
+      },
+      "stages": [
+        {
+          "quest": 1,
+          "why": "'Cover Boya and Wule': Wule and Boya are already fighting Eddga. Wule asks the player to hold Eddga off while the flare is readied (5300017). Eddga opens on Boya (chosen).",
+          "allies": [ { "npc": 5300086, "point": 21 }, { "npc": 5300087, "point": 23 } ],
+          "firstTarget": 5300087,
+          "lines": [
+            { "chat": 5300018, "by": 5300087, "ms": 500 },
+            { "chat": 5300019, "ms": 3000 },
+            { "chat": 5300016, "by": 5300087, "ms": 6000 },
+            { "chat": 5300017, "by": 5300086, "ms": 9000 },
+            { "chat": 5300020, "ms": 12000 }
+          ],
+          "end": { "bossHpPct": 60, "ms": 45000, "why": "Chosen: the stage ends when Eddga is down to 60% or after 45 s, whichever comes first." },
+          "endLines": [
+            { "chat": 5300021, "by": 5300087, "ms": 0 },
+            { "chat": 5300022, "by": 5300087, "ms": 2500 },
+            { "chat": 5300023, "by": 5300086, "ms": 5000 },
+            { "chat": 5300024, "by": 5300087, "ms": 7500 },
+            { "chat": 5300025, "ms": 10000 }
+          ],
+          "endDelayMs": 12500
+        },
+        {
+          "quest": 2,
+          "why": "'Join the Adventurers and defeat Eddga': the flare brings two parties of six (groups 24 and 40), each a full set of the story adventurer templates.",
+          "allies": [
+            { "npc": 5300007, "point": 34 }, { "npc": 5300070, "point": 35 }, { "npc": 5300009, "point": 36 },
+            { "npc": 5300072, "point": 37 }, { "npc": 5300071, "point": 38 }, { "npc": 5300008, "point": 39 },
+            { "npc": 5300073, "point": 41 }, { "npc": 5300076, "point": 42 }, { "npc": 5300075, "point": 43 },
+            { "npc": 5300078, "point": 44 }, { "npc": 5300077, "point": 45 }, { "npc": 5300074, "point": 46 }
+          ],
+          "lines": [
+            { "chat": 5300026, "by": 5300007, "ms": 0 },
+            { "chat": 5300033, "by": 5300073, "ms": 2500 },
+            { "chat": 5300027, "by": 5300009, "ms": 5000 },
+            { "chat": 5300028, "by": 5300007, "ms": 7500 },
+            { "chat": 5300030, "by": 5300008, "ms": 10000 },
+            { "chat": 5350105, "ms": 16000 },
+            { "chat": 5300032, "ms": 22000 }
+          ]
+        }
+      ],
+      "winLines": [ { "chat": 5300012 } ]
+    }
+  }
+}

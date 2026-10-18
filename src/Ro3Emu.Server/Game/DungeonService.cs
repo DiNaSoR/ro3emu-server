@@ -65,7 +65,7 @@ public sealed partial class DungeonService
         FunctionService functions, SeasonService seasons, InstanceService instances, TeamService teams,
         SessionRegistry sessions, RewardService rewards, AuctionService auctions, GuildStore guilds, MonsterService monsters, CombatService combat,
         SceneService scene, BuffService buffs, GameLoop loop, TimeProvider clock, ILogger<DungeonService> log, World world,
-        GmCommands gm)
+        GmCommands gm, ReconstructedDungeons? reconstructed = null)
     {
         this.data = data; this.catalog = catalog; this.roles = roles; this.owners = owners;
         this.obligations = obligations; this.character = character;
@@ -78,6 +78,7 @@ public sealed partial class DungeonService
         this.scenes = scene;
         this.world = world;
         gm.Register("actors", "[npcId | walk <x> <z> | use] (scripted scene test aid: the step's scene actors, jump beside one, arrive at x z as a walk would, or complete the step server-side)", ActorsGmAsync);
+        gm.Register("encounter", "[next] (story encounter test aid: its stage, quest and companions; next starts the next stage now)", EncounterGmAsync);
         teams.MultiDungeonInfo = TeamDungeonInfo;
         combat.DamageAdjusters.Add((s, m, _, _, damage) => BondDamage(s, m, damage, incoming: false));
         combat.IncomingDamageAdjusters.Add((m, s, _, damage) => Task.FromResult(BondDamage(s, m, damage, incoming: true)));
@@ -91,6 +92,7 @@ public sealed partial class DungeonService
         combat.Taken.Add((m, s, n, dead) => { if (Active(s) is { } a && m.InstanceId == a.Room.Id) a.Stats[s.Role!.Id].TotalBeDamage += n; });
         combat.Healed.Add((s, n) => { if (Active(s) is { } a) a.Stats[s.Role!.Id].TotalCure += n; });
         character.ProgressHandlers.Add(SyncLockedAsync); // CharacterService invokes these while holding StateLock.
+        UseReconstruction(reconstructed);
     }
 
     public sealed class Attempt
@@ -125,6 +127,8 @@ public sealed partial class DungeonService
         public bool Started { get; set; }
         public bool Settled { get; set; }
         public int Wave { get; set; }
+        /// <summary>The scene's story boss encounter while it runs (DungeonService.Encounter).</summary>
+        internal EncounterRun? Encounter { get; set; }
         public int Spawned { get; set; }
         /// <summary>Spawned before the current wave (its own kill count is Killed.Count minus this).</summary>
         public int WaveBase { get; set; }
@@ -407,7 +411,7 @@ public sealed partial class DungeonService
     /// </summary>
     private DungeonVar? QuestList(Attempt a)
     {
-        if (a.Wave >= a.Plan.Waves.Count || a.Plan.Waves[a.Wave].Quest is not (> 0 and var current)) return null;
+        if (CurrentQuest(a) is not (> 0 and var current)) return null;
         var v = new DungeonVar { VarId = 10001 };
         v.Vi64.Add(data.Table("DungeonQuestConfig").Values
             .Where(q => GameData.Int(q, "_iDungeonID") == a.Plan.SceneEntry && GameData.Int(q, "_iQuestID") <= current)
@@ -422,7 +426,7 @@ public sealed partial class DungeonService
     /// </summary>
     private static DungeonVar? GoalParams(Attempt a)
     {
-        if (a.Wave >= a.Plan.Waves.Count || a.Plan.Waves[a.Wave].Quest <= 0) return null;
+        if (a.Wave >= a.Plan.Waves.Count || CurrentQuest(a) <= 0) return null;
         int size = a.Plan.Waves[a.Wave].Spawns.Count;
         var v = new DungeonVar { VarId = 10003 };
         if (Step(a) is { } step)
@@ -483,6 +487,7 @@ public sealed partial class DungeonService
         a.Started = true; a.StartedAt = loop.Now; a.StartMs = MonsterService.NowMs;
         await BroadcastAsync(a, BaseInfo, Snapshot(a));
         await SpawnWaveAsync(a);
+        await BeginEncounterAsync(a);
         loop.ScheduleLegacy(TimeSpan.FromMilliseconds(a.Plan.DurationMs), () => a.Settled || a.Room.Closed ? Task.CompletedTask : SettleAsync(a, false));
     }
 
@@ -751,6 +756,7 @@ public sealed partial class DungeonService
     private async Task SettleAsync(Attempt a, bool won)
     {
         if (a.Settled || a.Room.Closed) return;
+        await EndEncounterAsync(a, won);
         if (a.GuildChallenge is { } challenge)
         {
             a.Settled = true;
