@@ -76,12 +76,15 @@ public sealed partial class DungeonService
         a.StepDone = false;
         await SyncSceneActorsAsync(a, step.Actors);
         if (step.Story != 0 && !a.Settled && !a.Room.Closed)
+        {
+            foreach (var s in Present(a).Where(a.Loaded.Contains)) s.BeginCutscene();
             // Once, in a var-change event: the client calls PlayCutSceneStory on every push of this var.
             await BroadcastAsync(a, Event, new DungeonEventNotify
             {
                 DungeonEntry = a.Plan.SceneEntry, EventType = (DungeonEventType)4, // DungeonEventDungeonVarChange
                 StageNum = a.Wave + 1, LevelNum = 1, Vars = { new DungeonVar { VarId = StoryVar, Vi64 = { step.Story } } },
             });
+        }
     }
 
     /// <summary>

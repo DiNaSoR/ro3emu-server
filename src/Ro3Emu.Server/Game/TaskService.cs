@@ -205,8 +205,26 @@ public sealed partial class TaskService
     }
 
     /// <summary>31209 CLIENT_ENTERAREA: target 104003 [map, area] (the region itself is trusted to the client).</summary>
-    public Task OnAreaAsync(GameSession session, ClientEnterAreaReq req) =>
-        ProgressAsync(session, TArea, t => t.Length >= 3 && t[1] == session.SceneEntry && t[2] == req.AreaId ? 1 : 0);
+    public Task OnAreaAsync(GameSession session, ClientEnterAreaReq req)
+    {
+        // A PlotInterpretation _kTrigger [map, area, task] story plays on this entry while its task runs
+        // (LC_CutSceneManager._onEnterAreaTrigger), before the area target below can finish that task.
+        if (AreaStoryTasks().TryGetValue((session.SceneEntry, req.AreaId), out var storyTasks)
+            && storyTasks.Any(task => session.Tasks?.Infos.TryGetValue(task, out var info) == true && info.Status == Running))
+            session.BeginCutscene();
+        return ProgressAsync(session, TArea, t => t.Length >= 3 && t[1] == session.SceneEntry && t[2] == req.AreaId ? 1 : 0);
+    }
+
+    private Dictionary<(long Map, long Area), long[]>? _areaStoryTasks;
+
+    /// <summary>PlotInterpretation rows with a [map, area trigger, task] _kTrigger, by map and area.</summary>
+    private Dictionary<(long Map, long Area), long[]> AreaStoryTasks() => _areaStoryTasks ??= data.Table("PlotInterpretation").Values
+        .Select(row => row.TryGetProperty("_kTrigger", out var t) && t.ValueKind == JsonValueKind.Array && t.GetArrayLength() >= 3
+            && t[0].TryGetInt64(out long map) && t[1].TryGetInt64(out long area) && t[2].TryGetInt64(out long task)
+            ? (map, area, task) : (0L, 0L, 0L))
+        .Where(t => t.Item3 != 0)
+        .GroupBy(t => (t.Item1, t.Item2), t => t.Item3)
+        .ToDictionary(g => g.Key, g => g.ToArray());
 
     /// <summary>31214 TASK_TRIGGER_EVENT: target 103046 [interactId, n]; the request's taskId field carries the interaction id.</summary>
     public async Task OnClientInteractAsync(GameSession session, TriggerTaskEventReq req)
@@ -241,8 +259,11 @@ public sealed partial class TaskService
             && emoji == emojiId && insideRegion(map, region) ? 1 : 0);
 
     /// <summary>84011 PLOT_ACTING_END: target 309002 [plotId] (required = the plot id, the client's describe quirk).</summary>
-    public Task OnPlotEndAsync(GameSession session, PlotActingEndReq req) =>
-        ProgressAsync(session, TPlot, t => t.Length >= 2 && t[1] == req.PlotId ? long.MaxValue : 0);
+    public Task OnPlotEndAsync(GameSession session, PlotActingEndReq req)
+    {
+        session.EndCutscene();
+        return ProgressAsync(session, TPlot, t => t.Length >= 2 && t[1] == req.PlotId ? long.MaxValue : 0);
+    }
 
     /// <summary>103022 follows MvpService's participant settlement, including non-final-killer contributors.</summary>
     public Task OnMvpParticipantAsync(GameSession session) =>
@@ -682,6 +703,7 @@ public sealed partial class TaskService
         session.Tasks = next;
         if (daily?.MirrorChanged == true && SyncDailyDelivery is { } sync) await sync(session);
         if (cutScene) session.InCutScene = true;
+        if (cutScene || def.ExecActions.Any(StartsCutscene)) session.BeginCutscene();
         if (deliveredPlan != null) foreach (var handler in QuestDelivered) handler(session, id, deliveredPlan);
         log.LogInformation("{Name} delivers task {Task} {TaskName}: exp {Exp}", session.Role?.Name, id,
             data.TextOf(data.Row("TaskConfig", id)!.Value, "_iName"), def.Exp);
@@ -737,6 +759,7 @@ public sealed partial class TaskService
         var info = session.Tasks.Infos[id];
         int step = Enumerable.Range(0, def.Targets.Length).FirstOrDefault(i => info.CompleteNum[i] != Required(session, def.Targets[i]), -1);
         if (step >= 0 && step < def.AcceptActions.Length && ServerOpcode(def.AcceptActions[step]) == 621) session.InCutScene = true;
+        if (step >= 0 && step < def.AcceptActions.Length && StartsCutscene(def.AcceptActions[step])) session.BeginCutscene();
         log.LogInformation("{Name} accepts task {Task} {TaskName}", session.Role?.Name, id, data.TextOf(data.Row("TaskConfig", id)!.Value, "_iName"));
     }
 

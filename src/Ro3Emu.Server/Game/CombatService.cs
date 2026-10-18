@@ -268,6 +268,7 @@ public sealed partial class CombatService : IGameTicker
         monsters.Attack = MonsterAttackAsync;
         buffs.ImmuneDeathDeclined = PlayerDiesAsync;
         scene.Leaving.Add(ClearSkillsAsync);
+        scene.Leaving.Add(s => { s.EndCutscene(); return Task.CompletedTask; }); // a story never outlives its scene
         scene.Leaving.Add(buffs.ClearOnSceneAsync);
         character.ExtraAttributes.Add(PassiveAttributes);
         character.ExtraAttributes.Add(ResonanceAttributes); // Job Resonance stats (CombatService.Restraint)
@@ -558,6 +559,7 @@ public sealed partial class CombatService : IGameTicker
         using var held = await CharacterService.Lock(target);
         if (target.Dead || targetRole == null || !ReferenceEquals(target.Role, targetRole) || target.SceneLoading
             || valid?.Invoke() == false) return null;
+        if (target.CutsceneProtected) return null; // nothing lands while a story plays (GameSession.CutsceneProtected)
         // A missed/fully absorbed hit must not spend a finite Safety Wall charge.
         if (damage > 0 && (buffs.HasForbidden(target, 9) || await GroundProtectsAsync(target, row))) damage = 0;
         // (inferred) Support damage reductions precede the finite shield and lethal-hit handling.
