@@ -20,6 +20,17 @@ public sealed class GameData(IOptions<ServerOptions> options, ILogger<GameData> 
     private volatile FrozenDictionary<string, Dictionary<string, JsonElement>>? _frozen;
 
     private string Root => options.Value.GameDataDir ?? options.Value.DataDir;
+    private CustomContent? _custom;
+
+    /// <summary>Content written for this server (content/*.json), overlaid on the tables as they load.</summary>
+    public CustomContent Custom
+    {
+        get
+        {
+            if (_custom is { } loaded) return loaded;
+            lock (_sync) return _custom ??= CustomContent.Load(options.Value.CustomContentDir, log);
+        }
+    }
 
     /// <summary>Rows of a table keyed as in the client (usually the id as a string).</summary>
     public IReadOnlyDictionary<string, JsonElement> Table(string name)
@@ -33,8 +44,9 @@ public sealed class GameData(IOptions<ServerOptions> options, ILogger<GameData> 
             else
             {
                 table = new();
-                log.LogWarning("No {Path}; run tools/ConfigExport", path);
+                if (!Custom.Rows.ContainsKey(name)) log.LogWarning("No {Path}; run tools/ConfigExport", path);
             }
+            Custom.Overlay(name, table, log);
             _tables[name] = table;
             return table;
         }
@@ -75,7 +87,13 @@ public sealed class GameData(IOptions<ServerOptions> options, ILogger<GameData> 
         var files = (Directory.Exists(config) ? Directory.GetFiles(config, "*.json").Select(p => (Key: Path.GetFileNameWithoutExtension(p), Path: p, Config: true)) : [])
             .Concat(Directory.Exists(skills) ? Directory.GetFiles(skills, "*.json").Select(p => (Key: "skills/" + Path.GetFileNameWithoutExtension(p), Path: p, Config: false)) : [])
             .ToArray();
-        Parallel.ForEach(files, f => loaded[f.Key] = f.Config ? LoadConfig(f.Path) : LoadObject(f.Path));
+        var custom = Custom;
+        Parallel.ForEach(files, f =>
+        {
+            var table = f.Config ? LoadConfig(f.Path) : LoadObject(f.Path);
+            if (f.Config) custom.Overlay(f.Key, table, log);
+            loaded[f.Key] = table;
+        });
         lock (_sync)
         {
             foreach (var (key, table) in loaded) _tables.TryAdd(key, table);

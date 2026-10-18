@@ -6,6 +6,7 @@
 - [Open content](guide/open-content.md): every feature the client can show is playable (`Ro3Emu:OpenContent`)
 - [Rates](guide/rates.md): Base/Job EXP, item drop and currency drop multipliers for monster kills (`Ro3Emu:Rates`)
 - [Starter kit](guide/starter-kit.md): what a new character starts with (nothing by default; `Ro3Emu:StarterKit`)
+- [Custom content](guide/custom-content.md): your own quests, NPCs, dialogue and text (`content/*.json`)
 - [Bug reports](guide/feedback.md): the in-game Feedback button and `/bug`, and how to read the reports
 - [Launcher and patch repository](guide/launcher.md): hosting the client for your players
 

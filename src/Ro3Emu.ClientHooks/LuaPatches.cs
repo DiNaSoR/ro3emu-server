@@ -32,6 +32,8 @@ namespace Ro3Emu.ClientHooks
     /// <item>The client's crystal checks (buy dialog, Fashion cart, exchange) count bound crystals too, which the server
     /// spends first on crystal prices (BoundCrystals).</item>
     /// <item>Profile cards without stickers parse (LC_DAL_Personal.ParsePersonalInfo walks a nil list; PersonalCards).</item>
+    /// <item>The server's custom content (quests, NPCs, dialogue, texts) is added to the client's config tables
+    /// (CustomContent).</item>
     /// </list>
     /// </summary>
     public static class LuaPatches
@@ -85,6 +87,7 @@ namespace Ro3Emu.ClientHooks
                 if (env == null) { Report(why); return; }
                 var global = ((Obf_R.Obf_Cf)env).Obf_A;
                 MapModules.Install(env, global); // own once-per-LuaEnv guard; needs only package.loaded
+                CustomContent.Tick(); // every tick: re-adds the server's custom rows when a table was reloaded
                 if (ReferenceEquals(env, _doneEnv)) { ServerDayGates.Probe(); LuaLogs.Probe(env, global); TopUpButton.Probe(global); return; }
                 _topBarClass = _evePanelClass = null;
                 // GlobalRequire sets LC_ItemShowHelper once the game's modules are up; before that, requiring is unsafe.

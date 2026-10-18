@@ -42,6 +42,10 @@ public sealed class ServerOptions
     /// </summary>
     public string? GameDataDir { get; set; }
 
+    /// <summary>Quests, NPCs, dialogue and text written for this server (docs/guide/custom-content.md): every *.json in
+    /// this folder. Relative to the working directory, like DataDir; a missing folder means no custom content.</summary>
+    public string CustomContentDir { get; set; } = "content";
+
     /// <summary>Walk check against the client's nav grid: "off", "log" (report only) or "enforce" (snap back).</summary>
     public string WalkCheck { get; set; } = "log";
 

@@ -144,6 +144,11 @@ namespace Ro3Emu.ClientHooks
                 _diagnostics.Enqueue(System.Text.Encoding.UTF8.GetString(memory.ToArray()));
                 return;
             }
+            if (msgId == CustomContent.MsgId)
+            {
+                CustomContent.Receive(memory.ToArray());
+                return;
+            }
             if (msgId != DownMsgId || memory.Length < 8) return;
             var data = memory.ToArray();
             _inbound.Enqueue(new Frame
