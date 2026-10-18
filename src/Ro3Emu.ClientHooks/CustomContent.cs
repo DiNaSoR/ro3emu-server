@@ -140,10 +140,14 @@ namespace Ro3Emu.ClientHooks
                     if (values == null) { Once("table " + table.Key + " not found"); continue; }
                     if (!force && !Missing(rawget, values, First(table.Value.Keys))) continue;
                     int added = 0;
+                    var meta = RowMeta(global, rawget, values, table.Value);
+                    if (meta == null) Once(table.Key + ": no row metatable found, rows keep no defaults");
                     foreach (var row in table.Value)
                     {
                         if (Missing(rawget, values, row.Key)) added++;
-                        rawset.Obf_HuA(values, row.Key, ToLua(row.Value, pack, rawset));
+                        var value = ToLua(row.Value, pack, rawset);
+                        if (meta != null) Adopt(global, rawget, value, row.Value, meta);
+                        rawset.Obf_HuA(values, row.Key, value);
                     }
                     if (added > 0 && data != null && LuaPatches.ToLong(data.Obf_RuA<object>("m_kCount")) is long count && count != long.MinValue)
                         rawset.Obf_HuA(data, "m_kCount", count + added);
@@ -191,6 +195,56 @@ namespace Ro3Emu.ClientHooks
                 if (manager != null) data = LuaPatches.Module(manager, global, table.ToLowerInvariant());
             }
             return data?.Obf_RuA<Obf_R.Obf_ff>("m_kValues");
+        }
+
+        /// <summary>
+        /// The metatable the client's config module gives its rows (DialogueConfig.lua's tail: every row, or every entry
+        /// of a row array, gets { __index = defaults, __newindex = read-only guard, __pairs }). The exported data leaves
+        /// out fields equal to the default, so rows without it read nil there (DialogueConfig _iSortID: "attempt to
+        /// compare number with nil" in GetNextDialogueConfig). Taken from the first rows of the table that are not ours;
+        /// for an array row, from its first entry. Null when none is found.
+        /// </summary>
+        private static Obf_R.Obf_ff RowMeta(Obf_R.Obf_ff global, Obf_R.Obf_Ef rawget, Obf_R.Obf_ff values, Dictionary<long, object> ours)
+        {
+            var next = global.Obf_LuA<Obf_R.Obf_Ef>("next");
+            var getmetatable = global.Obf_LuA<Obf_R.Obf_Ef>("getmetatable");
+            if (next == null || getmetatable == null) return null;
+            object key = null;
+            for (int i = 0; i < 64; i++)
+            {
+                var r = next.Obf_HuA(values, key);
+                if (r == null || r.Length < 2 || r[0] == null) return null;
+                key = r[0];
+                if (LuaPatches.ToLong(key) is long k && ours.ContainsKey(k)) continue;
+                if (!(r[1] is Obf_R.Obf_ff sample)) continue;
+                if (MetaOf(getmetatable, sample) is Obf_R.Obf_ff meta) return meta;
+                var first = rawget.Obf_HuA(sample, 1L);
+                if (first != null && first.Length > 0 && first[0] is Obf_R.Obf_ff entry && MetaOf(getmetatable, entry) is Obf_R.Obf_ff inner)
+                    return inner;
+            }
+            return null;
+        }
+
+        private static Obf_R.Obf_ff MetaOf(Obf_R.Obf_Ef getmetatable, Obf_R.Obf_ff table)
+        {
+            var r = getmetatable.Obf_HuA(table);
+            return r != null && r.Length > 0 ? r[0] as Obf_R.Obf_ff : null;
+        }
+
+        /// <summary>Gives a new row (or each entry of a new row array) the client's row metatable.</summary>
+        private static void Adopt(Obf_R.Obf_ff global, Obf_R.Obf_Ef rawget, object value, object json, Obf_R.Obf_ff meta)
+        {
+            var setmetatable = global.Obf_LuA<Obf_R.Obf_Ef>("setmetatable");
+            if (setmetatable == null || !(value is Obf_R.Obf_ff table)) return;
+            if (json is List<object> list)
+            {
+                for (int i = 1; i <= list.Count; i++)
+                {
+                    var r = rawget.Obf_HuA(table, (long)i);
+                    if (r != null && r.Length > 0 && r[0] is Obf_R.Obf_ff entry) setmetatable.Obf_HuA(entry, meta);
+                }
+            }
+            else setmetatable.Obf_HuA(table, meta);
         }
 
         private static bool Missing(Obf_R.Obf_Ef rawget, Obf_R.Obf_ff table, long key)
