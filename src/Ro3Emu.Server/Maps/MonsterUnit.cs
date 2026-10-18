@@ -52,6 +52,13 @@ public sealed class MonsterUnit : WorldUnit
     public GameSession? Target { get; set; }
     /// <summary>Tower pet currently drawing this monster's attacks; owner remains the fallback target (inferred).</summary>
     public TowerPetUnit? PetTarget { get; set; }
+    /// <summary>Another monster this one fights: a story encounter's allied companion and the boss it attacks, or the
+    /// boss turning on a companion (DungeonService.Encounter). Its owner chooses it; the brain only chases and swings.</summary>
+    public MonsterUnit? MonsterTarget { get; set; }
+    /// <summary>Until this server millisecond the unit performs a skill: it neither moves nor swings.</summary>
+    public long BusyUntilMs { get; set; }
+    /// <summary>An encounter owner chooses this unit's targets: hits taken do not redirect it (MonsterService.Engage).</summary>
+    public bool ScriptedTargeting { get; set; }
     public long NextSwingMs { get; set; }
     public long NextChaseMs { get; set; }
     public bool Returning { get; set; }

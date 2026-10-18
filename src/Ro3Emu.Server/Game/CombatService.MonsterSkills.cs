@@ -11,13 +11,14 @@ public sealed partial class CombatService
     /// A monster skill landing on players (MVP minion blasts, boss ground fields): the row's damage from the caster's
     /// stats (the same inferred formula as a monster swing), the protected HP transition, one 31101 per player from
     /// <paramref name="sourceId"/> (the caster or its ground object) and the row's _kBuff2 on each surviving player.
-    /// Returns the number of players hit.
+    /// Returns the number of players hit. <paramref name="scaleBp"/> scales the damage (one hit of a multi-hit skill).
     /// </summary>
-    internal async Task<int> MonsterSkillHitAsync(MonsterUnit caster, JsonElement row, IEnumerable<GameSession> targets, long sourceId)
+    internal async Task<int> MonsterSkillHitAsync(MonsterUnit caster, JsonElement row, IEnumerable<GameSession> targets, long sourceId,
+        long scaleBp = 10000, long sessionId = 0)
     {
         if (caster.Dead || caster.Hp <= 0) return 0;
         int skillId = (int)GameData.Int(row, "_iID");
-        long session = ++_sessionIds;
+        long session = sessionId > 0 ? sessionId : ++_sessionIds;
         int show = HitEffect(GameData.Int(row, "_iScriptShow"));
         int element = (int)GameData.Int(row, "_iEleType") is var e and > 1 ? e : caster.Template.Element;
         var attacker = new Fighter(caster.Template.Atk, caster.Template.Matk, caster.Template.Hit, caster.Template.Cri,
@@ -35,6 +36,7 @@ public sealed partial class CombatService
             var defender = new Fighter(0, 0, 0, 0, p.Progress.Level, 1) { Def = stats[105], Mdef = stats[106], Flee = stats[110], ResCri = stats[112] };
             var (damage, result) = Damage(attacker, defender, row);
             damage = ScaleMonsterDamage(damage, caster.DamageRatio);
+            if (scaleBp != 10000 && damage > 0) damage = Math.Max(1, damage * scaleBp / 10000);
             foreach (var adjust in MonsterDamageAdjusters) damage = adjust(caster, damage, true);
             if (damage > 0) foreach (var modifier in IncomingDamageAdjusters) damage = Math.Max(0, await modifier(caster, p, result, damage));
             var committed = await CommitPlayerDamageAsync(p, damage, row, Current, sourceElement: element);

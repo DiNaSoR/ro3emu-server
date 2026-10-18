@@ -120,6 +120,31 @@ Reconstructed story encounters (`ReconstructedDungeons`, switch `Ro3Emu:Reconstr
 - `DungeonTests.Reconstructed` resolves every reconstructed plan, clears each dungeon wave by wave to a win with the
   tracker vars checked, counts a clear toward its 101018 quest, and switches off.
 
+Story encounters (`Reconstructed/story-encounters.json`, same switch; `DungeonService.Encounter`):
+
+- What the client holds: the boss and companion templates, their SkillConfig kits (story rows 5300101-5380101, named by
+  `_kScriptLogic`), skill timelines (`data/skills`), the ChatConfig story lines (5300001-5380010, never referenced
+  by client code, so server-pushed), the scene-editor points and the DungeonQuestConfig stages. What it does not: the
+  encounter scripts, the boss behaviour trees (`_iAISpecial` MainStory_HuWang etc.; only MainStory_MuShi ships) and
+  any hit shape (`_kRange` is empty). Every rotation, hit area, hit time, stage trigger and line timing in the file is
+  chosen and says so.
+- First encounter: Payon Forest Eddga (1022001). Stage 1 "Cover Boya and Wule": the fighting Wule and Boya (5300086/87)
+  are at points 21 and 23 and Eddga opens on Boya. At 60% boss HP or after 45 s, the flare lines play and stage 2
+  "Join the Adventurers" brings two parties of six story adventurers (points 34-39 and 41-46) with their class kits.
+  Eddga casts his own kit (flame claw cone, jump impact, fire breath strip, ground flames, roar) between swings,
+  hitting players and companions in the area fixed at the cast start; he retargets every 8 s (a player weighs twice a
+  companion), and the swordman's Provoke pulls him.
+- Companions are camp-1 monsters with scripted targeting: their normal swing is the kit's first damaging row
+  (`MonsterService.FightMonster`), the rest is cast when ready (`CombatService.Allies`, same damage formula as other
+  hits). The priest follows tree 10803: Blessing and Increase AGI, then Sanctuary when three are below 95% HP, else
+  Heal. Companions stop at 1 HP; a companion's killing blow settles as the first loaded player's kill.
+- Lines go out as 30404 EventType 6: `ShowShoutingChatBubble(chat, speaker uid)` for type-2 bubbles, `Shouting(chat)`
+  otherwise. Unverified live: whether the bubble's second argument is the speaker, and whether a cast shows a
+  telegraph. `!encounter` shows the stage and HPs; `!encounter next` starts the next stage (test aid).
+- Eddga keeps his solo `soloTuning`; with fourteen companions the fight is now easier than the band above (open).
+- `DungeonTests.Encounter` checks every named row, the hit shapes, and the Eddga run: companions, lines, both stages
+  and a companion kill settling the win.
+
 Reconstructed scripted scenes without a fight (`Reconstructed/scripted-scenes.json`, same switch):
 
 - The last three main-story blockers of the story walk: the ant nest vortex and egg passage (1000201, task 10104290),

@@ -35,6 +35,7 @@
     <Content Remove="Reconstructed\**" />
     <EmbeddedResource Include="Reconstructed\dungeon-monsters.json" LogicalName="Ro3Emu.Server.Reconstructed.dungeon-monsters.json" />
     <EmbeddedResource Include="Reconstructed\scripted-scenes.json" LogicalName="Ro3Emu.Server.Reconstructed.scripted-scenes.json" />
+    <EmbeddedResource Include="Reconstructed\story-encounters.json" LogicalName="Ro3Emu.Server.Reconstructed.story-encounters.json" />
   </ItemGroup>
 
 </Project>

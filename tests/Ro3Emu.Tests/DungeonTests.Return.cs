@@ -348,7 +348,7 @@ public sealed partial class DungeonTests
                 await Service<CharacterService>().SetHpSpAsync(session, 1, 1);
                 await Service<SceneService>().TeleportInMapAsync(session,
                     new MapPoint(monster.X + 1, monster.Y, monster.Z, monster.Face));
-                Service<MonsterService>().Engage(monster, session);
+                Service<MonsterService>().Retarget(monster, session); // a story boss (1022001) picks its own targets otherwise
             });
             await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser,
                 hit => hit.SrcID == monster.Uid && hit.Dsts.Any(d => d.DstID == (long)alice.Self!.Uuid && d.IsDead));
