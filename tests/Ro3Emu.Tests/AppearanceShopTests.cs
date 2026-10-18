@@ -148,6 +148,12 @@ public sealed class AppearanceShopTests : IAsyncLifetime
         var source = Assert.Single(ledger.Legs, x => x.Kind == EconomyLegKind.Source && x.OperationId == receipt.OperationId);
         Assert.Equal((EconomyReason.ShopGoods, (long)TeaPartyBonus, 1L), (source.Reason, source.Asset.Id, source.Delta));
         Exact(opening, closing, ledger);
+
+        // The bonus voucher unlocks the hat the purchase already lit: refused as already unlocked, and kept.
+        long voucher = Alice.Items.First(i => i.Entry == TeaPartyBonus && i.Grid == 0).Guid;
+        await bot.SendGameAsync(CharacterService.ItemUse, new ItemUseReq { ItemGuid = voucher, ItemCount = 1 });
+        Assert.Equal(ErrorCodes.ShopAppearanceOwned, (await Next(bot, CharacterService.ItemUse, ItemUseResp.Parser)).Result);
+        Assert.Equal(bonus + 1, Bag(TeaPartyBonus));
     }
 
     [ClientDataFact]
