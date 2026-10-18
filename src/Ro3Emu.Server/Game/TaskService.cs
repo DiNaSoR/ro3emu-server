@@ -458,6 +458,25 @@ public sealed partial class TaskService
         return $"{op} {id}: {Describe(session)}";
     }
 
+    /// <summary>
+    /// Deliveries of <paramref name="id"/> that the saved quest state no longer counts but whose reward the ledger holds:
+    /// a GM drop before TaskRuntimeState.Forgotten existed removed CompleteTaskNum without keeping the count, so the
+    /// next hand-in reuses a paid reward source and the economy rejects it. Counted only while the saved state agrees
+    /// that the quest was not handed in that many times; a delivery that committed but was not applied here (the saved
+    /// state counts it) is never skipped, so it still fails instead of paying twice.
+    /// </summary>
+    private async Task<int> ForgottenDeliveriesAsync(GameSession session, long id, int delivery, Func<int, string> source)
+    {
+        if (!await roles.RewardSourceCommittedAsync(source(delivery))) return 0;
+        var saved = roles.LoadTasks(session.Role!.Id) is { } bytes ? DBTaskInfo.Parser.ParseFrom(bytes) : null;
+        var savedRuntime = roles.LoadTaskRuntime(session.Role.Id) is { } json ? JsonSerializer.Deserialize<TaskRuntimeState>(json) : null;
+        int savedCount = (saved?.CompleteTaskNum.GetValueOrDefault(id) ?? 0) + (savedRuntime?.Forgotten?.GetValueOrDefault(id) ?? 0);
+        if (savedCount >= delivery) return 0;
+        int skipped = 0;
+        while (skipped < 64 && await roles.RewardSourceCommittedAsync(source(delivery + skipped))) skipped++;
+        return skipped;
+    }
+
     private static void Forget(GameSession session, long task, int deliveries)
     {
         if (deliveries <= 0) return;
@@ -628,8 +647,16 @@ public sealed partial class TaskService
             var runtime = new TaskRuntimeState { CompletedGuides = session.TaskRuntime.CompletedGuides.ToHashSet(), InCutScene = session.InCutScene || cutScene,
                 Forgotten = session.TaskRuntime.Forgotten is { } forgotten ? new(forgotten) : null };
             int delivery = next.CompleteTaskNum[id] + (session.TaskRuntime.Forgotten?.GetValueOrDefault(id) ?? 0);
-            string awardSource = $"task/{session.Role!.Id}/{id}/{delivery}/" +
-                $"{session.Daily?.DailyEpoch ?? 0}/{session.Daily?.WeeklyEpoch ?? 0}";
+            string AwardSource(int n) => $"task/{session.Role!.Id}/{id}/{n}/{session.Daily?.DailyEpoch ?? 0}/{session.Daily?.WeeklyEpoch ?? 0}";
+            int skipped = await ForgottenDeliveriesAsync(session, id, delivery, AwardSource);
+            if (skipped > 0)
+            {
+                delivery += skipped;
+                (runtime.Forgotten ??= new())[id] = runtime.Forgotten.GetValueOrDefault(id) + skipped;
+                log.LogWarning("Task {Task}: {Skipped} earlier delivery(s) were forgotten without a count; reward source {Source}",
+                    id, skipped, AwardSource(delivery));
+            }
+            string awardSource = AwardSource(delivery);
             if (!await character.ApplyAwardAsync(session, plan, def.Exp, costs, next.ToByteArray(),
                 JsonSerializer.SerializeToUtf8Bytes(runtime), expectedDaily: daily?.Before, nextDaily: daily?.After,
                 expectedTasks: expectedTasks, persist: questMount is { } ride ? tx => mounts.PersistQuestRide(session, ride, tx) : null,
