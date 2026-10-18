@@ -16,6 +16,10 @@ public sealed class ServerOptions
         : System.Net.IPAddress.TryParse(PublicHost, out var host) && System.Net.IPAddress.IsLoopback(host) ? System.Net.IPAddress.Loopback
         : System.Net.IPAddress.Any;
 
+    /// <summary>The voice relay serves only with a port set, and off loopback only when plaintext was allowed on purpose.</summary>
+    public bool VoiceServed() =>
+        Voice.Port > 0 && (System.Net.IPAddress.IsLoopback(ListenAddress()) || Voice.AllowPlaintextOffLoopback);
+
     public int HttpPort { get; set; } = 5380;
 
     public int MicroGatePort { get; set; } = 20000;
@@ -115,6 +119,9 @@ public sealed class ServerOptions
     /// </summary>
     public StarterItemOptions[]? StarterKit { get; set; }
 
+    /// <summary>Team voice relay proof of concept (Voice/, docs TBD). Off until a port is set.</summary>
+    public VoiceOptions Voice { get; set; } = new();
+
     /// <summary>(inferred) Locally configured text blocklist; the original service's sensitive-word dictionary is unavailable.</summary>
     public string[] GuildBlockedWords { get; set; } = [];
 
@@ -145,6 +152,67 @@ public sealed class ServerOptions
     /// </summary>
     public int ChickenTestPlayers { get; set; }
     public int ChickenTestTeamSize { get; set; }
+
+    /// <summary>
+    /// (inferred) Seconds of a Realm of the Gods raid's preparation phase: the boss waits until the team leader presses the
+    /// scene's "Start Battle" button (DungeonLua_30201xx DungeonBase.FunctionButtons, sent as 30125) or this time runs out.
+    /// The client has the button, not the phase length.
+    /// </summary>
+    public int RaidPreparationSeconds { get; set; } = 120;
+
+    /// <summary>
+    /// (inferred) Seconds from a raid boss fight's start to its enrage, against which the Final Trial "more than N minutes
+    /// remaining until enrage" honors (TenGameplayFinalTrialConfig, condition 7004) are judged. The enrage timer lives in
+    /// the boss's server script, which the client does not carry.
+    /// </summary>
+    public int RaidEnrageSeconds { get; set; } = 600;
+
+    /// <summary>Boss special skills (BossSkillSets, MonsterService.BossSkills): the scheduler's inferred numbers.</summary>
+    public BossSkillOptions BossSkills { get; set; } = new();
+}
+
+/// <summary>
+/// The boss skill scheduler. The skill rows, their cooldowns, cast and action times, ranges, damage and buffs come from
+/// SkillConfig; the original server's AI scripts that decided when to cast are not in the client, so every number here
+/// is (inferred) and can be tuned without a code change.
+/// </summary>
+public sealed class BossSkillOptions
+{
+    /// <summary>Off: bosses only swing their normal attack, as before the scheduler.</summary>
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>Delay after a boss engages before its first special skill.</summary>
+    public int FirstCastDelayMs { get; set; } = 3000;
+
+    /// <summary>Pause after a special's action ends before the next one (the boss swings meanwhile); a row's longer
+    /// _iPubCD wins.</summary>
+    public int GlobalCooldownMs { get; set; } = 2000;
+
+    /// <summary>Cooldown of a skill whose family carries only placeholder cooldowns (every row 0-2 s: Realm of the
+    /// Gods, story Baphomet and Pharaoh), where the encounter script set the pace.</summary>
+    public int PlaceholderCooldownMs { get; set; } = 15000;
+
+    /// <summary>HP percent at which a boss with phase variants enters each next phase (phase 1, phase 2...).</summary>
+    public int[] PhaseHpPercents { get; set; } = [50, 25];
+
+    /// <summary>Area radius (m) when neither the row nor its show template gives one.</summary>
+    public float DefaultRadius { get; set; } = 5f;
+
+    /// <summary>Longest distance (m) to its target at which a boss starts a targeted skill; rows with "anywhere"
+    /// ranges (_iDistanceMax 9999) are capped to it.</summary>
+    public float MaxReach { get; set; } = 15f;
+
+    /// <summary>Most hits one cast lands (a show's attack points; Ring of Light has three).</summary>
+    public int MaxHitsPerCast { get; set; } = 6;
+
+    /// <summary>Boss skill damage as a percent of the row's formula result.</summary>
+    public int DamagePercent { get; set; } = 100;
+
+    /// <summary>Minions of a summon skill whose description gives no count.</summary>
+    public int SummonCount { get; set; } = 3;
+
+    /// <summary>Life of a summoned minion without a self-destruct born buff.</summary>
+    public int SummonLifeMs { get; set; } = 30000;
 }
 
 /// <summary>
@@ -215,6 +283,52 @@ public sealed class FeedbackOptions
 
     /// <summary>Minimum seconds between two reports of one account.</summary>
     public int CooldownSeconds { get; set; } = 5;
+}
+
+/// <summary>
+/// Team voice relay (Talk/Listen/Mute in the party panel). The listener only opens when <see cref="Port"/> is set;
+/// an off relay still answers the 77015 ticket request with port 0 so the client's menu can disable itself cleanly.
+/// </summary>
+public sealed class VoiceOptions
+{
+    /// <summary>TCP port the voice gate listens on; 0 keeps the relay off.</summary>
+    public int Port { get; set; }
+
+    /// <summary>Members a single voice room (one party/team) may hold.</summary>
+    public int MaxRoomSize { get; set; } = 40;
+
+    /// <summary>Audio frames a connection may send per second before the token bucket drops the extra ones.</summary>
+    public int FramesPerSecond { get; set; } = 50;
+
+    /// <summary>Extra frames the token bucket allows in a short burst on top of <see cref="FramesPerSecond"/>.</summary>
+    public int Burst { get; set; } = 10;
+
+    /// <summary>Longest opus payload accepted in one Audio frame, in bytes.</summary>
+    public int MaxPayload { get; set; } = 512;
+
+    /// <summary>How long a 77015 ticket stays valid before a connection must present it.</summary>
+    public int TicketSeconds { get; set; } = 60;
+
+    /// <summary>Voice connections the listener accepts at once; past this new connections are refused.</summary>
+    public int MaxConnections { get; set; } = 1024;
+
+    /// <summary>Voice connections one IP address may hold at once (a LAN party behind one router needs a few).</summary>
+    public int MaxConnectionsPerIp { get; set; } = 8;
+
+    /// <summary>Connections from one IP that end without a valid Auth before that IP is refused for a minute.</summary>
+    public int MaxFailedAuthPerIp { get; set; } = 10;
+
+    /// <summary>
+    /// The voice stream is not encrypted yet (only the ticket travels inside the encrypted game gate), so the relay
+    /// refuses to listen on anything but loopback unless this is set on purpose.
+    /// </summary>
+    public bool AllowPlaintextOffLoopback { get; set; }
+
+    /// <summary>Seconds a fresh connection has to send its Auth frame before it is closed. A test host lowers this.</summary>
+    public int FirstFrameTimeoutSeconds { get; set; } = 5;
+
+    /// <summary>Seconds without any frame before an authed connection is closed as idle. A test host lowers this.</summary>
+    public int IdleTimeoutSeconds { get; set; } = 30;
 }
 
 /// <summary>Both off by default so the tests keep the original's pass; a realm turns them on (docs/systems/activities-battlepass-monthcard.md).</summary>

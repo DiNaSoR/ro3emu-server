@@ -255,7 +255,7 @@ public sealed partial class DungeonService
                 if (run.Done || a.Settled || a.Room.Closed || boss.Dead || boss.Hp <= 0) return;
                 var players = Present(a).Where(p => p.Role != null && !p.Dead && !p.SceneLoading && p.WorldScene == boss.WorldScene
                     && InArea(hit, origin, p.Position.X, p.Position.Z)).ToArray();
-                if (players.Length > 0) await combat.MonsterSkillHitAsync(boss, row, players, boss.Uid, hit.ShareBp, castId);
+                if (players.Length > 0) await combat.MonsterSkillHitAsync(boss, row, players, boss.Uid, session: castId, scaleBp: hit.ShareBp);
                 foreach (var ally in run.Allies.Select(s => s.Unit).Where(u => !u.Dead && InArea(hit, origin, u.X, u.Z)).ToArray())
                     await combat.MonsterDamagesMonsterAsync(boss, ally, row, castId, hit.ShareBp);
             });

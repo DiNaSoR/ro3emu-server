@@ -49,7 +49,7 @@ public sealed partial class GmCommands(IOptions<ServerOptions> options, GameData
     {
         var allowed = options.GmAccounts;
         if (allowed.Length == 0) return loopbackTool || options.GmOpenWhenEmpty != false;
-        return account != null && allowed.Contains(account, StringComparer.OrdinalIgnoreCase);
+        return account != null && allowed.Contains(account, StringComparer.Ordinal);
     }
 
     internal static bool IsEventOwnerCommand(string line)
@@ -273,6 +273,11 @@ public sealed partial class GmCommands(IOptions<ServerOptions> options, GameData
                 }
             }
             await ReplyAsync(s, reply);
+        }),
+        ["boss"] = ("spawn <npcId> | skills [npcId] | phase <n> | cast <skillId> | kill (boss skill test aids: the nearest boss within 40 m)", async (s, a) =>
+        {
+            string reply = await services.GetRequiredService<MonsterService>().BossGmAsync(s, a);
+            foreach (string line in reply.Split('\n')) await ReplyAsync(s, line);
         }),
         ["season"] = ("[playbook]", async (s, a) =>
         {
