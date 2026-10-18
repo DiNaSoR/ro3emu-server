@@ -23,6 +23,27 @@ public sealed partial class CombatService
         11317, 11318, // Hundred Spears Stack / Slash monitors: stack trackers, not learned bonuses
     ];
 
+    /// <summary>
+    /// Passives whose skill changes sit in another group's BuffConfig rows (group, owner group). Steel Crow 13105
+    /// ("Blitz Beat damage coefficient +X%", Lv5 = 5%) has no rows of its own; its +100 bp per level on Blitz Beat
+    /// 13102/13110 is stored under Beastbane's group 13104 (rows 1310401-1310410 are named Steel Crow). Beastbane's
+    /// own effect, Brute and Insect damage %, is its SkillConfig _kAttri 401/409, so it reads no buff rows (inferred
+    /// client id swap; Steven chose Steel Crow as the owner, 2026-10-18).
+    /// </summary>
+    private static readonly IReadOnlyDictionary<int, int> PassiveBuffOwners = new Dictionary<int, int>
+    {
+        [13105] = 13104,
+        [13104] = 0,
+    };
+
+    /// <summary>The BuffConfig row holding a learned passive's skill changes: its own id, or the owner group's row of
+    /// the same level; 0 for none.</summary>
+    internal static int PassiveBuffRow(int group, System.Text.Json.JsonElement row)
+    {
+        if (!PassiveBuffOwners.TryGetValue(group, out int owner)) return (int)GameData.Int(row, "_iID");
+        return owner == 0 ? 0 : owner * 100 + (int)GameData.Int(row, "_iLevel");
+    }
+
     /// <summary>Passives whose same-id buff _kChangeAttri matches the description: Meditatio (Max MP% and MP
     /// recovery%), Mana Recharge (MP cost -% and MATK), Create Deadly Poison (Poison damage%).</summary>
     private static readonly HashSet<int> BuffStatGroups = [14203, 14204, 15212];
@@ -55,7 +76,7 @@ public sealed partial class CombatService
         var result = new List<SkillParameterRules.Modifier>();
         foreach (var (group, row) in LearnedPassiveRows(session))
             if (!ConditionalPassiveGroups.Contains(group))
-                result.AddRange(SkillParameterRules.BuffModifiers(data, (int)GameData.Int(row, "_iID")));
+                if (PassiveBuffRow(group, row) is var buff and > 0) result.AddRange(SkillParameterRules.BuffModifiers(data, buff));
         session.PassiveSkillSignature = signature;
         if (result.SequenceEqual(session.PassiveSkillModifiers)) return;
         session.PassiveSkillModifiers = result;
