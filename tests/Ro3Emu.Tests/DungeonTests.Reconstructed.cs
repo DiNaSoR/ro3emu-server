@@ -94,6 +94,32 @@ public sealed partial class DungeonTests
         Assert.True(State() is TaskState.Finish || TaskService.IsDelivered(Session(alice), 10103120), $"quest state {State()}");
     }
 
+    [ClientDataTheory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task TheEggThiefWavesDropTheCardPoringOnlyDuringItsQuest(bool onQuest)
+    {
+        // Boya's next dialogue (1010211001) says the player picked up a Card: Poring, and guide 26 then slots it.
+        // NPC 5001049's only drop is DropGroupConfig 144: Card: Poring 1420300, _iQuestLimit 10102100 (this dungeon's quest).
+        const int Card = 1420300;
+        await using var alice = await InWorld("Alice");
+        await Gm(alice, "!lvl 99");
+        if (onQuest) await Gm(alice, "!quest accept 10102100");
+        TaskState State() => Session(alice).Tasks!.Infos.TryGetValue(10102100, out var info) ? info.Status : TaskState.None;
+        Assert.Equal(onQuest ? TaskState.Running : TaskState.None, State());
+        Assert.Equal(0, await Enter(alice, new EnterDungeonReq { SceneEntry = 1021301 }));
+        long instance = await Load(alice, 1021301);
+        var plan = Session(alice).DungeonAttempt!.Plan;
+        Assert.Contains(plan.Waves.SelectMany(w => w.Spawns), s => s.NpcId == 5001049);
+        for (int wave = 0; wave < plan.Waves.Count; wave++)
+            foreach (var actor in await WaveIn(instance, plan.Waves[wave].Spawns.Count)) await Kill(alice, actor);
+        Assert.Equal((DungeonRes)1, (await Next(alice, DungeonService.Result, DungeonResNotify.Parser)).Res);
+        long Cards() => Session(alice).Items.Where(i => i.Entry == Card).Sum(i => (long)i.Stack);
+        for (int i = 0; i < 500 && onQuest && Cards() == 0; i++) await Task.Delay(20); // the loot lands after the kill commits
+        Assert.True((onQuest ? 1 : 0) == Cards(), $"cards {Cards()}, quest {State()}, items "
+            + string.Join(",", Session(alice).Items.Select(i => i.Entry)));
+    }
+
     [ClientDataFact]
     public async Task ADeathInADungeonRunGetsOnlyTheRunsReviveNotice()
     {
