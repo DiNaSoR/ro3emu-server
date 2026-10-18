@@ -31,6 +31,8 @@ namespace Ro3Emu.ClientHooks
     /// <item>Lua log lines skip the Lua stack traceback, which made each one cost 25-30 ms (LuaLogs).</item>
     /// <item>The client's crystal checks (buy dialog, Fashion cart, exchange) count bound crystals too, which the server
     /// spends first on crystal prices (BoundCrystals).</item>
+    /// <item>Buying (Top Up packs, month card Quick Buy) no longer overflows the Lua stack when the store SDK is
+    /// missing (PayManager).</item>
     /// <item>Profile cards without stickers parse (LC_DAL_Personal.ParsePersonalInfo walks a nil list; PersonalCards).</item>
     /// <item>The server's custom content (quests, NPCs, dialogue, texts) is added to the client's config tables
     /// (CustomContent).</item>
@@ -117,6 +119,7 @@ namespace Ro3Emu.ClientHooks
                     global.Obf_RuA<Obf_R.Obf_ff>("LC_SeasonExplorationHelper") ?? Module(manager, global, "lc_seasonexplorationhelper"));
                 PersonalCards.Install((Obf_R.Obf_Cf)env, Module(manager, global, "lc_dal_personal"));
                 BoundCrystals.Install(global.Obf_RuA<Obf_R.Obf_ff>("LC_ItemHelper") ?? Module(manager, global, "lc_itemhelper"));
+                PayManager.Install(Module(manager, global, "lua_sdk_paymgr"));
                 Debug.Log("[Ro3Emu.LuaPatches] lc_itemshowfunc: " + added + " card show-func method(s) added; stall name limit "
                     + (param != null ? StallNameMaxLength.ToString() : "not set (publicparamconfig missing)"));
             }
