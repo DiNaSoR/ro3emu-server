@@ -46,7 +46,7 @@ public sealed class GameData(IOptions<ServerOptions> options, ILogger<GameData> 
                 table = new();
                 if (!Custom.Rows.ContainsKey(name)) log.LogWarning("No {Path}; run tools/ConfigExport", path);
             }
-            Custom.Overlay(name, table, log);
+            Custom.Overlay(name, table, log, KillTrackTarget);
             _tables[name] = table;
             return table;
         }
@@ -227,6 +227,48 @@ public sealed class GameData(IOptions<ServerOptions> options, ILogger<GameData> 
     }
 
     public string MapName(long sceneEntry) => Row("MapConfig", sceneEntry) is { } row ? TextOf(row, "_iName") : "";
+
+    /// <summary>
+    /// Where the quest tracker should walk for a custom kill step on <paramref name="map"/>: a scene-editor id that
+    /// LC_InteractActions.GetPosByTargetID finds (action 142). That function looks in m_kRegins first and in
+    /// m_kWorldMonsterSpawnPoints last, so the id is a region next to a spawn point of one of the monsters (the
+    /// client's own kill quests point at such regions, e.g. 1010105001 by the South Gate Porings), else the spawn
+    /// point itself when no earlier list uses its id. Null when the map has no spawn of these monsters.
+    /// </summary>
+    public long? KillTrackTarget(long map, long[] monsters)
+    {
+        if ((Row("MapConfig", map) ?? Row("DungeonConfig", map)) is not { } config
+            || !config.TryGetProperty("_kResSceneEditorName", out var name) || name.GetString() is not { Length: > 0 } module
+            || DataFiles.Find(Path.Combine(Root, "sceneeditor"), module + ".json") is not { } path) return null;
+        using var doc = JsonDocument.Parse(File.ReadAllBytes(path));
+        var se = doc.RootElement;
+        if (!se.TryGetProperty("m_kWorldMonsterSpawnPoints", out var points) || points.ValueKind != JsonValueKind.Object) return null;
+        bool Spawns(JsonElement list, string? field) => list.ValueKind == JsonValueKind.Array && list.EnumerateArray().Any(e =>
+            (field is null ? Number(e) : e.ValueKind == JsonValueKind.Object && e.TryGetProperty(field, out var f) ? Number(f) : null) is { } n
+            && monsters.Contains((long)n));
+        // Points that spawn only these monsters first (m_kConfigIds), then pooled points that may spawn them.
+        var spawn = points.EnumerateObject().Select(p => p.Value)
+            .Select(p => (Point: p, Rank: p.TryGetProperty("m_kConfigIds", out var ids) && Spawns(ids, null) ? 0
+                : p.TryGetProperty("m_kMonsterRefreshLimitDatas", out var limits) && Spawns(limits, "m_kConfigId") ? 1 : 2))
+            .Where(p => p.Rank < 2 && p.Point.TryGetProperty("position", out _))
+            .OrderBy(p => p.Rank).ThenBy(p => Int(p.Point, "Id")).Select(p => p.Point).FirstOrDefault();
+        if (spawn.ValueKind != JsonValueKind.Object) return null;
+        var at = spawn.GetProperty("position");
+        double x = Number(at.GetProperty("x")) ?? 0, z = Number(at.GetProperty("z")) ?? 0;
+        if (se.TryGetProperty("m_kRegins", out var regions) && regions.ValueKind == JsonValueKind.Object)
+        {
+            var near = regions.EnumerateObject()
+                .Where(r => long.TryParse(r.Name, out _) && r.Value.TryGetProperty("center", out _))
+                .Select(r => (Id: long.Parse(r.Name, System.Globalization.CultureInfo.InvariantCulture), C: r.Value.GetProperty("center")))
+                .Select(r => (r.Id, D: Math.Pow((Number(r.C.GetProperty("x")) ?? 0) - x, 2) + Math.Pow((Number(r.C.GetProperty("z")) ?? 0) - z, 2)))
+                .Where(r => r.D <= 25 * 25).OrderBy(r => r.D).ToList();
+            if (near.Count > 0) return near[0].Id;
+        }
+        string key = Int(spawn, "Id").ToString(System.Globalization.CultureInfo.InvariantCulture);
+        foreach (var earlier in new[] { "m_kRegins", "m_kMonsterSpawnPoints", "m_kTaskPoints", "kNpcList", "m_kAllPoints" })
+            if (se.TryGetProperty(earlier, out var list) && list.ValueKind == JsonValueKind.Object && list.TryGetProperty(key, out _)) return null;
+        return Int(spawn, "Id");
+    }
 }
 
 /// <summary>Runs <see cref="GameData.Preload"/> at startup, before the game loop and the gates start.</summary>

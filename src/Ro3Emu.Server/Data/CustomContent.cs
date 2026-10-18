@@ -14,13 +14,16 @@ namespace Ro3Emu.Server.Data;
 /// top-level fields, and the base's id fields (_iID, _i*ID equal to the base id) take the new id. A row may also be an
 /// array of row objects (DialogueConfig keeps one array per dialogue id);</item>
 /// <item>"npcs": [ { "map", "npc", "x", "z", "y"?, "face"? } ], server NPCs placed on a map (WorldData) and added to
-/// the client's scene-editor NPC list of that map (<see cref="SceneEditorEntry"/>), so the quest tracker can walk to them.</item>
+/// the client's scene-editor NPC list of that map (<see cref="SceneEditorEntry"/>), so the quest tracker can walk to them.
+/// An entry with a "name" is a whole NPC instead (CustomContent.Quests.cs);</item>
+/// <item>"quests": [ { "id", "after"?, "steps": [...] } ], quest chains written in plain text, which become the rows
+/// and texts above (CustomContent.Quests.cs).</item>
 /// </list>
 /// GameData overlays the rows on the tables it loads, so the server reads them like client data; the client gets the
 /// same rows and texts at role login (CustomContentService, game message 77020) and Ro3Emu.ClientHooks.CustomContent
 /// adds them to the client's own tables. Files load once, at the first table load; a broken file is skipped with an error.
 /// </summary>
-public sealed class CustomContent
+public sealed partial class CustomContent
 {
     public sealed record Npc(long Map, int NpcId, float X, float? Y, float Z, float Face, string Source);
 
@@ -29,10 +32,16 @@ public sealed class CustomContent
     public IReadOnlyDictionary<long, string> Texts => _texts;
     public IReadOnlyList<Npc> Npcs => _npcs;
     public bool IsEmpty => _rows.Count == 0 && _texts.Count == 0 && _npcs.Count == 0;
+    /// <summary>The files that loaded, and the ones skipped with their error.</summary>
+    public IReadOnlyList<string> Files => _files;
+    public IReadOnlyList<string> Errors => _errors;
+    /// <summary>Problems found while overlaying the rows on the tables (e.g. a kill step with nowhere to walk).</summary>
+    public IReadOnlyList<string> Warnings { get { lock (_warnings) return _warnings.ToList(); } }
 
     private readonly Dictionary<string, Dictionary<string, JsonNode>> _rows = new(StringComparer.Ordinal);
     private readonly Dictionary<long, string> _texts = new();
     private readonly List<Npc> _npcs = new();
+    private readonly List<string> _files = new(), _errors = new(), _warnings = new();
 
     public const string TextTable = "Localization_en";
 
@@ -44,15 +53,21 @@ public sealed class CustomContent
         {
             try
             {
-                content.Add(file, JsonNode.Parse(File.ReadAllText(file), documentOptions: new JsonDocumentOptions
+                var root = JsonNode.Parse(File.ReadAllText(file), documentOptions: new JsonDocumentOptions
                     { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true }) as JsonObject
-                    ?? throw new InvalidDataException("not a JSON object"));
+                    ?? throw new InvalidDataException("not a JSON object");
+                // Check the whole file on a scratch copy first, so a broken file adds nothing.
+                new CustomContent().Add(file, root);
+                content.Add(file, root);
+                content._files.Add(file);
             }
             catch (Exception e)
             {
+                content._errors.Add($"{Path.GetFileName(file)}: {e.Message}");
                 log.LogError("Custom content {File} skipped: {Message}", file, e.Message);
             }
         }
+        content.ExpandQuests(log);
         if (!content.IsEmpty)
             log.LogInformation("Custom content from {Dir}: {Rows} row(s) in {Tables} table(s), {Texts} text(s), {Npcs} NPC(s)",
                 dir, content._rows.Values.Sum(t => t.Count), content._rows.Count, content._texts.Count, content._npcs.Count);
@@ -84,12 +99,21 @@ public sealed class CustomContent
         if (root["npcs"] is JsonArray npcs)
             foreach (var n in npcs)
             {
+                if (n is JsonObject whole && whole.ContainsKey("name"))
+                {
+                    AddNpcDefinition(whole, name);
+                    continue;
+                }
                 if (n is not JsonObject o || Num(o, "map") is not { } map || Num(o, "npc") is not { } npc
                     || Num(o, "x") is not { } x || Num(o, "z") is not { } z)
                     throw new InvalidDataException("npcs: each needs map, npc, x and z");
                 _npcs.Add(new Npc((long)map, (int)npc, (float)x, Num(o, "y") is { } y ? (float)y : null, (float)z,
                     (float)(Num(o, "face") ?? 0), name));
             }
+        if (root["quests"] is JsonArray quests)
+            foreach (var q in quests)
+                _quests.Add((q as JsonObject ?? throw new InvalidDataException("quests: each needs to be an object"), name));
+        else if (root["quests"] is not null) throw new InvalidDataException("quests: needs an array");
     }
 
     /// <summary>
@@ -114,7 +138,10 @@ public sealed class CustomContent
     /// Adds this content's rows of <paramref name="name"/> to a freshly loaded table (and the texts to Localization_en).
     /// <paramref name="table"/>'s own rows serve as the _base rows.
     /// </summary>
-    public void Overlay(string name, Dictionary<string, JsonElement> table, ILogger log)
+    /// <param name="spawnTarget">For kill steps written with a "map": the tracker target id of a place on that map
+    /// where one of the monsters spawns (GameData.KillTrackTarget), or null.</param>
+    public void Overlay(string name, Dictionary<string, JsonElement> table, ILogger log,
+        Func<long, long[], long?>? spawnTarget = null)
     {
         if (name == TextTable)
             foreach (var (id, text) in _texts)
@@ -125,7 +152,19 @@ public sealed class CustomContent
         {
             try
             {
-                table[id] = JsonSerializer.SerializeToElement(Resolve(name, id, row, table));
+                var resolved = Resolve(name, id, row, table);
+                if (name == "TaskConfig" && _killTracks.TryGetValue(id, out var kill) && resolved is JsonObject task)
+                {
+                    if (spawnTarget?.Invoke(kill.Map, kill.Monsters) is { } target)
+                        task["_kTrack"] = new JsonArray(new JsonArray("142", Str(kill.Map), Str(target), "-1"));
+                    else
+                    {
+                        string warning = $"TaskConfig {id}: no spawn of monster {string.Join(",", kill.Monsters)} found on map {kill.Map}, so the tracker cannot walk there";
+                        lock (_warnings) _warnings.Add(warning);
+                        log.LogWarning("Custom content: {Warning}", warning);
+                    }
+                }
+                table[id] = JsonSerializer.SerializeToElement(resolved);
             }
             catch (Exception e)
             {

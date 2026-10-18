@@ -1,113 +1,46 @@
 {
   "//": "Prototype custom quest (docs/guide/custom-content.md): Elias, a new NPC next to Alphonse in Prontera, asks for 5 Porings at the South Gate. Delete this file to remove it.",
-  "texts": {
-    "99000000001": "Elias",
-    "99000000002": "Wandering Scholar",
-    "99000000010": "So many curious creatures around Prontera, and so little time to study them all.",
-    "99000000011": "Goodbye",
-
-    "99000000101": "A Scholar's Request",
-    "99000000102": "A scholar named Elias is looking for help in Prontera.",
-    "99000000103": "Talk to Elias in Prontera",
-    "99000000111": "Ah, a traveler! I'm Elias. I study the creatures that live around Prontera.",
-    "99000000112": "How can I help?",
-    "99000000113": "The Porings outside the South Gate have been acting strangely. Could you defeat ^{1}5 Porings^{2} so I can study the jelly they leave behind?",
-
-    "99000000201": "Jelly Samples",
-    "99000000202": "Defeat @{1} Porings at the Prontera South Gate for Elias",
-    "99000000203": "Defeat Porings at the South Gate*",
-
-    "99000000301": "Back to the Scholar",
-    "99000000302": "Bring the jelly samples back to Elias in Prontera.",
-    "99000000303": "Report to Elias in Prontera",
-    "99000000311": "You're back already? This jelly is perfect. Thank you, adventurer. Please take this for your trouble."
-  },
-  "rows": {
-    "NPCConfig": {
-      "90000001": {
-        "_base": 200014,
-        "_kName": [99000000001],
-        "_kTitle": [99000000002],
-        "_iUnitID": 100079,
-        "_kHeadIcon": "temphead_npc_100079.png",
-        "_kDialoguePhoto": "",
-        "_iInteractID": [90000001]
-      }
-    },
-    "NPCInteractConfig": {
-      "90000001": { "_base": 20001401, "_iEXECAction": [["53", "900000101"]] }
-    },
-    "DialogueConfig": {
-      "900000101": [
-        { "_iID": 900000101, "_iNPCID": 90000001, "_iTalkNPCID": 90000001, "_iText": [99000000010] },
-        { "_iID": 900000101, "_iNPCID": 90000001, "_iTalkNPCID": 90000001, "_iSortID": 2, "_iTextType": 2,
-          "_iIcon": "npcdialog_icon_chat.png", "_iText": [99000000011], "_iEXECAction": [["8", "TOPBAR", "UI_Sys_NpcDialogPanel"]] }
-      ],
-      "900000201": [
-        { "_iID": 900000201, "_iNPCID": 90000001, "_iTalkNPCID": 90000001, "_iText": [99000000111] },
-        { "_iID": 900000201, "_iNPCID": 90000001, "_iTalkNPCID": 90000001, "_iSortID": 2, "_iTextType": 2,
-          "_iIcon": "npcdialog_icon_chat.png", "_iText": [99000000112], "_iEXECAction": [["7", "900000202"]] }
-      ],
-      "900000202": [
-        { "_iID": 900000202, "_iNPCID": 90000001, "_iTalkNPCID": 90000001, "_iText": [99000000113, "<color=#CC762A>", "</color>"], "_iEXECAction": [["17", "900000201"]] }
-      ],
-      "900000301": [
-        { "_iID": 900000301, "_iNPCID": 90000001, "_iTalkNPCID": 90000001, "_iText": [99000000311], "_iEXECAction": [["17", "900000301"]] }
-      ]
-    },
-    "TaskConfig": {
-      "90000001": {
-        "_base": 10101130,
-        "_iTaskType": 2,
-        "_iShowTag": [13150300008, "<color=#6890d2>", "</color>"],
-        "_iTaskRank": 90000001,
-        "_iName": [99000000101],
-        "_iTaskDescribe": [99000000102],
-        "_iBeforeDescribe": [99000000102],
-        "_iTargetDescribe": [99000000103],
-        "_iStageName": [0],
-        "_iCondition": 2000008,
-        "_iAward": 0,
-        "_kPreTask": {},
-        "_kEXP": {},
-        "_kProgressTarget": [[104001, 90000001, 10100, 900000201]],
-        "_kTrack": [["143", "10100", "90000001", "9", "900000201"]]
-      },
-      "90000002": {
-        "_base": 10101050,
-        "_iTaskType": 2,
-        "_iShowTag": [13150300008, "<color=#6890d2>", "</color>"],
-        "_iTaskRank": 90000002,
-        "_iName": [99000000201],
-        "_iTaskDescribe": [99000000202, "5"],
-        "_iBeforeDescribe": [99000000202, "5"],
-        "_iTargetDescribe": [99000000203],
-        "_iStageName": [0],
-        "_iAward": 0,
-        "_kPreTask": [90000001],
-        "_kEXP": {},
-        "_kProgressTarget": [[104014, 5000001, 5]],
-        "_kTrack": [["142", "10111", "1010105001", "-1"]]
-      },
-      "90000003": {
-        "_base": 10101130,
-        "_iTaskType": 2,
-        "_iShowTag": [13150300008, "<color=#6890d2>", "</color>"],
-        "_iTaskRank": 90000003,
-        "_iName": [99000000301],
-        "_iTaskDescribe": [99000000302],
-        "_iBeforeDescribe": [99000000302],
-        "_iTargetDescribe": [99000000303],
-        "_iStageName": [0],
-        "_iAward": 0,
-        "_kPreTask": [90000002],
-        "_kEXP": [1, 2000],
-        "_kProgressTarget": [[104001, 90000001, 10100, 900000301]],
-        "_kTrack": [["143", "10100", "90000001", "9", "900000301"]]
-      }
-    }
-  },
   "npcs": [
-    { "map": 10100, "npc": 90000001, "x": 150.4, "z": 193.05, "face": 180 }
+    {
+      "id": 90000001,
+      "name": "Elias",
+      "title": "Wandering Scholar",
+      "model": 100079,
+      "map": 10100, "x": 150.4, "z": 193.05, "face": 180,
+      "greeting": "So many curious creatures around Prontera, and so little time to study them all."
+    }
+  ],
+  "quests": [
+    {
+      "id": 90000001,
+      "steps": [
+        {
+          "name": "A Scholar's Request",
+          "description": "A scholar named Elias is looking for help in Prontera.",
+          "objective": "Talk to Elias in Prontera",
+          "talk": 90000001,
+          "dialog": [
+            { "say": "Ah, a traveler! I'm Elias. I study the creatures that live around Prontera.", "reply": "How can I help?" },
+            "The Porings outside the South Gate have been acting strangely. Could you defeat <color=#CC762A>5 Porings</color> so I can study the jelly they leave behind?"
+          ]
+        },
+        {
+          "name": "Jelly Samples",
+          "description": "Defeat 5 Porings at the Prontera South Gate for Elias",
+          "objective": "Defeat Porings at the South Gate",
+          "kill": 5000001, "count": 5, "map": 10111
+        },
+        {
+          "name": "Back to the Scholar",
+          "description": "Bring the jelly samples back to Elias in Prontera.",
+          "objective": "Report to Elias in Prontera",
+          "talk": 90000001,
+          "dialog": [
+            "You're back already? This jelly is perfect. Thank you, adventurer. Please take this for your trouble."
+          ],
+          "exp": 2000
+        }
+      ]
+    }
   ]
 }
