@@ -24,6 +24,11 @@ public sealed class SkillObject : WorldUnit
     /// <summary>Strikes left for a field with a set number of waves (Meteor Storm); 0 = strike until it expires, -1 = done.</summary>
     public int WavesLeft { get; set; }
     public int ProtectionDistanceType { get; init; }
+    /// <summary>Enemy touches before the field ends early (Fire Wall); 0 = no limit. <see cref="Touched"/> counts them.</summary>
+    public int TouchLimit { get; init; }
+    public int Touched { get; set; }
+    /// <summary>Meters a touched enemy is knocked back from the field (Fire Wall); 0 = none.</summary>
+    public float PushMeters { get; init; }
     public HashSet<int> Skills { get; } = new();
 
     public override EntityBase Entity() => new()
@@ -68,6 +73,8 @@ public sealed partial class CombatService
             else if (ReviveOffer != null) await ReviveOffer(s, target, row);
             return;
         }
+        if (Script(row) == "GaBanTaYin") await ClearGroundAsync(s, action);
+        if (!CurrentCastMap(s, action)) return;
         if (await CreateSkillObjectAsync(s, action)) return;
         if (!CurrentCastMap(s, action)) return;
         // SkillConfig._bMovement is enum_SkillLockMoveType (may the caster walk while casting), not a displacement.
@@ -160,7 +167,8 @@ public sealed partial class CombatService
     /// selects the caster), so the visual's selector does not decide its targets.</summary>
     private static bool HostileProc(ActiveSkillCast action) => action.Proc && GameData.Int(action.Row, "_iDmgType") is 1 or 2;
 
-    private bool Hostile(ActiveSkillCast action, MonsterUnit m) => HostileProc(action) || Relation(action.Row, false, race: m.Template.Race);
+    private bool Hostile(ActiveSkillCast action, MonsterUnit m) =>
+        (HostileProc(action) || Relation(action.Row, false, race: m.Template.Race)) && GroundFieldHits(action.Row, m);
 
     private List<MonsterUnit> SelectEnemies(GameSession s, ActiveSkillCast action, Vec3 center, float? radiusOverride = null, bool area = false)
     {
@@ -272,6 +280,7 @@ public sealed partial class CombatService
             if (!CanApplyMoreEffects()) break; // a previous target's awaited callback may have invalidated the caster
             if (target.Dead || target.Hp <= 0) continue; // another awaited cast may already own this death source
             processed.Add(target);
+            if (field != null) field.Touched++;
             if (damage)
             {
                 var defender = AsDefender(target);
@@ -331,14 +340,18 @@ public sealed partial class CombatService
                     await buffs.ShowOnUnitAsync(target, fid, fduration, castingRole.Id);
             }
             if (CanApplyMoreEffects() && script is ("Provoke" or "Taunt")) monsters.Engage(target, s);
-            if (CanApplyMoreEffects() && firstBolt && !target.Dead && target.Hp > 0) await DisplaceTargetAsync(s, action, target);
+            if (CanApplyMoreEffects() && firstBolt && !target.Dead && target.Hp > 0)
+            {
+                if (field is { PushMeters: > 0 }) await PushFromFieldAsync(s, action, field, target);
+                else await DisplaceTargetAsync(s, action, target);
+            }
         }
         // Buff1 is self for hostile selectors, but actual friend recipients for ally selectors (Detoxify, Blessing).
         foreach (var recipient in friendly ? allies : new List<GameSession> { s })
         {
             if (!CanApplyMoreEffects()) break;
             if (field == null && firstBolt)
-                foreach (var tuple in Buff1(s, row, script))
+                foreach (var tuple in Buff1(s, row, script, recipient))
                     if (CanApplyMoreEffects() && RollBuff(tuple, out int id, out int duration)) await GrantSkillBuffAsync(s, recipient, id, duration);
             if (friendly && damage)
             {
@@ -356,6 +369,9 @@ public sealed partial class CombatService
             }
             if (CleanseTargets(row) is { Length: > 0 } cleansed)
                 foreach (var buff in recipient.Buffs.Where(b => data.Row("BuffConfig", b.ConfigId) is { } br && Cleanses(cleansed, br)).ToArray())
+                    await buffs.RemoveAsync(recipient, buff);
+            if (CleansedCategories(row) is { Length: > 0 } categories)
+                foreach (var buff in recipient.Buffs.Where(b => data.Row("BuffConfig", b.ConfigId) is { } br && HasCategory(br, categories)).ToArray())
                     await buffs.RemoveAsync(recipient, buff);
         }
         if (hit.Dsts.Count > 0)
@@ -643,7 +659,8 @@ public sealed partial class CombatService
         var row = action.Row;
         string script = Script(row);
         var logic = Numbers(row, "_kLogicData");
-        int npc = 0, duration = 0, interval = 1000, protection = 0, charges = 0, waves = 0;
+        int npc = 0, duration = 0, interval = 1000, protection = 0, charges = 0, waves = 0, touches = 0;
+        float push = 0;
         bool trap = false;
         float radius = (float)(Numbers(row, "_kRange").FirstOrDefault(150) / 100);
         switch (script)
@@ -653,6 +670,10 @@ public sealed partial class CombatService
                 // Meteor Storm [npc, ms between meteors, ms, ?, ?, meteors]: "strikes in ${6} waves" (Lv1 2, Lv10 7), its
                 // NPC named for that count; 1.6 s / 300 ms would otherwise strike 6 times at Lv1.
                 if (script == "Meteor_Storm" && logic.Length >= 6) waves = Math.Max(1, (int)logic[5]);
+                if (script == "Fire_Wall") (touches, push) = FireWallLimits(row);
+                break;
+            case "Magnus_Exorcismus" or "Sanctuary" or "ZhongLiYuanYe":
+                (npc, duration, interval, radius, waves) = HolyAndGravityField(script, row, logic, radius);
                 break;
             case "Safety_Wall" or "Pneuma" when logic.Length >= 8:
                 npc = (int)logic[5]; duration = (int)logic[2]; radius = (float)(logic[7] / 100);
@@ -687,9 +708,10 @@ public sealed partial class CombatService
             NpcId = npc, EntityType = (int)GameData.Int(npcRow, "_iNPCType"), Cast = action,
             X = point.X, Y = point.Y, Z = point.Z, Face = action.Request.Face, ExpiresMs = Now + Math.Max(1, duration),
             IntervalMs = Math.Max(50, interval), NextTickMs = Now, Radius = radius, Trap = trap,
-            ProtectionDistanceType = protection, Charges = charges, WavesLeft = waves,
+            ProtectionDistanceType = protection, Charges = charges, WavesLeft = waves, TouchLimit = touches, PushMeters = push,
         };
         foreach (int skill in Numbers(npcRow, "_kSkills").Select(v => (int)v)) unit.Skills.Add(skill);
+        if (script == "Fire_Wall") await LimitFieldsAsync(s, row);
         s.SkillObjects.Add(unit);
         await world.AddUnitAsync(unit);
         if (!CurrentCastMap(s, action)) { await RemoveSkillObjectAsync(unit); return true; }
@@ -717,7 +739,7 @@ public sealed partial class CombatService
             if (unit.ProtectionDistanceType != 0 || unit.WavesLeft < 0) return;
             if (unit.Trap && !world.Map(unit.WorldScene).Near(unit.X, unit.Z, 1.5f).OfType<MonsterUnit>().Any(m => !m.Dead && Distance(m.Pos, unit.Pos) <= 1.5f)) return;
             await ApplyEffectsAsync(owner, unit.Cast, unit.Pos, unit);
-            if (unit.Trap) await RemoveSkillObjectAsync(unit);
+            if (unit.Trap || unit.TouchLimit > 0 && unit.Touched >= unit.TouchLimit) await RemoveSkillObjectAsync(unit);
             else if (unit.WavesLeft > 0 && --unit.WavesLeft == 0) unit.WavesLeft = -1; // the shower stays until it expires
         }
         finally { unit.Busy = false; }

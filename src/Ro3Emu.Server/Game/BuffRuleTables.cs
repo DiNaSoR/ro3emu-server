@@ -39,7 +39,8 @@ internal sealed partial class BuffRuleTables
     /// applier's ATK (_iDmgType 1) or MATK (2) by <see cref="RatioBp"/> (_kData1[0], "loses HP equal to 60% of the
     /// applier's Fire Magic Damage" = 6000) through the hit formula, element <see cref="Element"/> (_iEleType);
     /// <see cref="Row"/> is that as a skill row for CombatService.BaseDamage. A heal restores
-    /// <see cref="HealFlat"/> + the bearer's <see cref="HealAttr"/> x <see cref="HealRatioBp"/> / 10000.</summary>
+    /// <see cref="HealFlat"/> + the bearer's <see cref="HealAttr"/> x <see cref="HealRatioBp"/> / 10000, plus the applier's
+    /// MATK (<see cref="Magic"/>) or ATK x <see cref="RatioBp"/> / 10000 when that is set.</summary>
     public sealed record PeriodicRule(int ConfigId, PeriodicKind Kind, int IntervalMs, bool Magic, int Element, long RatioBp,
         int HealAttr, long HealRatioBp, long HealFlat, JsonElement Row);
 
@@ -182,6 +183,10 @@ internal sealed partial class BuffRuleTables
     [GeneratedRegex(@"periodically|over time", RegexOptions.IgnoreCase)]
     private static partial Regex PeriodicText();
 
+    // Hymn of Devotion: "This unit continuously restores Life." / "Continuously recover Life."
+    [GeneratedRegex(@"continuously (restores?|recover) Life", RegexOptions.IgnoreCase)]
+    private static partial Regex ContinuousHealText();
+
     /// <summary>
     /// Which buffs tick, and how often. BuffEffect.json only lists ids, so the fields that define a tick are these:
     /// <list type="bullet">
@@ -195,6 +200,9 @@ internal sealed partial class BuffRuleTables
     /// "Restores 30 HP to self per second", Tension Relax [1,0,101,350] "a total of 1750 Life over 5 seconds"
     /// (350 x 5). The bearer's attribute stands for the coefficient's base (every exported row has coefficient 0).
     /// T_AXadd0_etc (shields, Meditate, the Survivor Battle drain) is not a tick here: its owners apply it.</item>
+    /// <item>Heal: a buff (_iType 1) with _iDmgType and a ratio _kData1[0] described as "continuously restores Life"
+    /// (Hymn of Devotion 14325, "Restores Life equal to own ATK * @{2}% ... every sec."): every second, the applier's
+    /// MATK (_iDmgType 2) or ATK x _kData1 / 10000 + _kData2[0] (MATK*20%+20 at Lv1, the skill's _kDescData).</item>
     /// </list>
     /// </summary>
     private PeriodicRule? PeriodicOf(JsonElement row)
@@ -210,6 +218,10 @@ internal sealed partial class BuffRuleTables
 
         int dmgType = (int)GameData.Int(row, "_iDmgType");
         long ratio = Ints(row, "_kData1").FirstOrDefault();
+        if (GameData.Int(row, "_iType") == 1 && dmgType is 1 or 2 && ratio > 0
+            && row.TryGetProperty("_iDescription", out var healDesc) && healDesc.ValueKind == JsonValueKind.Array
+            && healDesc.GetArrayLength() > 0 && healDesc[0].TryGetInt64(out long healText) && ContinuousHealText().IsMatch(data.Text(healText)))
+            return new PeriodicRule(id, PeriodicKind.Heal, 1000, dmgType == 2, 0, ratio, 0, 0, Ints(row, "_kData2").FirstOrDefault(), default);
         if (GameData.Int(row, "_iType") != 2 || dmgType is not (1 or 2) || ratio <= 0) return null;
         int interval = 0;
         if (formula == "T_Xplus1_Xplus2_Xisbuff" && extra.Length > 0) interval = (int)(extra[0] * 1000);

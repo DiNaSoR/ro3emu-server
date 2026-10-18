@@ -353,7 +353,8 @@ public sealed partial class BuffService : IGameTicker
 
     public bool HasForbidden(GameSession p, int ordinal) => p.ForbiddenOrdinals.Contains(ordinal)
         || (p.ImmuneDeathOffer != null && ordinal == 9)
-        || (p.ImmuneRecoveryUntilMs > MonsterService.NowMs && ordinal is 3 or 4 or 5 or 9);
+        || (p.ImmuneRecoveryUntilMs > MonsterService.NowMs && ordinal is 3 or 4 or 5 or 9)
+        || (ordinal == 9 && p.InvincibleUntilMs > MonsterService.NowMs);
 
     /// <summary>Sends the caster's forbid mask after CombatService took or released its cast movement lock.</summary>
     public Task RefreshCastLockAsync(GameSession p) => RefreshControlAsync(p);

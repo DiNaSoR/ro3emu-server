@@ -301,6 +301,7 @@ public sealed partial class CombatService : IGameTicker
         buffs.UnitChanged.Add(PublishTowerPetStatsAsync);
         WireBuffRules();
         WireBossSkills();
+        WireSupportSkills();
     }
 
     private static long Now => MonsterService.NowMs;

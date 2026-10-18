@@ -17,7 +17,7 @@ internal sealed record HitStage(int Branch, int Element = 0, int Split = 0, bool
 
 public sealed partial class CombatService
 {
-    private const int UndeadRace = 5, DemonRace = 3, UndeadElement = 10;
+    private const int UndeadRace = 5, DemonRace = 3, UndeadElement = 10, ShadowElement = 8;
     private const int SupersonicBlowGroup = 15103, PreyOnTheWeakGroup = 15316;
 
     /// <summary>
@@ -88,7 +88,7 @@ public sealed partial class CombatService
     /// <list type="bullet">
     /// <item>Heal's enemy branch is [1]; Holy Cross's [1] is its two-handed spear branch ([5500, 5775] at Lv5).</item>
     /// <item>Soul Strike [1] "an Extra 50% ... to Undead enemies" (Undead element or race, inferred); Magnus Exorcismus
-    /// [1] against "the Undead Race or Demon Race".</item>
+    /// [1] against "the Undead Race or Demon Race, or with the Shadow property or Undead property".</item>
     /// <item>Shield Press, Earth Drive, Powerful/Ultra Shield Bash [1] "against Monster targets" (every target here is
     /// a monster; player targets use [0]).</item>
     /// <item>Sonic Blow [1] when the target's HP is at or below 50% (_kLogicData [2000, 101, 5000]: +20%, attribute
@@ -103,7 +103,8 @@ public sealed partial class CombatService
             "Heal" => 1,
             "HolyCross" => skills.Weapon(s).SubType == TwoHandedSpear ? 1 : 0,
             "Soul_Strike" => target is { } t && (t.Template.Element == UndeadElement || t.Template.Race == UndeadRace) ? 1 : 0,
-            "Magnus_Exorcismus" => target?.Template.Race is UndeadRace or DemonRace ? 1 : 0,
+            "Magnus_Exorcismus" => target is { } m && (m.Template.Race is UndeadRace or DemonRace
+                || m.Template.Element is ShadowElement or UndeadElement) ? 1 : 0,
             "ShieldPress" or "ShieldPresss1" or "EarthDrive" or "Smite3" or "Smite2" => target != null ? 1 : 0,
             "SonicBlow" => SonicBlowBranch(s, row, target),
             _ => 0,
