@@ -97,6 +97,11 @@ public sealed partial class DungeonService
         var stage = run.Def.Stages[run.Stage];
         run.StageStartMs = MonsterService.NowMs;
         run.Ending = false;
+        // Eddga cannot fall before the companions arrive: a stage that ends at a boss HP holds the boss there
+        // until the next stage starts (inferred; the original's script is not in the client).
+        bool more = run.Stage + 1 < run.Def.Stages.Count;
+        run.Boss.HpFloor = more && stage.EndBossHpPct > 0 ? Math.Max(1, run.Boss.Template.MaxHp * stage.EndBossHpPct / 100)
+            : more ? 1 : 0;
         foreach (var spec in stage.Allies)
         {
             if (a.Settled || a.Room.Closed) return;
@@ -464,6 +469,7 @@ public sealed partial class DungeonService
     {
         if (a.Encounter is not { Done: false } run) return;
         run.Done = true;
+        run.Boss.HpFloor = 0;
         if (won) foreach (var line in run.Def.WinLines) await SayAsync(a, run, line);
     }
 }

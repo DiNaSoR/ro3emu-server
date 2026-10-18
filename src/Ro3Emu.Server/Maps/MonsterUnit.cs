@@ -57,6 +57,11 @@ public sealed class MonsterUnit : WorldUnit
     public MonsterUnit? MonsterTarget { get; set; }
     /// <summary>Until this server millisecond the unit performs a skill: it neither moves nor swings.</summary>
     public long BusyUntilMs { get; set; }
+    /// <summary>Hits do not take HP below this (a story boss while its encounter has stages left); 0: none.</summary>
+    public long HpFloor { get; set; }
+
+    /// <summary>The HP left after <paramref name="damage"/> from <paramref name="before"/>, never under <see cref="HpFloor"/>.</summary>
+    public long HpAfter(long before, long damage) => Math.Max(Math.Min(before, HpFloor), before - damage);
     /// <summary>An encounter owner chooses this unit's targets: hits taken do not redirect it (MonsterService.Engage).</summary>
     public bool ScriptedTargeting { get; set; }
     public long NextSwingMs { get; set; }

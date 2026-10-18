@@ -6,9 +6,9 @@
   },
   "soloTuning": {
     "5300001": {
-      "hp": 1450,
+      "hp": 10000,
       "attack": 1500,
-      "why": "Eddga: solo tuning, see about"
+      "why": "Eddga: the story encounter (story-encounters.json 1022001) brings his companions back, so his HP is the client's again (measured: the twelve adventurers take about 300 HP/s off him); his attack keeps the solo tuning."
     },
     "5300002": {
       "hp": 970,

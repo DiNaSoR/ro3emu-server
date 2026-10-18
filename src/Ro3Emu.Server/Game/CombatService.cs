@@ -382,7 +382,7 @@ public sealed partial class CombatService : IGameTicker
                 var (damage, result) = Damage(attacker, defender, row);
                 foreach (var adjust in MonsterDamageAdjusters) damage = adjust(monster, damage, false);
                 long previousHp = monster.Hp;
-                monster.Hp = Math.Max(0, monster.Hp - damage);
+                monster.Hp = monster.HpAfter(monster.Hp, damage);
                 if (monster.Hp == 0) killed.Add(monster); // reserve before awaited callbacks
                 await SettleMonsterHitAsync(owner, monster, previousHp, damage);
                 hit.Dsts.Add(new DamageInfo { DstID = monster.Uid, Damage = damage, HitResult = result,
