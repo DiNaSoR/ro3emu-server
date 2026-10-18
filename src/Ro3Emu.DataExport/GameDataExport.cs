@@ -198,14 +198,8 @@ public static class GameDataExport
         if (nav.Extracted == 0) throw new ExportException("No walk map was found in the game's VFS folder; the game files look incomplete.");
 
         options.Progress?.Invoke("Building the English text map", 0, 0);
-        var loc = new LocMapBuilder();
-        if (options.TranslationQueue is { } queue && File.Exists(queue)) loc.AddQueue(queue);
-        var zh = Path.Combine(locDir, "Localization_zh_CN.json");
-        var en = Path.Combine(staged, "config", "Localization_en.json");
-        if (File.Exists(zh) && File.Exists(en)) loc.AddClientTables(zh, en);
-        loc.AddTranslations(options.Translations);
-        loc.Write(Path.Combine(staged, "loc_en.tsv"));
-        log($"loc_en.tsv: {loc.Count} entries ({loc.FromQueue} queue, {loc.FromTables} client tables, {loc.Ours} ours)");
+        var loc = BuildLocMap(Path.Combine(locDir, "Localization_zh_CN.json"), Path.Combine(staged, "config", "Localization_en.json"),
+            Path.Combine(staged, "loc_en.tsv"), options);
 
         foreach (var e in errors.Take(50)) log("  " + e);
 
@@ -227,6 +221,64 @@ public static class GameDataExport
         var read = new SortedSet<string>(StringComparer.OrdinalIgnoreCase) { LuaPayloadDir(clientDir) };
         foreach (var f in filesRead) read.Add(f);
         return new Result(config.Ok, scene.Ok, skills.Ok, nav.Extracted, messages, loc.Count, fingerprint, read);
+    }
+
+    /// <summary>The client's two Localization chunks, the only input of the English map.</summary>
+    public static string[] LocSourceFiles(string clientDir) =>
+        new[] { "Localization_zh_CN", "Localization_en" }.Select(n => Path.Combine(LuaPayloadDir(clientDir), n + ".lua.bytes")).ToArray();
+
+    /// <summary>
+    /// The English map alone, without the rest of the export: what a player who joins someone else's server needs.
+    /// Decodes only the two Localization chunks of <paramref name="clientDir"/>, so it takes seconds, and writes
+    /// <paramref name="path"/> exactly as <see cref="Run"/> writes data/loc_en.tsv. Returns the entry count.
+    /// </summary>
+    public static int WriteLocMap(string clientDir, string path, Options? options = null)
+    {
+        options ??= new Options();
+        var sources = LocSourceFiles(clientDir);
+        if (sources.FirstOrDefault(s => !File.Exists(s)) is { } absent)
+            throw new ExportException("The game folder is incomplete: " + Path.GetRelativePath(clientDir, absent) + " is missing.");
+        var work = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(path))!, ".locmap");
+        if (Directory.Exists(work)) Directory.Delete(work, recursive: true);
+        try
+        {
+            var luac = Path.Combine(work, "luac");
+            Directory.CreateDirectory(luac);
+            foreach (var source in sources)
+            {
+                var bytes = File.ReadAllBytes(source);
+                LuaChunkDecoder.Decode(bytes);
+                File.WriteAllBytes(Path.Combine(luac, Path.GetFileName(source)[..^".lua.bytes".Length] + ".luac"), bytes);
+            }
+            var tables = Path.Combine(work, "tables");
+            var errors = new List<string>();
+            using (var exporter = new LuaConfigExporter(luac))
+                exporter.ExportDirs(tables, ["Localization_zh_CN.luac", "Localization_en.luac"], errors.Add);
+            foreach (var e in errors) options.Log?.Invoke("  " + e);
+            var zh = Path.Combine(tables, "Localization_zh_CN.json");
+            var en = Path.Combine(tables, "Localization_en.json");
+            if (!File.Exists(zh) || !File.Exists(en)) throw new ExportException("The game's text tables could not be read: " + string.Join("; ", errors));
+            var staged = Path.Combine(work, "loc_en.tsv");
+            int count = BuildLocMap(zh, en, staged, options).Count;
+            Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
+            File.Move(staged, path, overwrite: true);
+            return count;
+        }
+        finally
+        {
+            if (Directory.Exists(work)) Directory.Delete(work, recursive: true);
+        }
+    }
+
+    private static LocMapBuilder BuildLocMap(string zhJson, string enJson, string outPath, Options options)
+    {
+        var loc = new LocMapBuilder();
+        if (options.TranslationQueue is { } queue && File.Exists(queue)) loc.AddQueue(queue);
+        if (File.Exists(zhJson) && File.Exists(enJson)) loc.AddClientTables(zhJson, enJson);
+        loc.AddTranslations(options.Translations);
+        loc.Write(outPath);
+        options.Log?.Invoke($"loc_en.tsv: {loc.Count} entries ({loc.FromQueue} queue, {loc.FromTables} client tables, {loc.Ours} ours)");
+        return loc;
     }
 }
 
