@@ -93,6 +93,10 @@ public sealed class SkillService
         return (main > 0 ? mainSub : viceSub, main > 0 && vice > 0 && mainSub == viceSub);
     }
 
+    /// <summary>A shield (ItemConfig subtype 50) in the off hand.</summary>
+    internal bool HoldsShield(GameSession session) =>
+        SubType(session.Items.FirstOrDefault(i => i.Grid == ViceHandGrid)?.Entry ?? 0) == CombatService.ShieldSubType;
+
     private int SubType(int entry) =>
         entry > 0 && data.Row("ItemConfig", entry) is { } row ? (int)GameData.Int(row, "_iSubType") : 0;
 
