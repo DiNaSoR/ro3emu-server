@@ -97,6 +97,10 @@ offered to every character at once, or after the quest named in `after`. Every s
 - **kill**: a monster id, or a list of them, and the `count`. Party kills count, unless you add `"solo": true`. Give
   the `map` where they spawn and the tracker walks to the spawn. The objective gets the `*` that shows the counter.
 
+A quest can say its `type`: `"main"`, `"side"` (the default) or `"guide"`. The type sets the quest log tag and the
+bubble over the NPC a talk step sends you to, in the client's colours: orange `[Main Quest]`, blue `[Side Quest]` or
+green `[Guide]`. Every step of the quest takes it.
+
 Optional on any step: `exp` (Base EXP when handed in; Job EXP follows at 20%), `award` (an AwardConfig item
 package), `track` (a raw `_kTrack` entry, replacing the one the server picks), and `fields` (any TaskConfig fields,
 written over the generated row).

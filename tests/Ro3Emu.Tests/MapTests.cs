@@ -229,6 +229,44 @@ public sealed partial class MapTests : IAsyncLifetime
     }
 
     [ClientDataFact]
+    public async Task AMonsterKilledMidWalkStopsWhereItDies()
+    {
+        await using var alice = await InWorld("Alice");
+        var units = await Next(alice, GameAoiSink.SyncAoiView, AoIViewChangeData.Parser, v => v.Bases.Any(b => b.EntityType == 1));
+        var seen = units.Bases.Where(b => b.EntityType == 1).OrderBy(b => Dist(b, alice.Self!)).First();
+        var loop = _app.Services.GetRequiredService<GameLoop>();
+        var (deathX, deathZ) = await loop.InvokeAsync(async () =>
+        {
+            var player = _app.Services.GetRequiredService<SessionRegistry>().All().Single(s => s.Account == "alice");
+            var m = _app.Services.GetRequiredService<World>().Map(player.WorldScene).Units.OfType<MonsterUnit>()
+                .Single(u => u.Uid == (long)seen.Uuid);
+            // A quarter of the way along a 10 m walk when it dies.
+            long now = MonsterService.NowMs;
+            m.NextRoamMs = long.MaxValue;
+            (m.FromX, m.FromY, m.FromZ, m.ToX, m.ToY, m.ToZ) = (m.X, m.Y, m.Z, m.X + 10, m.Y, m.Z);
+            (m.StartMs, m.EndMs, m.SegmentSpeed, m.Moving) = (now - 500, now + 1500, 5f, true);
+            await _app.Services.GetRequiredService<MonsterService>().KillAsync(m);
+            Assert.False(m.Moving);
+            Assert.InRange(m.X, m.FromX + 2, m.FromX + 4);
+            return (m.X, m.Z);
+        });
+
+        await alice.Inbox.WaitAsync(e => e.IsGame(CombatService.EntityBaseChange) && EntityBase.Parser.ParseFrom(e.Body) is var b
+            && b.Uuid == seen.Uuid && b.State == EntityState.Dead, Wait);
+        // Viewers get a stop at the death point before the Dead state, so the corpse does not finish the walk.
+        var events = alice.Inbox.Snapshot().ToList();
+        int stopAt = events.FindLastIndex(e => e.IsGame(GameAoiSink.MovementChange)
+            && MovementChangeNtf.Parser.ParseFrom(e.Body) is var mv && mv.Uid == (long)seen.Uuid);
+        int deadAt = events.FindIndex(e => e.IsGame(CombatService.EntityBaseChange)
+            && EntityBase.Parser.ParseFrom(e.Body) is var b && b.Uuid == seen.Uuid && b.State == EntityState.Dead);
+        Assert.InRange(stopAt, 0, deadAt - 1);
+        var stop = MovementChangeNtf.Parser.ParseFrom(events[stopAt].Body);
+        Assert.Equal(MovementType.MoveTypeNone, stop.MovementInfo.MoveType);
+        Assert.Equal(deathX, stop.MovementInfo.Pos.X, 0.01f);
+        Assert.Equal(deathZ, stop.MovementInfo.Pos.Z, 0.01f);
+    }
+
+    [ClientDataFact]
     public void NormalAttackCannotRecastItselfButOtherSkillsBreakIt()
     {
         var combat = _app.Services.GetRequiredService<CombatService>();

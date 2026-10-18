@@ -51,6 +51,7 @@ public sealed partial class CombatService
             ? ranged ? Pair(S(a, 1252), S(b, 1253)) : Pair(S(a, 1250), S(b, 1251))
             : ranged ? Pair(S(a, 229), S(b, 230)) : Pair(S(a, 227), S(b, 228));
         if (GameData.Int(skill, "_iIsNormalAtk") == 0) f *= Pair(S(a, 225), S(b, 226));
+        if (a.IsMonster && b.MonsterDamageCutBp > 0) f *= Math.Max(0, 1 - b.MonsterDamageCutBp / 10000.0);
         return f;
     }
 
@@ -62,11 +63,37 @@ public sealed partial class CombatService
     internal static double HealFactor(Fighter healer, Fighter recipient) =>
         Math.Max(0, 1 + (S(healer, 207) + S(healer, 241)) / 10000) * Math.Max(0, 1 + (S(recipient, 208) + S(recipient, 242)) / 10000);
 
+    /// <summary>
+    /// Which _kDamageParam1/2 entry a hit uses. Heal's enemy branch is [1]; Holy Cross's [1] is its two-handed spear
+    /// branch ("When the caster has a two-handed spear equipped, the damage multiplier is increased by an Extra 5%":
+    /// [5500, 5775] at Lv5).
+    /// </summary>
+    internal int DamageBranch(GameSession s, string script) => script switch
+    {
+        "Heal" => 1,
+        "HolyCross" => skills.Weapon(s).SubType == TwoHandedSpear ? 1 : 0,
+        _ => 0,
+    };
+
+    /// <summary>
+    /// A skill's _kBuff1 tuples for this caster. Divine Insight ("Inspiration") lists both of its buffs: 1162305
+    /// (Max Life +10%, PATK +5%) and 1162405 (Max Life +5%, PATK +10%), the second "when wielding a two-handed spear";
+    /// only the one matching the weapon is granted (before, both landed and the second overwrote the first).
+    /// </summary>
+    internal IEnumerable<JsonElement> Buff1(GameSession s, JsonElement row, string script)
+    {
+        var tuples = Tuples(row, "_kBuff1").ToArray();
+        if (script == "Inspiration" && tuples.Length == 2)
+            return [tuples[skills.Weapon(s).SubType == TwoHandedSpear ? 1 : 0]];
+        return tuples;
+    }
+
     /// <summary>A player attacking, with its secondary stats.</summary>
-    private Fighter PlayerAttacker(GameSession s, StatSheet stats) =>
+    internal Fighter PlayerAttacker(GameSession s, StatSheet stats) =>
         new(stats[103], stats[104], stats[109], stats[111], s.Progress!.Level, 1)
         {
             Stats = stats, Race = PlayerRace, Size = PlayerSize, Covered = Covered(s),
+            NormalAttackElement = HasBuffGroup(s, AspersioGroup) ? HolyElement : 0,
         };
 
     /// <summary>A player taking a hit, with its defenses and secondary stats.</summary>
@@ -75,7 +102,16 @@ public sealed partial class CombatService
         {
             Def = stats[105], Mdef = stats[106], Flee = stats[110], ResCri = stats[112],
             Stats = stats, Race = PlayerRace, Size = PlayerSize, Covered = Covered(p),
+            MonsterDamageCutBp = MonsterResistanceBp(p),
         };
+
+    /// <summary>Aspersio 14113: "Changes your Basic Attack element to Holy" (EleConfig row 7). Its buff 1411301 carries
+    /// _kLogicData [4, 4701], which no other buff uses and the server does not decode; the element is from the
+    /// description (inferred).</summary>
+    private const int AspersioGroup = 14113, HolyElement = 7;
+
+    private bool HasBuffGroup(GameSession s, int group) => s.Buffs.Any(b => b.ExpireMs > MonsterService.NowMs
+        && data.Row("BuffConfig", b.ConfigId) is { } row && GameData.Int(row, "_iBuffID") == group);
 
     private Func<int, double>? Covered(GameSession s) => CoveredBonus is { } covered ? id => covered(s, id) : null;
 

@@ -215,7 +215,7 @@ public sealed partial class CombatService
             if (damage)
             {
                 var defender = AsDefender(target);
-                var (amount, result) = Damage(attacker, defender, row, script == "Heal" ? 1 : 0);
+                var (amount, result) = Damage(attacker, defender, row, DamageBranch(s, script));
                 if (amount > 0)
                 {
                     foreach (var modifier in DamageAdjusters) amount = Math.Max(0, modifier(s, target, row, result, amount));
@@ -258,7 +258,7 @@ public sealed partial class CombatService
         {
             if (!CanApplyMoreEffects()) break;
             if (field == null)
-                foreach (var tuple in Tuples(row, "_kBuff1"))
+                foreach (var tuple in Buff1(s, row, script))
                     if (CanApplyMoreEffects() && RollBuff(tuple, out int id, out int duration)) await GrantSkillBuffAsync(s, recipient, id, duration);
             if (friendly && damage)
             {

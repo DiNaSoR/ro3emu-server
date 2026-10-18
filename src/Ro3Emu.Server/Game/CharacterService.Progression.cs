@@ -120,10 +120,13 @@ public sealed partial class CharacterService
         while (p.JobLevel < maxJob && JobLvRow(p.Career, p.JobLevel) is { } row && GameData.Int(row, "_iJobeExp") == 0) p.JobLevel++;
     }
 
-    /// <param name="levelUp">The base level rose: the client floats the attribute gains.</param>
+    /// <param name="levelUp">The base level rose: the client floats the attribute gains, and HP/SP refill to the new
+    /// maximum (inferred: classic RO heals fully on a base level up; the client shows no rule). Without it a level 3
+    /// Novice ends the first quest's five level 5 Porings near 20 of 129 HP, though it levels up after the third.</param>
     private async Task AfterLevelChangeAsync(GameSession session, Func<bool>? stillOwner = null, bool persist = true, bool levelUp = false)
     {
         var p = session.Progress!;
+        if (levelUp && !session.Dead) (session.CurrentHp, session.CurrentSp) = (null, null); // unset = full (Stats)
         if (persist) Save(session);
         await SyncAsync(session, RoleBaseInfoSync, BuildBaseInfo(session));
         if (stillOwner?.Invoke() == false) return;

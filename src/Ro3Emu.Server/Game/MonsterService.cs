@@ -749,7 +749,13 @@ public sealed partial class MonsterService : MonsterBrain, IGameTicker
     {
         if (m.Dead) return;
         m.Dead = true;
+        // A monster killed mid-walk dies where it stands: viewers are still playing its walk segment, so end it
+        // with a stop at the current point before the death state, or the corpse slides on to the walk's end.
+        bool wasMoving = m.Moving;
+        long now = NowMs;
+        if (wasMoving) m.Advance(now);
         m.Moving = false;
+        if (wasMoving) await world.MoveUnitAsync(m, Stop(m, now));
         EndBossSkills(m, interrupt: true);
         SetTarget(m, null);
         m.PetTarget = null;
