@@ -393,6 +393,13 @@ public sealed class GatheringTests : IAsyncLifetime
              s.LifeJob!.GeneralCollectionTimesByMap[Scene].Times[node.CollectionInfo.PointConfigId]));
         Assert.True(material >= 4);
         Assert.Equal(1, pointCount);
+        // The yield scatters on the ground at the node like monster loot (ManifestType Drop), items only.
+        var drop = await Next(alice, CharacterService.GetRewardNotify, GetRewardNotify.Parser, n => n.RewardType.Contains(8));
+        Assert.Equal(7010001, drop.TargetEntry);
+        Assert.Equal((long)alice.Self!.Uuid, drop.TargetUid);
+        Assert.Equal(node.MovementInfo.Pos, drop.Position);
+        Assert.Equal(material, drop.Rewards.Where(r => r.ItemEntry is 1291010 or 1291020 or 1291021).Sum(r => r.Stack));
+        Assert.DoesNotContain(drop.Rewards, r => r.ItemEntry is 100 or 101);
         var removed = await Next(alice, GameAoiSink.SyncAoiView, AoIViewChangeData.Parser, v => v.LeaveAoi.Contains(node.Uuid));
         Assert.Contains(node.Uuid, removed.LeaveAoi);
 

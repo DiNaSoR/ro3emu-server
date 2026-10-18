@@ -445,6 +445,7 @@ public sealed class GatheringService : IGameTicker
                                         node.Cooldowns[session.Role.Id] = DateTimeOffset.UtcNow.ToUnixTimeSeconds() + node.CooldownSeconds;
                                     pending.Committed = true;
                                 });
+                            if (code == 0) await SendYieldDropAsync(session, node, pending.Resolution!.Grants);
                         }
                         catch (Exception e)
                         {
@@ -607,6 +608,24 @@ public sealed class GatheringService : IGameTicker
         if (_runtimes.TryGetValue(pending.Node.RuntimeMap, out var owner)) owner.Deadlines.RemoveAll(d => d.Session == session);
         if (notify && session.Role != null) await SendIdleAsync(session, interrupted: true);
     }
+
+    /// <summary>
+    /// 31322 with ManifestType Drop, the node's position and its NPC id, as for a monster kill: the client scatters the
+    /// yield on the ground at the node (LC_TipHelper._popDropItemTip, NPCConfig._iDropPlanID; every Ore Vein and Plant
+    /// row has plan 1) and then gathers it to the player. The items are already in the bag; this is presentation only.
+    /// Without it the yield arrives silently through the 5009 bag sync. Base/Job EXP (items 100/101) are not dropped.
+    /// </summary>
+    private static Task SendYieldDropAsync(GameSession session, GatheringUnit node, IReadOnlyList<AwardGrant> grants)
+    {
+        var notify = new GetRewardNotify { Position = node.Pos, TargetEntry = node.NpcId, TargetUid = session.Role!.Id,
+            RewardType = { YieldDrop } };
+        foreach (var grant in grants.Where(g => g.Entry is not (100 or 101) && g.Count > 0))
+            notify.Rewards.Add(new ItemBaseInfo { ItemEntry = grant.Entry, Stack = grant.Count,
+                ItemInfos = { [10001] = new ItemAttrValue { LongVal = 0 } } });
+        return notify.Rewards.Count == 0 ? Task.CompletedTask : session.SendGameAsync(CharacterService.GetRewardNotify, notify);
+    }
+
+    private const int YieldDrop = 8; // ManifestType Drop
 
     private static Task SendIdleAsync(GameSession session, bool interrupted) => session.Role == null ? Task.CompletedTask
         : session.SendGameAsync(StateChange, new InteractChangeNtf
