@@ -1,9 +1,9 @@
 {
-  "//": "Every wardrobe look the client never sells or hands out, added to the Fashion shop (Costume tab) for Sacred Relic Crystals, once per role. Generated from WardRobeConfig: skipped are looks already sold, set pieces, disabled looks, default hairstyles and looks crafted with _kMaterial. Each row copies an existing commodity of the same tab (_base). Delete this file to remove them.",
+  "//": "Every wardrobe look the client never sells or hands out, added to the Fashion shop (Costume tab) for Sacred Relic Crystals, once per role. Generated from WardRobeConfig: skipped are looks already sold, set pieces, disabled looks, default hairstyles and looks crafted with _kMaterial. Each row copies an existing commodity of the same tab (_base), one that is not on the Recommended page: a copy of a Recommended row (_iRecommendID 501, _kBooth) lands in that row's booth slot there, hidden behind it. Delete this file to remove them.",
   "rows": {
     "ShopCommodityConfig": {
       "5000039": {
-        "_base": 5000017,
+        "_base": 5000018,
         "_iAppearanceId": 10050101,
         "_iAppranceId": 10050101,
         "_iAppearanceAwardId": 0,
@@ -17,7 +17,7 @@
         "_iSortId": 4006
       },
       "5000040": {
-        "_base": 5000017,
+        "_base": 5000018,
         "_iAppearanceId": 10050102,
         "_iAppranceId": 10050102,
         "_iAppearanceAwardId": 0,
@@ -31,7 +31,7 @@
         "_iSortId": 4007
       },
       "5000041": {
-        "_base": 5000017,
+        "_base": 5000018,
         "_iAppearanceId": 10050103,
         "_iAppranceId": 10050103,
         "_iAppearanceAwardId": 0,
@@ -45,7 +45,7 @@
         "_iSortId": 4008
       },
       "5000042": {
-        "_base": 5000017,
+        "_base": 5000018,
         "_iAppearanceId": 10050104,
         "_iAppranceId": 10050104,
         "_iAppearanceAwardId": 0,
@@ -59,7 +59,7 @@
         "_iSortId": 4009
       },
       "5000043": {
-        "_base": 5000017,
+        "_base": 5000018,
         "_iAppearanceId": 10050105,
         "_iAppranceId": 10050105,
         "_iAppearanceAwardId": 0,
@@ -73,7 +73,7 @@
         "_iSortId": 4010
       },
       "5000044": {
-        "_base": 5000017,
+        "_base": 5000018,
         "_iAppearanceId": 10050106,
         "_iAppranceId": 10050106,
         "_iAppearanceAwardId": 0,
@@ -87,7 +87,7 @@
         "_iSortId": 4011
       },
       "5000045": {
-        "_base": 5000017,
+        "_base": 5000018,
         "_iAppearanceId": 10050107,
         "_iAppranceId": 10050107,
         "_iAppearanceAwardId": 0,
@@ -101,7 +101,7 @@
         "_iSortId": 4012
       },
       "5000046": {
-        "_base": 5000017,
+        "_base": 5000018,
         "_iAppearanceId": 10050108,
         "_iAppranceId": 10050108,
         "_iAppearanceAwardId": 0,
@@ -115,7 +115,7 @@
         "_iSortId": 4013
       },
       "5000047": {
-        "_base": 5000017,
+        "_base": 5000018,
         "_iAppearanceId": 10050109,
         "_iAppranceId": 10050109,
         "_iAppearanceAwardId": 0,
@@ -129,7 +129,7 @@
         "_iSortId": 4014
       },
       "5000048": {
-        "_base": 5000017,
+        "_base": 5000018,
         "_iAppearanceId": 10050110,
         "_iAppranceId": 10050110,
         "_iAppearanceAwardId": 0,
@@ -143,7 +143,7 @@
         "_iSortId": 4015
       },
       "5000049": {
-        "_base": 5000017,
+        "_base": 5000018,
         "_iAppearanceId": 10050111,
         "_iAppranceId": 10050111,
         "_iAppearanceAwardId": 0,
@@ -157,7 +157,7 @@
         "_iSortId": 4016
       },
       "5000050": {
-        "_base": 5000017,
+        "_base": 5000018,
         "_iAppearanceId": 10050112,
         "_iAppranceId": 10050112,
         "_iAppearanceAwardId": 0,
@@ -171,7 +171,7 @@
         "_iSortId": 4017
       },
       "5000051": {
-        "_base": 5000017,
+        "_base": 5000018,
         "_iAppearanceId": 10050113,
         "_iAppranceId": 10050113,
         "_iAppearanceAwardId": 0,
@@ -185,7 +185,7 @@
         "_iSortId": 4018
       },
       "5000052": {
-        "_base": 5000017,
+        "_base": 5000018,
         "_iAppearanceId": 10050114,
         "_iAppranceId": 10050114,
         "_iAppearanceAwardId": 0,
@@ -199,7 +199,7 @@
         "_iSortId": 4019
       },
       "5000053": {
-        "_base": 5000017,
+        "_base": 5000018,
         "_iAppearanceId": 10050115,
         "_iAppranceId": 10050115,
         "_iAppearanceAwardId": 0,
@@ -213,7 +213,7 @@
         "_iSortId": 4020
       },
       "5000054": {
-        "_base": 5000017,
+        "_base": 5000018,
         "_iAppearanceId": 10050116,
         "_iAppranceId": 10050116,
         "_iAppearanceAwardId": 0,
@@ -227,7 +227,7 @@
         "_iSortId": 4021
       },
       "5000055": {
-        "_base": 5000017,
+        "_base": 5000018,
         "_iAppearanceId": 20050101,
         "_iAppranceId": 20050101,
         "_iAppearanceAwardId": 0,
@@ -241,7 +241,7 @@
         "_iSortId": 4022
       },
       "5000056": {
-        "_base": 5000017,
+        "_base": 5000018,
         "_iAppearanceId": 20050102,
         "_iAppranceId": 20050102,
         "_iAppearanceAwardId": 0,
@@ -255,7 +255,7 @@
         "_iSortId": 4023
       },
       "5000057": {
-        "_base": 5000017,
+        "_base": 5000018,
         "_iAppearanceId": 30050101,
         "_iAppranceId": 30050101,
         "_iAppearanceAwardId": 0,
@@ -269,7 +269,7 @@
         "_iSortId": 4024
       },
       "5000058": {
-        "_base": 5000017,
+        "_base": 5000018,
         "_iAppearanceId": 30050102,
         "_iAppranceId": 30050102,
         "_iAppearanceAwardId": 0,
@@ -283,7 +283,7 @@
         "_iSortId": 4025
       },
       "5000059": {
-        "_base": 5000002,
+        "_base": 5000003,
         "_iAppearanceId": 40050020,
         "_iAppranceId": 40050020,
         "_iAppearanceAwardId": 180004,
@@ -302,7 +302,7 @@
         ]
       },
       "5000060": {
-        "_base": 5000002,
+        "_base": 5000003,
         "_iAppearanceId": 40050030,
         "_iAppranceId": 40050030,
         "_iAppearanceAwardId": 180008,
@@ -321,7 +321,7 @@
         ]
       },
       "5000061": {
-        "_base": 5000002,
+        "_base": 5000003,
         "_iAppearanceId": 40060010,
         "_iAppranceId": 40060010,
         "_iAppearanceAwardId": 180001,
@@ -339,7 +339,7 @@
         ]
       },
       "5000062": {
-        "_base": 5000008,
+        "_base": 5000014,
         "_iAppearanceId": 60030020,
         "_iAppranceId": 60030020,
         "_iAppearanceAwardId": 0,
@@ -353,7 +353,7 @@
         "_iSortId": 2009
       },
       "5000063": {
-        "_base": 5000008,
+        "_base": 5000014,
         "_iAppearanceId": 60030030,
         "_iAppranceId": 60030030,
         "_iAppearanceAwardId": 0,
@@ -367,7 +367,7 @@
         "_iSortId": 2010
       },
       "5000064": {
-        "_base": 5000008,
+        "_base": 5000014,
         "_iAppearanceId": 60030040,
         "_iAppranceId": 60030040,
         "_iAppearanceAwardId": 0,
@@ -381,7 +381,7 @@
         "_iSortId": 2011
       },
       "5000065": {
-        "_base": 5000008,
+        "_base": 5000014,
         "_iAppearanceId": 60030050,
         "_iAppranceId": 60030050,
         "_iAppearanceAwardId": 0,
@@ -395,7 +395,7 @@
         "_iSortId": 2012
       },
       "5000066": {
-        "_base": 5000008,
+        "_base": 5000014,
         "_iAppearanceId": 60030060,
         "_iAppranceId": 60030060,
         "_iAppearanceAwardId": 0,
@@ -409,7 +409,7 @@
         "_iSortId": 2013
       },
       "5000067": {
-        "_base": 5000008,
+        "_base": 5000014,
         "_iAppearanceId": 60030070,
         "_iAppranceId": 60030070,
         "_iAppearanceAwardId": 0,
@@ -423,7 +423,7 @@
         "_iSortId": 2014
       },
       "5000068": {
-        "_base": 5000008,
+        "_base": 5000014,
         "_iAppearanceId": 60040031,
         "_iAppranceId": 60040031,
         "_iAppearanceAwardId": 0,
@@ -437,7 +437,7 @@
         "_iSortId": 2015
       },
       "5000069": {
-        "_base": 5000008,
+        "_base": 5000014,
         "_iAppearanceId": 60040033,
         "_iAppranceId": 60040033,
         "_iAppearanceAwardId": 0,
@@ -451,7 +451,7 @@
         "_iSortId": 2016
       },
       "5000070": {
-        "_base": 5000008,
+        "_base": 5000014,
         "_iAppearanceId": 60040070,
         "_iAppranceId": 60040070,
         "_iAppearanceAwardId": 0,
@@ -465,7 +465,7 @@
         "_iSortId": 2017
       },
       "5000071": {
-        "_base": 5000008,
+        "_base": 5000014,
         "_iAppearanceId": 60050010,
         "_iAppranceId": 60050010,
         "_iAppearanceAwardId": 0,
@@ -479,7 +479,7 @@
         "_iSortId": 2018
       },
       "5000072": {
-        "_base": 5000008,
+        "_base": 5000014,
         "_iAppearanceId": 60050020,
         "_iAppranceId": 60050020,
         "_iAppearanceAwardId": 0,
@@ -493,7 +493,7 @@
         "_iSortId": 2019
       },
       "5000073": {
-        "_base": 5000008,
+        "_base": 5000014,
         "_iAppearanceId": 60050021,
         "_iAppranceId": 60050021,
         "_iAppearanceAwardId": 0,
