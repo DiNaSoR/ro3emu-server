@@ -105,6 +105,35 @@ public sealed partial class SkillCombatTests
     }
 
     [ClientDataFact]
+    public async Task MeltDownDamagesAnEnemyPlayersWeapon()
+    {
+        await using var alice = await InWorld("Alice"); await using var bob = await InWorld("Bob");
+        await Gm("alice", "!job 6300"); await Teach("alice", 16203); await Seasoned("alice");
+        await Wield("bob", 2050120);
+        Combat.Rolls = new FixedRolls(0);
+        Assert.Equal(0, await CastSelf(alice, 1620301, Session("alice").Role!.Id));
+        await Until(s => s.Buffs.Any(b => b.ConfigId == 1620301), "alice");
+        long armed = await Loop.InvokeAsync(() => Task.FromResult(Character.Stats(Session("bob"))[101]));
+        await Loop.InvokeAsync(async () => { foreach (var handler in Combat.PvpDealtAsync) await handler(Session("alice"), Session("bob"), 100, false); });
+        Assert.True(await HasBuff("bob", 1620401)); // "Weapon damaged. All Main/Off-Hand Weapon stats and Affixes are not Active."
+        long damaged = await Loop.InvokeAsync(() => Task.FromResult(Character.Stats(Session("bob"))[101]));
+        Assert.True(damaged < armed, $"{damaged} < {armed}"); // the spear's Max HP is gone
+        await Loop.InvokeAsync(() => Buffs.RemoveAsync(Session("bob"), Session("bob").Buffs.First(b => b.ConfigId == 1620401)));
+        Assert.Equal(armed, await Loop.InvokeAsync(() => Task.FromResult(Character.Stats(Session("bob"))[101])));
+    }
+
+    [ClientDataFact]
+    public async Task HymnOfTheLambCannotBeCastWhileControlled()
+    {
+        await using var alice = await InWorld("Alice");
+        await Gm("alice", "!job 4400"); await Teach("alice", 14302); await Seasoned("alice");
+        var monster = await Spawn("alice", t => t);
+        await Loop.InvokeAsync(() => Buffs.AddAsync(Session("alice"), 901901, 5000, monster.Uid)); // Fear: control (25), casts allowed
+        Assert.True(await HasBuff("alice", 901901));
+        Assert.Equal(ErrorCodes.SkillBadState, await CastSelf(alice, 1430201, Session("alice").Role!.Id));
+    }
+
+    [ClientDataFact]
     public async Task SightAndRuwachUncoverHiddenEnemies()
     {
         await using var alice = await InWorld("Alice"); await using var bob = await InWorld("Bob");

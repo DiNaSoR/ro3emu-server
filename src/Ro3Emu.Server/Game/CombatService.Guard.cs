@@ -23,7 +23,9 @@ namespace Ro3Emu.Server.Game;
 /// players hide (BuffService.Stealth).</item>
 /// <item>Melt Down 16203: while its buff lasts, a monster hit has its ${4}% chance to put _kLogicData[2] (1620510,
 /// "Reduces Physical ATK and DEF by 5%") on the monster for ${6} s: the monster hits for 5% less and, monsters having no
-/// DEF in the formula, takes 5% more (inferred). The PvP "Weapon Damage" state is not simulated.</item>
+/// DEF in the formula, takes 5% more (inferred). A hit on an enemy player has its ${2}% chance to put 【Weapon Damage】
+/// 1620401 on them for ${3} s: their main- and off-hand weapons add no base stats, affixes or Stunts meanwhile
+/// (CharacterService.WeaponDamaged). Refine and enhance levels of the grids still count (inferred).</item>
 /// </list>
 /// </summary>
 public sealed partial class CombatService
@@ -40,6 +42,8 @@ public sealed partial class CombatService
     {
         DealtAsync.Add(MeltDownAsync);
         MonsterDamageAdjusters.Add(MeltDownDamage);
+        PvpDealtAsync.Add(MeltDownPlayerAsync);
+        buffs.Changed.Add(SyncWeaponDamageAsync);
     }
 
     private ActiveBuff? LiveGroup(GameSession p, int group) =>
@@ -189,6 +193,26 @@ public sealed partial class CombatService
         var logic = Numbers(meltRow, "_kLogicData");
         if (desc.Length < 6 || logic.Length < 3 || Rolls.Proc(10000) >= desc[3] * 100) return;
         await buffs.ShowOnUnitAsync(target, (int)logic[2], (int)(desc[5] * 1000), s.Role!.Id);
+    }
+
+    private const int WeaponDamageBuff = 1620401;
+
+    private async Task MeltDownPlayerAsync(GameSession s, GameSession target, long amount, bool killed)
+    {
+        if (amount <= 0 || killed || LiveGroup(s, MeltDownGroup) is not { } melt
+            || data.Row("BuffConfig", melt.ConfigId) is not { } meltRow) return;
+        var desc = Numbers(meltRow, "_kDescData");
+        if (desc.Length < 3 || Rolls.Proc(10000) >= desc[1] * 100) return;
+        await buffs.AddAsync(target, WeaponDamageBuff, (int)(desc[2] * 1000), s.Role!.Id);
+    }
+
+    /// <summary>Weapon Damage carries no attribute changes, so its start and end resend the stat sheet here.</summary>
+    private async Task SyncWeaponDamageAsync(GameSession p)
+    {
+        bool damaged = CharacterService.WeaponDamaged(p, data);
+        if (damaged == p.WeaponDamagedShown) return;
+        p.WeaponDamagedShown = damaged;
+        await character.RefreshStatsAsync(p);
     }
 
     private long MeltDownDamage(MonsterUnit monster, long damage, bool monsterAttacks)

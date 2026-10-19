@@ -182,6 +182,8 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
     /// <summary>Next support check (Union stacks, Sight reveals: CombatService.Guard) and the Union piles last given.</summary>
     internal long GuardTickMs { get; set; }
     internal int UnionPiles { get; set; }
+    /// <summary>Melt Down's Weapon Damage state the last stat sheet was sent with.</summary>
+    internal bool WeaponDamagedShown { get; set; }
     public int ImmuneRecoveryPercent { get; set; }
     public Dictionary<int, long> SkillCds { get; } = new();
     public Dictionary<int, long> ItemCds { get; } = new();
