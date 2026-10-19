@@ -19,7 +19,6 @@ public sealed partial class CombatService
     private static readonly HashSet<int> ConditionalPassiveGroups =
     [
         13310, // Wolf Taming: Warg Strike and the speed only while mounted on the wolf
-        15220, // Advanced Katar Mastery: the -20% multiplier is paired with +85% crit (type 10, not applied)
         11317, 11318, // Hundred Spears Stack / Slash monitors: stack trackers, not learned bonuses
     ];
 
@@ -76,7 +75,11 @@ public sealed partial class CombatService
         var result = new List<SkillParameterRules.Modifier>();
         foreach (var (group, row) in LearnedPassiveRows(session))
         {
-            if (!ConditionalPassiveGroups.Contains(group))
+            if (group == KatarMasteryGroup)
+            {
+                if (skills.Weapon(session).SubType == KatarSubType) result.AddRange(KatarMasteryModifiers(row));
+            }
+            else if (!ConditionalPassiveGroups.Contains(group))
                 if (PassiveBuffRow(group, row) is var buff and > 0) result.AddRange(SkillParameterRules.BuffModifiers(data, buff));
             // [21, weapon subtype or 0, scope 0, group, type, operation, value]: a skill change while that weapon is held
             // (Mace Mastery's Normal Attack crit with a mace), read like a talent's opcode 21 (SeasonTalentEffects).
@@ -88,6 +91,30 @@ public sealed partial class CombatService
         if (result.SequenceEqual(session.PassiveSkillModifiers)) return;
         session.PassiveSkillModifiers = result;
         session.PassiveSkillModifierVersion++;
+    }
+
+    private const int KatarMasteryGroup = 15101, KatarMasteryBuffGroup = 15112, KatarSubType = 12;
+
+    /// <summary>
+    /// Katar Mastery 15101: "While equipped with a Katar-type weapon, increases Physical ATK by ${1} and increases the
+    /// damage multiplier of [Assassin Normal Attack] by ${2}%". Its data sits in BuffConfig 1511201-1511210 (named
+    /// "Katar Mastery", in Disguise's group 15112): _kChangeAttri [1033, level] and, from Lv5, the +10% normal-attack
+    /// modifiers. The description gives 10% at every level, so lower levels use the Lv5 row's modifiers (inferred).
+    /// </summary>
+    private IEnumerable<SkillParameterRules.Modifier> KatarMasteryModifiers(System.Text.Json.JsonElement row)
+    {
+        int level = (int)Math.Max(1, GameData.Int(row, "_iLevel"));
+        var own = SkillParameterRules.BuffModifiers(data, KatarMasteryBuffGroup * 100 + level);
+        return own.Count > 0 ? own : SkillParameterRules.BuffModifiers(data, KatarMasteryBuffGroup * 100 + 5);
+    }
+
+    /// <summary>Katar Mastery's PATK (its BuffConfig row's _kChangeAttri) while a katar is held.</summary>
+    private IEnumerable<(long Id, double Value)> KatarMasteryAttributes(GameSession session)
+    {
+        if (session.Progress is not { } progress || skills.Level(progress, KatarMasteryGroup) is not (var level and > 0)
+            || skills.Weapon(session).SubType != KatarSubType
+            || data.Row("BuffConfig", KatarMasteryBuffGroup * 100 + level) is not { } row) yield break;
+        foreach (var (id, value) in GameData.Pairs(row, "_kChangeAttri")) yield return (id, value);
     }
 
     /// <summary>The SpecialEffectConfig tuples a passive level row names in _iSpecialEffect (one id or a list).</summary>
@@ -111,6 +138,7 @@ public sealed partial class CombatService
     /// </summary>
     private IEnumerable<(long Id, double Value)> PassiveConditionalAttributes(GameSession session)
     {
+        foreach (var katar in KatarMasteryAttributes(session)) yield return katar;
         int? weapon = null, mount = null;
         foreach (var (_, row) in LearnedPassiveRows(session))
             foreach (var op in SpecialEffectOps(row))

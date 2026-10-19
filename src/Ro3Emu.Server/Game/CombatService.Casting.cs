@@ -103,6 +103,10 @@ public sealed partial class CombatService
             else if (owned == null && !SkillConditionMet(s, row!.Value)) error = ErrorCodes.SkillRequirements; // weapon, mount, pendant
             else if (GameData.Int(row!.Value, "_iBasicType") != 1) error = ErrorCodes.SkillPassive;
             else if (buffs.HasForbidden(s, GameData.Int(row.Value, "_iIsNormalAtk") == 1 ? 5 : 4)) error = ErrorCodes.SkillBadState;
+            // Hymn of the Lamb: "This skill cannot be cast while You are under any control effect" (category 25: Stun,
+            // Knockback, Fear, Frozen, Petrify, Sleep). Fear leaves other skills castable; Blind or Immobilize do not stop it.
+            else if (Script(row.Value) == "Praefatio" && buffs.CategoriesOf(s).Contains(25))
+                error = ErrorCodes.SkillBadState;
             else if (req.SkillId == PublicSkill("WorldTreeSkillId") && buffs.HasForbidden(s, 12)) error = ErrorCodes.ItemUseForbidden;
             else if (req.SkillId == PublicSkill("WorldTreeSkillId") && !ItemAllowedInMap(s, (int)PublicSkill("WorldTreeItemId"))) error = ErrorCodes.ItemUseAreaForbidden;
             else if (req.IsExtraSkill && owned == null && GameData.Int(row.Value, "_iExtraType") == 0) error = ErrorCodes.SkillRequirements;

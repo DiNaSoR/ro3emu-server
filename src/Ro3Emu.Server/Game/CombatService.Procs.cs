@@ -18,6 +18,8 @@ public sealed partial class CombatService
         JudexGroup = 14309, DoubleHolyLightGroup = 14311, HolySpiritSurgeGroup = 14312,
         WargStrikeGroup = 13312, FocusedArrowStrikeGroup = 13305,
         ParryGroup = 11210, DeathBoundGroup = 11311, AutoCounterGroup = 11105,
+        ShieldReflectGroup = 11404, ShieldReflectSkill = 11410, ReflectDamageGroup = 11610, ReflectDamageSkill = 11609,
+        CastingShieldGroup = 11611,
         BowSubType = 11, PoisonElement = 6;
 
     /// <summary>The Auto Counter parry's "took a melee Physical hit" mark in <see cref="GameSession.ProcState"/>.</summary>
@@ -76,6 +78,7 @@ public sealed partial class CombatService
             if (!current() || main.Dead || main.Hp <= 0) break;
             if (Rolls.Proc(10000) < proc.Chance) await ProcCastAsync(s, proc.Row, main);
         }
+        await BurnAsync(s, row, landed, current);
     }
 
     /// <summary>
@@ -114,6 +117,7 @@ public sealed partial class CombatService
                     break;
             }
         }
+        foreach (var learned in LearnedProcs(s, row, normal)) yield return learned;
         if (s.Progress is not { } progress) yield break;
         if (group == JudexGroup && skills.Level(progress, DoubleHolyLightGroup) is var holy and > 0
             && data.Row("BuffConfig", skills.RealId(DoubleHolyLightGroup, holy)) is { } light)
@@ -194,18 +198,34 @@ public sealed partial class CombatService
     /// <item>Death Bound 11311: "When you take melee damage, reflects the damage to nearby enemies, dealing ... 100% of the
     /// damage taken to up to 5 enemies within a 5-meter radius. Built-in Cooldown: 0.2 seconds" (buff _kDescData
     /// [radius, targets, percent, cooldown]; the hit is the buff's _kLogicData row 1138101-1138105 around the player).</item>
+    /// <item>Shield Reflect 11410: "When you take Melee Physical DMG from an attacker within ${5} meters, deals ... PATK *
+    /// ${2}% + ${6} to the attacker. This effect can trigger up to ${4} times per second" (buff 1140401, _kLogicData
+    /// [11419]: the SReflect row of the learned level).</item>
+    /// <item>Reflect Damage 11609: "When you are hit, deals ... PATK * ${2}% to up to ${3} enemies within a ${7}-meter
+    /// radius. This effect can trigger up to ${5} times every ${4} seconds" (buff group 11610, _kLogicData [11618]: the
+    /// Thorn row of its level around the player). Any hit counts, ranged and magic too.</item>
+    /// <item>Shield Cast's 【Casting Shield】 (group 11611, _kLogicData [11618]): "When you are hit, triggers an Extra Auto
+    /// Counter from 【Reflect Damage】": the mode-1 Thorn row (1161811-1161815) at the Reflect Damage level, once per
+    /// Reflect Damage interval of its own (inferred; needs Reflect Damage learned).</item>
     /// </list>
     /// </summary>
     internal async Task ReactToMonsterHitAsync(MonsterUnit attacker, GameSession p, JsonElement? row, long damage)
     {
         if (damage <= 0 || p.Dead || p.Progress == null) return;
-        if (row is { } r && GameData.Int(r, "_iDistanceType") == 2) return;
+        bool melee = row is not { } r || GameData.Int(r, "_iDistanceType") != 2;
         bool physical = row is not { } dmg || GameData.Int(dmg, "_iDmgType") != 2;
         long now = MonsterService.NowMs;
+        await ReactWithTriggersAsync(attacker, p, now);
         foreach (var buff in p.Buffs.Where(b => b.ExpireMs > now).ToArray())
         {
             if (p.Dead || data.Row("BuffConfig", buff.ConfigId) is not { } config) continue;
             int group = (int)GameData.Int(config, "_iBuffID");
+            if (group is ShieldReflectGroup or ReflectDamageGroup or CastingShieldGroup)
+            {
+                await ReflectAsync(attacker, p, group, melee && physical, now);
+                continue;
+            }
+            if (!melee) continue;
             if (group == AutoCounterGroup && physical) p.ProcState[AutoCounterHitKey] = 1;
             if (group is not (ParryGroup or DeathBoundGroup) || group == ParryGroup && !physical
                 || now < p.ProcState.GetValueOrDefault(group)
@@ -225,5 +245,30 @@ public sealed partial class CombatService
                 if (reflected > 0) await ProcCastAsync(p, answer, null, p.Face, area: true, fixedDamage: reflected);
             }
         }
+    }
+    private async Task ReflectAsync(MonsterUnit attacker, GameSession p, int group, bool meleePhysical, long now)
+    {
+        if (now < p.ProcState.GetValueOrDefault(group)) return;
+        if (group == ShieldReflectGroup)
+        {
+            int level = skills.Level(p.Progress!, ShieldReflectSkill);
+            if (!meleePhysical || attacker.Dead || attacker.Hp <= 0 || level <= 0
+                || data.Row("SkillConfig", skills.RealId(ShieldReflectSkill, level)) is not { } skill
+                || data.Row("SkillConfig", skills.RealId(11419, level)) is not { } answer) return;
+            var desc = Numbers(skill, "_kDescData");
+            if (desc.Length > 4 && MonsterService.Distance(p.Position.X, p.Position.Z, attacker.X, attacker.Z) > desc[4]) return;
+            p.ProcState[group] = now + (long)(1000 / Math.Max(1, desc.Length > 3 ? desc[3] : 1));
+            await ProcCastAsync(p, answer, attacker);
+            return;
+        }
+        int reflectLevel = skills.Level(p.Progress!, ReflectDamageSkill);
+        if (reflectLevel <= 0 || data.Row("SkillConfig", skills.RealId(ReflectDamageSkill, reflectLevel)) is not { } reflect) return;
+        var rdesc = Numbers(reflect, "_kDescData");
+        double every = rdesc.Length > 3 ? rdesc[3] : 0.5, times = Math.Max(1, rdesc.Length > 4 ? rdesc[4] : 1);
+        // Thorn 1161801-1161805 (mode 0) for Reflect Damage, its mode-1 copy 1161811-1161815 for Casting Shield.
+        long thornId = 1161800 + (group == CastingShieldGroup ? 10 : 0) + reflectLevel;
+        if (data.Row("SkillConfig", thornId) is not { } thorn) return;
+        p.ProcState[group] = now + (long)(every * 1000 / times);
+        await ProcCastAsync(p, thorn, null, p.Face, area: true);
     }
 }

@@ -124,6 +124,23 @@ internal sealed partial class BuffRuleTables
                 // 2 has no recovered meaning and is not used.
                 !hostile && Ints(row, "_iExtraTarget").Contains(1), applied);
         }
+        // Only a skill's Lv1 carrier has a HaloConfig row (King's Grace 1161401 / Enemy Orbit 1162001); its higher-level
+        // rows (1161402-1161405, 1162002-1162005) carry the same aura and name their own level's target buff
+        // (1161505, 1162605) (inferred: same radius, tick and cap as Lv1).
+        var byGroup = halos.Values.Where(h => data.Row("BuffConfig", h.Id) is { } r && GameData.Int(r, "_iBuffID") > 0)
+            .GroupBy(h => GameData.Int(data.Row("BuffConfig", h.Id)!.Value, "_iBuffID")).ToDictionary(g => g.Key, g => g.OrderBy(h => h.Id).ToList());
+        foreach (var row in data.Table("BuffConfig").Values)
+        {
+            int id = (int)GameData.Int(row, "_iID");
+            if (halos.ContainsKey(id) || !byGroup.TryGetValue(GameData.Int(row, "_iBuffID"), out var levels)) continue;
+            var applied = Ints(row, "_kLogicData").Where(b => b != id && data.Row("BuffConfig", b) is { } r
+                && GameData.Int(r, "_iBuffID") > 0 && !halos.ContainsKey(b)).Distinct().ToArray();
+            if (applied.Length == 0) continue;
+            // Battle Chant has a hostile Lv1 row and a friendly Lv2 row: take the one whose side fits what this level applies.
+            bool debuffs = applied.All(b => GameData.Int(data.Row("BuffConfig", b)!.Value, "_iType") == 2);
+            var template = levels.FirstOrDefault(h => h.Hostile == debuffs) ?? levels[0];
+            halos[id] = template with { Id = id, Applied = applied };
+        }
         Halos = halos;
     }
 

@@ -18,10 +18,13 @@ internal static class EquipmentStunts
     /// LC_DAL_Equipment.RefreshSpecailEffectNum and the equipment tooltip exclude a main-hand weapon carried in the
     /// off-hand grid; each equipped GUID contributes once. Bag items and inactive plans contribute nothing.
     /// </summary>
-    private static IEnumerable<InvItem> Active(GameSession session, GameData data) => session.Items
-        .Where(i => i.Grid > 0 && CharacterService.IsAppraised(i)
+    private static IEnumerable<InvItem> Active(GameSession session, GameData data)
+    {
+        bool weaponDamaged = CharacterService.WeaponDamaged(session, data);
+        return session.Items.Where(i => i.Grid > 0 && CharacterService.IsAppraised(i) && !(weaponDamaged && i.Grid is 1 or 2)
             && !(i.Grid == 2 && data.Row("ItemConfig", i.Entry) is { } config && GameData.Int(config, "_iEquipPart") == 2))
-        .DistinctBy(i => i.Guid);
+            .DistinctBy(i => i.Guid);
+    }
 
     private static IEnumerable<(InvItem Item, long[] Op)> Operations(GameSession session, GameData data)
     {

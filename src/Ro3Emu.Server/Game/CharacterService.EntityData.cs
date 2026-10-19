@@ -99,14 +99,28 @@ public sealed partial class CharacterService
         return sheet;
     }
 
+    private const int MainHandGrid = 1, OffHandGrid = 2, WeaponDamagedBuffGroup = 16204;
+
+    /// <summary>
+    /// Melt Down's 【Weapon Damage】 (buff group 16204, "All Main/Off-Hand Weapon stats and Affixes are not Active"): while
+    /// it lasts the weapons in grids 1 and 2 add no base stats, affixes, enchantments or Stunts (EquipmentStunts.Active).
+    /// </summary>
+    internal static bool WeaponDamaged(GameSession session, GameData data)
+    {
+        long now = MonsterService.NowMs;
+        return session.Buffs.Any(b => b.ExpireMs > now && data.Row("BuffConfig", b.ConfigId) is { } row
+            && GameData.Int(row, "_iBuffID") == WeaponDamagedBuffGroup);
+    }
+
     /// <summary>The character's own raw contributions (gear, cards, talents, buffs, level and job rows, conversions).</summary>
     private void AddOwnAttributes(GameSession session, RoleProgress p, Action<long, double> Add)
     {
         var baseStats = new double[6];
         for (int i = 0; i < 6; i++) baseStats[i] = p.Stats[i];
+        bool weaponDamaged = WeaponDamaged(session, data);
         foreach (var item in Equipped(session))
         {
-            if (EquipRow(item.Entry) is not { } equip) continue;
+            if (EquipRow(item.Entry) is not { } equip || weaponDamaged && item.Grid is MainHandGrid or OffHandGrid) continue;
             foreach (var (id, v) in BaseAttributes(item, equip).Concat(EquipmentAffixes.Entries(item)))
             {
                 if (id is >= 1 and <= 6) baseStats[id - 1] += v;
