@@ -38,7 +38,8 @@
           "dialog": [
             "You're back already? This jelly is perfect. Thank you, adventurer. Please take this for your trouble."
           ],
-          "exp": 2000
+          "exp": 2000,
+          "items": [[1, 1000], [1200801, 3]]
         }
       ]
     }

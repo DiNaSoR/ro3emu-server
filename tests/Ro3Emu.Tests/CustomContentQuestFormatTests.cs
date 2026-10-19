@@ -144,6 +144,68 @@ public sealed class CustomContentQuestFormatTests : IDisposable
     }
 
     [Fact]
+    public void ItemsBecomeARewardPackageTheServerPaysAndTheCheckReads()
+    {
+        Directory.CreateDirectory(Path.Combine(_dir, "data", "config"));
+        Directory.CreateDirectory(Path.Combine(_dir, "content"));
+        File.WriteAllText(Path.Combine(_dir, "data", "config", "ItemConfig.json"), """
+            {"1200801": {"_iID": 1200801, "_iType": 2}, "1": {"_iID": 1, "_iType": 1, "_iTrade": 1}}
+            """);
+        File.WriteAllText(Path.Combine(_dir, "data", "config", "TaskConfig.json"), """{"10101050": {"_iTaskID": 10101050}}""");
+        File.WriteAllText(Path.Combine(_dir, "content", "q.json"), """
+            {"quests": [{"id": 91000070, "steps": [
+              {"name": "A", "description": "B", "objective": "C", "kill": 5000001, "count": 1,
+               "items": [[1200801, 3], {"item": 1, "count": 500, "bound": true}, [999999999, 1]]}]}]}
+            """);
+        var data = new GameData(Options.Create(new ServerOptions
+        {
+            DataDir = Path.Combine(_dir, "data"), CustomContentDir = Path.Combine(_dir, "content"),
+        }), NullLogger<GameData>.Instance);
+        Assert.Empty(data.Custom.Errors);
+
+        Assert.Equal(91000070, data.Row("TaskConfig", 91000070)!.Value.GetProperty("_iAward").GetInt64());
+        Assert.Equal(91000070, data.Row("MultiverseGroupConfig", 91000070)!.Value.GetProperty("_iValue_default").GetInt64());
+        var package = data.Row("AwardConfig", 91000070)!.Value[0];
+        Assert.Equal("[[1200801,3,0],[1,500,1],[999999999,1,0]]", package.GetProperty("_kAward").GetRawText());
+        Assert.Equal("[[1200801,3],[1,500],[999999999,1]]", package.GetProperty("_kPreview").GetRawText());
+
+        var problems = CustomContentCheck.Problems(data);
+        Assert.Contains(problems, p => p.Contains("AwardConfig 91000070: item 999999999 is not in ItemConfig"));
+        Assert.Contains(problems, p => p.Contains("AwardConfig 91000070: item 1 is a currency and cannot be bound"));
+    }
+
+    [Fact]
+    public void ItemRewardThatPassesTheCheckResolvesToItsItems()
+    {
+        Directory.CreateDirectory(Path.Combine(_dir, "data", "config"));
+        Directory.CreateDirectory(Path.Combine(_dir, "content"));
+        File.WriteAllText(Path.Combine(_dir, "data", "config", "ItemConfig.json"), """{"1200801": {"_iID": 1200801, "_iType": 2}}""");
+        File.WriteAllText(Path.Combine(_dir, "content", "q.json"), """
+            {"quests": [{"id": 91000080, "steps": [
+              {"name": "A", "description": "B", "objective": "C", "kill": 5000001, "count": 1,
+               "items": [{"item": 1200801, "count": 2, "bound": true}]}]}]}
+            """);
+        var data = new GameData(Options.Create(new ServerOptions
+        {
+            DataDir = Path.Combine(_dir, "data"), CustomContentDir = Path.Combine(_dir, "content"),
+        }), NullLogger<GameData>.Instance);
+        var plan = new Ro3Emu.Server.Game.AwardService(data).Resolve(null!, 91000080);
+        var grant = Assert.Single(plan.Grants);
+        Assert.Equal((1200801, 2, 1), (grant.Entry, grant.Count, grant.BindType));
+    }
+
+    [Theory]
+    [InlineData("\"award\": 31105, \"items\": [[1200801, 1]]", "not both")]
+    [InlineData("\"items\": []", "needs a list")]
+    [InlineData("\"items\": [[1200801]]", "[item, count]")]
+    [InlineData("\"items\": [[1200801, 0]]", "above 0")]
+    public void BrokenItemsAreSkippedWithAReason(string items, string reason)
+    {
+        var c = Load($$"""{"quests": [{"id": 91000090, "steps": [{"name": "A", "description": "B", "objective": "C", "kill": 1, "count": 1, {{items}}}]}]}""");
+        Assert.Contains(reason, Assert.Single(c.Errors));
+    }
+
+    [Fact]
     public void UnknownQuestTypeIsSkippedWithAReason()
     {
         var c = Load("""

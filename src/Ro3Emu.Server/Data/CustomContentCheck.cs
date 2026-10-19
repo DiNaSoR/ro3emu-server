@@ -73,6 +73,19 @@ public static class CustomContentCheck
                         Need("model", "UnitConfig", GameData.Int(row, "_iUnitID"), by);
                         foreach (long interact in Longs(row, "_iInteractID")) Need("interaction", "NPCInteractConfig", interact, by);
                         break;
+                    case "AwardConfig":
+                        foreach (var package in row.ValueKind == JsonValueKind.Array ? row.EnumerateArray().ToList() : [row])
+                            if (package.TryGetProperty("_kAward", out var grants) && grants.ValueKind == JsonValueKind.Array)
+                                foreach (var grant in grants.EnumerateArray())
+                                    if (grant.ValueKind == JsonValueKind.Array && grant.GetArrayLength() > 0 && GameData.Number(grant[0]) is { } item)
+                                    {
+                                        Need("item", "ItemConfig", (long)item, by);
+                                        // AwardService refuses a bound currency that can be traded.
+                                        if (grant.GetArrayLength() > 2 && GameData.Number(grant[2]) == 1 && data.Row("ItemConfig", (long)item) is { } it
+                                            && GameData.Int(it, "_iType") == 1 && (!it.TryGetProperty("_iTrade", out var trade) || GameData.Number(trade) != 0))
+                                            problems.Add($"{by}: item {item} is a currency and cannot be bound");
+                                    }
+                        break;
                     case "NPCInteractConfig":
                         NeedDialogs(row, "_iEXECAction", by);
                         break;

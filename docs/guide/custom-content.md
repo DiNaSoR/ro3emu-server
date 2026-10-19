@@ -73,7 +73,8 @@ dialogue ids by hand. The prototype is written this way: [`content/prototype-sch
           "objective": "Report to Elias in Prontera",
           "talk": 90000001,
           "dialog": [ "This jelly is perfect. Thank you, adventurer." ],
-          "exp": 2000
+          "exp": 2000,
+          "items": [[1, 1000], [1200801, 3]]  // 1000 Zeny and 3 Hot Cocoa
         }
       ]
     }
@@ -101,9 +102,16 @@ A quest can say its `type`: `"main"`, `"side"` (the default) or `"guide"`. The t
 bubble over the NPC a talk step sends you to, in the client's colours: orange `[Main Quest]`, blue `[Side Quest]` or
 green `[Guide]`. Every step of the quest takes it.
 
-Optional on any step: `exp` (Base EXP when handed in; Job EXP follows at 20%), `award` (a MultiverseGroupConfig id, whose
-`_iValue_default` names the AwardConfig item package), `track` (a raw `_kTrack` entry, replacing the one the server picks), and `fields` (any TaskConfig fields,
+Optional on any step: `exp` (Base EXP when handed in; Job EXP follows at 20%), `items` (items handed out with the
+quest, see below), `award` (a MultiverseGroupConfig id, whose
+`_iValue_default` names the AwardConfig item package; instead of `items`), `track` (a raw `_kTrack` entry, replacing the one the server picks), and `fields` (any TaskConfig fields,
 written over the generated row).
+
+**items**: a list of `[item, count]`, or `{ "item": id, "count": n, "bound": true }` for an item that cannot be traded.
+Any ItemConfig id works, currencies too: `"items": [[1, 1000], [1200801, 3]]` pays 1000 Zeny and 3 Hot Cocoa. The
+quest log shows them as the step's reward. `!finditem <name>` finds an id. The server makes an AwardConfig package and
+a MultiverseGroupConfig row with the step's quest id, so keep quest ids in the 90000001… range, which those tables leave
+free.
 
 Text can carry colour tags like `<color=#CC762A>5 Porings</color>`. Write the whole text, numbers included: there are
 no placeholders to fill in this format.
@@ -186,7 +194,8 @@ Each step is a Side quest (blue tag) that copies a client quest: 10101130 for a 
    `["17", dialog]`, which tells the server the talk is done.
 2. **Kill**: `_kPreTask [previous step]`, target `[104014, monster…, count]` (104002 with `solo`). `_kTrack`
    `["142", map, id, "-1"]` points the tracker at a scene-editor region next to a spawn of the monster.
-3. **Rewards**: `_kEXP [1, n]` pays n Base EXP, `_iAward` an AwardConfig package.
+3. **Rewards**: `_kEXP [1, n]` pays n Base EXP, `_iAward` an AwardConfig package (`items` makes AwardConfig and
+   MultiverseGroupConfig rows with the step's id: `_kAward [[item, count, bound 0/1]]`, `_kPreview [[item, count]]`).
 
 Useful target types (the first number of a `_kProgressTarget` entry; all supported by `TaskService`), for steps
 written as raw rows or through `fields`:
