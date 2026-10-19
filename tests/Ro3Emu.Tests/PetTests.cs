@@ -330,6 +330,121 @@ public sealed class PetTests : IAsyncLifetime
     }
 
 
+    private sealed class SureRolls : CombatRolls
+    {
+        public override double Hit() => 0;
+        public override double DamageFloat() => 0.5;
+        public override double Crit() => 0.999999;
+        public override int Proc(int max) => 0;
+    }
+
+    [ClientDataFact]
+    public async Task MainSkillBuffsFollowTheMastersHitsAndKillsAndItsHitsDrainLife()
+    {
+        await using var bot = await InWorld();
+        await Unlock();
+        await Gm("!lvl 33");
+        var combat = _app.Services.GetRequiredService<CombatService>();
+        var loop = _app.Services.GetRequiredService<GameLoop>();
+        combat.Rolls = new SureRolls();
+        int deployed = 0;
+        async Task Deploy(int pet, int fragment)
+        {
+            if (deployed > 0)
+            {
+                await bot.SendGameAsync(PetService.StateUpdate, new PetStateUpdateReq
+                {
+                    PetId = deployed, Source = (PetStateSource_Type)1, SourceSlotIndex = 1, Target = (PetStateSource_Type)0,
+                });
+                Assert.Equal(0, (await Next(bot, PetService.StateUpdate, PetStateUpdateResp.Parser)).Result);
+            }
+            await Gm($"!item {fragment} 50");
+            await bot.SendGameAsync(PetService.Combine, new PetCombineReq { PetId = pet });
+            Assert.Equal(0, (await Next(bot, PetService.Combine, PetCombineResp.Parser)).Result);
+            await bot.SendGameAsync(PetService.StateUpdate, new PetStateUpdateReq { PetId = pet, Target = (PetStateSource_Type)1, TargetSlotIndex = 1 });
+            Assert.Equal(0, (await Next(bot, PetService.StateUpdate, PetStateUpdateResp.Parser)).Result);
+            deployed = pet;
+        }
+        Task<MonsterUnit> Spawn(long hp) => loop.InvokeAsync(async () =>
+        {
+            var s = Session;
+            var monsters = _app.Services.GetRequiredService<MonsterService>();
+            var unit = await monsters.SpawnSingleAsync(s.SceneEntry, 5000001, new MapPoint(s.Position.X + 1, s.Position.Y, s.Position.Z, 0),
+                s.InstanceId, customTemplate: monsters.Template(5000001)! with { RoamDistance = 0 });
+            unit!.Hp = hp;
+            return unit;
+        });
+        async Task<int> Cast(int skill, MonsterUnit target)
+        {
+            int from = bot.Inbox.Snapshot().Count;
+            await bot.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = skill, TargetId = target.Uid, TargetPos = target.Pos.Clone() });
+            Assert.Equal(0, (await Next(bot, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
+            return from;
+        }
+        async Task<T> After<T>(int from, uint id, MessageParser<T> parser, Func<T, bool> match) where T : IMessage<T>
+        {
+            var deadline = DateTime.UtcNow.AddSeconds(8);
+            while (DateTime.UtcNow < deadline)
+            {
+                foreach (var e in bot.Inbox.Snapshot().Skip(from))
+                    if (e.IsGame(id) && parser.ParseFrom(e.Body) is var m && match(m)) return m;
+                await Task.Delay(50);
+            }
+            throw new TimeoutException($"no {id} after the cast");
+        }
+        // A normal attack hit on the target, as the cast path reports it to the pet buffs.
+        var normal = _app.Services.GetRequiredService<GameData>().Row("SkillConfig", 1000001)!.Value;
+        Task NormalHit(MonsterUnit target) => loop.InvokeAsync(async () =>
+        {
+            foreach (var handler in combat.DealtAsync.ToArray()) await handler(Session, target, normal, 100);
+        });
+        bool Has(int buff) => Session.Buffs.Any(b => b.ConfigId == buff && b.ExpireMs > MonsterService.NowMs);
+
+        // Mummy: killing an enemy under 【Evil Curse】 casts 【Malicious Curse】 there, hitting the enemy beside it.
+        await Deploy(30003, 1630003);
+        var victim = await Spawn(1);
+        var bystander = await Spawn(1_000_000);
+        int from = await Cast(2312101, victim);
+        var curse = await After(from, CombatService.SkillHit, SkillHitInfo.Parser, h => h.SkillId == 2312601);
+        Assert.Contains(curse.Dsts, d => d.DstID == bystander.Uid && d.Damage > 0);
+
+        // Medusa: a normal attack hit under her gaze petrifies the target.
+        await Deploy(32004, 1632004);
+        from = await Cast(2306001, bystander);
+        await After(from, CombatService.ExtraUseInSkill, UseInSkillInfo.Parser, u => u.SkillID == 2306101);
+        var unitBuffs = _app.Services.GetRequiredService<BuffService>();
+        bool Petrified() => unitBuffs.UnitBuffs(bystander).Any(b => b.ConfigId == 902101 && b.ExpireMs > MonsterService.NowMs);
+        await Task.Delay(1300); // the gaze's own 1 s Petrify ends
+        Assert.False(Petrified());
+        await NormalHit(bystander);
+        Assert.True(Petrified());
+
+        // Headless Warrior: the master's hit adds its extra Adaptive hit.
+        await Deploy(32002, 1632002);
+        from = await Cast(2327401, bystander);
+        await After(from, CombatService.ExtraUseInSkill, UseInSkillInfo.Parser, u => u.SkillID == 2327201);
+        from = bot.Inbox.Snapshot().Count;
+        await NormalHit(bystander);
+        var fury = await After(from, CombatService.SkillHit, SkillHitInfo.Parser, h => h.SkillId == 2327501);
+        Assert.Contains(fury.Dsts, d => d.DstID == bystander.Uid && d.Damage > 0);
+
+        // Silver Moon Witch: a hit under 【Moonlight】's watch grants the damage bonus.
+        await Deploy(30001, 1630001);
+        from = await Cast(2303201, bystander);
+        await After(from, CombatService.ExtraUseInSkill, UseInSkillInfo.Parser, u => u.SkillID == 2303101);
+        Assert.False(Has(2303301));
+        await NormalHit(bystander);
+        Assert.True(Has(2303301));
+
+        // Death Witch: each enemy hit restores the master's Life.
+        await Deploy(33002, 1633002);
+        await loop.InvokeAsync(() => _app.Services.GetRequiredService<CharacterService>().SetHpSpAsync(Session, 1, null));
+        from = await Cast(2310001, bystander);
+        var drain = await After(from, CombatService.SkillHit, SkillHitInfo.Parser,
+            h => h.SkillId == 2310101 && h.Dsts.Any(d => d.DamageType == DamageType.Heal));
+        Assert.Contains(drain.Dsts, d => d.DstID == RoleId(bot) && d.Damage > 0);
+    }
+
     [ClientDataFact]
     public async Task AuraMainSkillsKeepActingFromTheMasterWhileTheirBuffLasts()
     {

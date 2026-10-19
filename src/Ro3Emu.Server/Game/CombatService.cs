@@ -292,6 +292,7 @@ public sealed partial class CombatService : IGameTicker
         TakenAsync.Add((_, p, amount) => amount > 0 ? buffs.StealthHitAsync(p) : Task.CompletedTask);
         DealtAsync.Add((s, _, _, amount) => amount > 0 ? buffs.StealthDealtAsync(s) : Task.CompletedTask);
         DealtAsync.Add((s, _, _, amount) => amount > 0 ? WargHowlAsync(s) : Task.CompletedTask);
+        RegisterPetEffects();
         // Companion buffs follow the lease and the ride (MountService and CareerSpecialService register in ServerHost).
         skills.Learned.Add(SyncCompanionsAsync);
         character.JobChanged.Add(SyncCompanionsAsync);

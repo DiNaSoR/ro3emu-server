@@ -22,7 +22,7 @@ public sealed partial class CombatService
     internal const int ActiveGuardSkill = 8, GuardianSkill = 41;
 
     private bool AdaptiveGuardian(JsonElement skill) => GameData.Int(skill, "_iDmgType") == 4
-        && (GameData.Int(skill, "_iSystemType") == GuardianSkill || PetAuraRow(skill));
+        && (GameData.Int(skill, "_iSystemType") == GuardianSkill || PetAuraRow(skill) || PetProcRow(skill));
 
     /// <summary>What a friendly heal scales from: MATK, or Adaptive ATK for a pet's rows ("Is restores Adaptive
     /// ATK*180% Life", Angeling's halo).</summary>
@@ -49,8 +49,8 @@ public sealed partial class CombatService
             || pet.SkillId != action.Request.SkillId) return;
         var target = FindMonster(s.WorldScene, action.Request.TargetId);
         if (target != null && !CanHitMonster(s, target)) target = null;
-        await ProcCastAsync(s, row, target, face: action.Request.Face,
-            at: target == null ? action.Request.TargetPos : null, petId: pet.PetId);
+        await GuardianCastAsync(s, row, () => ProcCastAsync(s, row, target, face: action.Request.Face,
+            at: target == null ? action.Request.TargetPos : null, petId: pet.PetId));
         StartPetAuras(s, action.Row, row);
     }
 }
