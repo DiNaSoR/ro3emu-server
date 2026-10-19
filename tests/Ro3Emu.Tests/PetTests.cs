@@ -329,6 +329,73 @@ public sealed class PetTests : IAsyncLifetime
         Assert.Null(Session.PetActor);
     }
 
+
+    [ClientDataFact]
+    public async Task AuraMainSkillsKeepActingFromTheMasterWhileTheirBuffLasts()
+    {
+        await using var bot = await InWorld();
+        await Unlock();
+        await Gm("!lvl 33");
+        var combat = _app.Services.GetRequiredService<CombatService>();
+        async Task<MonsterUnit> Deploy(int pet, int fragment)
+        {
+            await Gm($"!item {fragment} 50");
+            await bot.SendGameAsync(PetService.Combine, new PetCombineReq { PetId = pet });
+            Assert.Equal(0, (await Next(bot, PetService.Combine, PetCombineResp.Parser)).Result);
+            await bot.SendGameAsync(PetService.StateUpdate, new PetStateUpdateReq { PetId = pet, Target = (PetStateSource_Type)1, TargetSlotIndex = 1 });
+            Assert.Equal(0, (await Next(bot, PetService.StateUpdate, PetStateUpdateResp.Parser)).Result);
+            var s = Session;
+            MonsterUnit? unit = null;
+            await _app.Services.GetRequiredService<GameLoop>().InvokeAsync(async () =>
+            {
+                var monsters = _app.Services.GetRequiredService<MonsterService>();
+                unit = await monsters.SpawnSingleAsync(s.SceneEntry, 5000001, new MapPoint(s.Position.X + 1, s.Position.Y, s.Position.Z, 0),
+                    s.InstanceId, customTemplate: monsters.Template(5000001)! with { RoamDistance = 0 });
+                unit!.Hp = 1_000_000;
+            });
+            return unit!;
+        }
+        async Task<List<BotEvent>> Cast(int skill, MonsterUnit target, uint until, int count)
+        {
+            int from = bot.Inbox.Snapshot().Count;
+            await bot.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = skill, TargetId = target.Uid, TargetPos = target.Pos.Clone() });
+            Assert.Equal(0, (await Next(bot, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
+            var deadline = DateTime.UtcNow.AddSeconds(10);
+            while (bot.Inbox.Snapshot().Skip(from).Count(e => e.IsGame(CombatService.ExtraUseInSkill)
+                       && UseInSkillInfo.Parser.ParseFrom(e.Body).SkillID == until) < count && DateTime.UtcNow < deadline)
+                await Task.Delay(100);
+            await Task.Delay(700); // nothing after the last due tick
+            return bot.Inbox.Snapshot().Skip(from).ToList();
+        }
+        static IEnumerable<T> Of<T>(List<BotEvent> events, uint id, MessageParser<T> parser) where T : IMessage<T> =>
+            events.Where(e => e.IsGame(id)).Select(e => parser.ParseFrom(e.Body));
+
+        // Demon Attendant: 【Demonic Aura】 for 5 s, Adaptive ATK*45% to enemies within 6 m every 0.5 s (10 hits).
+        var demon = await Deploy(31003, 1631003);
+        var events = await Cast(2308201, demon, 2308601, 10);
+        Assert.Equal(10, Of(events, CombatService.ExtraUseInSkill, UseInSkillInfo.Parser).Count(u => u.SkillID == 2308601));
+        var ticks = Of(events, CombatService.SkillHit, SkillHitInfo.Parser).Where(h => h.SkillId == 2308601).ToList();
+        Assert.Equal(10, ticks.Count);
+        Assert.All(ticks, h => Assert.Contains(h.Dsts, d => d.DstID == demon.Uid && d.Damage > 0));
+        Assert.Equal(0, combat.PetAuraCount);
+
+        await bot.SendGameAsync(PetService.StateUpdate, new PetStateUpdateReq
+        {
+            PetId = 31003, Source = (PetStateSource_Type)1, SourceSlotIndex = 1, Target = (PetStateSource_Type)0,
+        });
+        Assert.Equal(0, (await Next(bot, PetService.StateUpdate, PetStateUpdateResp.Parser)).Result);
+
+        // Chimera: the Holy Light Field lasts 5 s and shields the master (Max Life * 2%) every second. Its guardian
+        // row's P1 [10] is not a heal.
+        var chimera = await Deploy(33003, 1633003);
+        events = await Cast(2309201, chimera, 2309701, 5);
+        Assert.Equal(5, Of(events, CombatService.ExtraUseInSkill, UseInSkillInfo.Parser).Count(u => u.SkillID == 2309701));
+        Assert.DoesNotContain(Of(events, CombatService.SkillHit, SkillHitInfo.Parser), h => h.SkillId == 2309101);
+        var shield = Assert.Single(Session.Buffs, b => b.ConfigId == 2309201);
+        Assert.True(shield.ShieldRemaining > 0);
+        Assert.Equal(0, combat.PetAuraCount);
+    }
+
     [ClientDataFact]
     public async Task MainSlotPetGivesItsMainSkillOnThePetSlotAndCastsItsGuardianRow()
     {

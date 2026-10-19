@@ -360,12 +360,12 @@ public sealed partial class CombatService
             // word (LC_DamageHelper damage-word type -> None), so the entry shows the effect and no "0" (inferred).
             if (friendly && !damage && field == null && firstBolt)
                 shownOnly.Add(new DamageInfo { DstID = recipient.Role!.Id, DamageType = DamageType.DamageShare, DstElement = 1 });
-            if (friendly && damage)
+            if (friendly && damage && !PetAuraGuardian(row))
             {
                 double multiplier = Numbers(row, "_kDamageParam1").FirstOrDefault(), flat = Numbers(row, "_kDamageParam2").FirstOrDefault();
                 // Heal's friendly branch is P1[0]/P2[0]; its enemy branch is [1] (description + select race mask).
                 var before = character.Stats(recipient);
-                long amount = (long)Math.Max(0, Math.Round((stats[104] * multiplier / 10000 + flat)
+                long amount = (long)Math.Max(0, Math.Round((HealPower(row, stats) * multiplier / 10000 + flat)
                     * FormulaFactor(attacker, row, 0, heal: true) * HealFactor(attacker, PlayerDefender(recipient, before))));
                 foreach (var modifier in ExtraHeal) amount = modifier(s, amount);
                 long actual = Math.Min(amount, Math.Max(0, before[101] - before[2000]));

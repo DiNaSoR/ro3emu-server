@@ -15,14 +15,19 @@ namespace Ro3Emu.Server.Game;
 /// <item>The effect runs as a server follow-up from the master (ProcCastAsync): its stats, targets and buffs.
 /// "Adaptive ATK" in the descriptions is taken as the higher of the master's Physical and Magic ATK (inferred).</item>
 /// </list>
-/// Other _kAutoLearnSkill rows of a few pets (Demonic Aura's periodic hit, Realm of Light's descent) are not run.
+/// Other _kAutoLearnSkill rows (Demonic Aura's periodic hit, the Holy Light Field's shields) run from CombatService.PetAuras.
 /// </summary>
 public sealed partial class CombatService
 {
     internal const int ActiveGuardSkill = 8, GuardianSkill = 41;
 
-    private static bool AdaptiveGuardian(JsonElement skill) =>
-        GameData.Int(skill, "_iSystemType") == GuardianSkill && GameData.Int(skill, "_iDmgType") == 4;
+    private bool AdaptiveGuardian(JsonElement skill) => GameData.Int(skill, "_iDmgType") == 4
+        && (GameData.Int(skill, "_iSystemType") == GuardianSkill || PetAuraRow(skill));
+
+    /// <summary>What a friendly heal scales from: MATK, or Adaptive ATK for a pet's rows ("Is restores Adaptive
+    /// ATK*180% Life", Angeling's halo).</summary>
+    private double HealPower(JsonElement skill, StatSheet stats) =>
+        AdaptiveGuardian(skill) ? Math.Max(stats[103], stats[104]) : stats[104];
 
     /// <summary>The GuardianSkill row a Main Skill row triggers, or null when the data names none.</summary>
     internal JsonElement? GuardianRow(JsonElement main)
@@ -46,5 +51,6 @@ public sealed partial class CombatService
         if (target != null && !CanHitMonster(s, target)) target = null;
         await ProcCastAsync(s, row, target, face: action.Request.Face,
             at: target == null ? action.Request.TargetPos : null, petId: pet.PetId);
+        StartPetAuras(s, action.Row, row);
     }
 }
