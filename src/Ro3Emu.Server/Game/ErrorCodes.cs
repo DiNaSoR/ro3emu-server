@@ -227,6 +227,9 @@ public static class ErrorCodes
     public const int GuildTextLength = 10027;
     public const int GuildMailDailyLimit = 10025; // "You've used all Group Mail attempts for today."
     public const int MailBodyEmpty = 369, MailBodySensitive = 370;
+    // Leader impeachment (ErrorCodeConfig 472-479).
+    public const int ImpeachCooldown = 472, ImpeachNoGrounds = 473, ImpeachRequirements = 474, ImpeachSelf = 475;
+    public const int ImpeachCancelState = 476, ImpeachRepeat = 477, ImpeachRunning = 478, ImpeachNotRunning = 479;
     public const int GuildFundsShort = 484, GuildContributeShort = 10040, GuildBuildBusy = 485, GuildHallLow = 486, GuildBuildMax = 487;
     // Guild Caravan: ErrorCodeConfig 489-504; exact RPC-to-code selection is (inferred).
     public const int CaravanLoaded = 489, CaravanExpired = 490, CaravanOrderExpired = 491;

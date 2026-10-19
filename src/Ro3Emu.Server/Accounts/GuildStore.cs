@@ -65,8 +65,21 @@ public sealed class GuildStore
         public int BroadEmailCount { get; set; }
         public long BroadEmailDay { get; set; }
         public long NextBroadEmailMs { get; set; }
+        /// <summary>The leader impeachment under way, or null, and when the next may start (unix ms; GuildService.Impeach).</summary>
+        public Impeachment? Impeach { get; set; }
+        public long NextImpeachMs { get; set; }
         /// <summary>32228 journal rows (GuildEventData bytes) to append with this state's next save; not part of the state.</summary>
         internal List<byte[]> PendingEvents { get; } = new();
+    }
+
+    public sealed class Impeachment
+    {
+        public long OwnerId { get; set; }
+        public long BeginMs { get; set; }
+        public long EndMs { get; set; }
+        public long NeedCount { get; set; }
+        /// <summary>Who responded, the initiator first.</summary>
+        public List<long> Responders { get; set; } = new();
     }
 
     public sealed class Member

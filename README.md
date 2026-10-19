@@ -139,7 +139,7 @@ show is playable from day one, without season or server-day gates ([details](doc
 - adventure groups
 
 **Guilds**
-- management, journal, recruitment, founding, guild home, group mail
+- management, journal, recruitment, founding, guild home, group mail, leader impeachment
 - bonfire party, caravan, black market, Ilmata challenge
 - Guild League with elite rosters and capture rings
 - Territory Wars and the castle siege
@@ -163,7 +163,7 @@ show is playable from day one, without season or server-day gates ([details](doc
 - **Mock Battle extras:** the arena's monsters and the 40-player team frame.
 - **War of Emperium extras:** commander tools, siege weapons and vehicles.
 - **Survivor Battle extras:** the "Go, Kafra, Go!" weekly tasks.
-- **Guild extras:** merging, impeachment.
+- **Guild extras:** merging.
 - **Smaller missing pieces:** some stages of the story dungeons
   that are still simplified.
 - **Guild voice:** only party and Tavern voice are implemented.
