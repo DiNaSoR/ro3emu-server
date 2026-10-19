@@ -27,8 +27,7 @@ public sealed partial class StallsService
     {
         int skill = (int)Param("StallsPlaidMerchantSkill", 16005);
         int level = s.Progress!.Skills.GetValueOrDefault(skill);
-        var row = data.Table("SkillConfig").Values.FirstOrDefault(r => GameData.Int(r, "_iSkillID") == skill && GameData.Int(r, "_iLevel") == level);
-        var param = row.ValueKind == System.Text.Json.JsonValueKind.Object ? Field(row, "_kSpSkillParam") : [];
+        var param = data.SkillLevelRow(skill, level) is { ValueKind: System.Text.Json.JsonValueKind.Object } row ? Field(row, "_kSpSkillParam") : [];
         return (int)Param("StallsDefaultPlaidNum", 10) + (param.Length > 1 ? (int)param[1] : 0);
     }
 

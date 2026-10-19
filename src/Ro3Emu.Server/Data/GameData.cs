@@ -110,6 +110,27 @@ public sealed class GameData(IOptions<ServerOptions> options, ILogger<GameData> 
 
     public JsonElement? Row(string table, long id) => Table(table).TryGetValue(id.ToString(), out var row) ? row : null;
 
+    private readonly ConcurrentDictionary<string, object> _indexes = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// The rows of <paramref name="table"/> grouped by <paramref name="key"/>, for lookups by a field other than the row
+    /// id: a dictionary hit instead of a scan (a SkillConfig scan costs ~6 ms, an eighth of a game tick). Built on first
+    /// use and kept; <paramref name="name"/> names the key in the cache, so one name always means one key function.
+    /// </summary>
+    public TableIndex<TKey> Index<TKey>(string table, string name, Func<JsonElement, TKey> key) where TKey : notnull
+    {
+        var rows = Table(table);
+        string cacheKey = table + "/" + name;
+        if (_indexes.TryGetValue(cacheKey, out var cached) && cached is TableIndex<TKey> index && index.Fresh(rows)) return index;
+        index = new TableIndex<TKey>(rows, key);
+        _indexes[cacheKey] = index;
+        return index;
+    }
+
+    /// <summary>The first SkillConfig row of a skill group at a level, any mode (1600105 = BuyLow 16001 at Lv5).</summary>
+    public JsonElement? SkillLevelRow(long skill, long level) =>
+        Index("SkillConfig", "_iSkillID,_iLevel", r => (Int(r, "_iSkillID"), Int(r, "_iLevel"))).First((skill, level));
+
     /// <summary>Localized text (Localization_en: id -> {_kDes}); config "names" are arrays of text ids.</summary>
     public string Text(long id)
     {

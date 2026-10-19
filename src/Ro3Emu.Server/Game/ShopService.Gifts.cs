@@ -76,15 +76,15 @@ public sealed partial class ShopService
 
     private string NameOf(long role) => sessions.All().FirstOrDefault(s => s.Role?.Id == role)?.Role?.Name ?? roles.Get(role)?.Name ?? "";
 
-    private int CommodityOf(long appearance) => data.Table("ShopCommodityConfig").Values
-        .Where(r => GameData.Int(r, "_iAppearanceId") == appearance && IsFashion(r))
+    private int CommodityOf(long appearance) => data.Index("ShopCommodityConfig", "_iAppearanceId", r => GameData.Int(r, "_iAppearanceId"))
+        .All(appearance).Where(IsFashion)
         .Select(r => (int)GameData.Int(r, "_iID")).FirstOrDefault();
 
     private bool IsFashion(JsonElement commodity)
     {
         long classId = GameData.Int(commodity, "_iClassID");
-        var shop = data.Table("ShopConfig").Values.FirstOrDefault(s => GameData.Int(s, "_iClassID") == classId);
-        return shop.ValueKind == JsonValueKind.Object && GameData.Int(shop, "_iShopType") == ShopTypeFashion;
+        return data.Index("ShopConfig", "_iClassID", s => GameData.Int(s, "_iClassID")).First(classId) is { ValueKind: JsonValueKind.Object } shop
+            && GameData.Int(shop, "_iShopType") == ShopTypeFashion;
     }
 
     // ---- lists ----

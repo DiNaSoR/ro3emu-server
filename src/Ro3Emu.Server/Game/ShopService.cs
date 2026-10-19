@@ -303,8 +303,7 @@ public sealed partial class ShopService : IGameTicker
         int skill = data.Table("PublicParamConfig").TryGetValue("DiscountMerchantSkill", out var p) ? (int)(GameData.Number(p) ?? 16001) : 16001;
         int level = session.Progress?.Skills.GetValueOrDefault(skill) ?? 0;
         if (level <= 0) return 0;
-        var row = data.Table("SkillConfig").Values.FirstOrDefault(r => GameData.Int(r, "_iSkillID") == skill && GameData.Int(r, "_iLevel") == level);
-        if (row.ValueKind != JsonValueKind.Object || !row.TryGetProperty("_kSpSkillParam", out var param)
+        if (data.SkillLevelRow(skill, level) is not { ValueKind: JsonValueKind.Object } row || !row.TryGetProperty("_kSpSkillParam", out var param)
             || param.ValueKind != JsonValueKind.Array || param.GetArrayLength() < 2) return 0;
         return Math.Clamp((long)(GameData.Number(param[1]) ?? 0), 0, 10000);
     }
