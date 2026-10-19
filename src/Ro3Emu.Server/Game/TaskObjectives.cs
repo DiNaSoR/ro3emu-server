@@ -131,7 +131,10 @@ public sealed partial class TaskService
     //   personal score reaches p2; R = p3, the ${2} of the text (inferred, the default formatter would show p2).
     private const int TJoinGuild = 104007, TFriends = 103019, TEchoLevelSum = 317001, TEchoUpgrade = 317002,
         TTowerJoin = 101007, TTowerWin = 101010, TTowerFloorReached = 104008, TLike = 106902, TLiveness = 101009,
-        TCampfire = 106018, TLeagueScore = 106019, TSiegeScore = 106611;
+        TCampfire = 106018, TLeagueScore = 106019, TSiegeScore = 106611, TTavernTime = 106010;
+    // - 106010 [seconds] "Spend @{1} minutes in any Tavern room" (2000, the Daily Tavern quest): seconds in a room
+    //   (TavernService.SecondsToday, a snapshot target re-read on TavernService.TimeSpent). The guild tasks 1602050-1603014 reuse the id with [106010, 5] and a different
+    //   meaning the client does not show; only targets of a minute or more are the Tavern's (inferred).
 
     // Season activity tasks (TaskConfig type 13, TaskService.ActivityTasks.cs), R = p2:
     // - 106605 CheckGVGJoin [n] "Participate in ${1} War of Emperium matches" / 106606 CheckGVGWin [n] "Win ${1} Siege
@@ -163,7 +166,7 @@ public sealed partial class TaskService
             or TRefineCount or TMvp or TMvpOnce or TCargo or TAfkSeconds or TTimedBattle or TCaravan
             or TTalentLevels or TPetsDeployed or TTowerFloor or TGuildHunt or TDraculaWedding or TPetSupport
             or TPetRoom or TTreasureDig or TCoffinOrSurvivor or TDragonCoffin or TGveJoin or TFriends or TEchoLevelSum
-            or TEchoUpgrade or TTowerJoin or TTowerWin or TTowerFloorReached or TLike or TLiveness or TCampfire
+            or TEchoUpgrade or TTowerJoin or TTowerWin or TTowerFloorReached or TLike or TLiveness or TCampfire or TTavernTime
             or TGvgJoin or TGvgWin or TLogin, var n] => n,
         [TTenBossWin, var n, _, ..] => n,
         [TLeagueJoin, _, var n] => n,
@@ -223,6 +226,7 @@ public sealed partial class TaskService
             TLeagueJoin => t[1] is >= 0 and <= 3,
             TLeagueScore => t[1] is >= 0 and <= 2 && t[2] >= 0,
             TSiegeScore => t[1] >= 0,
+            TTavernTime => t[1] >= 60,
             _ => true, // Only the explicit formatter cases above can reach here.
         };
     }
@@ -254,6 +258,7 @@ public sealed partial class TaskService
         return t[0] switch
         {
             TBaseLevel => p.Level,
+            TTavernTime => TavernSecondsToday?.Invoke(s) ?? 0,
             // 500130 [106901,3600] displays whole consumed minutes. Reading the committed
             // daily counter also repairs a disconnect between 5035 persistence and the quest sync (inferred).
             TAfkSeconds => s.WildAfk is { } afk && s.Daily?.DailyEpoch == afk.DailyEpoch ? afk.ConsumedTodaySeconds : 0,

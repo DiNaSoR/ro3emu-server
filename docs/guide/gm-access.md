@@ -69,7 +69,7 @@ HP and SP, invincible, warp, fly to target, show position, create guild, enter a
 camp, learn all skills (with the role's own skill points) or reset them, and the server level. No cooldowns and
 invincible last for the session; damage fluctuation is server-wide until a restart.
 
-Not implemented: server time and open day, bulk character creation, revoking mail, the Tavern tools (the emulator
-has no Tavern yet), casting a skill, reloading skill blueprints, combat logs, and the GvG reset. Ten buttons have no
+Not implemented: server time and open day, bulk character creation, revoking mail, the panel's Tavern tools (the
+rooms themselves work, see [the Tavern](../systems/tavern.md)), casting a skill, reloading skill blueprints, combat logs, and the GvG reset. Ten buttons have no
 op the server could receive. Presets that use season talents, emblems, equipping gear or skill wheels run only
 their other steps.

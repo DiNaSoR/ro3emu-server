@@ -292,7 +292,7 @@ public sealed class NameService(RoleStore roles) : IMicroService
 /// PartyService: only the party search directory; membership is romsg 42000-42052 on the game gate.
 /// Empty lists keep the "Search Party" panel open without "not implemented" errors.
 /// </summary>
-public sealed class PartyService(TeamService teams, FriendStore friends, SessionRegistry sessions, RoleStore roles, GameLoop loop) : IMicroService
+public sealed class PartyService(TeamService teams, TavernService tavern, FriendStore friends, SessionRegistry sessions, RoleStore roles, GameLoop loop) : IMicroService
 {
     public string Name => "PartyService";
 
@@ -303,16 +303,23 @@ public sealed class PartyService(TeamService teams, FriendStore friends, Session
         return await loop.InvokeAsync(async () => method switch
         {
             "getPartysSummary" => Summary(args),
-            "getSubPartysCountByType" => new Dictionary<string, object?> { ["Ret"] = MicroServiceRouter.Ret(true), ["GroupCount"] = teams.TargetCounts(Arg(args, 1) ?? "") },
+            "getSubPartysCountByType" => new Dictionary<string, object?>
+            {
+                ["Ret"] = MicroServiceRouter.Ret(true),
+                ["GroupCount"] = Arg(args, 2) == TavernParty ? tavern.TypeCounts() : teams.TargetCounts(Arg(args, 1) ?? ""),
+            },
             "getParty" => GetParty(args),
             "getPartysByIDs" => await GetGroupsAsync(session, args),
             _ => null,
         });
     }
 
+    private static readonly string TavernParty = TavernService.PartyType.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
     private object Summary(object? args)
     {
         var list = args as object?[] ?? [];
+        if (list.Length > 0 && Convert.ToString(list[0]) == TavernParty) return TavernSummary(list);
         long target = 0, playBook = 0;
         int map = 0;
         string area = "";
@@ -336,6 +343,23 @@ public sealed class PartyService(TeamService teams, FriendStore friends, Session
         {
             ["Ret"] = MicroServiceRouter.Ret(true),
             ["SummaryList"] = teams.Directory(target, area, playBook, map, offset, limit),
+        };
+    }
+
+    /// <summary>partyType 4: the Tavern room list (TavernService.Directory) with its PartyIntCondition ranges.</summary>
+    private object TavernSummary(object?[] list)
+    {
+        var ranges = new Dictionary<string, (long, long)>();
+        if (list.Length > 2 && list[2] is object?[] integers)
+            foreach (var value in integers.OfType<IDictionary<object, object?>>())
+                if (Convert.ToString(Field(value, "Key")) is { Length: > 0 } key)
+                    ranges[key] = (Number(Field(value, "MinValue")), Field(value, "MaxValue") is { } max ? Number(max) : long.MaxValue);
+        int offset = list.Length > 4 ? (int)Number(list[4]) : 0;
+        int limit = list.Length > 5 && Number(list[5]) > 0 ? (int)Number(list[5]) : 100;
+        return new Dictionary<string, object?>
+        {
+            ["Ret"] = MicroServiceRouter.Ret(true),
+            ["SummaryList"] = tavern.Directory(ranges, offset, limit),
         };
     }
 

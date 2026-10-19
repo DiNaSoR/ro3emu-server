@@ -8,7 +8,7 @@ namespace Ro3Emu.Server.Game;
 /// selection check), when it moves and when it leaves. RoleSessionService runs the selection around these; the order
 /// here is the client's, see the comments on each step.
 /// </summary>
-public sealed class RoleSystems(Maps.World world, ChatService chat, CharacterService character, SkillService skills, FunctionService functions, CombatService combat, BuffService buffs, SceneService scene, TaskService tasks, DailyActivityService daily, GuideService guides, EmojiService emoji, PersonalService personal, SocialOutfitService socialOutfit, AchievementService achievements, Micro.FriendService friends, MvpService mvps, CardService cards, ShopService shops, EmblemService emblems, SeasonService seasons, SeasonPageService seasonPage, SeasonRefineService seasonRefine, SeasonTalentService talents, PetService pets, TowerService tower, ValhallaService valhalla, MonsterHuntService monsterHunt, GrowthClassService growthClass, FirstHeartService firstHeart, MailService mail, AuctionService auctions, GuildService guilds, AdventureGroupService adventureGroups, GuildCaravanService caravan, GuildChallengeService guildChallenge, DungeonService dungeons, DungeonMatchService dungeonMatches, InstanceService instances, TradeService trade, StallsService stalls, LifeJobService life, GatheringService gathering, WildAfkService afk, WorldCoreService worldCore, WorldInteractionService interaction, NewActivityService activities, TimedEventService timedEvents, PronteraDefenseService defense, TimedBattleService timedBattles, FestivalService festival, TrainingService training, LotteryService lottery, MountService mounts, CareerSpecialService careerSpecial, WardrobeService wardrobe, TotemService totems, GenreService genre, PowerService power, TerritoryWarsService territory, TerritoryEscortService escort, Persistence.SettingsPersistence settings, ItemAutoUseService autoUse, GearPromptService gearPrompt, CustomContentService customContent, ILogger<RoleSystems> log)
+public sealed class RoleSystems(Maps.World world, ChatService chat, CharacterService character, SkillService skills, FunctionService functions, CombatService combat, BuffService buffs, SceneService scene, TaskService tasks, DailyActivityService daily, GuideService guides, EmojiService emoji, PersonalService personal, SocialOutfitService socialOutfit, TavernService tavern, AchievementService achievements, Micro.FriendService friends, MvpService mvps, CardService cards, ShopService shops, EmblemService emblems, SeasonService seasons, SeasonPageService seasonPage, SeasonRefineService seasonRefine, SeasonTalentService talents, PetService pets, TowerService tower, ValhallaService valhalla, MonsterHuntService monsterHunt, GrowthClassService growthClass, FirstHeartService firstHeart, MailService mail, AuctionService auctions, GuildService guilds, AdventureGroupService adventureGroups, GuildCaravanService caravan, GuildChallengeService guildChallenge, DungeonService dungeons, DungeonMatchService dungeonMatches, InstanceService instances, TradeService trade, StallsService stalls, LifeJobService life, GatheringService gathering, WildAfkService afk, WorldCoreService worldCore, WorldInteractionService interaction, NewActivityService activities, TimedEventService timedEvents, PronteraDefenseService defense, TimedBattleService timedBattles, FestivalService festival, TrainingService training, LotteryService lottery, MountService mounts, CareerSpecialService careerSpecial, WardrobeService wardrobe, TotemService totems, GenreService genre, PowerService power, TerritoryWarsService territory, TerritoryEscortService escort, Persistence.SettingsPersistence settings, ItemAutoUseService autoUse, GearPromptService gearPrompt, CustomContentService customContent, ILogger<RoleSystems> log)
 {
     internal async Task LoadAsync(GameSession session)
     {
@@ -64,6 +64,8 @@ public sealed class RoleSystems(Maps.World world, ChatService chat, CharacterSer
         checkpoint();
         // 5035 must precede To-Do/scene loading: LC_OnHookHelper calls Mathf.Max on its remaining seconds.
         await afk.LoginAsync(session);
+        checkpoint();
+        await tavern.LoginAsync(session); // 5043 before 5027: the Daily Tavern quest (106010) reads today's seconds
         checkpoint();
         await tasks.LoginAsync(session); // 5027 before 5056: quest-gated functions (condition 4004)
         checkpoint();
@@ -208,6 +210,7 @@ public sealed class RoleSystems(Maps.World world, ChatService chat, CharacterSer
         await step("timed battle", () => timedBattles.LeaveRoleAsync(session));
         session.EventFaction = 0;
         await step("instance", () => instances.AbandonAsync(session));
+        await step("tavern", () => tavern.LeaveRoleAsync(session)); // before chat: the room's members are told
         await step("world", () => world.LeaveAsync(session));
         await step("chat", () => { chat.OnRoleLeft(session); return Task.CompletedTask; });
         await step("world core", () => { worldCore.Disconnected(session); return Task.CompletedTask; });

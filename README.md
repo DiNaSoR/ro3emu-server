@@ -135,6 +135,7 @@ show is playable from day one, without season or server-day gates ([details](doc
 - NPC, point and guild shops, battle pass, cash shop and Top Up
 - friends and gifts, parties and raids, chat channels and horns
 - party voice chat through the server (off by default, see below)
+- Tavern rooms with text and voice chat, mic rules, gifts and the Daily Tavern
 - adventure groups
 
 **Guilds**
@@ -165,7 +166,7 @@ show is playable from day one, without season or server-day gates ([details](doc
 - **Guild extras:** merging, impeachment, group mail.
 - **Smaller missing pieces:** shop gifting, titles, Paragon (Astral Level), and some stages of the story dungeons
   that are still simplified.
-- **Tavern and guild voice:** only party voice is implemented.
+- **Guild voice:** only party and Tavern voice are implemented.
 
 **Voice.** Party voice goes through a relay in the server instead of the publisher's Tencent GME, and the patched
 client records and plays it through Windows' own winmm. It is off by default: `Voice:Port` turns it on. The voice

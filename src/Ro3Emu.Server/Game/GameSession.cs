@@ -288,6 +288,13 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
     /// configuration's defaults); SocialOutfitService.</summary>
     public Romsg.DBSocialOutfit? SocialOutfit { get; set; }
 
+    /// <summary>Tavern Star Power, today's seconds in a room and completed days (5043, role blob "barroom"); TavernService.
+    /// barRoomId is the room the role is in now (rooms live in memory).</summary>
+    public Romsg.DBBarRoomInfo? Tavern { get; set; }
+
+    /// <summary>When this role's tavern seconds were last counted (unix seconds; 0 when not in a room); TavernService.</summary>
+    public long TavernCountedAt { get; set; }
+
     /// <summary>The emote or sitting in progress (state 17 Prepare or 14 Play); runtime only, gone at logout.</summary>
     public EmojiService.Emote? Emote { get; set; }
 

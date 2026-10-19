@@ -18,7 +18,7 @@ public readonly record struct VoiceMicOutcome(VoiceConnection[] Members, bool St
 /// from either side. Never touches <see cref="VoiceConnection"/>'s socket directly; it only calls the Send*
 /// helpers, which queue.
 /// </summary>
-public sealed class VoiceRooms(IOptions<ServerOptions> options, TeamService teams, SessionRegistry sessions,
+public sealed class VoiceRooms(IOptions<ServerOptions> options, TeamService teams, TavernService tavern, SessionRegistry sessions,
     ILogger<VoiceRooms> log) : IGameTicker
 {
     private static readonly TimeSpan SweepInterval = TimeSpan.FromSeconds(1);
@@ -188,8 +188,8 @@ public sealed class VoiceRooms(IOptions<ServerOptions> options, TeamService team
     }
 
     /// <summary>
-    /// Re-validates every joined connection against TeamService/SessionRegistry: a session that is gone, switched
-    /// teams or no longer matches its room is removed (Kicked + MemberChange to the rest); a member the team leader
+    /// Re-validates every joined connection against TeamService/TavernService/SessionRegistry: a session that is gone,
+    /// switched teams or Tavern rooms, or no longer matches its room is removed (Kicked + MemberChange to the rest); a member the team leader
     /// muted gets its mic forced off and a MicState broadcast, without leaving the room.
     /// </summary>
     private void SweepMembership()
@@ -202,7 +202,8 @@ public sealed class VoiceRooms(IOptions<ServerOptions> options, TeamService team
             if (room == 0) continue;
             bool alive = sessions.All().Any(s => s.Role?.Id == connection.RoleId);
             var (teamId, _) = teams.TeamOf(connection.RoleId);
-            if (!alive || teamId != room)
+            bool inTavern = tavern.InRoom(connection.RoleId, room);
+            if (!alive || teamId != room && !inTavern)
             {
                 var others = Leave(connection);
                 connection.Kick(VoiceKickCode.RemovedFromRoom);
@@ -210,7 +211,8 @@ public sealed class VoiceRooms(IOptions<ServerOptions> options, TeamService team
                 log.LogInformation("Voice: role {RoleId} dropped from room {Room} (sweep)", connection.RoleId, room);
                 continue;
             }
-            bool muted = teams.IsForbiddenChat(connection.RoleId);
+            // A Tavern member may talk only as the room's mic rules allow (TavernService.MayTalk).
+            bool muted = inTavern ? !tavern.MayTalk(connection.RoleId) : teams.IsForbiddenChat(connection.RoleId);
             if (muted && connection.MicOn) BroadcastMic(connection, SetMic(connection, false), false);
         }
     }
