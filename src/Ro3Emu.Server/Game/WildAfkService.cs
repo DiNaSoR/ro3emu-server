@@ -99,7 +99,8 @@ public sealed class WildAfkService : IGameTicker
         && GameData.Int(map, "_iSceneType") == 1; // enum scene type: field; private/dungeon maps never qualify.
     private bool Ordinary(MonsterUnit monster) => data.Row("NPCConfig", monster.Template.NpcId) is { } npc
         && GameData.Int(npc, "_iWildMonsters") == 1 && GameData.Int(npc, "_iNPCSubType") is 1 or 2;
-    private bool MvpAggro(GameSession s) => world.AllUnits().OfType<MonsterUnit>().Any(m => !m.Dead && !m.Returning
+    // Only the player's own map: this runs every second per auto-battling player, and every map's units were scanned.
+    private bool MvpAggro(GameSession s) => world.UnitsIn(s.WorldScene).OfType<MonsterUnit>().Any(m => !m.Dead && !m.Returning
         && m.WorldScene == s.WorldScene && m.Target == s && data.Row("NPCConfig", m.Template.NpcId) is { } npc
         && GameData.Int(npc, "_iNPCSubType") is 3 or 4);
 

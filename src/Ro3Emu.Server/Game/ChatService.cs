@@ -288,8 +288,21 @@ public sealed partial class ChatService
         }
     }
 
+    /// <summary>
+    /// Upper bounds of one chat line. The client's input box and link cards stay far below them; a modified client could
+    /// otherwise push a megabyte line to every member of a channel and into the 20-line history of each group id.
+    /// </summary>
+    internal const int MaxContentChars = 1024, MaxExtraParamChars = 8192, MaxReceiveIdChars = 128;
+
     private async Task SendTextAsync(GameSession sender, SendTextChatMessageRequest req)
     {
+        if (req.Content.Length > MaxContentChars || req.ExtraParam.Length > MaxExtraParamChars || req.ReceiveId.Length > MaxReceiveIdChars)
+        {
+            log.LogWarning("Chat from {Name} refused: {Content} content, {Extra} extra and {Receive} receiver characters",
+                sender.Role!.Name, req.Content.Length, req.ExtraParam.Length, req.ReceiveId.Length);
+            await DownAsync(sender, Cmd.SendText, new SendTextChatMessageResponse { ChatResult = false });
+            return;
+        }
         if (!GuildAllowed(sender, req.ReceiveId))
         {
             await DownAsync(sender, Cmd.SendText, new SendTextChatMessageResponse { ChatResult = false });

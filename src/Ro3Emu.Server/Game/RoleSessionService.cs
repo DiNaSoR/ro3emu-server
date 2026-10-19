@@ -354,6 +354,9 @@ public sealed class RoleSessionService(RoleStore roles, Data.GameData data, Buff
         positions.Persisted(session); // a durable barrier: no older lazy capture may follow it
     }
 
+    /// <summary>Largest stored DBSettingInfo. A real client's settings are a few KB.</summary>
+    internal const int MaxSettingsBytes = 256 * 1024;
+
     /// <summary>
     /// SETTING_SAVE_SETTING_INFO carries only the changed parts; merge them into the stored DBSettingInfo
     /// (map entries overwrite by key, sub-messages merge field by field).
@@ -362,14 +365,24 @@ public sealed class RoleSessionService(RoleStore roles, Data.GameData data, Buff
     {
         if (session.Role is { } role && req.DbSettingInfo != null)
         {
-            var stored = session.Settings ??= LoadSettings(role.Id);
             // LC_DAL_OnHook._onSaveOnHookSetting sends only edited keys. Merge the wire submessage:
             // parsing into the existing message preserves explicitly encoded false and leaves absent siblings alone.
             // MergeFrom(a parsed proto3 object) would lose that presence information.
+            // The merge goes into a copy: map entries add up across saves, so a client sending fresh keys could grow
+            // the stored blob without end (memory, the lazy save every second, the database, the login sync).
+            var stored = (session.Settings ??= LoadSettings(role.Id)).Clone();
             using (var input = new CodedInputStream(wire.ToArray()))
                 for (uint tag; (tag = input.ReadTag()) != 0;)
                     if (tag == 18) stored.MergeFrom(input.ReadBytes()); // SaveSettingReq.dbSettingInfo, field 2
                     else input.SkipLastField();
+            if (stored.CalculateSize() > MaxSettingsBytes)
+            {
+                log.LogWarning("{Name}: settings save refused, the merged settings would be {Bytes} bytes (limit {Limit})",
+                    role.Name, stored.CalculateSize(), MaxSettingsBytes);
+                await session.SendGameAsync(MsgId.SaveSetting, new SaveSettingResp { Result = ErrorCodes.Parameter });
+                return;
+            }
+            session.Settings = stored;
             bool modeChanged = ApplyGameModeAttackDefault(req.DbSettingInfo, stored);
             if (req.Type.Contains(SettingType.WildAfk) && stored.WildAFKInfo != null)
             {

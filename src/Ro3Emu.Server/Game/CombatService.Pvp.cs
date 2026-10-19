@@ -10,7 +10,7 @@ public sealed partial class CombatService
         && source.Role != null && source.Progress != null && !source.Dead && !source.SceneLoading
         && target.Role != null && target.Progress != null && !target.Dead && !target.SceneLoading
         && source.SceneEntry != 0 && source.WorldScene == target.WorldScene
-        && sessions.All().Contains(source) && sessions.All().Contains(target)
+        && sessions.Contains(source) && sessions.Contains(target)
         && world.PlayersIn(source.WorldScene).Contains(source) && world.PlayersIn(source.WorldScene).Contains(target)
         && PlayerHostile?.Invoke(source, target) == true;
 
@@ -21,5 +21,5 @@ public sealed partial class CombatService
     private bool CurrentPlayerHit(GameSession source, GameSession target, Role attackerRole, Role targetRole, long sceneId) =>
         ReferenceEquals(source.Role, attackerRole) && ReferenceEquals(target.Role, targetRole)
         && !source.SceneLoading && !target.SceneLoading && source.WorldScene == sceneId && target.WorldScene == sceneId
-        && sessions.All().Contains(source) && sessions.All().Contains(target);
+        && sessions.Contains(source) && sessions.Contains(target);
 }

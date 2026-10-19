@@ -30,6 +30,12 @@ public sealed partial class BuffService : IGameTicker
     private long _guids = 900000;
     private readonly Dictionary<long, List<ActiveBuff>> _unitBuffs = new();
 
+    private static bool AnyExpired(List<ActiveBuff> buffs, long now)
+    {
+        foreach (var b in buffs) if (b.ExpireMs <= now) return true;
+        return false;
+    }
+
     /// <summary>Subscribers recompute effective skill parameters/slots after a buff changes.</summary>
     public List<Func<GameSession, Task>> Changed { get; } = new();
 
@@ -455,6 +461,8 @@ public sealed partial class BuffService : IGameTicker
         SweepDecay(now);
         foreach (var s in sessions.All())
         {
+            // Every session, every tick: copy the list only when something in it has expired.
+            if (AnyExpired(s.Buffs, now))
             foreach (var b in s.Buffs.Where(b => b.ExpireMs <= now).ToList()) loop.TrackLegacyDetached("buff expiration", async () =>
             {
                 if (!s.Buffs.Contains(b)) return;
@@ -464,6 +472,9 @@ public sealed partial class BuffService : IGameTicker
             TickEnergy(s, now);
             TickImmuneDeath(s, now);
         }
+        bool unitExpired = false;
+        foreach (var list in _unitBuffs.Values) if (list.Count == 0 || AnyExpired(list, now)) { unitExpired = true; break; }
+        if (unitExpired)
         foreach (var (uid, list) in _unitBuffs.ToList())
         {
             foreach (var buff in list.Where(b => b.ExpireMs <= now).ToList())

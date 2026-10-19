@@ -22,8 +22,16 @@ public sealed class UserDataService(SocialOwnerCache cache, OwnerRegistry owners
 
     public string Name => "UserDataService";
 
-    public async ValueTask<object?> InvokeAsync(MicroSession session, string method, object? args) =>
-        method == "getAttributeBatchByVersion" ? await loop.InvokeAsync(() => GetAttributesAsync(args)) : null;
+    /// <summary>Roles answered per batch. The client asks for its friend, guild and team lists, far fewer than this.</summary>
+    internal const int MaxBatch = 1000;
+
+    public async ValueTask<object?> InvokeAsync(MicroSession session, string method, object? args)
+    {
+        if (method != "getAttributeBatchByVersion") return null;
+        // Profiles reserve each asked role's owner on the loop: only a verified connection may ask.
+        if (session.Account == null) return MicroServiceRouter.Fail("not verified");
+        return await loop.InvokeAsync(() => GetAttributesAsync(args));
+    }
 
     private async Task<object?> GetAttributesAsync(object? args)
     {
@@ -31,7 +39,7 @@ public sealed class UserDataService(SocialOwnerCache cache, OwnerRegistry owners
         if (args is IDictionary<object, object?> map && map.TryGetValue("UidFieldVersions", out var v) && v is IDictionary<object, object?> uids)
         {
             var ids = uids.Keys.Select(key => long.TryParse(key.ToString(), out long id) ? id : 0L)
-                .Where(id => id > 0).Distinct().ToArray();
+                .Where(id => id > 0).Distinct().Take(MaxBatch).ToArray();
             // Guild state has an entity revision separate from the role vector. Until guild publication
             // reaches this projection, a small worker snapshot validates it on every batch.
             while (true)
@@ -43,9 +51,10 @@ public sealed class UserDataService(SocialOwnerCache cache, OwnerRegistry owners
                 var stable = await cache.GuildStampsAsync(ids);
                 if (ids.Any(id => stamps[id] != stable[id])) continue;
                 var profiles = await cache.LoadProfilesAsync(ids, stable);
+                var answered = ids.ToHashSet();
                 foreach (var key in uids.Keys)
                 {
-                    if (!long.TryParse(key.ToString(), out long uid)) continue;
+                    if (!long.TryParse(key.ToString(), out long uid) || !answered.Remove(uid)) continue;
                     var asked = uids[key] is IDictionary<object, object?> types
                         ? types.Keys.Select(t => t?.ToString() ?? "").ToHashSet() : [];
                     if (profiles.TryGetValue(uid, out var profile) && profile is not null) results.Add(Entry(profile, asked));

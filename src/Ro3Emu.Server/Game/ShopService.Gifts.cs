@@ -30,7 +30,11 @@ public sealed partial class ShopService
     private static readonly long KeepFinishedMs = (long)TimeSpan.FromDays(30).TotalMilliseconds;
     private const string ExpiryDeadline = "present-orders/expiry";
 
+    // Orders of every role. Gift, pick and expiry each await a commit, and other roles' requests may change orders
+    // meanwhile, so a commit applies only its own order to the dictionary as it is then (With at commit time), never
+    // a copy taken before the await: that copy would put back a picked order as pending (refunded later, look kept).
     private Dictionary<long, PresentOrderInfo>? presents;
+    private long lastOrderId;
 
     private long Param(string name, long fallback) => data.Table("PublicParamConfig").TryGetValue(name, out var v)
         ? (long)(GameData.Number(v) ?? fallback) : fallback;
@@ -165,19 +169,21 @@ public sealed partial class ShopService
         if (Presents.Values.Any(o => o.ReceiverId == target && o.AppranceId == appearance && o.State == EPresentOrderState.Pending))
             return ErrDuplicateGift;
 
-        long orderId = Presents.Keys.DefaultIfEmpty(0).Max() + 1;
-        var next = With(new PresentOrderInfo
+        // Taken now, before the commit's await: two senders paying at once must not share an id.
+        long orderId = lastOrderId = Math.Max(lastOrderId, Presents.Keys.DefaultIfEmpty(0).Max()) + 1;
+        var order = new PresentOrderInfo
         {
             OrderId = orderId, SenderId = me, ReceiverId = target, AppranceId = appearance,
             AppranceAwardId = GameData.Int(row, "_iAppearanceAwardId"), CurrencyId = currency, CurrencyCount = unit,
             CreateTime = NowMs, State = EPresentOrderState.Pending, GiftContent = text,
-        });
+        };
+        var next = With(order);
         var cost = new List<(int Entry, long Count)> { (currency, unit) };
         var economy = character.FamilyEconomy(session, Economy.CharacterFamilyEconomy.ShopGiftKind, cost, [],
             new { Version = 1, Order = orderId, Commodity = commodityId, Target = target, Appearance = appearance, Payment = currency, Unit = unit });
         var paid = await character.ExchangeLockedAsync(session, cost, [],
             persist: tx => { tx.RoleBlob(me, "present_sent", Blob(me, true, next.Values)); tx.WithEconomy(economy); },
-            committed: () => presents = next, asyncCommit: true);
+            committed: () => presents = With(order), asyncCommit: true);
         if (paid == null) return character.ShortageOf(session, cost);
         resp.OrderId = orderId;
         resp.GiftContent = text;
@@ -235,7 +241,7 @@ public sealed partial class ShopService
         var next = With(picked);
         long me = session.Role!.Id;
         return await wardrobe.BuyFromShopLockedAsync(session, (int)order.AppranceId, Parts(row), [], bonus,
-            persistShop: tx => tx.RoleBlob(me, "present_received", Blob(me, false, next.Values)), committedShop: () => presents = next,
+            persistShop: tx => tx.RoleBlob(me, "present_received", Blob(me, false, next.Values)), committedShop: () => presents = With(picked),
             shopOutcome: new { Gift = order.OrderId, Sender = order.SenderId, Commodity = commodityId, Count = 1, Unit = 0 });
     }
 
@@ -270,7 +276,7 @@ public sealed partial class ShopService
                 await mail.SendTemplateOnceAsync(order.SenderId, template,
                     [new MailService.Attachment((int)order.CurrencyId, order.CurrencyCount)], $"present-refund:{id}",
                     tx => tx.RoleBlob(order.SenderId, "present_sent", Blob(order.SenderId, true, next.Values)), loop.Owners?.Current);
-                presents = next;
+                presents = With(refunded);
                 log.LogInformation("Gift order {Order} expired: {Count}x {Currency} back to {Sender}", id, order.CurrencyCount, order.CurrencyId, order.SenderId);
                 PushPresentsTo(order.SenderId, order.ReceiverId);
             }

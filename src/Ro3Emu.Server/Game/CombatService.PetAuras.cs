@@ -93,7 +93,7 @@ public sealed partial class CombatService
             // one removed early (dispelled, cleared) stops the aura.
             var buff = s.Buffs.FirstOrDefault(b => b.Guid == guid);
             bool live = ReferenceEquals(s.Role, role) && !s.Dead && !s.SceneLoading && s.WorldScene == scene
-                && s.SceneGeneration == generation && sessions.All().Contains(s)
+                && s.SceneGeneration == generation && sessions.Contains(s)
                 && (buff != null ? buff.ExpireMs >= due : due == expire && MonsterService.NowMs >= expire - GameLoop.TickInterval.TotalMilliseconds);
             if (!live)
             {

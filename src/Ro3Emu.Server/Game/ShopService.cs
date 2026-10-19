@@ -411,11 +411,8 @@ public sealed partial class ShopService : IGameTicker
         bool ok = code == 0;
         if (ok)
         {
-            var next = new ShopState
-            {
-                Favorites = new HashSet<int>(session.Shop!.Favorites),
-                Bought = session.Shop.Bought.ToDictionary(p => p.Key, p => new Counter { Count = p.Value.Count, Period = p.Value.Period }),
-            };
+            // A full copy: the favourite toggle must keep the Top Up tiers bought (Recharged) too.
+            var next = Copy(session.Shop!);
             if (req.OpType == CollectOperateType.Add) next.Favorites.Add(req.CommodityId);
             else next.Favorites.Remove(req.CommodityId);
             var tx = roles.NewTransaction();

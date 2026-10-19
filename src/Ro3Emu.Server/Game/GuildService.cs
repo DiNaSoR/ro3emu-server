@@ -644,7 +644,9 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
                 else if (g.Impeach != null) code = ErrorCodes.ImpeachRunning;
                 else { actor.Official = 20; target.Official = 1; }
             }
-            else if (target.Official == 1 || (actor.Official != 1 && next <= actor.Official)) code = ErrorCodes.GuildPermission;
+            // An officer below the leader assigns only below its own rank, and only to members below it (as kick does).
+            else if (target.Official == 1 || (actor.Official != 1 && (next <= actor.Official || target.Official <= actor.Official)))
+                code = ErrorCodes.GuildPermission;
             else
             {
                 int limit = (int)GameData.Int(row!.Value, "_iPositionNum");

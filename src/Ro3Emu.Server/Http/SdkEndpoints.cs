@@ -19,6 +19,12 @@ public static class SdkEndpoints
     /// <summary>Plain-JSON marker understood by Lua_UT_Utils.Decrypt (otherwise it expects base64 AES).</summary>
     private const string RecoveryJsonPrefix = "RO3_RECOVERY_JSON:";
 
+    /// <summary>
+    /// Longest account name and password accepted. A first login registers the name, so without a bound any form post
+    /// (up to ASP.NET's 4 MB per value) became a stored account name, and a log line.
+    /// </summary>
+    public const int MaxIdentityChars = 64, MaxCredentialChars = 256;
+
     public const int BigArea = 168;
     public const int AreaId = 1;
 
@@ -35,7 +41,8 @@ public static class SdkEndpoints
             var form = await request.ReadFormAsync();
             string identity = form["identity"].ToString().Trim();
             string credential = form["credential"].ToString();
-            if (identity.Length == 0 || credential.Length == 0)
+            if (identity.Length == 0 || credential.Length == 0 || identity.Length > MaxIdentityChars || credential.Length > MaxCredentialChars
+                || identity.Any(char.IsControl))
             {
                 return Results.Json(new { code = 401 });
             }

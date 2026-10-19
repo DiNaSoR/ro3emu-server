@@ -55,7 +55,7 @@ public sealed partial class CombatService
         ScheduleRuntime(scene, TimeSpan.FromMilliseconds(Math.Max(0, intervalMs - GameLoop.TickInterval.TotalMilliseconds)), async () =>
         {
             if (!ReferenceEquals(s.Role, role) || s.Dead || s.SceneLoading || s.WorldScene != scene
-                || s.SceneGeneration != generation || !sessions.All().Contains(s)) return;
+                || s.SceneGeneration != generation || !sessions.Contains(s)) return;
             if (!locked.Dead && locked.Hp > 0) center = locked.Pos.Clone();
             var pool = world.Map(scene).Units.OfType<MonsterUnit>()
                 .Where(m => m.Hp > 0 && !m.Dead && CanHitMonster(s, m) && Distance(center, m.Pos) <= radius + 0.1f).ToList();
