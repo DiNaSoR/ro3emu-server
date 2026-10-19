@@ -155,10 +155,13 @@ namespace Ro3Emu.ClientHooks
                         rawset.Obf_HuA(data, "m_kCount", count + added);
                     // Lua_CFG_Base.GetAllIDList caches the sorted ids on first use.
                     if (instance != null) rawset.Obf_HuA(instance, "m_kAllIDList", null);
+                    // ...and on the proxy, which keeps its own after Lua_DBManager.ReLoadAllCfg (see Reindex).
+                    if (global.Obf_LuA<Obf_R.Obf_ff>("Lua_DBManager.m_kCFG_" + table.Key) is Obf_R.Obf_ff proxy)
+                        rawset.Obf_HuA(proxy, "m_kAllIDList", null);
                     // Some Lua_CFG modules index their rows once, at load (OnInitDatas). Lua_CFG_ShopCommodityConfig builds
                     // ShopItemsMap (the shop tabs' lists by _iClassID) and AppearanceIdMap there, so added commodities
                     // stay out of the shop until it runs again; it starts from new tables, so a rerun is safe.
-                    if (Reindexed.Contains(table.Key)) Reindex(global, table.Key, instance);
+                    if (Reindexed.Contains(table.Key)) Reindex(global, rawget, table.Key, instance);
                     Note(table.Key + ": " + table.Value.Count + " row(s) set (" + added + " new)");
                 }
                 if (content.Npcs.Count > 0)
@@ -181,21 +184,38 @@ namespace Ro3Emu.ClientHooks
         }
 
         /// <summary>
-        /// Reruns OnInitDatas on the table's instance. Without one (not found), on the Lua_DBManager proxy: the method
-        /// comes through its __index and the rebuilt maps land on the proxy, where the UI's proxy:OnGet... calls read them.
+        /// Reruns OnInitDatas on the table's instance and, when it holds its own data, on the Lua_DBManager proxy.
+        /// Lua_DBManager.ReLoadAllCfg (on a language load) calls proxy:ctor(name), which runs Lua_CFG_Base's ctor
+        /// with self = the proxy: the proxy then keeps its own m_kConfigData and index maps (ShopItemsMap), which
+        /// shadow the instance's for every proxy:OnGet... call the UI makes. With no instance found, the proxy only.
         /// </summary>
-        private static void Reindex(Obf_R.Obf_ff global, string table, Obf_R.Obf_ff instance)
+        private static void Reindex(Obf_R.Obf_ff global, Obf_R.Obf_Ef rawget, string table, Obf_R.Obf_ff instance)
         {
-            var self = instance ?? global.Obf_LuA<Obf_R.Obf_ff>("Lua_DBManager.m_kCFG_" + table);
-            var init = self?.Obf_RuA<Obf_R.Obf_Ef>("OnInitDatas");
-            if (init == null) { Once(table + ": OnInitDatas not found, rows not reindexed"); return; }
+            var proxy = global.Obf_LuA<Obf_R.Obf_ff>("Lua_DBManager.m_kCFG_" + table);
+            bool proxyOwnsData = proxy != null && Raw(rawget, proxy, "m_kConfigData") != null;
+            var done = new List<string>();
+            if (instance != null) Init(global, rawget, table, instance, "instance", done);
+            if (proxy != null && (proxyOwnsData || instance == null)) Init(global, rawget, table, proxy, "proxy", done);
+            if (done.Count == 0) Once(table + ": OnInitDatas not found, rows not reindexed");
+            else Note(table + ": reindexed on " + string.Join(", ", done));
+        }
+
+        private static void Init(Obf_R.Obf_ff global, Obf_R.Obf_Ef rawget, string table, Obf_R.Obf_ff self, string name, List<string> done)
+        {
+            var init = self.Obf_RuA<Obf_R.Obf_Ef>("OnInitDatas");
+            if (init == null) return;
             init.Obf_HuA(self);
-            // Logs the Fashion tab's size so a Player.log shows whether the added commodities made it in.
-            var map = self.Obf_RuA<Obf_R.Obf_ff>("ShopItemsMap");
-            var tab = map == null ? null : global.Obf_LuA<Obf_R.Obf_Ef>("rawget")?.Obf_HuA(map, 50201L);
-            var len = tab != null && tab.Length > 0 && tab[0] != null ? global.Obf_LuA<Obf_R.Obf_Ef>("rawlen")?.Obf_HuA(tab[0]) : null;
-            Note(table + ": reindexed on the " + (instance != null ? "instance" : "proxy")
-                + (len != null && len.Length > 0 ? ", Fashion tab 50201 has " + LuaPatches.ToLong(len[0]) + " item(s)" : ""));
+            // The Fashion tab's size (sets, 50201) shows in a Player.log whether the added commodities made it in.
+            var tab = Raw(rawget, self.Obf_RuA<Obf_R.Obf_ff>("ShopItemsMap"), 50201L) as Obf_R.Obf_ff;
+            var len = tab == null ? null : global.Obf_LuA<Obf_R.Obf_Ef>("rawlen")?.Obf_HuA(tab);
+            done.Add("the " + name + (len != null && len.Length > 0 ? " (Fashion tab 50201: " + LuaPatches.ToLong(len[0]) + " item(s))" : ""));
+        }
+
+        private static object Raw(Obf_R.Obf_Ef rawget, Obf_R.Obf_ff table, object key)
+        {
+            if (table == null) return null;
+            var r = rawget.Obf_HuA(table, key);
+            return r != null && r.Length > 0 ? r[0] : null;
         }
 
         /// <summary>
