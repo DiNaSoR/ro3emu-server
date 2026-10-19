@@ -370,6 +370,23 @@ public sealed partial class SkillCombatTests : IAsyncLifetime
     }
 
     [ClientDataFact]
+    public async Task BlessingShowsItsBuffEffectOnEveryRecipient()
+    {
+        // Blessing has no number to show, but the client plays fx_buff_angelblessing (hit effect 1400102) only for a
+        // 31101 dst: each recipient comes as a display-only entry that maps to no HUD word.
+        await using var alice = await InWorld("Alice"); await using var bob = await InWorld("Bob");
+        await Gm("alice", "!job 4100"); await Teach("alice", 14001);
+        await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1400101 });
+        var accepted = await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser);
+        Assert.Equal(0, accepted.Result);
+        var hit = await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser, x => x.SessionId == accepted.SessionId);
+        Assert.Equal(1400102, hit.ShowPoint);
+        Assert.Equal(new[] { (long)alice.Self!.Uuid, (long)bob.Self!.Uuid }.OrderBy(id => id), hit.Dsts.Select(d => d.DstID).OrderBy(id => id));
+        Assert.All(hit.Dsts, d => { Assert.Equal(DamageType.DamageShare, d.DamageType); Assert.Equal(0, d.Damage); Assert.Equal(DamageHitResult.Normal, d.HitResult); });
+        Assert.Equal(accepted.SessionId, (await Next(bob, CombatService.SkillHit, SkillHitInfo.Parser, x => x.SkillId == 1400101)).SessionId);
+    }
+
+    [ClientDataFact]
     public async Task LethalHitBlocksReviveUntilDeathPublicationCompletes()
     {
         await using var alice = await InWorld("Alice");
