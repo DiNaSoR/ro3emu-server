@@ -81,7 +81,10 @@ public static partial class EconomySnapshotReader
     // sender's price is spent by the cd13a/shop-gift exchange that writes present_sent, comes back only as the refund
     // letter that marks the order Refunded, and the receiver's claim is a cost-free cd13a/shop-appearance unlock that writes
     // present_received; the orders only decide which of the two happens, once.
-    public const string ExpectedFormatManifestHash = "248124F733950AC5AF7ABD78B066DBC7BB8F6CD1B90CC93FD79285158049B007";
+    // casual_battle_obligation.payout is CasualBattleService.Payout: a frozen match result (rating delta, record,
+    // numbers) and the DropPool ids its payment rolls. No goods: they are granted by the role's event/casual-battle
+    // receipt that also writes the timed_battle state and marks the row delivered.
+    public const string ExpectedFormatManifestHash = "274D904BF18C7B225D7D49269C6BBB8F8B332A42A01A738E2C744E819DA80F1B";
     public static string FormatManifestHash => State.FormatManifestHash;
 
     private sealed partial class State
@@ -140,6 +143,8 @@ public static partial class EconomySnapshotReader
             entries.Add("role-string-set:task_followup:System.String");
             entries.Add("dungeon_reward_obligation:Ro3Emu.Server.Accounts.DungeonRewardObligation");
             TypeShape(typeof(Ro3Emu.Server.Accounts.DungeonRewardObligation));
+            entries.Add("casual_battle_obligation:Ro3Emu.Server.Game.CasualBattleService+Payout");
+            TypeShape(typeof(Ro3Emu.Server.Game.CasualBattleService.Payout));
             // These JSON wrappers carry embedded protobuf bytes in addition to their explicit DTO graph.
             Message(Romsg.DBMountsInfo.Descriptor);
             Message(Romsg.DBLotteryData.Descriptor);

@@ -505,6 +505,9 @@ public sealed partial class GameLoop : IHostedService, IDisposable
                     long finished = Stopwatch.GetTimestamp();
                     itemTicks += finished - started; items++;
                     _metrics?.RecordQueueItem(item.EnqueuedAt, started, finished);
+                    // An item whose permit had already closed (an orphan continuation) can be the last thing holding
+                    // the drain open: no Release follows it, so check here once the queue empties.
+                    if (Phase == GameLoopPhase.Draining) lock (_lifecycle) TryFinishDrain();
                     if (_metrics != null && Stopwatch.GetElapsedTime(started, finished).TotalMilliseconds >= SlowItemMs)
                         _metrics.RecordSlowItem(Describe(item.Callback, item.State), Stopwatch.GetElapsedTime(started, finished).TotalMilliseconds);
                 }
