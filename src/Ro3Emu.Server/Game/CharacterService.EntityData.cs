@@ -127,8 +127,9 @@ public sealed partial class CharacterService
                 else Add(id, v);
             }
             // enchant stats are per instance; base stats also feed their derived conversions.
-            foreach (var enchant in item.Enchantments.Values)
-                foreach (var (id, v) in enchant.Attr)
+            foreach (var (enchantId, enchant) in item.Enchantments)
+                foreach (var (id, v) in enchant.Attr.Select(a => (a.Key, (double)a.Value))
+                    .Concat(EnchantService.SkillAttributes(session, enchantId, data).Select(a => (a.Id, a.Value))))
                 {
                     if (id is >= 1 and <= 6) baseStats[id - 1] += v;
                     else Add(id, v);
