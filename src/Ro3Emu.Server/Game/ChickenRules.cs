@@ -75,6 +75,23 @@ public static class ChickenRules
     /// <summary>Map extent of the scene editor's points (x 27..826, z 28..825).</summary>
     public const int MapMin = 20, MapMax = 830;
 
+    // ---- service NPCs (shops, Rescue Wagons) ----
+    /// <summary>NpcLevelRegionRespawnConfig rows of 2240101 place NpcRespawnGroupConfig groups in scene-editor regions:
+    /// 877 "商店和救护车刷新区域" (shops and ambulances: groups 10012 = 2 x Rescue Wagon 15000055, 10013 = 3 x shop NPC
+    /// 15000054) and 866 "武器商人（大圈）" (weapon merchant: 10014 = 5 x shop NPC 15000060). The regions are rectangles
+    /// (shapeType 1) centred at (441, 424) 400 x 400 and (391, 421) 380 x 380 with no inner points; a uniform random
+    /// point inside, kept within the island circle, is (inferred).</summary>
+    public static readonly (int Region, float X, float Z, float Width, float Length)[] ServiceRegions =
+        [(877, 441f, 424f, 400f, 400f), (866, 391f, 421f, 380f, 380f)];
+    /// <summary>NPCConfig 15000055: interact 2900004, EXEC action 319 (LC_InteractActions.OpenAmbulancePanel ->
+    /// UI_Com_ChickenAmbulanceRevivalPanel, which spends ID cards 50001 through 82662).</summary>
+    public const int RescueWagon = 15000055;
+    /// <summary>ShopConfig _iShopType 8 (enum_ShopType ChickenShop).</summary>
+    public const int ChickenShopType = 8;
+    /// <summary>(inferred) ShopCommodityConfig _iPurchaseTimesLimit 6 on every chicken commodity: _iPurchaseNum is per
+    /// player per match.</summary>
+    public const int PerMatchLimit = 6;
+
     // ---- poison zone ----
     /// <summary>DL:255-272 chicken_poison: the poison strength from a circle index on (0..3 500, 4..6 700, 7..8 1000,
     /// 9 1300). (inferred) Basis points of the victim's max HP per tick: the HP-drain buff EatChickenPoisonBuffId

@@ -219,10 +219,16 @@ public sealed class ActivitiesMessages(PraiseService praise, CasualBattleService
             await timedBattles.ClaimDragonAsync(session, DragonIslandClaimRankRewardReq.Parser.ParseFrom(body.Span));
         });
         // Survivor Battle inside the match (TimedBattleService.Chicken*): careers, landing, items, revival, giving up.
+        routes.Intercept("timedBattles", id => id == SceneService.NpcInteraction, async (session, msgId, body) =>
+            session.Role != null && await timedBattles.TryChickenInteractAsync(session, NpcInteractionReq.Parser.ParseFrom(body.Span)));
         routes.Map(TimedBattleService.SelectCareer, "timedBattles", async (session, msgId, body) =>
             await timedBattles.SelectCareerAsync(session, SelectRoleCareerReq.Parser.ParseFrom(body.Span)));
         routes.Map(TimedBattleService.SelectPosition, "timedBattles", async (session, msgId, body) =>
             await timedBattles.SelectPositionAsync(session, SelectRolePositionReq.Parser.ParseFrom(body.Span)));
+        routes.Map(TimedBattleService.SelectFollow, "timedBattles", async (session, msgId, body) =>
+            await timedBattles.SelectFollowAsync(session, SelectFollowReq.Parser.ParseFrom(body.Span)));
+        routes.Map(TimedBattleService.OpenPanel, "timedBattles", async (session, msgId, body) =>
+            await timedBattles.OpenPanelAsync(session, ChickenOpenPanelReq.Parser.ParseFrom(body.Span)));
         routes.Map(TimedBattleService.InsertItem, "timedBattles", async (session, msgId, body) =>
             await timedBattles.InsertAsync(session, InsertChickenItemReq.Parser.ParseFrom(body.Span)));
         routes.Map(TimedBattleService.UseItem, "timedBattles", async (session, msgId, body) =>

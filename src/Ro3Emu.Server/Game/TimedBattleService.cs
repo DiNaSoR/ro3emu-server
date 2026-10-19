@@ -41,7 +41,13 @@ public sealed partial class TimedBattleService : IGameTicker
         if (message == DungeonService.Enter)
             return data.Row("OnePieceRewardConfig", EnterDungeonReq.Parser.ParseFrom(body.Span).SceneEntry) != null;
         if (message == SceneService.NpcInteraction)
-            return IsRiftUid(NpcInteractionReq.Parser.ParseFrom(body.Span).NpcUid);
+        {
+            long uid = NpcInteractionReq.Parser.ParseFrom(body.Span).NpcUid;
+            return IsRiftUid(uid) || IsChickenNpcUid(uid);
+        }
+        // Survivor Battle shops (TimedBattleService.ChickenShop) reserve the match themselves.
+        if (message == DungeonShop) return true;
+        if (message == ShopService.BuyCommodity) return IsChickenNpcUid(BuyCommodityReq.Parser.ParseFrom(body.Span).NpcId);
         return false;
     }
     private readonly GameData data;

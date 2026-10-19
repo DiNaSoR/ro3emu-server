@@ -256,11 +256,6 @@ public sealed partial class TimedBattleService
         }
     }
 
-    /// <summary>82662 at a Rescue Wagon (UI_Com_ChickenAmbulanceRevivalPanelCtrl.lua:435): no wagon NPC is placed on this
-    /// server (inferred: their refresh region 877 has no schedule), so it is refused.</summary>
-    public Task RelifeOtherAsync(GameSession session, ChickenRelifeOtherReq _) =>
-        session.SendGameAsync(RelifeOther, new ChickenRelifeOtherResp { Result = ErrorCodes.FeatureUnavailable });
-
     /// <summary>31013 inside the match: the generic revive is not this mode's (revival is 82661 after 82663). A Rift
     /// fight is NoRevive (TimedBattleService.OnePiece): no self-revive there either.</summary>
     public async Task<bool> TryRefuseReliveAsync(GameSession session)
