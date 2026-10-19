@@ -424,6 +424,7 @@ public sealed partial class CharacterService
                 }
                 if (p.Level != originalProgress.Level || p.JobLevel != originalProgress.JobLevel) await AfterLevelChangeAsync(session, persist: false, levelUp: p.Level > originalProgress.Level);
                 else await SyncAsync(session, RoleBaseInfoSync, BuildBaseInfo(session));
+                await CapExpAsync(session);
                 AddVirtualReward(reward, BaseExpItem, baseExp);
                 AddVirtualReward(reward, JobExpItem, jobExp);
                 if (reward.RewardType.Count == 0) reward.RewardType.Add(1);

@@ -26,6 +26,17 @@ public sealed partial class CharacterService
     /// <summary>The server's open day (1 = the opening day); set by FunctionService, which owns the season clock.</summary>
     internal Func<int>? ServerDay { get; set; }
 
+    /// <summary>Credits <see cref="RoleProgress.CapExp"/> (Base EXP past the level cap) to the Paragon level; set by
+    /// ParagonService. The caller holds the character lock, after the EXP commit.</summary>
+    internal Func<GameSession, Task>? CapExpGained { get; set; }
+
+    private async Task CapExpAsync(GameSession session)
+    {
+        if (session.Progress is not { CapExp: > 0 } p) return;
+        if (CapExpGained is { } credit) await credit(session);
+        p.CapExp = 0;
+    }
+
     private int _maxLevel;
     private int[]? _serverLevels;
     private (long[] Gaps, long[] Percents)? _pursue;

@@ -74,7 +74,10 @@ public static partial class EconomySnapshotReader
     // seconds and days; counters, no balance and no asset (the gift items are paid by their own exchange).
     // Titles: role.title DBTitleInfo holds the title rank; a marker, no balance and no asset (the crest items are paid by
     // their own exchange).
-    public const string ExpectedFormatManifestHash = "9798CA8FBE465A00408359A6255100445D18E27FF947708795F41DE20C064FD8";
+    // Astral Level: role.paragon (ParagonService.State) holds the Paragon level and EXP, the points on each star and the
+    // item ids of socketed Star Cores. No balance; a socketed core is spent from the bag by the same exchange that writes
+    // it here and granted back by the exchange that clears it, so it is never held twice.
+    public const string ExpectedFormatManifestHash = "1E30C4D728B85399A0899E16BE44525F6E97E551767E1496935C58625C0A7E44";
     public static string FormatManifestHash => State.FormatManifestHash;
 
     private sealed partial class State

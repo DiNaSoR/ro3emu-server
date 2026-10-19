@@ -118,7 +118,7 @@ show is playable from day one, without season or server-day gates ([details](doc
 - skills, buffs and debuffs, damage and healing over time, auras
 - passive skill changes, procs and follow-up hits, weapon and mount conditions, skill cost modifiers
 - crowd-control diminishing returns, energy meters, talents, job resonance
-- level cap 99 with catch-up EXP, character power score
+- level cap 99 with catch-up EXP, the Astral Level after it, character power score
 - PvP and event fights
 
 **Items and progression**
@@ -164,7 +164,7 @@ show is playable from day one, without season or server-day gates ([details](doc
 - **War of Emperium extras:** commander tools, siege weapons and vehicles.
 - **Survivor Battle extras:** the "Go, Kafra, Go!" weekly tasks.
 - **Guild extras:** merging, impeachment, group mail.
-- **Smaller missing pieces:** shop gifting, Paragon (Astral Level), and some stages of the story dungeons
+- **Smaller missing pieces:** shop gifting, and some stages of the story dungeons
   that are still simplified.
 - **Guild voice:** only party and Tavern voice are implemented.
 
