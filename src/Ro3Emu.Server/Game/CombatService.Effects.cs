@@ -82,7 +82,8 @@ public sealed partial class CombatService
         if (!CurrentCastMap(s, action)) return;
         await SpendCastResourcesAsync(s, action);
         if (!CurrentCastMap(s, action)) return;
-        if (!await StartFlightAsync(s, action.Row)) await ResolveHitsAsync(s, action);
+        if (await WargHuntAsync(s, action)) { }
+        else if (!await StartFlightAsync(s, action.Row)) await ResolveHitsAsync(s, action);
         if (CurrentCastMap(s, action)) await AfterCastResourcesAsync(s, action);
     }
 
@@ -343,6 +344,8 @@ public sealed partial class CombatService
                     && CanApplyMoreEffects() && RollHostileBuff(tuples[stage.Fallback], s, null, null, target, out int fid, out int fduration))
                     await buffs.ShowOnUnitAsync(target, fid, fduration, castingRole.Id);
             }
+            if (CanApplyMoreEffects() && firstBolt && KnockUps.Contains(script) && !target.Dead && target.Hp > 0)
+                await buffs.ShowOnUnitAsync(target, KnockUpBuff, KnockUpMs, castingRole.Id);
             if (CanApplyMoreEffects() && script is ("Provoke" or "Taunt")) monsters.Engage(target, s);
             if (CanApplyMoreEffects() && firstBolt && !target.Dead && target.Hp > 0)
             {
@@ -528,6 +531,17 @@ public sealed partial class CombatService
         return id > 0 && Rolls.Proc(10000) < (GameData.Number(tuple[1]) ?? 0);
     }
 
+    /// <summary>
+    /// Knock-Up 9018 (901801, first category 16: SpecialStatusConfig 3 击飞, the FlyHit animation, the same forbidden
+    /// actions as Stun). Its rows carry no time, so the toss lasts <see cref="KnockUpMs"/> (inferred). Skills whose
+    /// description names it: Sonic Burst ("inflicting Knock-Up and 【Immobilize】"), Fearless Charge's second stage ("then
+    /// inflict Knock-Up") and Energy Release's blast (BombSuicide2, a knock-up show with no text). Category 25 makes
+    /// control immunity (Boss CC Immunity, Immunity) shrug it off.
+    /// </summary>
+    internal const int KnockUpBuff = 901801, KnockUpMs = 1000;
+
+    internal static readonly HashSet<string> KnockUps = ["Sonicblast", "PinpointAttack2", "BombSuicide2"];
+
     internal enum DisplaceKind { CasterForward, CasterBack, TargetPush, TargetPull, CasterToTarget, CasterToPoint, PullToCenter }
 
     /// <summary>
@@ -576,6 +590,9 @@ public sealed partial class CombatService
             // "Move ${12} meters in that direction" (Fearless Charge 1162411 黄昏之光水平移动). Its _kDescData has 11 values,
             // so ${12} is missing; the 12 m of ${1}, the area's length, stands in (inferred).
             ["PinpointAttack2"] = (DisplaceKind.CasterForward, 0),
+            // Warg Hunt's ranged form: "If you are more than ${5}m from the target, you also dash in front of it" (show
+            // 13330's 1333014 and 133301's 13330113 are its move).
+            ["WolvesShadowFar"] = (DisplaceKind.CasterToTarget, -1),
         };
 
     private readonly System.Collections.Concurrent.ConcurrentDictionary<long, (int Id, int Ms)> _movementEffects = new();
@@ -615,15 +632,17 @@ public sealed partial class CombatService
         return distance > 0 ? (rule.Kind, distance, effect, ms) : null;
     }
 
-    private async Task MoveCasterAsync(GameSession s, ActiveSkillCast action)
+    private Task MoveCasterAsync(GameSession s, ActiveSkillCast action) => MoveCasterAsync(s, action.Row, action.Request, action.ActionMs);
+
+    private async Task MoveCasterAsync(GameSession s, JsonElement row, CastSkillReq request, int actionMs)
     {
-        if (Displacement(action.Row) is not { Kind: DisplaceKind.CasterForward or DisplaceKind.CasterBack
+        if (Displacement(row) is not { Kind: DisplaceKind.CasterForward or DisplaceKind.CasterBack
                 or DisplaceKind.CasterToTarget or DisplaceKind.CasterToPoint } move) return;
         float dx, dz;
         if (move.Kind == DisplaceKind.CasterToTarget)
         {
             // Stop the given distance short of the locked target, along the line to it.
-            if (FindMonster(s.WorldScene, action.Request.TargetId) is not { } target) return;
+            if (FindMonster(s.WorldScene, request.TargetId) is not { } target) return;
             float tx = target.X - s.Position.X, tz = target.Z - s.Position.Z, length = MathF.Sqrt(tx * tx + tz * tz);
             if (length <= move.Distance) return;
             dx = tx / length * (length - move.Distance);
@@ -631,13 +650,13 @@ public sealed partial class CombatService
         }
         else if (move.Kind == DisplaceKind.CasterToPoint)
         {
-            if (action.Request.TargetPos is not { } point) return;
+            if (request.TargetPos is not { } point) return;
             dx = point.X - s.Position.X;
             dz = point.Z - s.Position.Z;
         }
         else
         {
-            float face = action.Request.Face + (move.Kind == DisplaceKind.CasterBack ? 180 : 0);
+            float face = request.Face + (move.Kind == DisplaceKind.CasterBack ? 180 : 0);
             double angle = face * Math.PI / 180;
             dx = (float)Math.Sin(angle) * move.Distance;
             dz = (float)Math.Cos(angle) * move.Distance;
@@ -646,9 +665,9 @@ public sealed partial class CombatService
         var start = s.Position.Clone();
         await ToPlayerAndViewersAsync(s, SkillMove, new SkillStartMoveNotify
         {
-            EntityID = (ulong)s.Role!.Id, StartPos = start, EndPos = end, SkillConfigId = action.Request.SkillId,
-            EffectId = move.EffectId, StartTimestampMs = Now, MoveType = 1, Face = action.Request.Face,
-            MoveTimeMs = move.Ms > 0 ? move.Ms : action.ActionMs,
+            EntityID = (ulong)s.Role!.Id, StartPos = start, EndPos = end, SkillConfigId = request.SkillId,
+            EffectId = move.EffectId, StartTimestampMs = Now, MoveType = 1, Face = request.Face,
+            MoveTimeMs = move.Ms > 0 ? move.Ms : actionMs,
         });
         // MoveAsync updates persistent position and AOI membership from the same authoritative destination.
         s.PreviousPosition = start;

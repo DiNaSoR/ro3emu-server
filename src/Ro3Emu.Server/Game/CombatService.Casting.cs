@@ -738,6 +738,7 @@ public sealed partial class CombatService
 
     public void PlayerMoved(GameSession s)
     {
+        SwiftWargOnMove(s);
         if (eventAttacks.TryGetValue(s, out var eventAttack)
             && MonsterService.Distance(eventAttack.StartX, eventAttack.StartZ, s.Position.X, s.Position.Z) > 1.5f) eventAttacks.Remove(s);
         if (s.Attack is { } a && MonsterService.Distance(a.StartX, a.StartZ, s.Position.X, s.Position.Z) > 0.1f)
