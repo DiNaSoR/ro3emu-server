@@ -30,6 +30,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The voice frame cipher: one copy for the relay, the bot (through this project) and the in-game client hooks,
+         which compile it against the client's own mscorlib. -->
+    <Compile Include="..\Ro3Emu.ClientHooks\VoiceCipher.cs" Link="Voice\VoiceCipher.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="Ro3Emu.Tests" />
     <!-- Embedded only: no loose copies next to the server binary. -->
     <Content Remove="Reconstructed\**" />
