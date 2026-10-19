@@ -548,15 +548,23 @@ public sealed partial class GameLoop : IHostedService, IDisposable
     private static string Describe(SendOrPostCallback callback, object? state)
     {
         object? target = state ?? callback.Target;
+        // An await continuation posts the state machine box's MoveNext Action: name the box, not "Action".
+        if (target is Delegate { Target: { } owner } && owner.GetType().Name.StartsWith("AsyncStateMachineBox")) target = owner;
         if (target == null) return callback.Method.DeclaringType?.Name + "." + callback.Method.Name;
         var type = target.GetType();
         if (type.IsGenericType && type.Name.StartsWith("AsyncStateMachineBox"))
-            return type.GetGenericArguments().Last().FullName?.Split('.').Last() ?? type.Name;
+        {
+            // The state machine: Owner+<Method>d__N (a generic owner's FullName carries assembly-qualified arguments).
+            var machine = type.GetGenericArguments().Last();
+            return machine.DeclaringType is { } declaring ? StripArity(declaring.Name) + "+" + machine.Name : machine.Name;
+        }
         foreach (var field in type.GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic))
             if (field.GetValue(target) is Delegate inner && inner.Method.DeclaringType != typeof(GameLoop))
                 return (inner.Method.DeclaringType?.FullName?.Split('.').Last() ?? "?") + "." + inner.Method.Name;
         return type.FullName?.Split('.').Last() ?? type.Name;
     }
+
+    private static string StripArity(string name) => name.IndexOf('`') is var tick and >= 0 ? name[..tick] : name;
 
     private void Execute((SendOrPostCallback Callback, object? State, long EnqueuedAt, WorkPermit Permit) item)
     {

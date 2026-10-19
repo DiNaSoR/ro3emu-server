@@ -1,0 +1,78 @@
+name: client DLLs
+
+# Builds the DLLs that go into the game (Ro3Emu.ClientHooks.dll, Ro3Emu.Loc.dll) with tools/release/client-dlls.ps1.
+# They compile against the client's own DLLs, which are never committed: the job downloads only ro3_Data/Managed from
+# the publisher (RO3Emu install --only, signature checked) and caches it per client release.
+#   pull requests: build check + a "client-dlls" artifact to test the PR's build
+#   main:          the build is published to the rolling "client-dlls" release, which
+#                  tools/update-client-dlls.sh downloads. The DLLs are not in git, so branches never conflict over them.
+on:
+  push:
+    branches: [main]
+    paths: ['src/Ro3Emu.ClientHooks/**', 'src/Ro3Emu.Loc/**', 'src/Ro3Emu.Setup/**', 'tools/release/client-dlls.ps1', '.github/workflows/client-dlls.yml']
+  pull_request:
+    paths: ['src/Ro3Emu.ClientHooks/**', 'src/Ro3Emu.Loc/**', 'tools/release/client-dlls.ps1', '.github/workflows/client-dlls.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: client-dlls-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Current client release
+        id: client
+        run: |
+          release=$(curl -fsS -A RO3Emu/1.0 --retry 3 https://update.genesis3.is/windows/launcher/v1/channels/ro3_recovery/full/manifest.json | jq -r .release.release_id)
+          echo "release=$release" >> "$GITHUB_OUTPUT"
+          echo "client release: $release"
+      - name: Client managed DLLs (cache)
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: .client
+          key: client-managed-${{ steps.client.outputs.release }}
+      - name: Download the client's managed DLLs
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: dotnet run --project src/Ro3Emu.Setup -c Release -- install "$PWD/.client" --only 'ro3_Data/Managed/*' --yes --home "$RUNNER_TEMP/ro3emu-home"
+      - name: Build
+        shell: pwsh
+        run: ./tools/release/client-dlls.ps1 -ClientDir .client -Out client-dlls
+      - uses: actions/upload-artifact@v5
+        with:
+          name: client-dlls
+          path: client-dlls/
+
+  publish:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          name: client-dlls
+          path: client-dlls
+      - name: Publish to the client-dlls release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          echo "$GITHUB_SHA" > client-dlls/commit.txt
+          notes="Ro3Emu.ClientHooks.dll and Ro3Emu.Loc.dll built by CI from main at $GITHUB_SHA. Replaced on every change to the hooks or loc sources; tools/update-client-dlls.sh installs them."
+          if ! gh release view client-dlls >/dev/null 2>&1; then
+            gh release create client-dlls --target "$GITHUB_SHA" --prerelease --latest=false --title "Client DLLs (latest main build)" --notes "$notes"
+          fi
+          gh release upload client-dlls client-dlls/* --clobber
+          gh release edit client-dlls --notes "$notes"

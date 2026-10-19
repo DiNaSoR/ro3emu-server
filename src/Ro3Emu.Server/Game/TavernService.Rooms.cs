@@ -509,7 +509,7 @@ public sealed partial class TavernService
         RollDay(info, Now);
         info.Popularity = (int)Math.Min(int.MaxValue, (long)info.Popularity + star);
         info.WeekPopularity = (int)Math.Min(int.MaxValue, (long)info.WeekPopularity + star);
-        Save(s);
+        await SaveAsync(s);
         foreach (var handler in Changed) handler(s);
         await SyncAsync(s);
     }
