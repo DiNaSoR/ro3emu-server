@@ -109,5 +109,13 @@ public sealed class ReopenedContentTests : IAsyncLifetime
         Assert.Equal(TaskState.Delivery, await State(HairBand));
         Assert.Equal(0, await Count(Pearl));
         Assert.Equal(0, await Count(Clover));
+
+        // The placeholder Base EXP (100 a step) is raised: 10,000 a step, 150,000 to 300,000 for each arc's finale.
+        var data = Service<Ro3Emu.Server.Data.GameData>();
+        long Exp(long task) => data.Row("TaskConfig", task) is { } row ? row.GetProperty("_kEXP")[1].GetInt64() : 0;
+        Assert.Equal(10000, Exp(Root));
+        Assert.Equal(10000, Exp(HairBand));
+        Assert.Equal(150000, Exp(201130));
+        Assert.Equal(300000, Exp(205200));
     }
 }

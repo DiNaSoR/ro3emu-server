@@ -47,7 +47,11 @@ public static class CustomContentCheck
                     case "TaskConfig":
                         foreach (var f in new[] { "_iName", "_iTaskDescribe", "_iTargetDescribe" }) NeedText(row, f, by);
                         foreach (long pre in Longs(row, "_kPreTask")) Need("pre-task", "TaskConfig", pre, by);
-                        Need("reward", "AwardConfig", GameData.Int(row, "_iAward"), by);
+                        // _iAward is a MultiverseGroupConfig id, resolved to its default AwardConfig row as the server does.
+                        long award = GameData.Int(row, "_iAward");
+                        Need("reward", "MultiverseGroupConfig", award, by);
+                        if (award != 0 && data.Row("MultiverseGroupConfig", award) is { } group && GameData.Int(group, "_itype") == 0)
+                            Need($"reward {award} item package", "AwardConfig", GameData.Int(group, "_iValue_default"), by);
                         if (row.TryGetProperty("_kProgressTarget", out var targets) && targets.ValueKind == JsonValueKind.Array)
                             foreach (var t in targets.EnumerateArray())
                             {

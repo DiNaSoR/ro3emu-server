@@ -11,6 +11,7 @@ them closed. It works with or without [OpenContent](open-content.md).
 | "Dejected Young Man" blue side chain (TaskConfig 201010 to 205200, 75 quests) | pre-quest 9999999 and condition 88000010 (base level 999) | offered from base level 20 (condition 2000056) |
 | 201090 "Allen's Request" | no reward; nothing in the client gives the Pearl (1253001) or Four-leaf Clover (1253002) that 201100 "Gather Materials" asks for | gives one of each (MultiverseGroupConfig/AwardConfig 99201090) |
 | 201120 "Bunny Hair Band" | item turn-in mode 0, which the server leaves pending | mode 1, the NPC turn-in the main story uses; both items are taken at the Headgear Merchant |
+| Base EXP for the whole chain | 100 a step and 100,000 for each arc's last step, about 507,000 in all | 10,000 a step and 150,000, 200,000, 250,000, 250,000, 300,000 for the five finales, about 1,850,000 in all (level 20 to about 34) |
 
 The level-20 start for the side chain is a choice: the client data names no level for it. Its other steps are the
 client's own rows. The chain's dungeon steps (201040 Royal Palace dance, 205110 Moonlight Flower, 205170 Pharaoh) have
