@@ -350,7 +350,7 @@ public sealed partial class MailService(AccountStore accounts, RoleStore roles, 
     /// (inferred) _kTimes is retention in days for _iTimerMethod=0. Other timer modes need explicit expiry.
     /// </summary>
     public Task<string> SendTemplateAsync(long role, int templateId, IReadOnlyList<Attachment> attachments,
-        DateTimeOffset? expiresAt = null, int category = 1, int importantType = 0)
+        DateTimeOffset? expiresAt = null, int category = 1, int importantType = 0, object[]? contentParams = null)
     {
         ArgumentNullException.ThrowIfNull(attachments);
         if (data.Row("MailConfig", templateId) is not { } template)
@@ -359,7 +359,8 @@ public sealed partial class MailService(AccountStore accounts, RoleStore roles, 
             throw new ArgumentException("This MailConfig timer mode requires an explicit expiry.", nameof(expiresAt));
         int days = (int)GameData.Int(template, "_kTimes");
         return DeliverAsync(role, new Letter { TemplateId = templateId, SenderId = "0", Category = category,
-            ImportantType = importantType, Attachments = attachments.ToList() }, expiresAt, days > 0 ? days : 30);
+            ImportantType = importantType, Attachments = attachments.ToList(),
+            ContentParams = EncodeLanguageData(contentParams ?? []) }, expiresAt, days > 0 ? days : 30);
     }
 
     /// <summary>

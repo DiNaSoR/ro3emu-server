@@ -65,8 +65,38 @@ public sealed class GuildStore
         public int BroadEmailCount { get; set; }
         public long BroadEmailDay { get; set; }
         public long NextBroadEmailMs { get; set; }
+        /// <summary>The leader impeachment under way, or null, and when the next may start (unix ms; GuildService.Impeach).</summary>
+        public Impeachment? Impeach { get; set; }
+        public long NextImpeachMs { get; set; }
+        /// <summary>Guild merging (GuildService.Merge): invites this guild received (inviter to invite), refusals (inviter to
+        /// unix ms), the accepted merge's other guild, whether this guild is the surviving inviter, the target's members
+        /// chosen to move, the 05:00 it runs (unix s), its announcement, and the last merge (unix s).</summary>
+        public Dictionary<long, MergeInvite> MergeInvites { get; set; } = new();
+        public Dictionary<long, long> MergeRefusals { get; set; } = new();
+        public long PendingMergeGuildId { get; set; }
+        public bool MergeInviter { get; set; }
+        public List<long> MergeMembers { get; set; } = new();
+        public long MergeExecuteSec { get; set; }
+        public string MergeAnnounce { get; set; } = "";
+        public long LastMergeSec { get; set; }
         /// <summary>32228 journal rows (GuildEventData bytes) to append with this state's next save; not part of the state.</summary>
         internal List<byte[]> PendingEvents { get; } = new();
+    }
+
+    public sealed class MergeInvite
+    {
+        public long SentMs { get; set; }
+        public string Announce { get; set; } = "";
+    }
+
+    public sealed class Impeachment
+    {
+        public long OwnerId { get; set; }
+        public long BeginMs { get; set; }
+        public long EndMs { get; set; }
+        public long NeedCount { get; set; }
+        /// <summary>Who responded, the initiator first.</summary>
+        public List<long> Responders { get; set; } = new();
     }
 
     public sealed class Member

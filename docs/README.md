@@ -22,7 +22,7 @@
 | Life jobs | [life jobs and production](systems/lifejob.md) · [gathering](systems/gathering.md) |
 | Economy | [cash shop and Top Up](systems/cash-shop.md) · [Fashion gifts](systems/fashion-gifts.md) · [trade and stalls](systems/trade-stalls.md) · [auctions](systems/auction.md) · [mail](systems/mail.md) |
 | Social | [the Tavern](systems/tavern.md) |
-| Guilds | [guilds](systems/guild.md) · [group mail](systems/guild-group-mail.md) · [territory wars](systems/territory-wars.md) · [escort and guild trading](systems/territory-escort.md) |
+| Guilds | [guilds](systems/guild.md) · [group mail](systems/guild-group-mail.md) · [impeachment](systems/guild-impeachment.md) · [merging](systems/guild-merge.md) · [territory wars](systems/territory-wars.md) · [escort and guild trading](systems/territory-escort.md) |
 | Instances | [dungeons](systems/dungeon.md) · [story dungeon inventory](systems/dungeon-inventory.md) |
 | Activities | [overview](systems/activities.md) · [timed activities](systems/activities-timed-events.md) · [Survivor Battle NPCs](systems/survivor-battle-npcs.md) · [adventures](systems/activities-adventures.md) · [battle pass and month card](systems/activities-battlepass-monthcard.md) · [guild campfire](systems/activities-guild-campfire.md) · [lottery](systems/activities-lottery.md) |
 

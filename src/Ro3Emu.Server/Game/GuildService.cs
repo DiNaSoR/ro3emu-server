@@ -209,7 +209,8 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
             MaxCreateHelperNum = Setting("GuildResponsePeopleLimit", 3)[0],
             JoinLevelLimit = g.JoinLevelLimit, LastChangeNameTime = g.LastChangeNameTime,
             LastChangeNoticeTime = (int)g.LastChangeNoticeTime, IsJoin = isJoin, ActivityInfo = ActivityInfo(g),
-            NextBroadEmailTime = g.NextBroadEmailMs, BroadEmailLimit = BroadEmailUsed(g),
+            NextBroadEmailTime = g.NextBroadEmailMs, BroadEmailLimit = BroadEmailUsed(g), PeachInfo = ImpeachView(g),
+            PendingMergeGuildId = g.PendingMergeGuildId,
         };
         full.HistoryNames.AddRange(g.HistoryNames.Count > 0 ? g.HistoryNames : [g.Name]);
         full.MemberInfo.AddRange(g.Members.Values.Select(m => MemberInfo(m)));
@@ -639,6 +640,8 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
             if (next == 1)
             {
                 if (actor.Official != 1 || target.RoleId == actor.RoleId) code = ErrorCodes.GuildPermission;
+                // (inferred) the leader cannot hand over the guild while it is being impeached (478).
+                else if (g.Impeach != null) code = ErrorCodes.ImpeachRunning;
                 else { actor.Official = 20; target.Official = 1; }
             }
             else if (target.Official == 1 || (actor.Official != 1 && next <= actor.Official)) code = ErrorCodes.GuildPermission;
@@ -676,9 +679,11 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
             if (g.Members.Count == 0) await DeleteGuildAsync(g, [member.RoleId]);
             else
             {
+                var impeach = ImpeachMemberLeaving(g, member);
                 Journal(g, EvLeft, [member.RoleId], Str(member.Name));
                 await SaveGuildAsync(g, [member.RoleId]);
                 if (elite) await PushElitesAsync(g, LeagueElites(g).Values.ToHashSet());
+                if (impeach != null) await impeach();
             }
             await s.SendGameAsync(Leave, new GuildMemberLeaveResp { Result = 0 });
             await PushMember(g, member, GuildMemberInfoChangeNtf.Types.ChangeType.Leave);
@@ -697,6 +702,7 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
         var removed = new List<GuildStore.Member>();
         var targetViews = new List<(GuildStore.Member Member, GameSession? Session, DBRoleGuildInfo Personal)>();
         bool eliteDropped = false;
+        var impeachAfter = new List<Func<Task>>();
         if (code == 0 && g != null)
         {
             foreach (long id in req.TarPlayerIDs.Distinct())
@@ -720,6 +726,7 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
                 foreach (var m in removed)
                 {
                     g.Members.Remove(m.RoleId);
+                    if (ImpeachMemberLeaving(g, m) is { } after) impeachAfter.Add(after);
                     eliteDropped |= DropElite(g, m.RoleId);
                     Journal(g, EvKicked, [kicker.RoleId, m.RoleId], Str(kicker.Name), Str(m.Name));
                 }
@@ -753,6 +760,7 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
             }
         if (code == 0 && g != null && eliteDropped) await PushElitesAsync(g, LeagueElites(g).Values.ToHashSet());
         await s.SendGameAsync(Kick, resp);
+        foreach (var after in impeachAfter) await after();
     }
 
     private async Task EditCoreAsync(GameSession s, GuildEditReq req)
@@ -880,13 +888,7 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
                 await RefreshMembers(g);
                 if (tp is 1 or 2 or 5 or 10)
                 {
-                    var change = new GuildBaseInfoChangeNtf { Tp = GuildBaseInfoChangeNtf.Types.ChangeType.ChangeBase,
-                        Base = new GuildBaseInfoChangeNtf.Types.BaseChangeInfo { Name = g.Name, Level = g.Level,
-                        Announce = g.Announce, Notice = g.Notice, Status = (GuildStatus)g.Status,
-                        MaxMemberCount = MaxMembers(g), LastChangeNameTime = g.LastChangeNameTime,
-                        LastChangeNoticeTime = (int)g.LastChangeNoticeTime } };
-                    change.Base.HistoryNames.AddRange(g.HistoryNames.Count > 0 ? g.HistoryNames : [g.Name]);
-                    foreach (var m in g.Members.Values) if (Online(m.RoleId) is { } peer) await peer.SendGameAsync(BaseChange, change);
+                    await PushBase(g, BaseInfoChange(g));
                 }
                 if (tp == 10)
                 {
@@ -990,6 +992,18 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
         ? PushBase(guild, new GuildBaseInfoChangeNtf { Tp = GuildBaseInfoChangeNtf.Types.ChangeType.ChangeResource,
             Resource = Resource(guild) }) : Task.CompletedTask;
 
+    /// <summary>32231 tp=1: the client overwrites every base field from it, so all of them go out.</summary>
+    private GuildBaseInfoChangeNtf BaseInfoChange(GuildStore.State g)
+    {
+        var change = new GuildBaseInfoChangeNtf { Tp = GuildBaseInfoChangeNtf.Types.ChangeType.ChangeBase,
+            Base = new GuildBaseInfoChangeNtf.Types.BaseChangeInfo { Name = g.Name, Level = g.Level,
+            Announce = g.Announce, Notice = g.Notice, Status = (GuildStatus)g.Status,
+            MaxMemberCount = MaxMembers(g), LastChangeNameTime = g.LastChangeNameTime,
+            LastChangeNoticeTime = (int)g.LastChangeNoticeTime, PendingMergeGuildId = g.PendingMergeGuildId } };
+        change.Base.HistoryNames.AddRange(g.HistoryNames.Count > 0 ? g.HistoryNames : [g.Name]);
+        return change;
+    }
+
     private async Task PushBase(GuildStore.State g, GuildBaseInfoChangeNtf change)
     {
         foreach (var m in g.Members.Values)
@@ -1014,6 +1028,8 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
     {
         await ExpireApplicationsAsync();
         await ExpireHelpersAsync();
+        await ExpireImpeachmentsAsync();
+        await MergeDueAsync();
         long now = NowMs();
         foreach (var g in store.List().Where(g => g.BuildingEndTimes.Values.Any(end => end > 0 && end <= now)))
         {

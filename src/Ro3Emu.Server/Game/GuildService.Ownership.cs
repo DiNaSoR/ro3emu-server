@@ -180,13 +180,23 @@ public sealed partial class GuildService
     private async Task DeleteGuildAsync(GuildStore.State guild, IEnumerable<long>? removed = null)
     {
         var transaction = roles.NewTransaction();
+        transaction.WithEconomy(EnlistDisband(guild, transaction, guild.Members.Keys.Concat(removed ?? []).Distinct().ToArray(),
+            "guild-disband"));
+        await roles.CommitAsync(transaction, "guild/disband-recovery");
+    }
+
+    /// <summary>Stage a guild's removal: market stock and treasury to recovery, the guild row, and guildless views for
+    /// <paramref name="prior"/> (its first role is the actor of the economy record). The caller adds the returned economy
+    /// record last: it freezes the transaction.</summary>
+    private EconomyEnvelope EnlistDisband(GuildStore.State guild, RoleItemPlanBuilder transaction, long[] prior, string kind,
+        IEnumerable<long>? keepViews = null)
+    {
         var market = store.LoadMarket();
         long escrow = market.Stalls.Where(stall => stall.GuildId == guild.Id).Sum(stall => stall.RemainCount);
         if (market.Stalls.RemoveAll(stall => stall.GuildId == guild.Id) > 0) store.EnlistMarket(market, transaction);
         store.EnlistRecoverDelete(guild, transaction, escrow);
-        long[] prior = guild.Members.Keys.Concat(removed ?? []).Distinct().ToArray();
         var empty = new GuildStore.State { Id = guild.Id };
-        EnlistViews(empty, transaction, prior);
+        EnlistViews(empty, transaction, prior.Except(keepViews ?? []));
         // The last leaver may already be removed from the staged roster; resolve the durable actor.
         long actorId = prior.First();
         var actor = roles.Get(actorId)!;
@@ -209,9 +219,8 @@ public sealed partial class GuildService
             effects.Add(new(new(EconomyAssetKind.GuildResource, asset), owner, EconomyCompartment.Recovery,
                 count, EconomyLegKind.Transfer, EconomyReason.GuildResourceTransfer, (int)asset));
         }
-        transaction.WithEconomy(new EconomyEnvelope(Guid.NewGuid().ToString("N"), actor.Account, actor.Id,
-            "guild-disband", "guild:" + guild.Id, "guild-disband:" + guild.Id, NowMs(), effects, []));
-        await roles.CommitAsync(transaction, "guild/disband-recovery");
+        return new EconomyEnvelope(Guid.NewGuid().ToString("N"), actor.Account, actor.Id,
+            kind, "guild:" + guild.Id, kind + ":" + guild.Id, NowMs(), effects, []);
     }
 
     private EconomyEnvelope GuildPayment(GameSession actor, string kind, int entry, long amount)
