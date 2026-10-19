@@ -409,17 +409,28 @@ public sealed partial class SceneService(IOptions<ServerOptions> options, World 
             RequireReconnect(s, pending); // failed load has no nonce: do not arm an ambiguous same-map retry
             return;
         }
-        bool ok = data.Row("MapConfig", req.TargetMapId) != null && worldData.Map(req.TargetMapId) != null;
-        await s.SendGameAsync(SceneTeleport, new SceneTeleportRsp { Result = ok ? 0 : ErrorCodes.SceneMissing });
-        if (ok) await EnterSceneAsync(s, req.TargetMapId);
+        int result = data.Row("MapConfig", req.TargetMapId) == null || worldData.Map(req.TargetMapId) == null ? ErrorCodes.SceneMissing
+            : TravelRefused(s, req.TargetMapId) ? ErrorCodes.FeatureUnavailable : 0;
+        await s.SendGameAsync(SceneTeleport, new SceneTeleportRsp { Result = result });
+        if (result == 0) await EnterSceneAsync(s, req.TargetMapId);
     }
+
+    /// <summary>
+    /// 30012 to another map is free travel: a GM may go anywhere, a player only to a map it has been to (the world map
+    /// the client draws from 1016 VisitedMaps), alive and outside an instance or dungeon. The failed-load recovery
+    /// request names the current map and is always allowed.
+    /// </summary>
+    private bool TravelRefused(GameSession s, long target) =>
+        target != s.SceneEntry && !GmCommands.Allowed(options.Value, s.Account, loopbackTool: false)
+        && (s.Dead || s.InstanceId != 0 || !s.WorldState.Saved.VisitedMaps.Contains(target));
 
     /// <summary>30131: a dialog option jumping to a numbered point of a map (e.g. the palace guard).</summary>
     public async Task CustomJumpAsync(GameSession s, ClientCustomJumpMapReq req)
     {
         var map = data.Row("MapConfig", req.SceneId) != null ? worldData.Map(req.SceneId) : null;
-        var point = map?.Points.GetValueOrDefault(req.PointId);
-        await s.SendGameAsync(CustomJumpMap, new ClientCustomJumpMapResp { Result = point != null ? 0 : map == null ? ErrorCodes.SceneMissing : ErrorCodes.Parameter });
+        var point = s.Dead || s.SceneLoading ? null : map?.Points.GetValueOrDefault(req.PointId);
+        await s.SendGameAsync(CustomJumpMap, new ClientCustomJumpMapResp { Result = point != null ? 0 : map == null ? ErrorCodes.SceneMissing
+            : s.Dead || s.SceneLoading ? ErrorCodes.FeatureUnavailable : ErrorCodes.Parameter });
         if (point is { } p) await EnterSceneAsync(s, req.SceneId, p);
     }
 

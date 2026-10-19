@@ -195,6 +195,7 @@ public sealed partial class MapTests
                 var player = _app.Services.GetRequiredService<SessionRegistry>().All().Single(s => s.Account == "alice");
                 player.Attack = null;
                 if (player.SkillCast is { } cast) cast.Cancelled = true;
+                player.LastNormalAttack = null;
                 return Task.FromException(new IOException("Lose MVP settlement acknowledgement."));
             };
             mvp.BeforeSettlementProbeForTest = _ =>

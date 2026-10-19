@@ -120,6 +120,7 @@ public sealed partial class CombatService
             // cancel-button flag (LC_SkillInput_Handler_Default.CheckShowCancelBtn), not a licence to recast.
             else if (s.SkillCast is { Cancelled: false } active && Now < active.StartMs + active.ChantMs + active.ActionMs
                 && !CastYieldsTo(active, row.Value)) error = ErrorCodes.SkillBusy;
+            else if (owned == null && NormalAttackTooSoon(s, row.Value)) error = ErrorCodes.SkillBusy;
             else error = ValidateTarget(s, row.Value, req, origin, owned == null ? WalkSlack(s) : 0);
         }
         var costs = row is { } value ? ResolveCosts(s, value) : new CastCosts();
@@ -276,12 +277,31 @@ public sealed partial class CombatService
         }
     }
 
+    /// <summary>
+    /// A normal attack (_iInterruptedType 1) waits for the previous one's swing, cancelled or not: cancelling a swing once
+    /// its hit landed, or alternating two normal-attack groups, would otherwise attack several times per swing. A
+    /// fifth of the swing is allowed as latency slack, and a swing whose target already died gives way at once
+    /// (CastYieldsTo).
+    /// </summary>
+    private bool NormalAttackTooSoon(GameSession s, JsonElement row)
+    {
+        if (GameData.Int(row, "_iInterruptedType") != 1 || s.LastNormalAttack is not { } last) return false;
+        if (last.WorldScene != s.WorldScene || last.Resolved && !TargetAlive(last.WorldScene, last.Request.TargetId)) return false;
+        return Now < last.StartMs + (last.ChantMs + last.ActionMs) * 4L / 5;
+    }
+
     private bool Learned(GameSession s, JsonElement row)
     {
         if (GameData.Int(row, "_iID") == PublicSkill("WorldTreeSkillId")) return true; // paid item skill, LC_ReviveHelper.
         // A Survivor Battle career owns the match skill set (TimedBattleService.Chicken), not the job tree.
         if (MatchSkillRule?.Invoke(s, (int)GameData.Int(row, "_iID")) is { } granted) return granted;
-        if (GameData.Int(row, "_iID") == skills.NormalAttack(s)) return true;
+        int normal = skills.NormalAttack(s);
+        if (GameData.Int(row, "_iID") == normal) return true;
+        // Only the normal attack of the weapon and battle mount in use (SkillService.NormalAttack): the career's others
+        // count as learned for the skill window, but an Archer without a bow does not shoot at bow range.
+        int group = (int)GameData.Int(row, "_iSkillID");
+        if (skills.NormalGroups(s.Progress!.Career).Contains(group)
+            && data.Row("SkillConfig", normal) is { } current && GameData.Int(current, "_iSkillID") != group) return false;
         if (GameData.Int(row, "_iSystemType") == ActiveGuardSkill) return skills.PetMainSkill?.Invoke(s)?.SkillId == GameData.Int(row, "_iID");
         return skills.Level(s.Progress, (int)GameData.Int(row, "_iSkillID")) >= GameData.Int(row, "_iLevel");
     }
@@ -351,7 +371,18 @@ public sealed partial class CombatService
             if (req.TargetPos == null) return ErrorCodes.SkillTargetInvalid;
             targetPosition = req.TargetPos;
         }
-        else { req.TargetPos ??= origin.Clone(); return 0; }
+        else
+        {
+            // No release target: the hit picks req.TargetId (single-target rows) and summons or pulls use req.TargetPos,
+            // so both must lie within the row's reach of the caster. One beyond it is dropped rather than refused, so a
+            // client that sends a stale target still casts (Auto Battle does not retry a refusal).
+            float reach = Math.Max(5f, Math.Max(Range(row), (float)(Numbers(row, "_kRange").FirstOrDefault(0) / 100))) + 1.5f + slack;
+            if (req.TargetPos == null || Distance(origin, req.TargetPos) > reach) req.TargetPos = origin.Clone();
+            if (req.TargetId != 0 && req.TargetId != s.Role.Id
+                && (monster?.Pos ?? enemyPlayer?.Position ?? player?.Position) is { } at && Distance(origin, at) > reach)
+                req.TargetId = 0;
+            return 0;
+        }
         float d = Distance(origin, targetPosition);
         if (d < GameData.Int(row, "_iDistanceMin") / 100f - slack || d > Range(row) + 0.5f + slack) return ErrorCodes.SkillDistance;
         float height = GameData.Int(row, "_iHeightRange") / 100f;
@@ -575,6 +606,7 @@ public sealed partial class CombatService
         };
         if (chantCosts is { } owed) action.ChantCost = () => PayChantCostAsync(s, action, owed);
         s.SkillCast = action;
+        if (actor == null && GameData.Int(row, "_iInterruptedType") == 1) s.LastNormalAttack = action;
         var template = data.SkillTemplate(GameData.Int(row, "_iScriptShow"));
         var points = template is { } t ? Numbers(t, "m_kAtkPoints") : [];
         double point = points.FirstOrDefault(0.2);

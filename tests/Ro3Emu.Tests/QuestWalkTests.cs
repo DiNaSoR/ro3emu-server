@@ -107,6 +107,9 @@ public sealed class QuestWalkTests : IAsyncLifetime
                 {
                     case 104003: // reach area [map, area]
                         if (scene != t[1]) await WarpAsync(bot, t[1]);
+                        // The server checks that the player stands near the area.
+                        if (world.Map(t[1])?.Regions.GetValueOrDefault(t[2]) is { } area)
+                            await Gm(FormattableString.Invariant($"!jump {area.X:0.0} {area.Z:0.0}"));
                         await bot.SendGameAsync(SceneService.ClientEnterArea, new ClientEnterAreaReq { AreaId = t[2] });
                         break;
                     case 309002: // cutscene ended
@@ -199,7 +202,7 @@ public sealed class QuestWalkTests : IAsyncLifetime
             var me = sessions.All().Single(x => x.Role != null);
             var m = world.AllUnits().OfType<MonsterUnit>().Where(u => u.SceneEntry == scene && !u.Dead && npc(u.Template.NpcId))
                 .OrderBy(u => (u.X - me.Position.X) * (u.X - me.Position.X) + (u.Z - me.Position.Z) * (u.Z - me.Position.Z)).First();
-            return Task.FromResult((m, skills.NormalAttack(me.Progress!.Career)));
+            return Task.FromResult((m, skills.NormalAttack(me))); // the weapon's attack, as the client picks it
         });
         // Like the client: attack again only when the auto-attack stopped (a potion, a jump) and chase a target that
         // roamed out of reach. A new cast cancels the swing in progress, so attacking blindly on a timer starved the

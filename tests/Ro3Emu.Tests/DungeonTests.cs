@@ -163,6 +163,7 @@ public sealed partial class DungeonTests : IAsyncLifetime
             var role = Session(bot);
             role.Attack = null;
             if (role.SkillCast is { } swing) { swing.Cancelled = true; role.SkillCast = null; }
+            role.LastNormalAttack = null;
         });
         await bot.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1000001, TargetId = actor.Uid });
         Assert.Equal(0, (await Next(bot, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
