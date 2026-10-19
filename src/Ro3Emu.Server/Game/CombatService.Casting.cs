@@ -214,14 +214,16 @@ public sealed partial class CombatService
     /// <summary>
     /// Whether move input breaks a live cast. While the server forbids walking, the client turns a move key or a
     /// ground click into a bare 31124 (LC_UnitChecker.CheckClearCacheSkill: Skill state, a cached skill and
-    /// IsSkillBlockMove) and stays in the skill unless the server agrees (LC_Scene_Sync._skillInterrupt). The click
-    /// that places a ground skill could arrive that way, so granting every one dropped the spell after its cooldown
-    /// started. A cast breaks like it yields to a new skill (_iInterruptedType 1 at once, 2 after its interrupt point),
-    /// and any cast once its hit has landed, when the client lets a move break it by itself (inferred for the rest:
-    /// it holds, as classic RO's chant roots the caster).
+    /// IsSkillBlockMove) and stays in the skill unless the server agrees (LC_Scene_Sync._skillInterrupt). Moving
+    /// cancels a cast (Steven's call, 2026-10-19), except in its first MoveCancelGraceMs: the click that places a
+    /// ground skill can come back as one of these requests right after the cast starts, and granting it dropped the
+    /// spell (inferred window). Normal attacks (_iInterruptedType 1) and casts past their hit break at once.
     /// </summary>
     private bool MoveBreaksCast(ActiveSkillCast active) => active.Resolved || active.Launched
-        || GameData.Int(active.Row, "_iInterruptedType") switch { 1 => true, 2 => InterruptPointPassed(active), _ => false };
+        || GameData.Int(active.Row, "_iInterruptedType") == 1 || Now >= active.StartMs + MoveCancelGraceMs;
+
+    /// <summary>How long after a cast starts move input cannot cancel it (the placing click, see MoveBreaksCast).</summary>
+    internal const int MoveCancelGraceMs = 300;
 
     private bool TargetAlive(long sceneId, long uid) => uid != 0 && (FindMonster(sceneId, uid) != null
         || world.PlayersIn(sceneId).Any(p => p.Role?.Id == uid && !p.Dead));
@@ -651,7 +653,7 @@ public sealed partial class CombatService
     {
         bool valid = req == null || req.InterruptSkillId == 0 || req.InterruptSkillId == s.SkillCast?.Request.SkillId
             || req.InterruptSkillId == s.Attack?.SkillId || eventAttacks.TryGetValue(s, out var eventAttack) && req.InterruptSkillId == eventAttack.SkillId;
-        // A bare request is move input (see MoveBreaksCast): a cast that holds against it carries on.
+        // A bare request is move input (see MoveBreaksCast): inside the grace window the cast carries on.
         if (valid && req is { InterruptSkillId: 0, NxtSkill: null } && s.SkillCast is { Cancelled: false } live
             && Now < live.StartMs + live.ChantMs + live.ActionMs && !MoveBreaksCast(live)) valid = false;
         bool interrupted = valid && (s.SkillCast != null || s.Attack != null || eventAttacks.ContainsKey(s));

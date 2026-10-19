@@ -8,11 +8,11 @@ public sealed partial class SkillCombatTests
 {
     /// <summary>
     /// While a cast forbids walking, the client turns a move key or a ground click into a bare 31124
-    /// (LC_UnitChecker.CheckClearCacheSkill) and keeps casting unless the server agrees. Granting it dropped ground
-    /// spells after their cooldown had started: the placing click itself could cancel them.
+    /// (LC_UnitChecker.CheckClearCacheSkill) and keeps casting unless the server agrees. The click that places a
+    /// ground spell can come back that way right after the cast starts; it must not drop the spell.
     /// </summary>
     [ClientDataFact]
-    public async Task MoveInputDuringAGroundChantDoesNotDropTheSpell()
+    public async Task ThePlacingClickRightAfterAGroundCastDoesNotDropTheSpell()
     {
         await using var alice = await InWorld("Alice"); await using var bob = await InWorld("Bob");
         await Gm("alice", "!job 2100"); await Teach("alice", 12010); // Fire Wall 1201001: ground, Lock, 840 ms chant
@@ -77,5 +77,28 @@ public sealed partial class SkillCombatTests
             Assert.True(Math.Max(player.SkillCds.GetValueOrDefault(group), player.SkillModeCds.GetValueOrDefault((group, mode))) > MonsterService.NowMs);
             return Task.CompletedTask;
         });
+    }
+
+    /// <summary>Moving after the first moments of a chant cancels it, and the cancelled cast's cooldown comes back.</summary>
+    [ClientDataFact]
+    public async Task MovingDuringAGroundChantCancelsItWithoutCooldown()
+    {
+        await using var alice = await InWorld("Alice");
+        await Gm("alice", "!job 2100"); await Teach("alice", 12010); // Fire Wall 1201001: 840 ms chant
+        var player = Session("alice");
+        await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1201001, TargetPos = player.Position.Clone() });
+        var accepted = await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser);
+        Assert.Equal(0, accepted.Result);
+        var cd = Assert.Single((await Next(alice, CombatService.SkillCdUpdate, SkillCdNotify.Parser)).Infos);
+
+        await Task.Delay(CombatService.MoveCancelGraceMs + 100);
+        await alice.SendGameAsync(CombatService.SkillInterrupt, new SkillInterruptReq());
+        Assert.True((await Next(alice, CombatService.SkillInterrupt, SkillInterruptResp.Parser)).IsInterruptSucc);
+        var end = await Next(alice, CombatService.SkillEnd, SkillEndNotify.Parser, x => x.SessionId == accepted.SessionId);
+        Assert.Equal(SkillInterruptedInfo.Types.SkillInterruptType.Move, end.InterruptedInfo.Type);
+        var back = Assert.Single((await Next(alice, CombatService.SkillCdUpdate, SkillCdNotify.Parser)).Infos);
+        Assert.Equal(cd.SkillId, back.SkillId);
+        Assert.True(back.CdEndTimestampMs <= back.CdStartTimestampMs);
+        await Loop.InvokeAsync(() => { Assert.Null(player.SkillCast); return Task.CompletedTask; });
     }
 }
