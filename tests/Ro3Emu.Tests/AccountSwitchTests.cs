@@ -26,7 +26,8 @@ public sealed class AccountSwitchTests : IAsyncLifetime
         app = ServerHost.Create([], o =>
         {
             o.DataDir = dataDir;
-            o.GameDataDir = SyntheticData.Dir;
+            // Upstream runs this on its synthetic fixture (not ported yet); the exported client data works the same.
+            o.GameDataDir = Path.Combine(ClientData.RepoRoot, "data");
             o.HttpPort = httpPort;
             o.MicroGatePort = microPort;
             o.GameGatePort = gamePort;
@@ -40,7 +41,7 @@ public sealed class AccountSwitchTests : IAsyncLifetime
 
     private Task<T> OnLoop<T>(Func<T> read) => Service<GameLoop>().InvokeAsync(() => Task.FromResult(read()));
 
-    [Fact]
+    [ClientDataFact]
     public async Task AnotherAccountOnTheGameConnectionLeavesNoKeyOfTheFirst()
     {
         await using var alice = new BotClient(http, pem);
@@ -55,7 +56,7 @@ public sealed class AccountSwitchTests : IAsyncLifetime
         Assert.Equal("bob", session.Account);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task AnotherAccountIsRefusedWhileARoleIsInTheWorld()
     {
         await using var alice = new BotClient(http, pem);
@@ -71,7 +72,7 @@ public sealed class AccountSwitchTests : IAsyncLifetime
         Assert.NotNull(session.Role);
     }
 
-    [Fact]
+    [ClientDataFact]
     public async Task AnotherAccountVerifiedOnTheMicroConnectionTakesTheFirstOnesKeyAway()
     {
         var micro = Service<MicroSessions>();
