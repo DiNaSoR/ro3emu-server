@@ -37,6 +37,9 @@ public sealed class VoiceRooms(IOptions<ServerOptions> options, TeamService team
     private readonly Dictionary<long, HashSet<VoiceConnection>> _rooms = new();
     private TimeSpan _sinceSweep;
 
+    /// <summary>The account's authed voice connection, or null.</summary>
+    public VoiceConnection? ConnectionOf(string account) { lock (_sync) return _byAccount.GetValueOrDefault(account); }
+
     /// <summary>Registers an authed connection under its account, replacing (and returning) whatever connection
     /// that account already held: one voice connection per account.</summary>
     public VoiceConnection? Authenticate(string account, long roleId, VoiceConnection connection)

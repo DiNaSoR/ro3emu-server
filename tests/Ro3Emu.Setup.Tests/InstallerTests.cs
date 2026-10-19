@@ -219,6 +219,9 @@ public sealed class InstallerTests : IAsyncLifetime
                 context.Response.ContentLength = big.Length;
                 await context.Response.Body.WriteAsync(big.AsMemory(0, big.Length / 2));
                 await context.Response.Body.FlushAsync();
+                // Let the client read the half before the reset: a reset that arrives first can discard bytes still in
+                // the socket buffer, and then a resume from zero is right but is not what this test is about.
+                await Task.Delay(300);
                 context.Abort();
                 return true;
             }
