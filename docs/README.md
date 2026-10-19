@@ -23,7 +23,7 @@
 | Social | [the Tavern](systems/tavern.md) |
 | Guilds | [guilds](systems/guild.md) · [territory wars](systems/territory-wars.md) · [escort and guild trading](systems/territory-escort.md) |
 | Instances | [dungeons](systems/dungeon.md) · [story dungeon inventory](systems/dungeon-inventory.md) |
-| Activities | [overview](systems/activities.md) · [timed activities](systems/activities-timed-events.md) · [adventures](systems/activities-adventures.md) · [battle pass and month card](systems/activities-battlepass-monthcard.md) · [guild campfire](systems/activities-guild-campfire.md) · [lottery](systems/activities-lottery.md) |
+| Activities | [overview](systems/activities.md) · [timed activities](systems/activities-timed-events.md) · [Survivor Battle NPCs](systems/survivor-battle-npcs.md) · [adventures](systems/activities-adventures.md) · [battle pass and month card](systems/activities-battlepass-monthcard.md) · [guild campfire](systems/activities-guild-campfire.md) · [lottery](systems/activities-lottery.md) |
 
 ## Research: client evidence
 

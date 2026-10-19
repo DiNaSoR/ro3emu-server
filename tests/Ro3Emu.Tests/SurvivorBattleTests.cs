@@ -518,4 +518,151 @@ public sealed class SurvivorBattleTests : IAsyncLifetime
         while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "data", "config"))) dir = dir.Parent;
         return dir?.FullName ?? throw new DirectoryNotFoundException("data/config");
     }
+
+    /// <summary>Shop NPCs from the respawn regions sell the match's rolled goods for the pack's currency 10006.</summary>
+    [ClientDataFact]
+    public async Task ShopNpcsSellRolledGoodsForTheMatchCurrency()
+    {
+        await HostAsync(2, 1);
+        await using var alice = await InWorld("Alice");
+        await using var bob = await InWorld("Bob");
+        var players = new[] { alice, bob };
+        await BattleAsync(players, await StartAsync(players));
+        ChickenNpcUnit shop = null!;
+        await OnLoop(() =>
+        {
+            var npcs = Battles.NpcsForTest(Session(alice));
+            Assert.Equal(3, npcs.Count(n => n.NpcId == 15000054 && n.ShopId == 801));
+            Assert.Equal(5, npcs.Count(n => n.NpcId == 15000060 && n.ShopId == 802));
+            Assert.Equal(2, npcs.Count(n => n.NpcId == 15000055 && n.ShopId == 0));
+            shop = npcs.First(n => n.ShopId == 801);
+            return Task.CompletedTask;
+        });
+
+        // Too far: the interaction is refused; at the NPC it is echoed and the list is the rolled goods.
+        await MoveAsync(alice, shop.X + 30, shop.Z);
+        await alice.SendGameAsync(SceneService.NpcInteraction, new NpcInteractionReq { NpcUid = shop.Uid, InteractionId = 2900003 });
+        Assert.Equal(ErrorCodes.NpcTooFar, (await Next(alice, SceneService.NpcInteraction, NpcInteractionRsp.Parser)).Result);
+        await MoveAsync(alice, shop.X, shop.Z);
+        await alice.SendGameAsync(SceneService.NpcInteraction, new NpcInteractionReq { NpcUid = shop.Uid, InteractionId = 2900003 });
+        Assert.Equal(0, (await Next(alice, SceneService.NpcInteraction, NpcInteractionRsp.Parser)).Result);
+        await alice.SendGameAsync(TimedBattleService.DungeonShop, new GetDungeonShopReq { NpcGuid = shop.Uid });
+        var list = await Next(alice, TimedBattleService.DungeonShop, GetDungeonShopResp.Parser);
+        Assert.Equal(4 + 6 + 3 + 5 + 15, list.CommodityInfo.Count); // ShopConfig 27-29 _kGroup counts
+        var commodities = Service<GameData>().Table("ShopCommodityConfig");
+        long Group(long id) => GameData.Int(commodities[id.ToString()], "_iGroup");
+        Assert.Equal(4, list.CommodityInfo.Keys.Count(id => Group(id) == 1001));
+        long skill = list.CommodityInfo.Keys.First(id => Group(id) == 1010); // a skill book: 3888, one per match
+        Assert.Equal((1L, 1L), (list.CommodityInfo[skill].RemainCount, list.CommodityInfo[skill].CanBuyCount));
+
+        await alice.SendGameAsync(ShopService.BuyCommodity, new BuyCommodityReq { CommodityId = (int)skill, Count = 1, NpcId = shop.Uid });
+        Assert.Equal(ErrorCodes.CurrencyShort, (await Next(alice, ShopService.BuyCommodity, BuyCommodityResp.Parser)).Result);
+        long chest = 0;
+        await OnLoop(async () => chest = await Battles.PlaceChestForTestAsync(Session(alice), 15000501, (10006, 5000)));
+        await alice.SendGameAsync(TimedBattleService.PickupAll, new PickUpAllChickenItemReq { NpcIds = { chest } });
+        Assert.Equal(0, (await Next(alice, TimedBattleService.PickupAll, PickUpAllChickenItemResp.Parser)).Result);
+        await alice.SendGameAsync(ShopService.BuyCommodity, new BuyCommodityReq { CommodityId = (int)skill, Count = 2, NpcId = shop.Uid });
+        Assert.Equal(ErrorCodes.PurchaseLimit, (await Next(alice, ShopService.BuyCommodity, BuyCommodityResp.Parser)).Result);
+        await alice.SendGameAsync(ShopService.BuyCommodity, new BuyCommodityReq { CommodityId = (int)skill, Count = 1, NpcId = shop.Uid });
+        var bought = await Next(alice, ShopService.BuyCommodity, BuyCommodityResp.Parser);
+        Assert.Equal((0, 3888, 1), (bought.Result, bought.Price, bought.BuyTimes));
+        var after = await Next(alice, TimedBattleService.DungeonShop, GetDungeonShopResp.Parser);
+        Assert.Equal((0L, 0L), (after.CommodityInfo[skill].RemainCount, after.CommodityInfo[skill].CanBuyCount));
+        int book = (int)GameData.Int(commodities[skill.ToString()], "_iItemId");
+        await OnLoop(() =>
+        {
+            var pack = Round(alice).PackInfos.Values.Where(i => i.ItemEntry != 0).ToArray();
+            Assert.Equal(5000 - 3888, pack.Single(i => i.ItemEntry == 10006).Stack);
+            Assert.Single(pack, i => i.ItemEntry == book);
+            return Task.CompletedTask;
+        });
+
+        // Another player's list keeps its own counts.
+        await bob.SendGameAsync(TimedBattleService.DungeonShop, new GetDungeonShopReq { NpcGuid = shop.Uid });
+        Assert.Equal(1L, (await Next(bob, TimedBattleService.DungeonShop, GetDungeonShopResp.Parser)).CommodityInfo[skill].RemainCount);
+    }
+
+    /// <summary>Follow: an invite, the accepted follow (the follower lands with its leader); the Rescue Wagon spends
+    /// a carried ID card to bring a fallen teammate back; the shop head sign reaches the others.</summary>
+    [ClientDataFact]
+    public async Task FollowLandingRescueWagonAndHeadSigns()
+    {
+        await HostAsync(4, 2);
+        await using var alice = await InWorld("Alice");
+        await using var bob = await InWorld("Bob");
+        await using var cara = await InWorld("Cara");
+        await using var dan = await InWorld("Dan");
+        var players = new[] { alice, bob, cara, dan };
+        var choose = await NextStageAsync(players, await NextStageAsync(players, await StartAsync(players)));
+        Assert.Equal(Round(alice).TeamId, Round(bob).TeamId);
+
+        await alice.SendGameAsync(TimedBattleService.SelectFollow, new SelectFollowReq
+        { Type = EChickenFollowNotifyType.Invite, RoleId = Id(bob), FollowedRoleId = Id(alice) });
+        Assert.Equal(0, (await Next(alice, TimedBattleService.SelectFollow, SelectFollowResp.Parser)).Result);
+        Assert.Equal(Id(alice), (await Next(bob, TimedBattleService.InviteFollowNotify, ChickenInviteFollowNotify.Parser)).FollowedRoleId);
+        Assert.True((await Next(alice, TimedBattleService.FollowNotify, ChickenSelectFollowResp.Parser)).InviteCd[Id(bob)] > 0);
+        await alice.SendGameAsync(TimedBattleService.SelectFollow, new SelectFollowReq
+        { Type = EChickenFollowNotifyType.Invite, RoleId = Id(bob), FollowedRoleId = Id(alice) });
+        Assert.Equal(ErrorCodes.DungeonBusy, (await Next(alice, TimedBattleService.SelectFollow, SelectFollowResp.Parser)).Result);
+        await bob.SendGameAsync(TimedBattleService.SelectFollow, new SelectFollowReq
+        { Type = EChickenFollowNotifyType.Followed, RoleId = Id(bob), FollowedRoleId = Id(alice) });
+        Assert.Equal(0, (await Next(bob, TimedBattleService.SelectFollow, SelectFollowResp.Parser)).Result);
+        Assert.Equal(Id(alice), (await Next(alice, TimedBattleService.FollowNotify, ChickenSelectFollowResp.Parser,
+            f => f.FollowedMap.ContainsKey(Id(bob)))).FollowedMap[Id(bob)]);
+        await alice.SendGameAsync(TimedBattleService.SelectFollow, new SelectFollowReq
+        { Type = EChickenFollowNotifyType.Followed, RoleId = Id(alice), FollowedRoleId = Id(bob) });
+        Assert.Equal(ErrorCodes.Parameter, (await Next(alice, TimedBattleService.SelectFollow, SelectFollowResp.Parser)).Result); // a circle
+
+        // Bob picks elsewhere, but lands with Alice.
+        foreach (var (player, x, z) in new[] { (alice, 430, 402), (bob, 200, 500), (cara, 430, 402), (dan, 430, 402) })
+        {
+            await player.SendGameAsync(TimedBattleService.SelectPosition, new SelectRolePositionReq { PositionX = x, PositionY = z });
+            Assert.Equal(0, (await Next(player, TimedBattleService.SelectPosition, SelectRolePositionResp.Parser)).Result);
+        }
+        var battle = await NextStageAsync(players, choose);
+        await OnLoop(() =>
+        {
+            Assert.InRange(MonsterService.Distance(Session(bob).Position.X, Session(bob).Position.Z, 430, 402), 0, 45);
+            return Task.CompletedTask;
+        });
+
+        // The shop sign: shown to the others while the panel is open.
+        await alice.SendGameAsync(TimedBattleService.OpenPanel, new ChickenOpenPanelReq { PanelNum = EChickenOpenPanel.Shop, IsOpen = true });
+        await Next(alice, TimedBattleService.OpenPanel, ChickenOpenPanelResp.Parser);
+        var sign = await Next(cara, WorldCoreService.CustomChange, CustomDataChange.Parser, c => c.CustomDatas.Any(d => d.Id == 5000008));
+        Assert.Equal((Id(alice), 1L), (sign.EntityId, sign.CustomDatas.Single().CustomParam.IntParam));
+
+        // A final death, the ID tag carried to a Rescue Wagon: Bob is back without the 20 s channel.
+        await PastFreeReviveAsync(players, battle);
+        await KillAsync(bob);
+        ChickenChestUnit tag = null!;
+        ChickenNpcUnit wagon = null!;
+        await OnLoop(() =>
+        {
+            tag = Battles.ChestsForTest(Session(alice)).Single(c => c.NpcId == 15000056);
+            wagon = Battles.NpcsForTest(Session(alice)).First(n => n.NpcId == 15000055);
+            return Task.CompletedTask;
+        });
+        await MoveAsync(alice, wagon.X, wagon.Z);
+        await alice.SendGameAsync(TimedBattleService.RelifeOther, new ChickenRelifeOtherReq { NpcId = wagon.Uid });
+        Assert.Equal(ErrorCodes.ItemsShort, (await Next(alice, TimedBattleService.RelifeOther, ChickenRelifeOtherResp.Parser)).Result);
+        await MoveAsync(alice, tag.X, tag.Z);
+        await alice.SendGameAsync(TimedBattleService.PickupItem, new PickUpChickenItemReq
+        { NpcId = tag.Uid, ItemGuid = tag.Items.Values.Single().Guid, Count = 1 });
+        Assert.Equal(0, (await Next(alice, TimedBattleService.PickupItem, PickUpChickenItemResp.Parser)).Result);
+        await MoveAsync(alice, wagon.X, wagon.Z);
+        await alice.SendGameAsync(TimedBattleService.RelifeOther, new ChickenRelifeOtherReq { NpcId = wagon.Uid });
+        Assert.Equal(0, (await Next(alice, TimedBattleService.RelifeOther, ChickenRelifeOtherResp.Parser)).Result);
+        var map = await Next(bob, TimedBattleService.RelifeNotify, ChickenRelifeNotify.Parser, n => n.RelifeEndTime > 0);
+        Assert.Equal(((int)wagon.X, (int)wagon.Z), (map.PositionX, map.PositionY));
+        await bob.SendGameAsync(TimedBattleService.Relife, new ChickenRelifeReq { PositionX = (int)wagon.X, PositionY = (int)wagon.Z });
+        Assert.Equal(0, (await Next(bob, TimedBattleService.Relife, ChickenRelifeResp.Parser)).Result);
+        await Next(bob, TimedBattleService.RelifeNotify, ChickenRelifeNotify.Parser, n => n.RelifeEndTime == 0);
+        await OnLoop(() =>
+        {
+            Assert.False(Session(bob).Dead);
+            Assert.DoesNotContain(Round(alice).PackInfos.Values, i => i.ItemEntry == 50001); // the card is spent
+            return Task.CompletedTask;
+        });
+    }
 }

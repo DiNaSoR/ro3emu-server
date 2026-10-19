@@ -28,6 +28,14 @@ public sealed partial class TimedBattleService
         public required Random Rng;
         public Dictionary<GameSession, ChickenPlayer> Players { get; } = new(ReferenceEqualityComparer.Instance);
         public List<ChickenChestUnit> Chests { get; } = new();
+        /// <summary>Shop NPCs and Rescue Wagons (TimedBattleService.ChickenShop).</summary>
+        public List<ChickenNpcUnit> Npcs { get; } = new();
+        /// <summary>Shop id -> the commodities rolled for this match.</summary>
+        public Dictionary<int, List<int>> ShopGoods { get; } = new();
+        /// <summary>Follower role id -> followed role id (TimedBattleService.ChickenFollow).</summary>
+        public Dictionary<long, long> Follow { get; } = new();
+        /// <summary>(inviter, invitee) -> when the inviter may invite again (unix seconds).</summary>
+        public Dictionary<(long Inviter, long Invitee), long> InviteCd { get; } = new();
         public List<ZoneEvent> Zone { get; } = new();
         public List<ZoneShrink> Shrinks { get; } = new();
         public int ZonePublished = -1;
@@ -53,6 +61,8 @@ public sealed partial class TimedBattleService
         /// <summary>Carried ID tags: dead teammate id -> card guid in the pack (inferred key/value meaning).</summary>
         public Dictionary<long, long> IdentityCards { get; } = new();
         public Dictionary<int, long> ItemCd { get; } = new();
+        /// <summary>ShopCommodityConfig id -> units bought from the match shops.</summary>
+        public Dictionary<int, int> ShopBought { get; } = new();
         public RoundRoleStatus State = RoundRoleStatus.InWar;
         public int FreeRelifeLeft = FreeRelifeCount;
         /// <summary>An open 82663 revive map: the player comes back at a point of its choice before this time.</summary>
@@ -349,6 +359,7 @@ public sealed partial class TimedBattleService
         await SyncRoundAsync(match, run, session);
         await session.SendGameAsync(DungeonService.BaseInfo, ChickenBaseInfo(match, run));
         if (run.Stage == StageChoosePos) await SendTeamPicksAsync(match, run, match.Faction[session]);
+        if (run.Follow.Count > 0) await session.SendGameAsync(FollowNotify, FollowState(match, run, session));
         await SyncTeamAsync(match, match.Faction[session]);
     }
 
@@ -418,6 +429,7 @@ public sealed partial class TimedBattleService
             PlanZone(run, now);
             foreach (var player in InRoom(match).ToArray()) await LandAsync(match, run, player);
             await SpawnCratesAsync(match, run);
+            await SpawnServiceNpcsAsync(match, run);
         }
         await BroadcastBaseInfoAsync(match, run);
         if (run.Stage == StageStartGame)
@@ -438,10 +450,10 @@ public sealed partial class TimedBattleService
     private async Task LandAsync(Match match, ChickenRun run, GameSession player)
     {
         var me = run.Players[player];
-        var mate = Team(match, match.Faction[player]).Select(p => run.Players[p]).Where(p => p.LandChosen)
-            .OrderBy(p => p.PickOrder).FirstOrDefault();
+        var mate = Leader(match, run, player) ?? Team(match, match.Faction[player]).Select(p => run.Players[p])
+            .Where(p => p.LandChosen).OrderBy(p => p.PickOrder).FirstOrDefault();
         float x, z;
-        if (me.LandChosen) { x = me.LandX; z = me.LandZ; }
+        if (me.LandChosen && Leader(match, run, player) == null) { x = me.LandX; z = me.LandZ; }
         else if (mate != null) { x = mate.LandX + me.TeamIndex * 2; z = mate.LandZ; }
         else (x, z) = RandomPoint(run, IslandX, IslandZ, IslandRadius * 0.8f);
         if (WalkablePoint(x, z) is { } at) await scene.TeleportInMapAsync(player, at);
