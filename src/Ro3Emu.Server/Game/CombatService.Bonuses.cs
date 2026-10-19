@@ -86,6 +86,8 @@ public sealed partial class CombatService
         // Firepower Loaded and Energy Release's countdown are granted by CombatService.Delayed (load counts, shield).
         if (script is "VulcanArm" or "FlameLauncher")
             return tuples.Where(t => (int)(GameData.Number(t[0]) ?? 0) != FirepowerLoadedBuff).ToArray();
+        if (script.StartsWith("AxeLeapAttack2", StringComparison.Ordinal))
+            return tuples.Where(t => (int)(GameData.Number(t[0]) ?? 0) != HighEnergyShieldBuff).ToArray();
         if (script == "BombSuicide1")
             return tuples.Where(t => (int)(GameData.Number(t[0]) ?? 0) != EnergyReleaseCountdownBuff).ToArray();
         if (script.StartsWith("AdrenalineRush", StringComparison.Ordinal) && tuples.Length == 2

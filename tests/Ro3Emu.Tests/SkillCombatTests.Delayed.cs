@@ -57,4 +57,28 @@ public sealed partial class SkillCombatTests
         Assert.False(await HasBuff("alice", 1632001));
         Assert.False(await HasBuff("alice", 1631701));
     }
+    [ClientDataFact]
+    public async Task HighEnergyImpactFliesThenStrikesBelow()
+    {
+        await using var alice = await InWorld("Alice");
+        await Gm("alice", "!job 6400"); await Teach("alice", 16309); await Teach("alice", 16307); await Teach("alice", 16304); await Seasoned("alice");
+        await Lease(alice, MadogearLease); await RideBattle(alice, true);
+        var target = await Target("alice", stationary: true);
+        await Loop.InvokeAsync(() => { target.Hp = 100_000_000; return Task.CompletedTask; });
+        await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1630701, TargetId = target.Uid, TargetPos = target.Pos.Clone() });
+        Assert.Equal(0, (await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
+        await Until(s => s.Buffs.Any(b => b.ConfigId == 1634601 && b.ShieldRemaining > 0), "alice"); // 10% Max HP shield
+        Assert.True(await HasBuff("alice", 1632901));
+        Assert.Equal(100_000_000, target.Hp); // taking off hits nothing
+        await Task.Delay(1200); // the take-off action
+        // The switch turns the next press into the attack below (mode 1, 1630711).
+        Assert.Equal(1630711, await Loop.InvokeAsync(() => Task.FromResult((int)Ro3Emu.Server.Data.GameData.Int(Combat.EffectiveSkillRow(Session("alice"), 1630701)!.Value, "_iID"))));
+        await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1630711, TargetId = target.Uid, TargetPos = target.Pos.Clone() });
+        Assert.Equal(0, (await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
+        var hit = await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser, h => h.SkillId == 1630711);
+        Assert.Contains(hit.Dsts, d => d.DstID == target.Uid && d.Damage > 0);
+        await Until(s => !s.Buffs.Any(b => b.ConfigId == 1632901) && s.Buffs.Any(b => b.ConfigId == 1633601), "alice");
+        Assert.Equal(1630411, await Loop.InvokeAsync(() => Task.FromResult((int)Ro3Emu.Server.Data.GameData.Int(Combat.EffectiveSkillRow(Session("alice"), 1630401)!.Value, "_iID")))); // Axe Tornado Enhanced
+        Assert.True(await Loop.InvokeAsync(() => Task.FromResult(Session("alice").SkillCds.GetValueOrDefault(16307) > MonsterService.NowMs + 10_000)));
+    }
 }

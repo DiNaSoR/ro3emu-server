@@ -82,7 +82,7 @@ public sealed partial class CombatService
         if (!CurrentCastMap(s, action)) return;
         await SpendCastResourcesAsync(s, action);
         if (!CurrentCastMap(s, action)) return;
-        await ResolveHitsAsync(s, action);
+        if (!await StartFlightAsync(s, action.Row)) await ResolveHitsAsync(s, action);
         if (CurrentCastMap(s, action)) await AfterCastResourcesAsync(s, action);
     }
 

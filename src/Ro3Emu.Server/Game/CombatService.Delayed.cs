@@ -19,10 +19,54 @@ namespace Ro3Emu.Server.Game;
 /// Flame Launcher load it ${7}/@{1} (1) time for ${9} (3) Arm Cannon attacks. While loaded, 1631701's _kLogicData buff
 /// 1632001 switches Arm Cannon to its mode-1 row (ArmCannonPro, 8 shells); each Arm Cannon cast spends one attack.
 /// Before, every Vulcan Arm cast granted 1631701 and nothing switched the mode.</item>
+/// <item>High-Energy Impact 16307: the mode-0 cast (AxeLeapAttack) only takes off: "become Flying and gain a Shield equal to
+/// ${1}% of your Max HP for ${2} seconds ... and have 【Immunity】" (the shield on 1634601, Immunity 903201) and the mode
+/// switch 1632901 turns the next press into its mode-1 row (AxeLeapAttack2, the attack below). "Tap the skill again or
+/// wait until the Flying duration ends": a switch that runs out casts that row by itself. The attack ends the flight and
+/// arms 1633601, Axe Tornado's Enhanced mode (AxeTornadoPro), until the next Axe Tornado. Its per-hit shield stacks and
+/// the pulse count are not built.</item>
 /// </list>
 /// </summary>
 public sealed partial class CombatService
 {
+    private const int HighEnergyShieldBuff = 1634601, FlightModeBuff = 1632901, AxeTornadoArmBuff = 1633601, AxeTornadoGroup = 16304;
+
+    /// <summary>High-Energy Impact's take-off rows (mode 0 and its talent modes 2/4); +10 is the matching attack row.</summary>
+    private static bool FlightScript(string script) => script is "AxeLeapAttack" or "AxeLeapAttackS1BD1" or "AxeLeapAttackS1BD2";
+
+    private static bool FlightAttackScript(string script) => script.StartsWith("AxeLeapAttack2", StringComparison.Ordinal);
+
+    /// <summary>The take-off of High-Energy Impact instead of its hits; false for any other row.</summary>
+    private async Task<bool> StartFlightAsync(GameSession s, JsonElement row)
+    {
+        if (!FlightScript(Script(row))) return false;
+        var desc = Numbers(row, "_kDescData");
+        var stats = character.Stats(s);
+        int ms = (int)((desc.Length > 1 ? desc[1] : 10) * 1000);
+        long shield = (long)Math.Round(stats[101] * (desc.Length > 0 ? desc[0] : 10) / 100);
+        s.FlightAttackRowId = (int)GameData.Int(row, "_iID") + 10;
+        await buffs.AddSupportAsync(s, HighEnergyShieldBuff, ms, s.Role!.Id, shield);
+        await buffs.AddAsync(s, ImmunityBuff, ms, s.Role!.Id);
+        await buffs.AddAsync(s, FlightModeBuff, ms, s.Role!.Id);
+        return true;
+    }
+
+    private async Task LandFlightAsync(GameSession s)
+    {
+        foreach (var buff in s.Buffs.Where(b => b.ConfigId is FlightModeBuff or ImmunityBuff && b.SourceId == s.Role!.Id).ToArray())
+            await buffs.RemoveAsync(s, buff);
+        await buffs.AddLastingAsync(s, AxeTornadoArmBuff, s.Role!.Id);
+        if (data.Row("SkillConfig", s.FlightAttackRowId - 10) is { } takeoff) await StartCooldownAsync(s, takeoff, landing: true);
+    }
+
+    private async Task FlightEndedAsync(GameSession s, ActiveBuff buff)
+    {
+        if (buff.ConfigId != FlightModeBuff || s.Dead || s.Role == null || data.Row("SkillConfig", s.FlightAttackRowId) is not { } attack
+            || !FlightAttackScript(Script(attack))) return;
+        await LandFlightAsync(s);
+        await ProcCastAsync(s, attack, null, s.Face, area: true);
+    }
+
     private const int VenomSplasherBombGroup = 15119, EnergyReleaseCountdownGroup = 16344, EnergyReleaseCountdownBuff = 1634401,
         ImmunityBuff = 903201, FirepowerReadyBuff = 1631301, FirepowerLoadedBuff = 1631701, VulcanArmGroup = 16313,
         FlameLauncherGroup = 16315, ArmCannonGroup = 16312;
@@ -34,6 +78,7 @@ public sealed partial class CombatService
     {
         buffs.UnitExpired.Add(VenomSplasherBombAsync);
         buffs.Expired.Add(EnergyReleaseBlastAsync);
+        buffs.Expired.Add(FlightEndedAsync);
         buffs.Changed.Add(FirepowerReadyAsync);
         CastLanded.Add(DelayedCastLandedAsync);
     }
@@ -60,6 +105,9 @@ public sealed partial class CombatService
                 if (Numbers(row, "_kDescData") is { Length: > 8 } flame) await LoadFirepowerAsync(s, (int)flame[8]);
                 break;
         }
+        if (FlightAttackScript(Script(row))) await LandFlightAsync(s);
+        if (GameData.Int(row, "_iSkillID") == AxeTornadoGroup && GameData.Int(row, "_iMode") % 2 == 1)
+            foreach (var arm in s.Buffs.Where(b => b.ConfigId == AxeTornadoArmBuff).ToArray()) await buffs.RemoveAsync(s, arm);
         if (GameData.Int(row, "_iSkillID") == ArmCannonGroup && s.FirepowerUses > 0 && --s.FirepowerUses == 0)
             await UnloadFirepowerAsync(s);
     }
