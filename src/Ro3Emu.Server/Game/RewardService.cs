@@ -248,7 +248,7 @@ public sealed class RewardService
             if (!ReferenceEquals(player.Role, role) || player.Attachment?.Cancelled == true) return;
             await handler(player, monster, granted);
         }
-        log.LogInformation("{Name} durable loot from {Npc}: exp {Exp}, source {Source}",
+        log.LogDebug("{Name} durable loot from {Npc}: exp {Exp}, source {Source}",
             role.Name, monster.Template.NpcId, outcome.BaseExp, monster.RewardSource!.Key);
     }
     /// <summary>MultiverseGroupConfig id → the playbook's value, else _iValue_default (playbook 0 here).</summary>

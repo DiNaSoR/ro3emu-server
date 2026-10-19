@@ -123,6 +123,8 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
     /// <summary>C/D 17: the role's client settings, merged in memory and written lazily (SettingsPersistence).</summary>
     internal Romsg.DBSettingInfo? Settings { get; set; }
     internal Persistence.LazyRolePart.State? SettingsPart { get; set; }
+    /// <summary>The Bonus Time clock's lazy save (WildAfkPersistence).</summary>
+    internal Persistence.LazyRolePart.State? WildAfkPart { get; set; }
 
     /// <summary>Dead (HP 0, 31049 state 1) until revived (31013).</summary>
     public bool Dead { get; set; }

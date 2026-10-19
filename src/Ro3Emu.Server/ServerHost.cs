@@ -170,6 +170,7 @@ public static class ServerHost
         builder.Services.AddHostedService<DatabaseBackup>();
         builder.Services.AddSingleton<Game.Persistence.PositionPersistence>();
         builder.Services.AddSingleton<Game.Persistence.SettingsPersistence>();
+        builder.Services.AddSingleton<Game.Persistence.WildAfkPersistence>();
         builder.Services.AddSingleton<RoleSystems>();
         builder.Services.AddSingleton<RoleSessionService>();
         // Message modules in this order: it is the order of their interceptors (World before Economy before Character).
@@ -510,6 +511,7 @@ internal sealed class GameLoopTickers(IServiceProvider services) : IHostedServic
         Add<TotemEffects>();
         Add<Game.Persistence.PositionPersistence>();
         Add<Game.Persistence.SettingsPersistence>();
+        Add<Game.Persistence.WildAfkPersistence>();
         Add<ShopService>(); // 05:00 purchase-limit rollover
         Add<ItemBoxService>(); // award boxes; 05:00 item use-time rollover
         Add<PowerService>(); // throttled 31502/31503 republish of changed power

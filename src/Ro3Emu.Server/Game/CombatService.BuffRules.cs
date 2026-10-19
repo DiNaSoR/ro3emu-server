@@ -184,7 +184,7 @@ public sealed partial class CombatService
                 return;
             }
             if (!lethal) return;
-            log.LogInformation("{Name} killed {Monster} ({Npc}) with {Buff}", role.Name, m.Uid, m.Template.NpcId, buff.ConfigId);
+            log.LogDebug("{Name} killed {Monster} ({Npc}) with {Buff}", role.Name, m.Uid, m.Template.NpcId, buff.ConfigId);
             await monsters.KillAsync(m);
             foreach (var other in sessions.All().Where(o => o.Attack?.Target == m))
             {

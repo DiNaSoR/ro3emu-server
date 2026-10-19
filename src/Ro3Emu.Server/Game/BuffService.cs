@@ -119,7 +119,7 @@ public sealed partial class BuffService : IGameTicker
         p.Buffs.Add(buff);
         TrackPeriodic(p, null, buff);
         TrackHalo(p, buff);
-        log.LogInformation("{Name} gets buff {Buff} x{Pile} for {Ms} ms", p.Role.Name, configId, pile, durationMs);
+        log.LogDebug("{Name} gets buff {Buff} x{Pile} for {Ms} ms", p.Role.Name, configId, pile, durationMs);
         if (replaced && Visible(existing!))
             await ToPlayerAndViewersAsync(p, BuffRemove, new BuffRemoveNotify { UnitId = p.Role.Id, BuffGuids = { existing!.Guid } });
         var info = Wire(buff);

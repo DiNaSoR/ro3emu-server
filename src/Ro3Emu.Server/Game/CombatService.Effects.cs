@@ -423,7 +423,7 @@ public sealed partial class CombatService
         if (processed.Count > 0 && CurrentCaster()) await FightingAsync(s);
         foreach (var target in killed.Where(target => target.Hp == 0 && target.DeathDurable))
         {
-            log.LogInformation("{Name} killed {Monster} ({Npc})", castingRole.Name, target.Uid, target.Template.NpcId);
+            log.LogDebug("{Name} killed {Monster} ({Npc})", castingRole.Name, target.Uid, target.Template.NpcId);
             await monsters.KillAsync(target);
             foreach (var other in sessions.All().Where(o => o.Attack?.Target == target))
             {

@@ -294,6 +294,48 @@ public sealed class WildAfkTests : IAsyncLifetime
         Assert.True(bonus > reduced);
     }
 
+    /// <summary>
+    /// The running Bonus Time clock is saved lazily: no synchronous wild_afk write on the loop each second, but the
+    /// stored state still follows within the lazy interval, and leaving the world writes the final value.
+    /// </summary>
+    [ClientDataFact]
+    public async Task RunningClockIsSavedLazilyWithoutALoopWriteEachSecond()
+    {
+        await using var bot = await InWorld();
+        await Eligible(bot);
+        await Warp(bot, 10111);
+        await Auto(bot, true);
+        await Kill(bot);
+        await Query(bot); // the kill's own (durable) reconcile is done before the observer starts
+        Service<Ro3Emu.Server.Game.Persistence.WildAfkPersistence>().Interval = TimeSpan.FromMilliseconds(500);
+        long role = (long)bot.Self!.Uuid;
+        var accounts = Service<AccountStore>();
+        int loopWrites = 0;
+        accounts.WriteSyncPlanObserved = (plan, onLoop) =>
+        { if (onLoop && plan is Ro3Emu.Server.Accounts.Persistence.RoleBlobWritePlan { Column: "wild_afk" }) Interlocked.Increment(ref loopWrites); };
+        try
+        {
+            await OnOwnedLoop(bot, "AFK running fixture", _ =>
+            {
+                long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                var s = Session(bot).WildAfk!;
+                s.Info.HighMultiplierTimeSeconds = 3600; s.Info.IsHighMagnification = true; s.Info.IsSuspended = false;
+                s.AccountedAtMs = now; s.LastKillAtMs = now; s.RemainderMs = 0;
+                return Task.CompletedTask;
+            });
+            long Stored() => JsonSerializer.Deserialize<WildAfkService.State>(Service<RoleStore>().LoadWildAfk(role)!)!.Info.HighMultiplierTimeSeconds;
+            var until = DateTime.UtcNow + Wait;
+            while (Stored() is not (< 3600 and > 3590))
+            {
+                if (DateTime.UtcNow > until) throw new TimeoutException($"stored {Stored()}");
+                await Task.Delay(50);
+            }
+            Assert.False(await State(bot, s => s.WildAfk!.Info.IsSuspended));
+            Assert.Equal(0, loopWrites);
+        }
+        finally { accounts.WriteSyncPlanObserved = null; }
+    }
+
     [ClientDataFact]
     public async Task MonitorCapsIdleChargeAndAutoOffPauseAndSceneExitStopConsumption()
     {
