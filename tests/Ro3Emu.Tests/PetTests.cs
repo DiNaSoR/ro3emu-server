@@ -446,6 +446,138 @@ public sealed class PetTests : IAsyncLifetime
     }
 
     [ClientDataFact]
+    public async Task MoreMainSkillBuffsActOnHitsDealtAndTaken()
+    {
+        await using var bot = await InWorld();
+        await Unlock();
+        await Gm("!lvl 33");
+        var combat = _app.Services.GetRequiredService<CombatService>();
+        var loop = _app.Services.GetRequiredService<GameLoop>();
+        var buffService = _app.Services.GetRequiredService<BuffService>();
+        var character = _app.Services.GetRequiredService<CharacterService>();
+        combat.Rolls = new SureRolls();
+        int deployed = 0;
+        async Task Deploy(int pet, int fragment)
+        {
+            if (deployed > 0)
+            {
+                await bot.SendGameAsync(PetService.StateUpdate, new PetStateUpdateReq
+                {
+                    PetId = deployed, Source = (PetStateSource_Type)1, SourceSlotIndex = 1, Target = (PetStateSource_Type)0,
+                });
+                Assert.Equal(0, (await Next(bot, PetService.StateUpdate, PetStateUpdateResp.Parser)).Result);
+            }
+            await Gm($"!item {fragment} 50");
+            await bot.SendGameAsync(PetService.Combine, new PetCombineReq { PetId = pet });
+            Assert.Equal(0, (await Next(bot, PetService.Combine, PetCombineResp.Parser)).Result);
+            await bot.SendGameAsync(PetService.StateUpdate, new PetStateUpdateReq { PetId = pet, Target = (PetStateSource_Type)1, TargetSlotIndex = 1 });
+            Assert.Equal(0, (await Next(bot, PetService.StateUpdate, PetStateUpdateResp.Parser)).Result);
+            deployed = pet;
+        }
+        var target = await loop.InvokeAsync(async () =>
+        {
+            var s = Session;
+            var monsters = _app.Services.GetRequiredService<MonsterService>();
+            var unit = await monsters.SpawnSingleAsync(s.SceneEntry, 5000001, new MapPoint(s.Position.X + 1, s.Position.Y, s.Position.Z, 0),
+                s.InstanceId, customTemplate: monsters.Template(5000001)! with { RoamDistance = 0, AttackRange = 0, SwingIntervalMs = 3_600_000 });
+            unit!.Hp = 10_000_000; // it never swings back: the hits taken below are the test's own
+            return unit;
+        });
+        async Task<T> After<T>(int from, uint id, MessageParser<T> parser, Func<T, bool> match) where T : IMessage<T>
+        {
+            var deadline = DateTime.UtcNow.AddSeconds(8);
+            while (DateTime.UtcNow < deadline)
+            {
+                foreach (var e in bot.Inbox.Snapshot().Skip(from))
+                    if (e.IsGame(id) && parser.ParseFrom(e.Body) is var m && match(m)) return m;
+                await Task.Delay(50);
+            }
+            throw new TimeoutException($"no {id} after the cast");
+        }
+        async Task Cast(int skill, int guardian)
+        {
+            int from = bot.Inbox.Snapshot().Count;
+            await bot.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = skill, TargetId = target.Uid, TargetPos = target.Pos.Clone() });
+            Assert.Equal(0, (await Next(bot, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
+            await After(from, CombatService.ExtraUseInSkill, UseInSkillInfo.Parser, u => u.SkillID == guardian);
+            await Task.Delay(200); // the guardian's buffs land after its 31121
+        }
+        var normal = _app.Services.GetRequiredService<GameData>().Row("SkillConfig", 1000001)!.Value;
+        async Task<int> NormalHit()
+        {
+            int from = bot.Inbox.Snapshot().Count;
+            await loop.InvokeAsync(async () =>
+            {
+                foreach (var handler in combat.DealtAsync.ToArray()) await handler(Session, target, normal, 100);
+            });
+            return from;
+        }
+        Task Taken() => loop.InvokeAsync(async () =>
+        {
+            foreach (var handler in combat.TakenAsync.ToArray()) await handler(target, Session, 100);
+        });
+        ActiveBuff? Buff(int id) => Session.Buffs.FirstOrDefault(b => b.ConfigId == id && b.ExpireMs > MonsterService.NowMs);
+        long Hp() => character.Stats(Session)[2000];
+        Task SetHp(long hp) => loop.InvokeAsync(() => character.SetHpSpAsync(Session, hp, null));
+
+        // Cat o' Nine-Tail: its damage bonus is spent by the master's next hit.
+        await Deploy(30201, 1630201);
+        await Cast(2301301, 2301401);
+        Assert.NotNull(Buff(2301401));
+        await NormalHit();
+        Assert.Null(Buff(2301401));
+
+        // Female Warrior Lola: the master's hit drops the extra iron ball on the target.
+        await Deploy(32001, 1632001);
+        await Cast(2326201, 2326101);
+        var ball = await After(await NormalHit(), CombatService.SkillHit, SkillHitInfo.Parser, h => h.SkillId == 2326601);
+        Assert.Contains(ball.Dsts, d => d.DstID == target.Uid && d.Damage > 0);
+
+        // Sarah Irene: 【Flame Fist】 adds its Fire hits.
+        await Deploy(30004, 1630004);
+        await Cast(2334101, 2334201);
+        var fist = await After(await NormalHit(), CombatService.SkillHit, SkillHitInfo.Parser, h => h.SkillId == 2334601);
+        Assert.Contains(fist.Dsts, d => d.DstID == target.Uid && d.Damage > 0);
+
+        // Retribution: a hit under 【Execution】 slows the target.
+        await Deploy(32102, 1632102);
+        await Cast(2336201, 2336101);
+        await NormalHit();
+        Assert.Contains(buffService.UnitBuffs(target), b => b.ConfigId == 2336201);
+
+        // Scout Basilisk: each hit taken adds a 【Vigilant Recon】 stack.
+        await Deploy(23003, 1623003);
+        await Cast(2341201, 2341101);
+        await Taken();
+        await Taken();
+        Assert.Equal(2, Buff(2341201)?.PileCount);
+
+        // Piamette: a hit taken below half Life restores Max Life * 5%, once.
+        await Deploy(31201, 1631201);
+        await Cast(2332201, 2332101);
+        await SetHp(1);
+        await Taken();
+        long healed = Hp();
+        Assert.True(healed > 1);
+        await Taken();
+        Assert.Equal(healed, Hp());
+
+        // Wildcat Knight: the enemy it hits adds a 【Vanguard Shield】 stack.
+        await Deploy(33004, 1633004);
+        await Cast(2307201, 2307101);
+        await Task.Delay(200);
+        Assert.Equal(2, Buff(2307101)?.PileCount);
+
+        // Fruit Tree Turtle: its vines restore 1000 Life every second.
+        await Deploy(23004, 1623004);
+        await SetHp(1);
+        await Cast(2343201, 2343101);
+        long start = Hp();
+        await Task.Delay(1400);
+        Assert.True(Hp() >= start + 1000);
+    }
+
+    [ClientDataFact]
     public async Task AuraMainSkillsKeepActingFromTheMasterWhileTheirBuffLasts()
     {
         await using var bot = await InWorld();
