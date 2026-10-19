@@ -47,7 +47,7 @@ namespace Ro3Emu.ClientHooks
         private static volatile Content _content;
         private static volatile bool _dirty;            // _content changed since it was last applied
         /// <summary>Tables whose Lua_CFG module indexes its rows in OnInitDatas, rerun after rows are added.</summary>
-        private static readonly HashSet<string> Reindexed = new HashSet<string> { "ShopCommodityConfig" };
+        private static readonly HashSet<string> Reindexed = new HashSet<string> { "ShopConfig", "ShopCommodityConfig" };
         private static volatile byte[] _toCache;        // received, not written to the cache file yet
         private static string _cachePath;
         private static bool _cacheRead;
@@ -156,7 +156,8 @@ namespace Ro3Emu.ClientHooks
                     // Lua_CFG_Base.GetAllIDList caches the sorted ids on first use.
                     if (instance != null) rawset.Obf_HuA(instance, "m_kAllIDList", null);
                     // Some Lua_CFG modules index their rows once, at load (OnInitDatas). Lua_CFG_ShopCommodityConfig builds
-                    // ShopItemsMap (the shop tabs' lists by _iClassID) and AppearanceIdMap there, so added commodities
+                    // ShopItemsMap (the shop tabs' lists by _iClassID) and AppearanceIdMap there, and Lua_CFG_ShopConfig
+                    // ShopTypeMap/SubShopMap/npcShopMap (the shops by type and id, for UI_Sys_ShopNpcPanel), so added rows
                     // stay out of the shop until it runs again; it starts from new tables, so a rerun is safe.
                     if (instance != null && Reindexed.Contains(table.Key))
                         instance.Obf_RuA<Obf_R.Obf_Ef>("OnInitDatas")?.Obf_HuA(instance);

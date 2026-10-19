@@ -87,6 +87,26 @@ greeting with a goodbye button. The NPC copies Alphonse (200014) for everything 
 NPC to copy instead. Without `model` it keeps that NPC's look. `icon` sets the dialogue portrait, which is
 `temphead_npc_<model>.png` by default. Leave out `map` to define the NPC without placing it.
 
+**Shops**: an NPC with a `shop` sells items. Its greeting gets a Shop button (`button` renames it) that opens the
+client's NPC shop window, the one the Kafra Staff's Novice Shop uses, titled with the shop's `name`:
+
+```jsonc
+"shop": {
+  "name": "Scholar's Supplies",
+  "items": [
+    [1200801, 50],                                            // Hot Cocoa for 50 Zeny
+    { "item": 1002000, "price": 3, "currency": 2, "count": 5 } // 5 Butterfly Wings for 3 Minted Coins
+  ]
+}
+```
+
+Each item is `[item, price]` in Zeny, or an object with a `currency` (an item id: 1 Zeny, 2 Minted Coin, 3 Sacred
+Relic Crystal) and a `count` sold per purchase. There is no stock or purchase limit. The shop is ShopConfig row
+`<NPC id>` (its `_iShopId` and `_iClassID` are the NPC id too) and the goods are ShopCommodityConfig rows
+950000000 + (NPC id % 1,000,000) × 100 + 1, 2, …; buying goes through the server's normal shop checks. The window
+needs the client hooks from the same release: older hooks add the rows after the client has indexed its shops, so the
+window stays empty.
+
 **Quests**: each step is one quest in the quest log, offered when the step before it is handed in. The first step is
 offered to every character at once, or after the quest named in `after`. Every step needs a `name`, a `description`
 (shown in the quest log) and an `objective` (the tracker line), and then one of:
@@ -97,6 +117,11 @@ offered to every character at once, or after the quest named in `after`. Every s
   file places) also needs the `map` it stands on. The tracker walks to the NPC.
 - **kill**: a monster id, or a list of them, and the `count`. Party kills count, unless you add `"solo": true`. Give
   the `map` where they spawn and the tracker walks to the spawn. The objective gets the `*` that shows the counter.
+- **level**: a base level to reach. A character already at that level finishes the step at once.
+- **area**: a scene-editor area (region) id and its `map`: the step finishes when the player walks into it, and the
+  tracker walks there. As a GM, `!pos` lists the areas nearest to where you stand.
+- **done**: a quest id, the client's or a custom one: the step finishes once that quest is handed in. Unlike
+  `after`, the step is in the quest log while the player works on the other quest.
 
 A quest can say its `type`: `"main"`, `"side"` (the default) or `"guide"`. The type sets the quest log tag and the
 bubble over the NPC a talk step sends you to, in the client's colours: orange `[Main Quest]`, blue `[Side Quest]` or
@@ -187,7 +212,7 @@ row with the same id. `//` comments and trailing commas are allowed. A file with
 
 ### What the quest format makes
 
-Each step is a Side quest (blue tag) that copies a client quest: 10101130 for a talk step, 10101050 for a kill step.
+Each step is a Side quest (blue tag) that copies a client quest: 10101130 for a talk step, 10101050 for the others.
 
 1. **Talk**: `_kProgressTarget [[104001, npc, map, dialog]]`. A first step with no pre-task gets `_iCondition`
    2000008 (base level 1), which auto-accepts it for every character. The dialogue's last row carries action
@@ -207,6 +232,7 @@ written as raw rows or through `fields`:
 | 104014 | monster…, count | kill monsters, party credit counts |
 | 101002 | level | reach a base level |
 | 104003 | map, area | enter a scene-editor area |
+| 104004 | quest | hand in another quest |
 
 A custom NPC clicked in game runs its `_iInteractID` rows in NPCInteractConfig; action `["53", dialog]` opens a
 dialogue. Models, animations and portraits must already exist in the client. The hooks also add each placed NPC to

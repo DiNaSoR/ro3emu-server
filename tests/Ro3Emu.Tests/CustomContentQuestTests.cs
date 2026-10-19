@@ -153,4 +153,26 @@ public sealed class CustomContentQuestTests : IAsyncLifetime
         Assert.Equal(TaskState.Delivery, (await State(Talk))!.Status);
         Assert.Equal(2, await Read(s => s.TaskRuntime.Forgotten?.GetValueOrDefault(Talk) ?? 0));
     }
+
+    [ClientDataFact]
+    public async Task ScholarShopSellsForZeny()
+    {
+        // Elias's "shop": commodity CustomContent.CommodityBase + 1 * 100 + 1 is Hot Cocoa for 50 Zeny.
+        const int Cocoa = 950_000_101;
+        var bot = new BotClient(_http, File.ReadAllText(Path.Combine(_dataDir, "gate_rsa_public.pem")));
+        await using var _ = bot;
+        await bot.LoginAsync("customalice", "pw");
+        await bot.EnterGateAsync();
+        long id = (await bot.CreateRoleAsync("CustomAlice")).RoleBaseInfo.Id;
+        await bot.EnterWorldAsync(id);
+        await Barrier(bot);
+        await Gm("!item 1 1000");
+        await Barrier(bot);
+
+        long zeny = await Read(s => s.Progress!.Currency.GetValueOrDefault(1));
+        await bot.SendGameAsync(ShopService.BuyCommodity, new BuyCommodityReq { CommodityId = Cocoa, Count = 2, Price = 50 });
+        Assert.Equal(0, (await Next(bot, ShopService.BuyCommodity, BuyCommodityResp.Parser)).Result);
+        Assert.Equal(zeny - 100, await Read(s => s.Progress!.Currency.GetValueOrDefault(1)));
+        Assert.Equal(2, await Read(s => s.Items.Where(i => i.Entry == 1200801).Sum(i => (long)i.Stack)));
+    }
 }

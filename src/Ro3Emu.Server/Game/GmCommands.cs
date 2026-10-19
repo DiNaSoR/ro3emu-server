@@ -387,10 +387,18 @@ public sealed partial class GmCommands(IOptions<ServerOptions> options, GameData
     private Task Online(GameSession s, string[] _) =>
         ReplyAsync(s, "Online: " + string.Join(", ", sessions.All().Select(o => $"{o.Role?.Name ?? o.Account} ({o.SceneEntry})")));
 
-    /// <summary>Where the GM stands, as a custom content "npcs" entry needs it (docs/guide/custom-content.md).</summary>
-    private Task Pos(GameSession s, string[] _) =>
-        ReplyAsync(s, string.Create(System.Globalization.CultureInfo.InvariantCulture,
-            $"Map {s.SceneEntry} {data.MapName(s.SceneEntry)}: \"x\": {s.Position.X:0.##}, \"y\": {s.Position.Y:0.##}, \"z\": {s.Position.Z:0.##}"));
+    /// <summary>Where the GM stands, as a custom content "npcs" entry needs it, and the nearest scene-editor regions, the
+    /// "area" of a quest step (docs/guide/custom-content.md).</summary>
+    private Task Pos(GameSession s, string[] _)
+    {
+        var regions = services.GetRequiredService<WorldData>().Map(s.SceneEntry)?.Regions.Values
+            .Select(r => (r.Id, Distance: MathF.Sqrt((r.X - s.Position.X) * (r.X - s.Position.X) + (r.Z - s.Position.Z) * (r.Z - s.Position.Z))))
+            .OrderBy(r => r.Distance).Take(3).ToList() ?? [];
+        string areas = regions.Count == 0 ? ""
+            : "  Areas nearby: " + string.Join(", ", regions.Select(r => FormattableString.Invariant($"{r.Id} ({r.Distance:0} m)")));
+        return ReplyAsync(s, FormattableString.Invariant(
+            $"Map {s.SceneEntry} {data.MapName(s.SceneEntry)}: \"x\": {s.Position.X:0.##}, \"y\": {s.Position.Y:0.##}, \"z\": {s.Position.Z:0.##}{areas}"));
+    }
 
     private Task FindItem(GameSession s, string[] args)
     {

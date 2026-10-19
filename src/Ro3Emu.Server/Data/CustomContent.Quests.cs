@@ -24,7 +24,14 @@ public sealed partial class CustomContent
 
     private const long NpcBase = 200014, InteractBase = 20001401, TalkQuestBase = 10101130, KillQuestBase = 10101050;
     private const long BaseLevelOneCondition = 2000008;
-    private const int TalkTarget = 104001, KillTarget = 104002, PartyKillTarget = 104014;
+    /// <summary>Custom shops copy the Kafra Staff's Novice Shop (ShopConfig 10) and its first commodity (113).</summary>
+    private const long ShopBase = 10, CommodityCopy = 113, Zeny = 1;
+    private const int NpcShopType = 3;
+    /// <summary>Commodity ids made for NPC shops (the client's stop at 5,000,038); the id travels as a 32-bit int.</summary>
+    public const long CommodityBase = 950_000_000;
+    private const int TalkTarget = 104001, KillTarget = 104002, PartyKillTarget = 104014, LevelTarget = 101002,
+        AreaTarget = 104003, DoneTarget = 104004;
+    private static readonly string[] StepKinds = ["talk", "kill", "level", "area", "done"];
 
     /// <summary>
     /// "type" of a quest: the client's enum_TaskType, the quest log tag (TaskConfig._iShowTag, as the client's own
@@ -49,7 +56,7 @@ public sealed partial class CustomContent
     private readonly Dictionary<long, string> _madeIds = new();
 
     /// <summary>
-    /// { "id", "name", "title"?, "model"?, "icon"?, "copy"?, "greeting", "goodbye"?, "map"?, "x"?, "z"?, "y"?, "face"? }
+    /// { "id", "name", "title"?, "model"?, "icon"?, "copy"?, "greeting", "goodbye"?, "shop"?, "map"?, "x"?, "z"?, "y"?, "face"? }
     /// </summary>
     private void AddNpcDefinition(JsonObject o, string file)
     {
@@ -78,9 +85,18 @@ public sealed partial class CustomContent
             ["_base"] = InteractBase,
             ["_iEXECAction"] = new JsonArray(new JsonArray("53", Str(dialog))),
         });
-        Row("DialogueConfig", dialog, new JsonArray(
-            DialogRow(dialog, id, texts.Field(Need(o, "greeting", where))),
-            ReplyRow(dialog, id, texts.Field(Str(o, "goodbye") ?? "Goodbye"), new JsonArray("8", "TOPBAR", "UI_Sys_NpcDialogPanel"))));
+        var close = new JsonArray("8", "TOPBAR", "UI_Sys_NpcDialogPanel");
+        var greeting = new JsonArray(DialogRow(dialog, id, texts.Field(Need(o, "greeting", where))));
+        if (o["shop"] is { } shop)
+        {
+            var open = AddShop(shop, id, texts, where);
+            greeting.Add(ReplyRow(dialog, id, texts.Field(Str(shop.AsObject(), "button") ?? "Shop"), [open, close],
+                "npcdialog_icon_shop.png"));
+        }
+        var goodbye = ReplyRow(dialog, id, texts.Field(Str(o, "goodbye") ?? "Goodbye"), [(JsonArray)close.DeepClone()]);
+        goodbye["_iSortID"] = 3;
+        greeting.Add(goodbye);
+        Row("DialogueConfig", dialog, greeting);
 
         if (o.ContainsKey("map"))
         {
@@ -89,6 +105,49 @@ public sealed partial class CustomContent
             _npcs.Add(new Npc(map, checked((int)id), (float)x, Num(o, "y") is { } y ? (float)y : null, (float)z, (float)(Num(o, "face") ?? 0), file));
             _npcMaps[id] = map;
         }
+    }
+
+    /// <summary>
+    /// "shop": { "name"?, "button"?, "items": [ [item, price], ... or { "item", "price", "currency"? (default 1, Zeny),
+    /// "count"? (per purchase, default 1) } ] }: an NPC shop (ShopConfig _iShopType 3, the Kafra Staff's Novice Shop 10
+    /// copied) whose _iShopId and _iClassID are the NPC id, and one ShopCommodityConfig row per item (commodity 113 copied)
+    /// with ids <see cref="CommodityBase"/> + (NPC id % 1,000,000) * 100 + n. The greeting gets a reply that opens
+    /// UI_Sys_ShopNpcPanel with [shop id, class id] (ActionConfig 1 OpenUI; the Kafra's own reply opens it the same way
+    /// through 25 OpenFunctionUI, which also asks for function 70110). Buying goes through ShopService like the client's
+    /// NPC shops. Returns the action that opens the shop.
+    /// </summary>
+    private JsonArray AddShop(JsonNode node, long npc, TextMaker texts, string where)
+    {
+        where += " shop";
+        if (node is not JsonObject shop) throw new InvalidDataException($"{where}: needs to be an object with \"items\"");
+        if (shop["items"] is not JsonArray { Count: > 0 } items) throw new InvalidDataException($"{where}: needs \"items\": [[item, price], ...]");
+        if (items.Count > 99) throw new InvalidDataException($"{where}: at most 99 items");
+        Row("ShopConfig", npc, new JsonObject
+        {
+            ["_base"] = ShopBase, ["_iShopId"] = npc, ["_iClassID"] = npc, ["_iNpcId"] = npc, ["_iFunctionId"] = 0,
+            ["_iShopType"] = NpcShopType, ["_iShopName"] = texts.Field(Str(shop, "name") ?? "Shop"),
+        });
+        for (int n = 1; n <= items.Count; n++)
+        {
+            (long item, long price, long currency, long count) = items[n - 1] switch
+            {
+                JsonArray { Count: 2 } pair when pair[0] is JsonValue a && a.TryGetValue<long>(out long i)
+                    && pair[1] is JsonValue b && b.TryGetValue<long>(out long p) => (i, p, Zeny, 1L),
+                JsonObject o => (Id(o, "item", where), Id(o, "price", where), Opt(o, "currency") ?? Zeny, Opt(o, "count") ?? 1),
+                _ => throw new InvalidDataException($"{where}: each of \"items\" is [item, price] or {{ \"item\", \"price\" }}"),
+            };
+            if (item <= 0 || price <= 0 || currency <= 0 || count <= 0)
+                throw new InvalidDataException($"{where}: items, prices, currencies and counts must be above 0");
+            long id = CommodityBase + npc % 1_000_000 * 100 + n;
+            Claim(id, where);
+            Row("ShopCommodityConfig", id, new JsonObject
+            {
+                ["_base"] = CommodityCopy, ["_iClassID"] = npc, ["_iItemId"] = item, ["_iItemPerMount"] = count,
+                ["_kItemPerPrice"] = new JsonArray(currency, price), ["_iSortId"] = n, ["_iPurchaseNum"] = 0,
+                ["_iPurchaseTimesLimit"] = 0, ["_kMultiverseArray"] = new JsonArray(0), ["_kRecommended"] = "",
+            });
+        }
+        return new JsonArray("1", "TOPBAR", "UI_Sys_ShopNpcPanel", Str(npc), Str(npc));
     }
 
     /// <summary>Turns every "quests" entry into rows, once all files are read (a step may talk to an NPC of
@@ -124,8 +183,9 @@ public sealed partial class CustomContent
     }
 
     /// <summary>
-    /// { "id", "after"?, "type"? ("main", "side" (default) or "guide"), "steps": [ { "name", "description", "objective", and either "talk" (NPC id) + "dialog"
-    /// (+ "map" for a client NPC) or "kill" (monster id or ids) + "count" (+ "map", "solo"); "exp"?, "award"? or "items"?,
+    /// { "id", "after"?, "type"? ("main", "side" (default) or "guide"), "steps": [ { "name", "description", "objective", and one of "talk" (NPC id) + "dialog"
+    /// (+ "map" for a client NPC), "kill" (monster id or ids) + "count" (+ "map", "solo"), "level" (base level),
+    /// "area" (scene-editor region) + "map", or "done" (a quest handed in); "exp"?, "award"? or "items"?,
     /// "track"?, "fields"? } ] }. Step n takes TaskConfig id + n and follows step n - 1.
     /// </summary>
     private void AddQuest(JsonObject q)
@@ -143,7 +203,8 @@ public sealed partial class CustomContent
             if (steps[i] is not JsonObject step) throw new InvalidDataException($"{where}: needs to be an object");
             var texts = new TextMaker(this, QuestTextBase, id, where);
             bool talk = step.ContainsKey("talk"), kill = step.ContainsKey("kill");
-            if (talk == kill) throw new InvalidDataException($"{where}: needs either \"talk\" or \"kill\"");
+            if (StepKinds.Count(step.ContainsKey) != 1)
+                throw new InvalidDataException($"{where}: needs one of \"talk\", \"kill\", \"level\", \"area\" or \"done\"");
 
             string description = Need(step, "description", where);
             string objective = Need(step, "objective", where);
@@ -176,6 +237,26 @@ public sealed partial class CustomContent
                 long dialog = AddDialog(step, id, npc, texts, where);
                 row["_kProgressTarget"] = new JsonArray(new JsonArray(TalkTarget, npc, map, dialog));
                 row["_kTrack"] = new JsonArray(new JsonArray("143", Str(map), Str(npc), "9", Str(dialog)));
+            }
+            else if (step.ContainsKey("level"))
+            {
+                // Base level reached; checked against the character's level, so a high enough character finishes at once.
+                row["_kProgressTarget"] = new JsonArray(new JsonArray(LevelTarget, Id(step, "level", where)));
+                row["_kTrack"] = new JsonArray(new JsonArray(""));
+            }
+            else if (step.ContainsKey("area"))
+            {
+                // A scene-editor region of the map (!pos lists the ones nearby); the client reports entering it (31209).
+                long area = Id(step, "area", where);
+                long map = step.ContainsKey("map") ? Id(step, "map", where) : throw new InvalidDataException($"{where}: an area step needs the \"map\"");
+                row["_kProgressTarget"] = new JsonArray(new JsonArray(AreaTarget, map, area));
+                row["_kTrack"] = new JsonArray(new JsonArray("142", Str(map), Str(area), "-1"));
+            }
+            else if (step.ContainsKey("done"))
+            {
+                // Another quest handed in (any quest id, the client's or custom).
+                row["_kProgressTarget"] = new JsonArray(new JsonArray(DoneTarget, Id(step, "done", where)));
+                row["_kTrack"] = new JsonArray(new JsonArray(""));
             }
             else
             {
@@ -282,10 +363,12 @@ public sealed partial class CustomContent
         ["_iID"] = dialog, ["_iNPCID"] = npc, ["_iTalkNPCID"] = npc, ["_iText"] = text,
     };
 
-    private static JsonObject ReplyRow(long dialog, long npc, JsonArray text, JsonArray action) => new()
+    private static JsonObject ReplyRow(long dialog, long npc, JsonArray text, JsonArray action) => ReplyRow(dialog, npc, text, [action]);
+
+    private static JsonObject ReplyRow(long dialog, long npc, JsonArray text, JsonArray[] actions, string icon = "npcdialog_icon_chat.png") => new()
     {
         ["_iID"] = dialog, ["_iNPCID"] = npc, ["_iTalkNPCID"] = npc, ["_iSortID"] = 2, ["_iTextType"] = 2,
-        ["_iIcon"] = "npcdialog_icon_chat.png", ["_iText"] = text, ["_iEXECAction"] = new JsonArray(action),
+        ["_iIcon"] = icon, ["_iText"] = text, ["_iEXECAction"] = new JsonArray(actions.Select(a => (JsonNode)a).ToArray()),
     };
 
     private long DialogId(long @base, long owner, int page, string where)
