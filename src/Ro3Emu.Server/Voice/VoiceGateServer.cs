@@ -15,7 +15,7 @@ namespace Ro3Emu.Server.Voice;
 /// and drains in <see cref="StopAsync"/>, like <see cref="Net.GateListener"/>.
 /// </summary>
 public sealed class VoiceGateServer(IOptions<ServerOptions> options, VoiceTicketRegistry tickets, VoiceRooms rooms,
-    TeamService teams, SessionRegistry sessions, GameLoop loop, ILogger<VoiceGateServer> log)
+    TeamService teams, TavernService tavern, SessionRegistry sessions, GameLoop loop, ILogger<VoiceGateServer> log)
     : BackgroundService
 {
     private const long IpBanDurationMs = 60_000;
@@ -208,7 +208,9 @@ public sealed class VoiceGateServer(IOptions<ServerOptions> options, VoiceTicket
         {
             bool alive = sessions.All().Any(s => s.Role?.Id == connection.RoleId);
             var (teamId, _) = teams.TeamOf(connection.RoleId);
-            byte result = alive && teamId != 0 && teamId == requested ? VoiceJoinCode.Ok : VoiceJoinCode.NotMember;
+            // The room is the team (TeamService ids) or a Tavern room (TavernService ids start at 2^40).
+            bool member = teamId != 0 && teamId == requested || tavern.InRoom(connection.RoleId, requested);
+            byte result = alive && member ? VoiceJoinCode.Ok : VoiceJoinCode.NotMember;
             return Task.FromResult(result);
         });
         if (code != VoiceJoinCode.Ok)

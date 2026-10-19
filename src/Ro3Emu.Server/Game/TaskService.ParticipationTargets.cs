@@ -123,4 +123,8 @@ public sealed partial class TaskService
     /// <summary>106018: the member is at the Bonfire Party (once per event day, GuildCampfireService).</summary>
     public void OnCampfireJoined(GameSession s) =>
         loop.PostOwned(s, () => ProgressAsync(s, TCampfire, t => t.Length == 2 ? 1 : 0), "quest campfire");
+
+    /// <summary>106010: today's seconds in a Tavern room (TavernService.SecondsToday), read like the AFK seconds of
+    /// 106901 so a quest accepted later in the day still sees the time already spent.</summary>
+    public Func<GameSession, long>? TavernSecondsToday { get; set; }
 }

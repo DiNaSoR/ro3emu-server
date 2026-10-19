@@ -170,8 +170,29 @@ public sealed partial class ChatService
     private const int RecentLines = 20;
     private static bool GuildChannel(string group) => group.StartsWith("2_", StringComparison.Ordinal);
 
+    /// <summary>Tavern membership of chat channel 10 (TavernService.InRoom), set by ServerHost.</summary>
+    public Func<long, long, bool>? TavernMember { get; set; }
+
+    /// <summary>EChannelBarRoom (10): "10_&lt;room&gt;", optionally with Tencent's "@TGS#_" prefix (LC_ChatHelper).</summary>
+    private static bool TavernChannel(string group, out long room)
+    {
+        room = 0;
+        string rest = group.StartsWith("@TGS#_", StringComparison.Ordinal) ? group[6..] : group;
+        return rest.StartsWith("10_", StringComparison.Ordinal) && long.TryParse(rest.AsSpan(3), out room) && room > 0
+            && rest == $"10_{room}";
+    }
+
+    /// <summary>A role left a Tavern room: its chat channel stops reaching it.</summary>
+    public void TavernLeft(GameSession session, long room)
+    {
+        Leave(session, $"10_{room}");
+        Leave(session, $"@TGS#_10_{room}");
+    }
+
     private bool GuildAllowed(GameSession session, string group)
     {
+        if (group.StartsWith("10_", StringComparison.Ordinal) || group.StartsWith("@TGS#_10_", StringComparison.Ordinal))
+            return TavernChannel(group, out long room) && session.Role != null && TavernMember?.Invoke(session.Role.Id, room) == true;
         if (group.StartsWith("5_", StringComparison.Ordinal))
             return long.TryParse(group.AsSpan(2), out long groupId) && groupId > 0 && group == $"5_{groupId}"
                 && session.Role != null && friends.Group(groupId.ToString()) is { } chatGroup

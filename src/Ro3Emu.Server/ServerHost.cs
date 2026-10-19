@@ -88,6 +88,7 @@ public static class ServerHost
         builder.Services.AddSingleton<EmojiService>();
         builder.Services.AddSingleton<PersonalService>();
         builder.Services.AddSingleton<SocialOutfitService>();
+        builder.Services.AddSingleton<TavernService>();
         builder.Services.AddSingleton<AchievementService>();
         builder.Services.AddSingleton<TeamService>();
         builder.Services.AddSingleton<MvpService>();
@@ -177,6 +178,7 @@ public static class ServerHost
         builder.Services.AddSingleton<Game.Messaging.IMessageModule, SocialMessages>();
         builder.Services.AddSingleton<Game.Messaging.IMessageModule, ActivitiesMessages>();
         builder.Services.AddSingleton<Game.Messaging.IMessageModule, AdventureGroupMessages>();
+        builder.Services.AddSingleton<Game.Messaging.IMessageModule, TavernMessages>();
         builder.Services.AddSingleton<Game.Messaging.IMessageModule, Voice.VoiceTicketService>();
         builder.Services.AddSingleton<GameMessageHandler>();
         builder.Services.AddSingleton(sp => GateCrypto.LoadOrCreate(options.DataDir, sp.GetRequiredService<ILogger<GateCrypto>>()));
@@ -376,6 +378,12 @@ public static class ServerHost
         app.Services.GetRequiredService<PersonalService>().Upvoted.Add(questTasks.OnProfileLiked); // 106902
         app.Services.GetRequiredService<GuildCampfireService>().Joined.Add(questTasks.OnCampfireJoined); // 106018
         app.Services.GetRequiredService<GuildService>().MembershipChanged.Add(questTasks.OnStateChanged); // 104007
+        var tavern = app.Services.GetRequiredService<TavernService>();
+        questTasks.TavernSecondsToday = tavern.SecondsToday; // 106010, the Daily Tavern quest
+        tavern.TimeSpent.Add((s, _) => questTasks.OnStateChanged(s));
+        var tavernChat = app.Services.GetRequiredService<ChatService>();
+        tavernChat.TavernMember = tavern.InRoom; // chat channel 10
+        tavern.Left.Add(tavernChat.TavernLeft);
         var social = app.Services.GetRequiredService<Micro.SocialOwnerCache>();
         questTasks.LoadFriendCount = async s => s.Role is { } role
             ? (await social.LoadSocialAsync([role.Id])).GetValueOrDefault(role.Id)?.Friends.LongLength : null; // 103019
@@ -485,6 +493,7 @@ internal sealed class GameLoopTickers(IServiceProvider services) : IHostedServic
         Add<GuildLeagueService>();
         Add<WorldCoreService>();
         Add<EmojiService>();
+        Add<TavernService>(); // seconds in a Tavern room
         Add<AchievementService>();
         Add<FirstHeartService>();
         Add<DungeonMatchService>();

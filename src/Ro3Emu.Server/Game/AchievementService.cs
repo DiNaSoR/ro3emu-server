@@ -39,9 +39,9 @@ public sealed class AchievementService : IGameTicker
         CAffection = 106016, CTavernQuest = 106007, CTavernStar = 106008, CFashionLevel = 303001, CAppearance = 303002,
         CAppearanceCount = 303003, CJobRank = 101019, CLoginDays = 101011;
 
-    /// <summary>No source in this server (tavern), no table (fashion level) or an unresolved meaning (§5, §10.5).</summary>
+    /// <summary>No table (fashion level) or an unresolved meaning (§5, §10.5).</summary>
     private static readonly HashSet<long> BlockedConditions =
-        [CTavernQuest, CTavernStar, CFashionLevel, CAppraiseRare, CJobTalent];
+        [CFashionLevel, CAppraiseRare, CJobTalent];
 
     /// <summary>Event counters: no history, the slot is the count since the feature exists (spec §5 "E").</summary>
     private static readonly HashSet<long> CounterConditions =
@@ -104,7 +104,7 @@ public sealed class AchievementService : IGameTicker
     public AchievementService(GameData data, RoleStore roles, CharacterService character, AwardService awards,
         EquipmentService equipment, AppraisalService appraisal, CardService cards, MvpService mvps, TowerService tower,
         DungeonService dungeons, GuildService guilds, Micro.FriendService friends, Micro.SocialOwnerCache social,
-        SessionRegistry sessions, GameLoop loop, GmCommands gm, TimeProvider clock, ILogger<AchievementService> log)
+        TavernService tavern, SessionRegistry sessions, GameLoop loop, GmCommands gm, TimeProvider clock, ILogger<AchievementService> log)
     {
         this.data = data; this.roles = roles; this.character = character; this.awards = awards; this.tower = tower;
         this.social = social; this.sessions = sessions; this.loop = loop; this.clock = clock; this.log = log;
@@ -118,6 +118,7 @@ public sealed class AchievementService : IGameTicker
         dungeons.Completed.Add((s, _, _) => { QueueRecheck(s); return Task.CompletedTask; });
         tower.FloorCleared.Add(QueueRecheck);
         guilds.MembershipChanged.Add(QueueRecheck);
+        tavern.Changed.Add(QueueRecheck); // 106007 / 106008
         friends.RelationChanged.Add(QueueFriendRecheck);
         // Event counters: the payload is captured now, applied on the owner loop.
         equipment.Crafted.Add((s, entry, _, _) =>
@@ -364,6 +365,10 @@ public sealed class AchievementService : IGameTicker
             case CGodBoss: // [npc, 1]: the boss passed in the normal or hard Realm of the Gods
                 return s.Dungeons == null ? null
                     : row.GodKeys[index].Any(k => s.Dungeons.Records.TryGetValue(k, out var god) && god.Passed) ? r : 0;
+            case CTavernQuest: // [2000, days]: days the Daily Tavern quest time was reached (DBBarRoomInfo.actDays)
+                return s.Tavern == null ? null : TavernService.QuestDays(s);
+            case CTavernStar: // [n]: Star Power received from Tavern gifts (DBBarRoomInfo.popularity)
+                return s.Tavern == null ? null : TavernService.StarPower(s);
             case CGuild:
                 return s.Guild == null ? null : s.Guild.GuildId != 0 ? r : 0;
             case CGuildPosition: // [op, value]: LC_InteractCondition.CheckGuildPosition, ePosition op p2 (5 = "<")

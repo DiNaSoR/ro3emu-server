@@ -156,6 +156,8 @@ internal sealed class RoleSchemaPlan : DbPlan
         SchemaSql.AddColumn(db, tx, "role", "emoji_info", "BLOB");
         // Unix seconds of a deletion; deleted roles are kept (items, progress) but no longer listed or selectable.
         SchemaSql.AddColumn(db, tx, "role", "deleted_time", "INTEGER NOT NULL DEFAULT 0");
+        // Serialized romsg.DBBarRoomInfo (Tavern Star Power, today's seconds in a room, completed days; AUTO_SYNC 5043).
+        SchemaSql.AddColumn(db, tx, "role", "barroom", "BLOB");
         SchemaSql.Execute(db, tx, """
             CREATE TABLE IF NOT EXISTS role_lifecycle (
                 role_id INTEGER PRIMARY KEY,

@@ -70,7 +70,9 @@ public static partial class EconomySnapshotReader
     // roles' equipment as a display snapshot, never a holding.
     // Mock Battle: role.timed_battle CasualMmr/CasualRecords/CasualBest/CasualTotal are a rating and statistics, and
     // CasualSettled the once-only markers of each match's event/casual-battle receipt; no balance, no asset.
-    public const string ExpectedFormatManifestHash = "201478235A89C85FBCCC725FBFCFD6B624EB1590FD0FCC188DCAD4DCD1EF03D5";
+    // Tavern: role.barroom DBBarRoomInfo holds Star Power received (popularity, weekPopularity) and the Daily Tavern
+    // seconds and days; counters, no balance and no asset (the gift items are paid by their own exchange).
+    public const string ExpectedFormatManifestHash = "7B2DD5C94777212F27DA335DF41821B8132478A22D787F72303CDA03D4BF3647";
     public static string FormatManifestHash => State.FormatManifestHash;
 
     private sealed partial class State
