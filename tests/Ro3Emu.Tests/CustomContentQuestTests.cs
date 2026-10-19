@@ -115,10 +115,15 @@ public sealed class CustomContentQuestTests : IAsyncLifetime
         Assert.Equal(TaskState.Running, (await State(Report))!.Status);
 
         long exp = await Read(s => s.Progress!.Exp), level = await Read(s => (long)s.Progress!.Level);
+        long zeny = await Read(s => s.Progress!.Currency.GetValueOrDefault(1));
+        long cocoa = await Read(s => s.Items.Where(i => i.Entry == 1200801).Sum(i => (long)i.Stack));
         await bot.SendGameAsync(SceneService.ClientNpcInteract, new ClientNpcInteractReq { NpcUid = npc.Uid, DialogID = ReportDialog });
         await Barrier(bot);
         Assert.Equal(TaskState.Delivery, (await State(Report))!.Status);
         Assert.True(await Read(s => s.Progress!.Level) > level || await Read(s => s.Progress!.Exp) > exp, "the report pays its EXP");
+        // ... and its "items": 1000 Zeny and 3 Hot Cocoa.
+        Assert.Equal(zeny + 1000, await Read(s => s.Progress!.Currency.GetValueOrDefault(1)));
+        Assert.Equal(cocoa + 3, await Read(s => s.Items.Where(i => i.Entry == 1200801).Sum(i => (long)i.Stack)));
 
         // Dropping the first quest restarts the chain: the later quests go too, and only the first is offered again.
         await Gm($"!quest drop {Talk}");

@@ -125,7 +125,7 @@ public sealed partial class CustomContent
 
     /// <summary>
     /// { "id", "after"?, "type"? ("main", "side" (default) or "guide"), "steps": [ { "name", "description", "objective", and either "talk" (NPC id) + "dialog"
-    /// (+ "map" for a client NPC) or "kill" (monster id or ids) + "count" (+ "map", "solo"); "exp"?, "award"?,
+    /// (+ "map" for a client NPC) or "kill" (monster id or ids) + "count" (+ "map", "solo"); "exp"?, "award"? or "items"?,
     /// "track"?, "fields"? } ] }. Step n takes TaskConfig id + n and follows step n - 1.
     /// </summary>
     private void AddQuest(JsonObject q)
@@ -160,7 +160,7 @@ public sealed partial class CustomContent
                 // A line ending in * shows the progress counter (5/5) in the quest log; kills want one.
                 ["_iTargetDescribe"] = texts.Field(kill && !objective.EndsWith('*') ? objective + "*" : objective),
                 ["_iStageName"] = new JsonArray(0),
-                ["_iAward"] = Opt(step, "award") ?? 0,
+                ["_iAward"] = Award(step, id, where),
                 ["_kPreTask"] = i > 0 ? new JsonArray(id - 1) : after is { } pre ? new JsonArray(pre) : new JsonObject(),
                 ["_kEXP"] = Opt(step, "exp") is { } exp ? new JsonArray(1, exp) : new JsonObject(),
             };
@@ -200,6 +200,48 @@ public sealed partial class CustomContent
                 foreach (var (key, value) in fields) row[key] = value?.DeepClone();
             Row("TaskConfig", id, row);
         }
+    }
+
+    /// <summary>
+    /// The step's _iAward: "award" (a MultiverseGroupConfig id) as written, or "items": [ [item, count], ... ] or
+    /// [ { "item", "count", "bound"? }, ... ], which become an AwardConfig item package and the MultiverseGroupConfig
+    /// row that names it, both with the step's id (the client's own rows of those tables leave 90,000,000-99,999,999
+    /// free, where quest ids are chosen from 90000001). _kPreview lists the items in the quest log.
+    /// </summary>
+    private long Award(JsonObject step, long id, string where)
+    {
+        long? award = Opt(step, "award");
+        if (step["items"] is not { } node) return award ?? 0;
+        if (award is not null) throw new InvalidDataException($"{where}: use \"award\" or \"items\", not both");
+        if (node is not JsonArray { Count: > 0 } items) throw new InvalidDataException($"{where}: \"items\" needs a list, like [[1200801, 3]]");
+        var grants = new JsonArray();
+        var preview = new JsonArray();
+        foreach (var entry in items)
+        {
+            (long item, long count, bool bound) = entry switch
+            {
+                JsonArray { Count: 2 } pair when pair[0] is JsonValue a && a.TryGetValue<long>(out long i)
+                    && pair[1] is JsonValue b && b.TryGetValue<long>(out long n) => (i, n, false),
+                JsonObject o => (Id(o, "item", $"{where} items"), Id(o, "count", $"{where} items"),
+                    o["bound"] is JsonValue v && v.GetValueKind() == JsonValueKind.True),
+                _ => throw new InvalidDataException($"{where}: each of \"items\" is [item, count] or {{ \"item\", \"count\" }}"),
+            };
+            if (item <= 0 || count <= 0) throw new InvalidDataException($"{where}: item ids and counts must be above 0");
+            // AwardConfig fixed tuple [item, count, bind] (AwardService); the client's quest rewards use 0 for most items.
+            grants.Add(new JsonArray(item, count, bound ? 1 : 0));
+            preview.Add(new JsonArray(item, count));
+        }
+        Row("AwardConfig", id, new JsonArray(new JsonObject
+        {
+            ["_iID"] = id, ["_kAward"] = grants, ["_kPreview"] = preview, ["_iDropPool"] = 0,
+        }));
+        Row("MultiverseGroupConfig", id, new JsonObject
+        {
+            ["_iID"] = id, ["_itype"] = 0, ["_iValue_default"] = id,
+            ["_iValue_101"] = 0, ["_iValue_102"] = 0, ["_iValue_103"] = 0, ["_iValue_104"] = 0,
+            ["_iValue_105"] = 0, ["_iValue_106"] = 0, ["_iValue_107"] = 0,
+        });
+        return id;
     }
 
     /// <summary>
