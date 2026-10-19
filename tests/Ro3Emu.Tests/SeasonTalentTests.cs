@@ -529,7 +529,8 @@ public sealed class SeasonTalentTests
         Assert.Equal(ErrorCodes.SkillMaxLevel, await Upgrade(alice, PierceA));
         Assert.Equal(0, await Upgrade(alice, PierceB));
         await Eventually(() => fixture.Session.Buffs.Any(b => b.IsTalentOwned && b.SourceId == PierceA && b.ConfigId == 1112101)
-            && fixture.Session.Buffs.Any(b => b.IsTalentOwned && b.SourceId == PierceB && b.ConfigId == 1112201), "branch buffs");
+            && fixture.Session.Buffs.Any(b => b.IsTalentOwned && b.SourceId == PierceB && b.ConfigId == 1112201)
+            && fixture.Session.ExtraSkillModifiers.Any(m => m.Group == 11120), "branch buffs and modifiers");
         // Pierce itself: [21,0,0,11120,29,1,100] and [21,0,0,11120,30,1,20].
         Assert.Contains(fixture.Session.ExtraSkillModifiers, m => m is { Group: 11120, Type: 29, Operation: 1, Value: 100 });
         Assert.Contains(fixture.Session.ExtraSkillModifiers, m => m is { Group: 11120, Type: 30, Operation: 1, Value: 20 });
@@ -543,8 +544,9 @@ public sealed class SeasonTalentTests
         Assert.Equal(1, plan[Bash].CurrentLevel);
         Assert.Equal(1, plan[BashA].CurrentLevel);
         Assert.Equal(1, plan[Point].CurrentLevel);
-        await Eventually(() => !fixture.Session.Buffs.Any(b => b.IsTalentOwned), "replaced branch buffs removed");
-        Assert.DoesNotContain(fixture.Session.ExtraSkillModifiers, m => m.Group == 11120);
+        // The refresh removes the buffs first and swaps the skill modifiers after, so wait for both.
+        await Eventually(() => !fixture.Session.Buffs.Any(b => b.IsTalentOwned)
+            && !fixture.Session.ExtraSkillModifiers.Any(m => m.Group == 11120), "replaced branch buffs and modifiers removed");
         Assert.Contains(fixture.Session.ExtraSkillModifiers, m => m is { Group: 11104, Type: 0, Operation: 2, Value: 8000 });
         Assert.Contains(fixture.Session.ExtraSkillModifiers, m => m is { Group: 11104, Type: 15, Operation: 2, Value: 1 });
         Assert.Equal(0, await Upgrade(alice, AfterPoint)); // the main line continues past the chosen branch point

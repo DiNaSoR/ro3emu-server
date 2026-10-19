@@ -158,8 +158,7 @@ public sealed partial class WorldData(IOptions<ServerOptions> options, GameData 
                 _kafraDestinations = new();
                 if (DataFiles.Find(Dir("sceneeditor"), "MapLinkData.json") is { } path)
                 {
-                    using var doc = JsonDocument.Parse(File.ReadAllBytes(path));
-                    if (doc.RootElement.TryGetProperty("Capra", out var capra) && capra.ValueKind == JsonValueKind.Object)
+                    if (ProcessCache.Json(path).TryGetProperty("Capra", out var capra) && capra.ValueKind == JsonValueKind.Object)
                         foreach (var p in capra.EnumerateObject())
                             if (long.TryParse(p.Name, out var id)) _kafraDestinations.Add(id);
                 }
@@ -181,8 +180,7 @@ public sealed partial class WorldData(IOptions<ServerOptions> options, GameData 
                 Path.Combine(Dir("sceneeditor"), name + ".json"), sceneEntry);
             return map;
         }
-        using var doc = JsonDocument.Parse(File.ReadAllBytes(path));
-        var se = doc.RootElement.Clone();
+        var se = ProcessCache.Json(path);
 
         MapPoint? Point(JsonElement p, string faceField) =>
             p.TryGetProperty("position", out var pos)
@@ -347,7 +345,7 @@ public sealed partial class WorldData(IOptions<ServerOptions> options, GameData 
         if (DataFiles.Find(Dir("nav"), file) is not { } path) return null;
         try
         {
-            return NavGrid.Load(path);
+            return ProcessCache.File("nav", path, NavGrid.Load);
         }
         catch (Exception e) when (e is IOException or ArgumentException)
         {

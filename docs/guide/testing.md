@@ -64,3 +64,31 @@ pwsh tools/test-summary.ps1 -Results TestResults   # server: N executed (0 faile
 ```
 
 CI prints the same line per test project in its job summary.
+
+## Running tests while you work
+
+Every server test starts its own server, so a whole run starts about 2,000 of them. The test project shares what
+those servers would otherwise each redo (`tests/Ro3Emu.Tests/TestRunSetup.cs`): the parsed client tables, scene
+editors and nav grids (`ProcessCache`), one gate RSA key, and a lower password hash count. It also turns off
+profile-guided recompilation (`TieredPGO`, about 30% of the run's CPU) and starts the longest test classes first
+(`LongestFirstOrderer`). None of this changes how a real server runs.
+
+Build once and pass `--no-build` after that. Then pick the smallest set that covers your change:
+
+| What | Command | Time on 4 cores |
+|---|---|---|
+| The classes you touched | `dotnet test tests/Ro3Emu.Tests -c Release --no-build --filter "FullyQualifiedName~Ro3Emu.Tests.TavernTests"` | seconds to a minute |
+| Everything about skills | `--filter "FullyQualifiedName~Ro3Emu.Tests.Skill"` (172 tests) | ~3 min |
+| What CI runs | `RO3EMU_NO_CLIENT_DATA=1` with `--filter "Category!=Slow"` (735 tests) | ~2 min |
+| The whole suite | `--filter "Category!=Slow"` | ~12 min |
+
+Join several classes with `|`: `--filter "FullyQualifiedName~PetTests|FullyQualifiedName~PetAoiTests"`. A class
+named after a service (`MailTests`, `GuildTests`) usually holds that service's end-to-end tests; for a shared piece
+such as `CombatService` or `GameData`, search the tests for the type name.
+
+- The whole suite fits in one run in 16 GB. Don't raise `xUnit.MaxParallelThreads` above the core count: the run is
+  CPU-bound, and 8 threads on 4 cores was slower than 4.
+- `Category=Slow` holds the long walks (`QuestWalkTests` alone takes ~3.5 min); run them when you change what they
+  walk.
+- A few tests depend on timing and can fail when the machine is busy. Re-run a failing test on its own before you
+  chase it.

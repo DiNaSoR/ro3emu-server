@@ -93,8 +93,7 @@ public sealed class FestivalService : IGameTicker
         {
             if (DataFiles.Find(Path.Combine(options.Value.GameDataDir ?? options.Value.DataDir, "sceneeditor"), editor.GetString() + ".json") is { } path)
             {
-                using var doc = JsonDocument.Parse(File.ReadAllBytes(path));
-                if (doc.RootElement.TryGetProperty("m_kRegins", out var regions))
+                if (ProcessCache.Json(path).TryGetProperty("m_kRegins", out var regions))
                     foreach (int id in new[] { 27, 28 })
                         if (regions.TryGetProperty(id.ToString(), out var region))
                         {

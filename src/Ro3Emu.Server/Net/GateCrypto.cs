@@ -27,7 +27,11 @@ public sealed class GateCrypto
         }
         else
         {
-            rsa.KeySize = 2048;
+            rsa.ImportFromPem(Ro3Emu.Server.Data.ProcessCache.Generate("gate_rsa_private", () =>
+            {
+                using var fresh = RSA.Create(2048);
+                return fresh.ExportRSAPrivateKeyPem();
+            }));
             File.WriteAllText(privatePath, rsa.ExportRSAPrivateKeyPem());
             log.LogInformation("Generated a new gate RSA key in {Path}", privatePath);
         }

@@ -761,8 +761,7 @@ public sealed partial class GuildLeagueService
         {
             if (DataFiles.Find(Path.Combine(options.Value.GameDataDir ?? options.Value.DataDir, "sceneeditor"), file + ".json") is { } path)
             {
-                using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllBytes(path));
-                if (doc.RootElement.TryGetProperty("m_kGroups", out var groups)
+                if (ProcessCache.Json(path).TryGetProperty("m_kGroups", out var groups)
                     && groups.TryGetProperty(groupId.ToString(System.Globalization.CultureInfo.InvariantCulture), out var group)
                     && group.TryGetProperty("itemIdList", out var list))
                     ids = list.EnumerateArray().Select(v => (long)(GameData.Number(v) ?? 0)).ToArray();
