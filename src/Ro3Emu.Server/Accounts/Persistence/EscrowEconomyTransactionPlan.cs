@@ -183,7 +183,9 @@ internal sealed class EscrowEconomyTransactionPlan(RoleItemPlan child, EscrowEco
             if (blob.Column is not ("mailbox" or "new_activities" or "activity_runtime" or
                 "tasks" or "task_runtime" or "task_followup" or "daily" or "library" or "bag_state" or
                 "trade_info" or "stalls_info" or "auction" or "guild_info" or
-                "season_page" or "season_page_meta"))
+                "season_page" or "season_page_meta" or
+                // A Fashion gift's refund letter marks the sender's order Refunded (ShopService.Gifts).
+                "present_sent"))
                 throw new InvalidOperationException("Unclassified E03 role blob: " + blob.Column);
         foreach (var entity in EntityWrites.Concat(EntityDeltaWrites))
             if (!entity.Kind.StartsWith("market_record:", StringComparison.Ordinal) &&

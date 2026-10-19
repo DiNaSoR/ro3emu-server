@@ -344,6 +344,7 @@ public sealed partial class CharacterService
                 await SendStatsAsync(session, showChange: staged.Level > oldLevel);
                 foreach (var handler in ProgressHandlers) await handler(session);
             }
+            await CapExpAsync(session);
         }
         if (!suppressRewardNotice && notification.Rewards.Count > 0)
         {
@@ -368,7 +369,11 @@ public sealed partial class CharacterService
             p.Exp -= need;
             p.Level++;
         }
-        if (p.Level >= MaxLevel) p.Exp = 0;
+        if (p.Level >= MaxLevel)
+        {
+            p.CapExp = checked(p.CapExp + p.Exp); // ParagonService credits it after the commit
+            p.Exp = 0;
+        }
         p.JobExp = checked(p.JobExp + jobExp);
         SkipFreeJobLevels(p);
         int maxJob = MaxJobLevel(p.Career);
@@ -395,7 +400,7 @@ public sealed partial class CharacterService
     private static RoleProgress CloneProgress(RoleProgress source)
     {
         var result = new RoleProgress { SourceRevision = source.SourceRevision, Career = source.Career, Level = source.Level, JobLevel = source.JobLevel,
-            Exp = source.Exp, JobExp = source.JobExp, BonusPoints = source.BonusPoints, StarterKit = source.StarterKit };
+            Exp = source.Exp, JobExp = source.JobExp, BonusPoints = source.BonusPoints, StarterKit = source.StarterKit, CapExp = source.CapExp };
         Array.Copy(source.Stats, result.Stats, source.Stats.Length);
         foreach (var (key, value) in source.Currency) result.Currency[key] = value;
         foreach (var (key, value) in source.Skills) result.Skills[key] = value;
@@ -408,7 +413,7 @@ public sealed partial class CharacterService
         target.SourceRevision = source.SourceRevision;
         target.Career = source.Career; target.Level = source.Level; target.JobLevel = source.JobLevel;
         target.Exp = source.Exp; target.JobExp = source.JobExp; target.BonusPoints = source.BonusPoints;
-        target.StarterKit = source.StarterKit;
+        target.StarterKit = source.StarterKit; target.CapExp = source.CapExp;
         Array.Copy(source.Stats, target.Stats, source.Stats.Length);
         target.Currency.Clear(); foreach (var (key, value) in source.Currency) target.Currency[key] = value;
         target.Skills.Clear(); foreach (var (key, value) in source.Skills) target.Skills[key] = value;

@@ -225,6 +225,8 @@ public static class ErrorCodes
     public const int GuildNameInvalid = 10000, GuildNameNumbers = 10001, GuildLevelCreate = 10002;
     public const int GuildIconLocked = 10003, GuildFrameLocked = 10004, GuildJoinLevel = 10008;
     public const int GuildTextLength = 10027;
+    public const int GuildMailDailyLimit = 10025; // "You've used all Group Mail attempts for today."
+    public const int MailBodyEmpty = 369, MailBodySensitive = 370;
     public const int GuildFundsShort = 484, GuildContributeShort = 10040, GuildBuildBusy = 485, GuildHallLow = 486, GuildBuildMax = 487;
     // Guild Caravan: ErrorCodeConfig 489-504; exact RPC-to-code selection is (inferred).
     public const int CaravanLoaded = 489, CaravanExpired = 490, CaravanOrderExpired = 491;

@@ -91,7 +91,8 @@ was agreed with the project owner. The currency exchange (2005) pays crystals th
 hook `BoundCrystals` wraps it so item 3 counts both kinds. Without the hook a role needs enough regular crystals for
 the client to send the buy at all.
 
+Gifting a look to a friend is described in [Fashion gifts](fashion-gifts.md).
+
 ## Not done
 
-- Gifting a look (82335 is refused with 2317; 82336/82337/82339 have no handler).
 - `_kIsBindGive` on shop goods, and the server-only `_iGlobalPurchase` (meaning unknown).

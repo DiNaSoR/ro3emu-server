@@ -209,6 +209,7 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
             MaxCreateHelperNum = Setting("GuildResponsePeopleLimit", 3)[0],
             JoinLevelLimit = g.JoinLevelLimit, LastChangeNameTime = g.LastChangeNameTime,
             LastChangeNoticeTime = (int)g.LastChangeNoticeTime, IsJoin = isJoin, ActivityInfo = ActivityInfo(g),
+            NextBroadEmailTime = g.NextBroadEmailMs, BroadEmailLimit = BroadEmailUsed(g),
         };
         full.HistoryNames.AddRange(g.HistoryNames.Count > 0 ? g.HistoryNames : [g.Name]);
         full.MemberInfo.AddRange(g.Members.Values.Select(m => MemberInfo(m)));

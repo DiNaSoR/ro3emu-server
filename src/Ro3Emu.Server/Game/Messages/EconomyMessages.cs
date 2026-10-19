@@ -15,7 +15,7 @@ public sealed class EconomyMessages(ShopService shops, MailService mail, Auction
         routes.AdmitEconomic(id => id is >= 33401 and <= 33418); // stalls
         routes.AdmitEconomic(id => id is >= 82000 and <= 82020); // auctions
         routes.AdmitEconomic(id => id is MailService.ClaimMail);
-        routes.AdmitRole(id => id is >= 82332 and <= 82340); // ordinary shops
+        routes.AdmitRole(id => id is >= 82332 and <= 82340); // ordinary shops and Fashion gifts
         routes.AdmitRole(id => id is >= ShopService.CreateOrder and <= ShopService.ItemExchange); // Top Up, exchange
         routes.Intercept("trade", id => id is >= 32601 and <= 32630, (session, msgId, body) =>
             session.Role != null && session.Progress != null ? trade.HandleAsync(session, msgId, body) : Task.FromResult(false));
@@ -43,7 +43,11 @@ public sealed class EconomyMessages(ShopService shops, MailService mail, Auction
         });
         routes.Map(ShopService.CommodityPresent, "shops", async (session, msgId, body) =>
         {
-            await shops.RefusePresentAsync(session, CommodityPresentReq.Parser.ParseFrom(body.Span));
+            await shops.PresentAsync(session, CommodityPresentReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(ShopService.CommodityPick, "shops", async (session, msgId, body) =>
+        {
+            await shops.PickAsync(session, CommodityPickReq.Parser.ParseFrom(body.Span));
         });
         routes.Map(ShopService.CommodityGetInfo, "shops", async (session, msgId, body) =>
         {

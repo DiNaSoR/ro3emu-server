@@ -90,6 +90,7 @@ public static class ServerHost
         builder.Services.AddSingleton<SocialOutfitService>();
         builder.Services.AddSingleton<TavernService>();
         builder.Services.AddSingleton<TitleService>();
+        builder.Services.AddSingleton<ParagonService>();
         builder.Services.AddSingleton<AchievementService>();
         builder.Services.AddSingleton<TeamService>();
         builder.Services.AddSingleton<MvpService>();
@@ -181,6 +182,7 @@ public static class ServerHost
         builder.Services.AddSingleton<Game.Messaging.IMessageModule, AdventureGroupMessages>();
         builder.Services.AddSingleton<Game.Messaging.IMessageModule, TavernMessages>();
         builder.Services.AddSingleton<Game.Messaging.IMessageModule, TitleMessages>();
+        builder.Services.AddSingleton<Game.Messaging.IMessageModule, ParagonMessages>();
         builder.Services.AddSingleton<Game.Messaging.IMessageModule, Voice.VoiceTicketService>();
         builder.Services.AddSingleton<GameMessageHandler>();
         builder.Services.AddSingleton(sp => GateCrypto.LoadOrCreate(options.DataDir, sp.GetRequiredService<ILogger<GateCrypto>>()));

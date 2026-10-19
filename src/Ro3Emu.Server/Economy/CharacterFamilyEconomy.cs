@@ -12,6 +12,10 @@ internal static class CharacterFamilyEconomy
     /// A mount look also writes "mounts": its 5012 system-mount ownership (MountService.PlanShopGrant).</summary>
     internal const string ShopAppearanceKind = "cd13a/shop-appearance";
 
+    /// <summary>A Fashion gift's payment (ShopService.Gifts): the price and the sender's present_sent order commit together.
+    /// A claimed gift is a cd13a/shop-appearance unlock with no cost that writes the receiver's present_received.</summary>
+    internal const string ShopGiftKind = "cd13a/shop-gift";
+
     /// <summary>A used item and the role state its use action unlocks (CharacterService.ItemActions): the item is the only
     /// cost and there are no goods. 207 a Codex page (library), 212 a chat emoticon set (emoji_info), 620 a profile
     /// theme or background (personal), 349 a chat cosmetic (social_outfit), 112 / 105 / 2 nothing but the item;
@@ -20,7 +24,8 @@ internal static class CharacterFamilyEconomy
 
     internal static IReadOnlySet<string> AllowedBlobs(string kind)
     {
-        string[] parts = kind == ShopAppearanceKind ? ["shop", "wardrobe", "mounts", "equip_plans"]
+        string[] parts = kind == ShopAppearanceKind ? ["shop", "wardrobe", "mounts", "equip_plans", "present_received"]
+            : kind == ShopGiftKind ? ["present_sent"]
             : kind == ItemActionKind ? ["bag_state", "emoji_info", "personal", "social_outfit"]
             : kind[6..].Split('-')[0] switch
         {

@@ -118,7 +118,7 @@ show is playable from day one, without season or server-day gates ([details](doc
 - skills, buffs and debuffs, damage and healing over time, auras
 - passive skill changes, procs and follow-up hits, weapon and mount conditions, skill cost modifiers
 - crowd-control diminishing returns, energy meters, talents, job resonance
-- level cap 99 with catch-up EXP, character power score
+- level cap 99 with catch-up EXP, the Astral Level after it, character power score
 - PvP and event fights
 
 **Items and progression**
@@ -132,14 +132,14 @@ show is playable from day one, without season or server-day gates ([details](doc
 
 **Economy and social**
 - trade center, stalls, auctions (guild, world, event), mail
-- NPC, point and guild shops, battle pass, cash shop and Top Up
+- NPC, point and guild shops, battle pass, cash shop and Top Up, Fashion gifts to friends
 - friends and gifts, parties and raids, chat channels and horns
 - party voice chat through the server (off by default, see below)
 - Tavern rooms with text and voice chat, mic rules, gifts and the Daily Tavern
 - adventure groups
 
 **Guilds**
-- management, journal, recruitment, founding, guild home
+- management, journal, recruitment, founding, guild home, group mail
 - bonfire party, caravan, black market, Ilmata challenge
 - Guild League with elite rosters and capture rings
 - Territory Wars and the castle siege
@@ -163,8 +163,8 @@ show is playable from day one, without season or server-day gates ([details](doc
 - **Mock Battle extras:** the arena's monsters and the 40-player team frame.
 - **War of Emperium extras:** commander tools, siege weapons and vehicles.
 - **Survivor Battle extras:** the "Go, Kafra, Go!" weekly tasks.
-- **Guild extras:** merging, impeachment, group mail.
-- **Smaller missing pieces:** shop gifting, Paragon (Astral Level), and some stages of the story dungeons
+- **Guild extras:** merging, impeachment.
+- **Smaller missing pieces:** some stages of the story dungeons
   that are still simplified.
 - **Guild voice:** only party and Tavern voice are implemented.
 

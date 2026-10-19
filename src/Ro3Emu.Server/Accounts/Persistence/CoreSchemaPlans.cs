@@ -160,6 +160,11 @@ internal sealed class RoleSchemaPlan : DbPlan
         SchemaSql.AddColumn(db, tx, "role", "barroom", "BLOB");
         // Serialized romsg.DBTitleInfo (the title rank, AUTO_SYNC 5031); absent = title 1.
         SchemaSql.AddColumn(db, tx, "role", "title", "BLOB");
+        // JSON ParagonService.State (Astral Level, stars, socketed Star Core item ids; AUTO_SYNC 5015).
+        SchemaSql.AddColumn(db, tx, "role", "paragon", "BLOB");
+        // Serialized romsg.DBPresentInfo: Fashion gifts this role paid for (present_sent) and claimed (present_received).
+        SchemaSql.AddColumn(db, tx, "role", "present_sent", "BLOB");
+        SchemaSql.AddColumn(db, tx, "role", "present_received", "BLOB");
         SchemaSql.Execute(db, tx, """
             CREATE TABLE IF NOT EXISTS role_lifecycle (
                 role_id INTEGER PRIMARY KEY,

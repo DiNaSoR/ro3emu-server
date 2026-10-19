@@ -311,6 +311,9 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
     /// <summary>The title rank (5031, role blob "title"); TitleService.</summary>
     public Romsg.DBTitleInfo? Title { get; set; }
 
+    /// <summary>The Astral Level: Paragon level, EXP, stars and Star Cores (5015, role blob "paragon"); ParagonService.</summary>
+    public ParagonService.State? Paragon { get; set; }
+
     /// <summary>When this role's tavern seconds were last counted (unix seconds; 0 when not in a room); TavernService.</summary>
     public long TavernCountedAt { get; set; }
 
