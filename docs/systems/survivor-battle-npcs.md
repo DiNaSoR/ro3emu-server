@@ -1,8 +1,8 @@
-# Survivor Battle shops, Rescue Wagons and follow
+# Survivor Battle shops, Rescue Wagons, follow and spectating
 
 Kafra Survivor Battle ("Chicken", scene 2240101) already runs its stages, items, poison zone and revives in
 `TimedBattleService.Chicken*` (see [timed activities](activities-timed-events.md)). This page covers the match's
-service NPCs and team follow: `TimedBattleService.ChickenShop` and `.ChickenFollow`, tests in `SurvivorBattleTests`.
+service NPCs, team follow and spectating: `TimedBattleService.ChickenShop`, `.ChickenFollow` and `.ChickenWatch`, tests in `SurvivorBattleTests`.
 
 ## Service NPCs
 
@@ -60,8 +60,23 @@ At the landing a follower lands with the end of its follow chain when that playe
 adventure, ambulance). The others in the match get 31018 with that id at 1 (open) or 0 (closed), which shows or
 hides the sign over the player's head.
 
+## Spectating
+
+A player out of the battle (dead, no revive map open, not given up) watches a teammate who still stands:
+
+- The elimination sends 82675 `ChickenWatchNotify {autoWatchTime}` (seconds) when a teammate still stands. The
+  client shows "auto spectate in N s" while it watches nobody. After `EatChickenObserve` 10 s *(inferred: the same
+  value as the revive map time)* the server picks the first standing teammate in team order.
+- The watch itself is custom data 1002 (`Unit_CameraBindUnitCustomData`) on the spectator's own player, sent only to
+  it: the client binds its camera to that unit and opens the spectating widget. 0 ends it.
+- 82640 `ChickenChangeWatchPlayerReq {player_id}` (the widget's arrows, the team list) switches to another standing
+  teammate. Anyone else is ignored (the response is NullArg).
+- *(inferred)* On the server the spectator's view point moves with the watched teammate (every tick, once 4 m off),
+  and World hides the spectator from every other player, so its client gets the units around the watched teammate.
+  The Death crate and ID tag stay where it fell.
+- When the watched teammate falls or leaves, the next standing one is watched, or the watch ends. A revive map, a
+  revive, giving up or leaving the match also ends it, and the view goes back to where the player fell.
+
 ## Not done
 
-- Spectating after elimination (82640, 82675): the camera follows a unit through custom data 1002, which needs the
-  server to show the spectator what the watched player sees.
 - Kafra adventure tasks (adventure NPCs 15000301 in region 899, 82671) and the messenger monsters 15000058 (region 855).

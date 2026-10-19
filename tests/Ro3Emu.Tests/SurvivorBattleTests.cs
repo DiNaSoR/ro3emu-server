@@ -665,4 +665,53 @@ public sealed class SurvivorBattleTests : IAsyncLifetime
             return Task.CompletedTask;
         });
     }
+
+    [ClientDataFact]
+    public async Task EliminatedPlayerWatchesAStandingTeammate()
+    {
+        await HostAsync(4, 2);
+        await using var alice = await InWorld("Alice");
+        await using var bob = await InWorld("Bob");
+        await using var cara = await InWorld("Cara");
+        await using var dan = await InWorld("Dan");
+        var players = new[] { alice, bob, cara, dan };
+        var battle = await BattleAsync(players, await StartAsync(players));
+        Assert.Equal(Round(alice).TeamId, Round(bob).TeamId);
+        long start = battle.StageModuleData.StageStartTime / 1000;
+        await PastFreeReviveAsync(players, battle);
+
+        // Out for good: the countdown to watching, then the server picks Alice.
+        await KillAsync(bob);
+        var offer = await Next(bob, TimedBattleService.WatchNotify, ChickenWatchNotify.Parser);
+        Assert.InRange(offer.AutoWatchTime, start + 181 + 9, start + 181 + 11);
+        await Tick(offer.AutoWatchTime + 1);
+        var bind = await Next(bob, WorldCoreService.CustomChange, CustomDataChange.Parser, c => c.CustomDatas.Any(d => d.Id == 1002));
+        Assert.Equal((Id(bob), Id(alice)), (bind.EntityId, bind.CustomDatas.Single().CustomParam.IntParam));
+        await OnLoop(() =>
+        {
+            var b = Session(bob);
+            Assert.True(b.AoiHidden);
+            Assert.Contains(Session(alice), b.Visible);
+            Assert.DoesNotContain(b, Session(cara).Visible);
+            Assert.DoesNotContain(b, Session(alice).Visible);
+            return Task.CompletedTask;
+        });
+
+        // Only a standing teammate can be watched; the view follows Alice.
+        await bob.SendGameAsync(TimedBattleService.ChangeWatch, new ChickenChangeWatchPlayerReq { PlayerId = Id(cara) });
+        await MoveAsync(alice, 300, 300);
+        await Tick(offer.AutoWatchTime + 2);
+        for (int i = 0; ; i++)
+        {
+            bool there = false;
+            await OnLoop(() =>
+            {
+                there = MonsterService.Distance(Session(bob).Position.X, Session(bob).Position.Z, 300, 300) < 1;
+                return Task.CompletedTask;
+            });
+            if (there) break;
+            Assert.True(i < 50, "the spectator's view did not follow");
+            await Task.Delay(100);
+        }
+    }
 }

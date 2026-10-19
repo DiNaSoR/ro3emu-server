@@ -31,6 +31,11 @@ public static class ChickenRules
     /// <summary>DL:226 "EatChickenObserve " 10000 (also PublicParam EatChickenObserve 10): (inferred) the time a revived
     /// player has to pick a point on the 82663 revive map before the server picks one.</summary>
     public const long RelifeChooseMs = 10_000;
+    /// <summary>The same EatChickenObserve 10 s, (inferred) also the wait before an eliminated player starts watching a
+    /// standing teammate (82675 autoWatchTime, the client's "auto spectate in N s").</summary>
+    public const long AutoWatchMs = 10_000;
+    /// <summary>(inferred) The spectator's view moves with the watched teammate once it is this far (m) off.</summary>
+    public const float WatchFollowStep = 4f;
     /// <summary>(inferred) A revive channel breaks when the reviver walks this far (m) from where it started.</summary>
     public const float ReliveChannelMoveLimit = 2f;
     /// <summary>DL:4 AssemblySkillCd 5000: a skill put on the bar cannot be used for 5 s.</summary>

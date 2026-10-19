@@ -87,6 +87,35 @@ public sealed class AoiCapTests
     }
 
     [Fact]
+    public async Task HiddenPlayerSeesWithoutBeingSeen()
+    {
+        var a = Player("A", 100, 100);
+        var b = Player("B", 110, 100);
+        var far = Player("F", 400, 100);
+        foreach (var p in new[] { a, b, far }) await world.JoinAsync(p);
+        sink.Events.Clear();
+
+        await world.SetHiddenAsync(a, true);
+        Assert.Equal(new[] { "B-A" }, sink.Events.ToArray());   // B loses A, A keeps showing B
+        Assert.Equal("B", Names(a.Visible));
+        Assert.Empty(a.Observers);
+
+        // A's view moves to F: it shows F, F never shows A.
+        sink.Events.Clear();
+        a.Position = new Vec3 { X = 405, Z = 100 };
+        await world.MoveAsync(a, new WalkReq { Pos = a.Position, BStop = true, SpeedRate = 1 }, forceTeleport: true);
+        Assert.Equal("F", Names(a.Visible));
+        Assert.Empty(far.Visible);
+        Assert.DoesNotContain("F+A", sink.Events);
+
+        // Shown again where it stands.
+        sink.Events.Clear();
+        await world.SetHiddenAsync(a, false);
+        Assert.Equal(new[] { "F+A" }, sink.Events.ToArray());
+        Assert.Contains(a, far.Visible);
+    }
+
+    [Fact]
     public async Task RebalanceLeavesViewsWithRoomAlone()
     {
         var a = Player("A", 100, 100, limit: 3);

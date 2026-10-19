@@ -76,6 +76,7 @@ public sealed partial class TimedBattleService
         {
             Eliminate(match, run, player, now);
             await DropBelongingsAsync(match, run, player, me);
+            await OfferWatchAsync(match, run, player, me, now);
         }
         await SyncTeamAsync(match, match.Faction[player]);
         await BroadcastHudAsync(match);
@@ -152,6 +153,7 @@ public sealed partial class TimedBattleService
     private async Task ReviveAtAsync(Match match, ChickenRun run, GameSession player, float x, float z)
     {
         var me = run.Players[player];
+        await StopWatchAsync(match, player, me);
         // A death still being published (or another revive) holds the claim: the tick retries a second later.
         if (!combat.TryClaimRevive(player)) { me.RelifeUntilMs = NowMs() + 1000; return; }
         me.RelifeUntilMs = 0;
@@ -332,6 +334,7 @@ public sealed partial class TimedBattleService
     private async Task ChickenDetachAsync(Match match, GameSession player)
     {
         player.Synced.Remove(RoundSync);
+        if (match.Chicken is { } watching && watching.Players.TryGetValue(player, out var me)) await StopWatchAsync(match, player, me);
         if (match.Chicken is { } run && run.Channels.Count > 0) await InterruptChannelsAsync(match, run, c => c.Reviver == player);
         if (player.Role != null && player.Progress != null)
         {
