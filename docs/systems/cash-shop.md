@@ -93,6 +93,19 @@ the client to send the buy at all.
 
 Gifting a look to a friend is described in [Fashion gifts](fashion-gifts.md).
 
+## Free cash shop, `Ro3Emu:CashShop:Free`
+
+With it on, every crystal price (item 3) is paid by the server: Mall and Fashion buys, the Fashion cart, Fashion gifts
+and the crystal to Zeny exchange (2005) take no crystals, bound or regular. Prices in other currencies (Zeny, Minted
+Coin, the Zeny to Minted Coin exchange) are still paid. A gift order made this way carries a price of 0, so its expiry
+refund letter has no attachment.
+
+The client checks crystals before it sends a buy, so the server also tells the hook at every role login (game message
+77021, UTF-8 JSON `{"free": true|false}`, `ShopService.CashShopMsg`). While it is on, `BoundCrystals` makes
+`LC_ItemHelper.GetItemCount(3)` answer at least 9,999,999, so every buy dialog, the cart, gifts and the exchange go
+through without loading up on Top Up packs. Off (the default, which keeps real prices) nothing changes.
+`appsettings.Development.json`, `server.sh` and `RO3Emu.exe` (hosted) turn it on, next to `TopUp:Free`.
+
 ## Not done
 
 - `_kIsBindGive` on shop goods, and the server-only `_iGlobalPurchase` (meaning unknown).

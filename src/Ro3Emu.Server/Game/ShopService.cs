@@ -44,6 +44,7 @@ public sealed partial class ShopService : IGameTicker
         ILogger<ShopService> log, Microsoft.Extensions.Options.IOptions<ServerOptions>? options = null)
     {
         freeTopUp = options?.Value.TopUp.Free ?? false;
+        freeCashShop = options?.Value.CashShop.Free ?? false;
         this.data = data;
         this.character = character;
         this.functions = functions;
@@ -111,7 +112,16 @@ public sealed partial class ShopService : IGameTicker
             { counter.Period = "S1"; migrated = true; }
         if (migrated) Save(session);
         await SyncAsync(session);
+        await session.SendGameRawAsync(CashShopMsg, Encoding.UTF8.GetBytes(freeCashShop ? "{\"free\":true}" : "{\"free\":false}"));
     }
+
+    /// <summary>
+    /// Server -> client hook (Ro3Emu.ClientHooks.BoundCrystals.MsgId): whether Ro3Emu:CashShop:Free is on, as UTF-8 JSON
+    /// {"free": bool}. Sent at every role login so a client that last played on a free realm forgets it.
+    /// </summary>
+    public const uint CashShopMsg = 77021;
+
+    private readonly bool freeCashShop;
 
     private Task SyncAsync(GameSession session)
     {
@@ -314,9 +324,11 @@ public sealed partial class ShopService : IGameTicker
     /// What a price takes from the role. A crystal price (item 3) spends bound crystals (item 16, the Top Up bonuses)
     /// first and regular crystals for the rest. No config says so: the rule is (inferred), agreed with the project
     /// owner. The client's buy dialog still checks the price against regular crystals alone (LC_ItemHelper.GetItemCount).
+    /// With Ro3Emu:CashShop:Free a crystal price takes nothing.
     /// </summary>
     private (int Entry, long Count)[] Payment(GameSession session, int currency, long amount)
     {
+        if (currency == CrystalItem && freeCashShop) return [];
         if (currency != CrystalItem || amount <= 0) return [(currency, amount)];
         long bound = Math.Min(amount, Math.Max(0, character.CountOf(session, BoundCrystalItem)));
         return bound == 0 ? [(CrystalItem, amount)]

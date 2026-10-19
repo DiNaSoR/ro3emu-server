@@ -152,6 +152,11 @@ namespace Ro3Emu.ClientHooks
                 CustomContent.Receive(memory.ToArray());
                 return;
             }
+            if (msgId == BoundCrystals.MsgId)
+            {
+                BoundCrystals.Receive(memory.ToArray());
+                return;
+            }
             if (msgId == VoiceProtocol.TicketMsgId)
             {
                 VoiceClient.OnTicket(memory.ToArray());
