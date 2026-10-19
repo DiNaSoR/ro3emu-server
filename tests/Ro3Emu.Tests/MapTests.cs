@@ -434,7 +434,8 @@ public sealed partial class MapTests : IAsyncLifetime
         Assert.NotEmpty(full.CompleteTaskNum);
         Assert.InRange(alice.Self!.MovementInfo.Pos.X, 340f, 355f); // South Gate born point (347.26, 293.01)
 
-        // Task 1: reach area 10000001 -> delivered, task 2 (plot 18) accepted.
+        // Task 1: reach area 10000001 (scene editor centre 328.62, -7.22, 272.3) -> delivered, task 2 (plot 18) accepted.
+        await Gm("alice", "!jump 328.62 272.3"); // the area must be near the player
         await alice.SendGameAsync(SceneService.ClientEnterArea, new ClientEnterAreaReq { AreaId = 10000001 });
         var step = await Next(alice, TaskService.TaskInfoSync, DBTaskInfoIncrement.Parser, m => m.Infos.ContainsKey(10101020));
         Assert.Equal(TaskState.Delivery, step.Infos[TaskService.FirstTask].Inc.Status);
@@ -449,6 +450,7 @@ public sealed partial class MapTests : IAsyncLifetime
         Assert.Equal(TaskState.Delivery, step.Infos[10101020].Inc.Status);
 
         // Task 3 (area) -> task 4: talk to Rhine (client task point 1010104001) -> task 5 kill 5 Porings.
+        await Gm("alice", "!jump 258.9304 249.3749");
         await alice.SendGameAsync(SceneService.ClientEnterArea, new ClientEnterAreaReq { AreaId = 1010103001 });
         await Next(alice, TaskService.TaskInfoSync, DBTaskInfoIncrement.Parser, m => m.Infos.ContainsKey(10101040));
         var rhine = _app.Services.GetRequiredService<WorldData>().Map(SouthGate)!.Points[1010104001];
@@ -566,6 +568,7 @@ public sealed partial class MapTests : IAsyncLifetime
                 // Stop the running auto-attack: a swing still in flight would refuse the next press (it never yields to itself).
                 player.Attack = null;
                 if (player.SkillCast is { } swing) { swing.Cancelled = true; player.SkillCast = null; }
+                player.LastNormalAttack = null;
                 boss.Advance(MonsterService.NowMs);
                 boss.Moving = false;
                 boss.NextRoamMs = long.MaxValue;
@@ -608,6 +611,7 @@ public sealed partial class MapTests : IAsyncLifetime
             var player = _app.Services.GetRequiredService<SessionRegistry>().All().Single(s => s.Account == "alice");
             player.Attack = null;
             if (player.SkillCast is { } cast) cast.Cancelled = true;
+            player.LastNormalAttack = null; // the next press is the fixture's, not a faster swing
             observed.TrySetResult(snapshot);
         }
         var rejected = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);

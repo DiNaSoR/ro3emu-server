@@ -137,6 +137,8 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
 
     /// <summary>Authoritative cast generation; delayed effects cannot outlive an interrupted/replaced cast.</summary>
     public ActiveSkillCast? SkillCast { get; set; }
+    /// <summary>The last accepted normal attack, which paces the next one (CombatService.NormalAttackTooSoon).</summary>
+    internal ActiveSkillCast? LastNormalAttack { get; set; }
     public SemaphoreSlim SkillCastGate { get; } = new(1, 1);
     public List<SkillObject> SkillObjects { get; } = new();
     public Dictionary<(int Group, int Mode), long> SkillModeCds { get; } = new();
