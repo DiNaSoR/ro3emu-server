@@ -206,6 +206,82 @@ public sealed class CustomContentQuestFormatTests : IDisposable
     }
 
     [Fact]
+    public void ShopBecomesAnNpcShopWithCommoditiesAndAGreetingButton()
+    {
+        var c = Load("""
+            {"npcs": [{"id": 91000005, "name": "Mira", "greeting": "Hello there.",
+                       "shop": {"name": "Mira's Goods", "items": [[1200801, 50], {"item": 1002000, "price": 3, "currency": 2, "count": 5}]}}]}
+            """);
+        Assert.Empty(c.Errors);
+        var shop = Obj(c, "ShopConfig", 91000005);
+        Assert.Equal((10L, 91000005L, 91000005L, 91000005L, 3, 0),
+            (shop["_base"]!.GetValue<long>(), shop["_iShopId"]!.GetValue<long>(), shop["_iClassID"]!.GetValue<long>(),
+             shop["_iNpcId"]!.GetValue<long>(), shop["_iShopType"]!.GetValue<int>(), shop["_iFunctionId"]!.GetValue<int>()));
+        Assert.Equal("Mira's Goods", Text(c, shop["_iShopName"]));
+
+        long first = CustomContent.CommodityBase + 5 * 100 + 1;
+        var cocoa = Obj(c, "ShopCommodityConfig", first);
+        Assert.Equal((113L, 91000005L, 1200801L, 1L), (cocoa["_base"]!.GetValue<long>(), cocoa["_iClassID"]!.GetValue<long>(),
+            cocoa["_iItemId"]!.GetValue<long>(), cocoa["_iItemPerMount"]!.GetValue<long>()));
+        Assert.Equal("[1,50]", cocoa["_kItemPerPrice"]!.ToJsonString());
+        var wings = Obj(c, "ShopCommodityConfig", first + 1);
+        Assert.Equal("[2,3]", wings["_kItemPerPrice"]!.ToJsonString());
+        Assert.Equal(5, wings["_iItemPerMount"]!.GetValue<long>());
+
+        // The greeting: the line, a Shop button that opens the panel on this shop and closes the dialogue, then Goodbye.
+        var pages = Arr(c, "DialogueConfig", CustomContent.NpcDialogBase + 5 * 100 + 1);
+        Assert.Equal(3, pages.Count);
+        Assert.Equal("Shop", Text(c, pages[1]!["_iText"]));
+        Assert.Equal("""[["1","TOPBAR","UI_Sys_ShopNpcPanel","91000005","91000005"],["8","TOPBAR","UI_Sys_NpcDialogPanel"]]""",
+            pages[1]!["_iEXECAction"]!.ToJsonString());
+        Assert.Equal("npcdialog_icon_shop.png", pages[1]!["_iIcon"]!.GetValue<string>());
+        Assert.Equal("Goodbye", Text(c, pages[2]!["_iText"]));
+        Assert.Equal(3, pages[2]!["_iSortID"]!.GetValue<int>());
+    }
+
+    [Theory]
+    [InlineData("\"shop\": []", "an object")]
+    [InlineData("\"shop\": {\"items\": []}", "\"items\"")]
+    [InlineData("\"shop\": {\"items\": [[1200801]]}", "[item, price]")]
+    [InlineData("\"shop\": {\"items\": [[1200801, 0]]}", "above 0")]
+    public void BrokenShopIsSkippedWithAReason(string shop, string reason)
+    {
+        var c = Load($$"""{"npcs": [{"id": 91000006, "name": "M", "greeting": "Hi", {{shop}}}]}""");
+        Assert.Contains(reason, Assert.Single(c.Errors));
+    }
+
+    [Fact]
+    public void LevelAreaAndDoneStepsBecomeTheirTargets()
+    {
+        var c = Load("""
+            {"quests": [{"id": 91000100, "steps": [
+              {"name": "A", "description": "B", "objective": "Reach base level 20", "level": 20},
+              {"name": "A", "description": "B", "objective": "Go to the South Gate", "area": 1010101, "map": 10111},
+              {"name": "A", "description": "B", "objective": "Finish the Novice Guide", "done": 10101130}
+            ]}]}
+            """);
+        Assert.Empty(c.Errors);
+        var level = Obj(c, "TaskConfig", 91000100);
+        Assert.Equal("[[101002,20]]", level["_kProgressTarget"]!.ToJsonString());
+        Assert.Equal(2000008, level["_iCondition"]!.GetValue<long>());
+        var area = Obj(c, "TaskConfig", 91000101);
+        Assert.Equal("[[104003,10111,1010101]]", area["_kProgressTarget"]!.ToJsonString());
+        Assert.Equal("""[["142","10111","1010101","-1"]]""", area["_kTrack"]!.ToJsonString());
+        Assert.Equal("[91000100]", area["_kPreTask"]!.ToJsonString());
+        var done = Obj(c, "TaskConfig", 91000102);
+        Assert.Equal("[[104004,10101130]]", done["_kProgressTarget"]!.ToJsonString());
+    }
+
+    [Theory]
+    [InlineData("\"area\": 1010101", "needs the \"map\"")]
+    [InlineData("\"level\": 20, \"done\": 10101130", "needs one of")]
+    public void BrokenStepKindIsSkippedWithAReason(string kind, string reason)
+    {
+        var c = Load($$"""{"quests": [{"id": 91000110, "steps": [{"name": "A", "description": "B", "objective": "C", {{kind}}}]}]}""");
+        Assert.Contains(reason, Assert.Single(c.Errors));
+    }
+
+    [Fact]
     public void UnknownQuestTypeIsSkippedWithAReason()
     {
         var c = Load("""
@@ -215,7 +291,7 @@ public sealed class CustomContentQuestFormatTests : IDisposable
     }
 
     [Theory]
-    [InlineData("""{"name": "A", "description": "B", "objective": "C"}""", "either \"talk\" or \"kill\"")]
+    [InlineData("""{"name": "A", "description": "B", "objective": "C"}""", "needs one of \"talk\"")]
     [InlineData("""{"name": "A", "description": "B", "objective": "C", "talk": 200014, "dialog": ["Hi"]}""", "needs a \"map\"")]
     [InlineData("""{"name": "A", "description": "B", "objective": "C", "talk": 200014, "map": 1, "dialog": [{"say": "x", "reply": "y"}]}""", "last dialog page")]
     [InlineData("""{"name": "A", "objective": "C", "kill": 5000001, "count": 5}""", "\"description\"")]

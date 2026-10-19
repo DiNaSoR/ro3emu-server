@@ -1,5 +1,5 @@
 {
-  "//": "Prototype custom quest (docs/guide/custom-content.md): Elias, a new NPC next to Alphonse in Prontera, asks for 5 Porings at the South Gate. Delete this file to remove it.",
+  "//": "Prototype custom quest (docs/guide/custom-content.md): Elias, a new NPC next to Alphonse in Prontera, asks for 5 Porings at the South Gate and sells a few supplies. Delete this file to remove it.",
   "npcs": [
     {
       "id": 90000001,
@@ -7,7 +7,11 @@
       "title": "Wandering Scholar",
       "model": 100079,
       "map": 10100, "x": 150.4, "z": 193.05, "face": 180,
-      "greeting": "So many curious creatures around Prontera, and so little time to study them all."
+      "greeting": "So many curious creatures around Prontera, and so little time to study them all.",
+      "shop": {
+        "name": "Scholar's Supplies",
+        "items": [[1200801, 50], [1002001, 60], [1002000, 300]]
+      }
     }
   ],
   "quests": [

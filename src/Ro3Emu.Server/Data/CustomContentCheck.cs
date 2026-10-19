@@ -86,6 +86,12 @@ public static class CustomContentCheck
                                             problems.Add($"{by}: item {item} is a currency and cannot be bound");
                                     }
                         break;
+                    case "ShopCommodityConfig":
+                        Need("item", "ItemConfig", GameData.Int(row, "_iItemId"), by);
+                        foreach (var price in Longs(row, "_kItemPerPrice").Take(1)) Need("currency", "ItemConfig", price, by);
+                        if (data.Table("ShopConfig").Values.All(s => GameData.Int(s, "_iClassID") != GameData.Int(row, "_iClassID")))
+                            problems.Add($"{by}: no ShopConfig row has _iClassID {GameData.Int(row, "_iClassID")}");
+                        break;
                     case "NPCInteractConfig":
                         NeedDialogs(row, "_iEXECAction", by);
                         break;
