@@ -598,6 +598,7 @@ public sealed partial class CombatService : IGameTicker
         // Devotion / King's Grace pass their share to the Crusader (CombatService.Guard); a passed share is not passed again.
         if (!shared) damage = await ShareDamageAsync(target, damage);
         long beforeShield = damage;
+        if (damage > 0) target.LastDamagedMs = Now;
         damage = await buffs.AbsorbAsync(target, damage);
         if (!ReferenceEquals(target.Role, targetRole) || target.SceneLoading || valid?.Invoke() == false) return null;
         long before = character.Stats(target)[2000];

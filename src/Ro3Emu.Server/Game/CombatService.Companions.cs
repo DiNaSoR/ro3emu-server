@@ -138,7 +138,11 @@ public sealed partial class CombatService
         int group = (int)GameData.Int(row, "_iSkillID");
         bool charge = group == WargStrikeSkillGroup && GameData.Int(row, "_iMode") == 1;
         if (group == WargBiteGroup) await ResetCooldownAsync(s, WargHuntGroup);
-        if (charge || group == WargHuntGroup) await ResetCooldownAsync(s, SwiftWargGroup);
+        if (charge || group == WargHuntGroup)
+        {
+            await ResetCooldownAsync(s, SwiftWargGroup);
+            ArmSwiftWarg(s);
+        }
         if (!charge && group != WargBiteGroup) return;
 
         long now = MonsterService.NowMs;

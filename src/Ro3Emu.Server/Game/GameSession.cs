@@ -200,6 +200,10 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
     internal long AstralNextMs { get; set; }
     /// <summary>Where Move back Shadow Echo left its shadow (CombatService.Chains).</summary>
     internal Romsg.Vec3? ShadowEchoPos { get; set; }
+    /// <summary>When this role last took damage (shield included): Prayer of Gratitude's shield refreshes after a quiet spell.</summary>
+    internal long LastDamagedMs { get; set; }
+    /// <summary>Swift Warg is armed until then: the next movement casts it (CombatService.WargSkills).</summary>
+    internal long SwiftWargArmedMs { get; set; }
     public int ImmuneRecoveryPercent { get; set; }
     public Dictionary<int, long> SkillCds { get; } = new();
     public Dictionary<int, long> ItemCds { get; } = new();

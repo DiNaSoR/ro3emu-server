@@ -83,8 +83,8 @@ public sealed partial class BuffService : IGameTicker
     /// duration -1 on a BuffConfig row without a time (Reading Spellbook until Stop Reading, inferred). It shows no
     /// countdown (expire time 0, like a passive).
     /// </summary>
-    public Task AddLastingAsync(GameSession p, int configId, long sourceId, int? pileCount = null) =>
-        AddCoreAsync(p, configId, 0, sourceId, pileCount is { } n ? Math.Max(1, n) : null, lasting: true);
+    public Task AddLastingAsync(GameSession p, int configId, long sourceId, int? pileCount = null, long shieldAmount = 0) =>
+        AddCoreAsync(p, configId, 0, sourceId, pileCount is { } n ? Math.Max(1, n) : null, shieldAmount, lasting: true);
 
     private async Task AddCoreAsync(GameSession p, int configId, int durationMs, long sourceId, int? explicitPileCount,
         long shieldAmount = 0, bool lasting = false)
