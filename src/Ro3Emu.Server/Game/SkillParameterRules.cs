@@ -161,7 +161,7 @@ internal static class SkillParameterRules
     // The supported scalar/list fields are shared by server validation and client 31132.
     internal static string? Field(int type) => type switch
     {
-        0 => "_iCD", 21 => "_iActionTime", 23 => "_iChantFix", 24 => "_iChantVar",
+        0 => "_iCD", 10 => "_iSkillCri", 21 => "_iActionTime", 23 => "_iChantFix", 24 => "_iChantVar",
         25 => "_iDistanceMin", 26 => "_iDistanceMax", 27 => "_iTargetMax",
         29 => "_kDamageParam1", 30 => "_kDamageParam2", 35 => "_kCost",
         _ => null,

@@ -16,6 +16,9 @@ namespace Ro3Emu.Server.Game;
 /// per enemy per cast, inferred).</item>
 /// <item>Enchant Blade 11313: "After dealing damage, increases your DEF by ${2}%" (the buff's _kLogicData row, 1131501-
 /// 1131503) for 5 s, refreshed on each hit (inferred: the duration is @{1} with no source).</item>
+/// <item>Advanced Katar Mastery 15220: "When a Basic Attack crits (internal cooldown: ${1}s), your ${2} Crit increases for
+/// ${3}s, stacking up to ${4} times" (same-id buff _kLogicData [crit buff row, ...]: 1522101-1522110, +10 to +100 Crit
+/// a pile).</item>
 /// <item>Soul Drain 12209: "Each Kill restores ${2}% of Max MP as MP".</item>
 /// <item>Energy Coat 12003: "When you take damage, gain 【Energy Coat】 for ${1} sec. ... Cooldown: ${3} sec." (buff
 /// 1201401 _kLogicData [1201501, ms, 1]).</item>
@@ -37,6 +40,7 @@ public sealed partial class CombatService
     private void WireTriggerSkills()
     {
         DealtAsync.Add(EnchantBladeAsync);
+        DamageAdjusters.Add(AdvancedKatarCrit);
         Killed.Add(SoulDrainAsync);
     }
 
@@ -73,6 +77,27 @@ public sealed partial class CombatService
         if (amount <= 0 || LiveGroup(s, EnchantBladeGroup) is not { } blade || data.Row("BuffConfig", blade.ConfigId) is not { } bladeRow
             || Numbers(bladeRow, "_kLogicData") is not [var defId, ..]) return;
         await buffs.AddAsync(s, (int)defId, EnchantBladeMs, s.Role!.Id);
+    }
+
+    private const int AdvancedKatarGroup = 15220;
+
+    private long AdvancedKatarCrit(GameSession s, MonsterUnit target, JsonElement row, Romsg.DamageHitResult result, long damage)
+    {
+        if (result != Romsg.DamageHitResult.Critical || GameData.Int(row, "_iIsNormalAtk") != 1 || s.Progress is not { } progress
+            || skills.Level(progress, AdvancedKatarGroup) is not (var level and > 0)) return damage;
+        long now = MonsterService.NowMs;
+        if (now < s.ProcState.GetValueOrDefault(AdvancedKatarGroup)
+            || data.Row("SkillConfig", skills.RealId(AdvancedKatarGroup, level)) is not { } skill
+            || Numbers(skill, "_kDescData") is not { Length: > 2 } desc
+            || data.Row("BuffConfig", skills.RealId(AdvancedKatarGroup, level)) is not { } buff
+            || Numbers(buff, "_kLogicData") is not [var critId, ..]) return damage;
+        s.ProcState[AdvancedKatarGroup] = now + (long)(desc[0] * 1000);
+        var role = s.Role;
+        ScheduleRuntime(s.WorldScene, TimeSpan.Zero, async () =>
+        {
+            if (ReferenceEquals(s.Role, role) && !s.Dead) await buffs.AddAsync(s, (int)critId, (int)(desc[2] * 1000), role!.Id);
+        });
+        return damage;
     }
 
     private async Task SoulDrainAsync(GameSession s, MonsterUnit monster)

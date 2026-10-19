@@ -79,4 +79,46 @@ public sealed partial class SkillCombatTests
         await Loop.InvokeAsync(() => Combat.ReactToMonsterHitAsync(monster, Session("alice"), null, 100));
         await WaitFor(() => Loop.InvokeAsync(() => Task.FromResult(Buffs.UnitBuffs(monster).Any(b => b.ConfigId == 901601))), "no stun");
     }
+    [ClientDataFact]
+    public async Task KatarMasteryNeedsAKatar()
+    {
+        await using var alice = await InWorld("Alice");
+        await Gm("alice", "!job 5100");
+        long bare = await Loop.InvokeAsync(() => Task.FromResult(Character.Stats(Session("alice"))[103]));
+        await Wield("alice", 2120120); // a katar (subtype 12)
+        long katar = await Loop.InvokeAsync(() => Task.FromResult(Character.Stats(Session("alice"))[103]));
+        long ratio = await Loop.InvokeAsync(() => Task.FromResult(Combat.EffectiveSkillRow(Session("alice"), 1005101)!.Value.GetProperty("_kDamageParam1")[0].GetInt64()));
+        await Teach("alice", 15101);
+        await Until(s => Character.Stats(s)[103] > katar, "alice"); // "increases Physical ATK by ${1}"
+        await Loop.InvokeAsync(() =>
+        {
+            Combat.SyncPassiveSkillModifiers(Session("alice"));
+            long mastered = Combat.EffectiveSkillRow(Session("alice"), 1005101)!.Value.GetProperty("_kDamageParam1")[0].GetInt64();
+            Assert.Equal((long)Math.Round(ratio * 1.1), mastered); // [Assassin Normal Attack] multiplier +10%
+            return Task.CompletedTask;
+        });
+        Assert.True(katar >= bare);
+    }
+
+    [ClientDataFact]
+    public async Task AdvancedKatarMasteryRaisesCritAndStacksOnCrits()
+    {
+        await using var alice = await InWorld("Alice");
+        await Gm("alice", "!job 5200"); await Teach("alice", 15220); await Wield("alice", 2120120);
+        var monster = await Spawn("alice", t => t);
+        await Loop.InvokeAsync(() =>
+        {
+            Combat.SyncPassiveSkillModifiers(Session("alice"));
+            var row = Combat.EffectiveSkillRow(Session("alice"), 1005101)!.Value;
+            Assert.True(row.GetProperty("_iSkillCri").GetInt64() > 10000); // Crit Chance +40% (type 10)
+            return Task.CompletedTask;
+        });
+        var attack = Data.Row("SkillConfig", 1005101)!.Value;
+        await Loop.InvokeAsync(() =>
+        {
+            foreach (var adjust in Combat.DamageAdjusters) adjust(Session("alice"), monster, attack, DamageHitResult.Critical, 100);
+            return Task.CompletedTask;
+        });
+        await Until(s => s.Buffs.Any(b => b.ConfigId / 100 == 15221), "alice"); // 【CRIT】 pile
+    }
 }
