@@ -181,6 +181,38 @@ public sealed class CardRulesTests : IAsyncLifetime
     }
 
     [ClientDataFact]
+    public async Task HeadFaceAndMouthSocketsOpenAtTheLevelTheClientShows()
+    {
+        // EquipGridConfig rows 8-10 (by _iID, as the client keys them) open socket 1 at base level 20. The server used
+        // to look the grid up by _iEquipGridType and read the empty appearance rows, refusing a slot the client drew open.
+        const int head = 1420700, face = 1430800, mouth = 1430900; // _iCardPart 7 / 8 / 9
+        await using var alice = await InWorld("Alice");
+        var session = Session("Alice");
+        await Gm("alice", "!lvl 19");
+        await Gm("alice", $"!item {head} 1");
+        await Gm("alice", $"!item {face} 1");
+        await Gm("alice", $"!item {mouth} 1");
+        long GuidOf(int entry) => session.Items.Single(i => i.Entry == entry).Guid;
+
+        Assert.Equal(ErrorCodes.SlotSealed, await Insert(alice, 8, 1, GuidOf(head)));
+        Assert.Equal(ErrorCodes.SlotSealed, await Insert(alice, 9, 1, GuidOf(face)));
+        Assert.Equal(ErrorCodes.SlotSealed, await Insert(alice, 10, 1, GuidOf(mouth)));
+
+        await Gm("alice", "!lvl 20");
+        Assert.Equal(0, await Insert(alice, 8, 1, GuidOf(head)));
+        Assert.Equal(0, await Insert(alice, 9, 1, GuidOf(face)));
+        Assert.Equal(0, await Insert(alice, 10, 1, GuidOf(mouth)));
+        Assert.Equal(head, session.Items.Single(i => i.Grid == CharacterService.CardGrid(8, 1)).Entry);
+        Assert.Equal(face, session.Items.Single(i => i.Grid == CharacterService.CardGrid(9, 1)).Entry);
+        Assert.Equal(mouth, session.Items.Single(i => i.Grid == CharacterService.CardGrid(10, 1)).Entry);
+
+        // Socket 2 of these grids is 0 in the config, and the client never draws it.
+        await Gm("alice", "!lvl 80");
+        await Gm("alice", "!item 1430700 1");
+        Assert.Equal(ErrorCodes.SlotSealed, await Insert(alice, 8, 2, GuidOf(1430700)));
+    }
+
+    [ClientDataFact]
     public async Task SocketedCardAppliesFlashAttributesAndItsAttributeConversion()
     {
         const int card = 1450101; // _kSkillAttribute 11000062 [8, 109, 1, 1304, 1, 650]; Flash 11001201

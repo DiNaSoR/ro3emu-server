@@ -13,7 +13,8 @@ namespace Ro3Emu.Server.Game;
 /// CharacterService.CardGrid). Persisted selections are 5026 DBStorageHoleInfo, the card collection
 /// ("library") 5057 DBLibraryInfo.cards. Messages: 31406-31408 sockets, 31411-31412 plans, 31461-31463 progression,
 /// 82404 collection unlock; the Codex monsters (5057 monsters, 82407) are CardService.Monsters.cs.
-/// Sockets open by EquipGridConfig._kSocketOpen1..4 conditions (base level); main/off hand need a worn item there.
+/// Sockets open by EquipGridConfig[grid id]._kSocketOpen1..4 conditions (base level); main/off hand need a worn item there,
+/// head/face/mouth (8-10) their wardrobe page.
 /// </summary>
 public sealed partial class CardService
 {
@@ -29,11 +30,14 @@ public sealed partial class CardService
     /// retains durable debt until the task pass has committed.</summary>
     internal Func<GameSession, OwnerContext, Task<bool>>? RequiredCollectionRefresh { get; set; }
 
-    /// <summary>ItemConfig._iCardPart → equipment grids (card names: Lunatic weapon, Poring armour, Worm Tail accessory ...).</summary>
+    /// <summary>
+    /// ItemConfig._iCardPart (enum_CardPosType) → equipment grids, LC_CardHelper's pos table: 1 weapon, 2 shield,
+    /// 3 armour, 4 cloak, 5 shoes, 6 accessory (both), 7 head, 8 face, 9 mouth.
+    /// </summary>
     private static int[] GridsFor(long part) => part switch
     {
-        1 => [1], 2 => [2], 3 => [3], 4 => [4], 5 => [5], 6 => [6, 7], 7 => [8],
-        _ => [], // 8 / 9 "Sketch Card" (MVP): target not established
+        1 => [1], 2 => [2], 3 => [3], 4 => [4], 5 => [5], 6 => [6, 7], 7 => [8], 8 => [9], 9 => [10],
+        _ => [],
     };
 
     private readonly GameData data;
@@ -256,18 +260,32 @@ public sealed partial class CardService
     private InvItem? Socketed(GameSession session, int grid, int socket) =>
         session.Items.FirstOrDefault(i => i.Grid == CharacterService.CardGrid(grid, socket));
 
-    private bool ValidSocket(int grid, int socket) => socket is >= 1 and <= 4 && data.Table("EquipGridConfig").Values
-        .Any(r => GameData.Int(r, "_iEquipGridType") == grid && GameData.Int(r, "_iGridCategory") is 1 or 3);
+    private bool ValidSocket(int grid, int socket) => socket is >= 1 and <= 4 && SocketGridRow(grid) is not null;
+
+    /// <summary>
+    /// The EquipGridConfig row of a card grid. Lua_CFG_EquipGridConfig keys it by _iID, which is the EquipGridType
+    /// (8 head, 9 face, 10 mouth), not by _iEquipGridType: the appearance rows reuse 1..9 there (row 8 is the headwear
+    /// grid with _iEquipGridType 1). A card grid is a row with at least one _kSocketOpenN (its m_kCardGridList).
+    /// </summary>
+    private JsonElement? SocketGridRow(int grid) =>
+        data.Row("EquipGridConfig", grid) is { ValueKind: JsonValueKind.Object } row && GameData.Int(row, "_iGridCategory") is 1 or 3
+            && Enumerable.Range(1, 4).Any(n => GameData.Int(row, $"_kSocketOpen{n}") != 0) ? row : null;
+
+    /// <summary>Lua_CFG_EquipGridConfig.CheckGridOpenCondition: the appearance card grids open with their wardrobe page.</summary>
+    private static long GridFunction(int grid) => grid switch { 8 => 3203, 9 => 3204, 10 => 3205, _ => 0 };
 
     private int AddressError(int grid, int socket) => socket is < 1 or > 4 ? ErrorCodes.SlotIndex
         : ValidSocket(grid, socket) ? 0 : ErrorCodes.EquipSlot; // (inferred) invalid grid.
 
-    /// <summary>EquipGridConfig[grid]._kSocketOpenN condition (0 = never); the weapon grids also need a worn item.</summary>
+    /// <summary>
+    /// Lua_CFG_EquipGridConfig.IsSocketUnlockByIndex: the grid's open condition, then EquipGridConfig[grid]._kSocketOpenN
+    /// (0 = never); the weapon grids also need a worn item.
+    /// </summary>
     private int SocketError(GameSession session, int grid, int socket)
     {
         if (AddressError(grid, socket) is var address and not 0) return address;
-        var row = data.Table("EquipGridConfig").Values.FirstOrDefault(r => GameData.Int(r, "_iEquipGridType") == grid && GameData.Int(r, "_iGridCategory") is 1 or 3);
-        if (row.ValueKind != JsonValueKind.Object) return ErrorCodes.EquipSlot; // (inferred) bad grid.
+        if (SocketGridRow(grid) is not { } row) return ErrorCodes.EquipSlot; // (inferred) bad grid.
+        if (GridFunction(grid) is var function and not 0 && !functions.IsOpen(session, function)) return ErrorCodes.SlotSealed;
         if (!row.TryGetProperty($"_kSocketOpen{socket}", out var cond) || GameData.Number(cond) is not { } id || id <= 0) return ErrorCodes.SlotSealed;
         if (grid is 1 or 2 && session.Items.All(i => i.Grid != grid)) return ErrorCodes.EquipSlot; // (inferred) no worn weapon.
         return functions.ConditionMet(session, (long)id) ? 0 : ErrorCodes.SlotSealed;
