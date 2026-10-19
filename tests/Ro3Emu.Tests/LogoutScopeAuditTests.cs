@@ -71,6 +71,37 @@ public sealed class LogoutScopeAuditTests(ITestOutputHelper output) : IAsyncLife
     }
 
     [Fact]
+    public async Task RegenWaitingForTheCharacterGateEndsQuietlyWhenTheRoleLeaves()
+    {
+        var loop = app.Services.GetRequiredService<GameLoop>();
+        var combat = app.Services.GetRequiredService<CombatService>();
+        var (bot, id) = await InWorld("OutRegen");
+        var s = app.Services.GetRequiredService<SessionRegistry>().All().Single(x => x.Role?.Id == id);
+        // Another operation holds the gate while the regen queues behind it; the role's attachment changes meanwhile.
+        var locked = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var holder = loop.InvokeAsync(async () =>
+        {
+            using (await CharacterService.Lock(s)) { locked.SetResult(); await release.Task; }
+        });
+        await locked.Task.WaitAsync(Wait);
+        Task regen = null!;
+        // As CombatService.Tick starts it; the detached root logs a failure, the captured task shows it here.
+        await loop.InvokeAsync(() =>
+        {
+            loop.TrackRuntimeDetached("combat regeneration", () => regen = combat.RegenAsync(s));
+            return Task.CompletedTask;
+        });
+        var attachment = await loop.InvokeAsync(() => { var a = s.Attachment; s.Attachment = null; return Task.FromResult(a); });
+        release.SetResult();
+        await holder.WaitAsync(Wait);
+        try { await regen.WaitAsync(Wait); } // used to throw "Role changed before the character gate was acquired"
+        finally { await loop.InvokeAsync(() => { s.Attachment = attachment; return Task.CompletedTask; }); }
+        await bot.DisposeAsync();
+        await WaitDetached(id);
+    }
+
+    [Fact]
     public async Task GuildMemberLogoutStaysInsideItsReservation()
     {
         var audit = Audit();

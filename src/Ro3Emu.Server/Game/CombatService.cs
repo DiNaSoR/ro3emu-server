@@ -1035,10 +1035,15 @@ public sealed partial class CombatService : IGameTicker
 
     /// <summary>HP/SP regeneration every 5 s out of combat: FinalReHp = ReHP + MaxHP × per_rehp (117/118, inferred).
     /// MP also takes 243 ("temporary_per_magicrecover", Meditatio's "MP Recovery Speed") beside per_resp 1081 (inferred).</summary>
-    private async Task RegenAsync(GameSession s)
+    internal async Task RegenAsync(GameSession s)
     {
-        if (s.Role == null || s.Progress == null) return;
-        using var held = await CharacterService.Lock(s);
+        if (s.Role is not { } role || s.Progress == null) return;
+        var attachment = s.Attachment;
+        IDisposable held;
+        // The role can log out or switch while the regen waits for the character gate: nothing to restore then.
+        try { held = await CharacterService.Lock(s); }
+        catch (OperationCanceledException) when (!ReferenceEquals(s.Role, role) || !ReferenceEquals(s.Attachment, attachment)) { return; }
+        using var _ = held;
         if (s.Role == null || s.Progress == null || s.Dead || (s.StatusBits & FightBit) != 0) return;
         if (s.CurrentHp == null && s.CurrentSp == null) return; // unset = full (CharacterService.Stats): nothing to restore
         var st = character.Stats(s);
