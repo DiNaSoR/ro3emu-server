@@ -50,6 +50,10 @@ public sealed class ReopenedContentTests : IAsyncLifetime
     private Task<bool> SeasonOpen() => Read(s => Service<FunctionService>().IsOpen(s, 69));
     private Task<long> Count(int item) => Read(s => Service<CharacterService>().CountOf(s, item));
 
+    private static async Task<T> Next<T>(BotClient bot, uint msgId, Google.Protobuf.MessageParser<T> parser)
+        where T : Google.Protobuf.IMessage<T>
+        => parser.ParseFrom((await bot.Inbox.WaitAsync(e => e.IsGame(msgId), Wait)).Body);
+
     private async Task Gm(string line)
     {
         using var http = new HttpClient();
@@ -117,5 +121,41 @@ public sealed class ReopenedContentTests : IAsyncLifetime
         Assert.Equal(10000, Exp(HairBand));
         Assert.Equal(150000, Exp(201130));
         Assert.Equal(300000, Exp(205200));
+    }
+
+    [ClientDataFact]
+    public async Task TheTotemGoodsAndTheSurvivorBattleIntroOpenAtTheirLevels()
+    {
+        const int RandomTotem = 12107; // Zeny Shop (function 70103, base level 10): Random Divine Arts Totem, 6,750 Zeny
+        const long KafraIntro = 10200060;
+        var bot = new BotClient(_http, File.ReadAllText(Path.Combine(_dataDir, "gate_rsa_public.pem")));
+        await using var _ = bot;
+        await bot.LoginAsync("reopenalice", "pw");
+        await bot.EnterGateAsync();
+        long id = (await bot.CreateRoleAsync("ReopenAlice")).RoleBaseInfo.Id;
+        await bot.EnterWorldAsync(id);
+        await Barrier(bot);
+        await Gm("!item 1 100000");
+
+        // Base level 39: the shop is open but the totem goods are not, and the Survivor Battle intro is not offered.
+        await Gm("!lvl 39");
+        await Barrier(bot);
+        await bot.SendGameAsync(ShopService.BuyCommodity, new BuyCommodityReq { CommodityId = RandomTotem, Count = 1, Price = 6750 });
+        Assert.Equal(ErrorCodes.PurchaseRequirements, (await Next(bot, ShopService.BuyCommodity, BuyCommodityResp.Parser)).Result);
+        Assert.Null(await State(KafraIntro));
+
+        // Base level 40, the Divine Totem's level: they can be bought.
+        await Gm("!lvl 40");
+        await Barrier(bot);
+        await bot.SendGameAsync(ShopService.BuyCommodity, new BuyCommodityReq { CommodityId = RandomTotem, Count = 1, Price = 6750 });
+        Assert.Equal(0, (await Next(bot, ShopService.BuyCommodity, BuyCommodityResp.Parser)).Result);
+        Assert.Equal(1, await Count(1300078));
+        Assert.All(new long[] { 12107, 12108, 13101, 13120, 13121, 13122, 25103 },
+            c => Assert.Equal(2000026, Service<Ro3Emu.Server.Data.GameData>().Row("ShopCommodityConfig", c)!.Value.GetProperty("_iIsLock").GetInt64()));
+
+        // Base level 49, the quest's own condition: "Learn About Kafra: Survivor Battle" is offered.
+        await Gm("!lvl 49");
+        await Barrier(bot);
+        Assert.Equal(TaskState.Running, await State(KafraIntro));
     }
 }
