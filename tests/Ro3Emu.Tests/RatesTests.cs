@@ -9,7 +9,10 @@ namespace Ro3Emu.Tests;
 /// <summary>ServerOptions.Rates on monster kill rewards (docs/guide/rates.md).</summary>
 public sealed class RatesTests
 {
-    private static async Task<T> WithRates<T>(Action<RatesOptions> rates, Func<RewardService, T> act)
+    private static Task<T> WithRates<T>(Action<RatesOptions> rates, Func<RewardService, T> act) =>
+        WithRates<RewardService, T>(rates, act);
+
+    private static async Task<T> WithRates<TService, T>(Action<RatesOptions> rates, Func<TService, T> act) where TService : notnull
     {
         string dir = Path.Combine(ClientData.RepoRoot, ".loadtest-temp", "rates-" + Guid.NewGuid().ToString("N"));
         var (web, micro, game) = TestPorts.FreePorts();
@@ -19,7 +22,7 @@ public sealed class RatesTests
             o.HttpPort = web; o.MicroGatePort = micro; o.GameGatePort = game;
             rates(o.Rates);
         });
-        try { return act(app.Services.GetRequiredService<RewardService>()); }
+        try { return act(app.Services.GetRequiredService<TService>()); }
         finally
         {
             await app.DisposeAsync(); SqliteConnection.ClearAllPools();
@@ -58,6 +61,24 @@ public sealed class RatesTests
         Assert.Equal([(1, 1), (2, 1), (1000000, 2)], low.Items);
         var none = await WithRates(r => r.CurrencyDrop = 0, r => r.ApplyRates(Loot, 4));
         Assert.Equal([(1000000, 2)], none.Items);
+    }
+
+    [ClientDataFact]
+    public async Task BaseExpRateScalesQuestExpAndJobExpFollowsAt20Percent()
+    {
+        Assert.Equal(70_000, await WithRates<CharacterService, long>(_ => { }, c => c.QuestExp(70_000)));
+        var (quest, job) = await WithRates<CharacterService, (long, long)>(r => { r.BaseExp = 3; r.JobExp = 9; },
+            c => (c.QuestExp(70_000), c.JobExpFromBase(c.QuestExp(70_000))));
+        Assert.Equal((210_000, 42_000), (quest, job));
+        Assert.Equal(0, await WithRates<CharacterService, long>(r => r.BaseExp = 0, c => c.QuestExp(70_000)));
+        Assert.Equal(0, await WithRates<CharacterService, long>(r => r.BaseExp = 3, c => c.QuestExp(0)));
+    }
+
+    [ClientDataFact]
+    public async Task SoloKillerHasNoPartyDropBonus()
+    {
+        var solo = new GameSession(null!, null!);
+        Assert.Equal(10000, await WithRates<TeamService, int>(_ => { }, t => t.DropBonus(solo)));
     }
 
     [Fact]

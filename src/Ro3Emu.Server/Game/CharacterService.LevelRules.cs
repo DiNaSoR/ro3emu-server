@@ -110,6 +110,10 @@ public sealed partial class CharacterService
         return percent <= 0 ? baseExp : checked(baseExp + baseExp * percent / 10000);
     }
 
+    /// <summary>A quest's _kEXP Base EXP under the server's BaseExp rate (Ro3Emu:Rates). Its Job EXP is then the usual 20%
+    /// of the scaled amount (<see cref="JobExpFromBase"/>), so JobExp is not applied a second time.</summary>
+    public long QuestExp(long baseExp) => RewardService.Scale(baseExp, RewardService.Rate(options.Value.Rates.BaseExp));
+
     private long? _baseToJobPercent;
 
     /// <summary>
