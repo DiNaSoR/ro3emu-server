@@ -40,7 +40,7 @@ public sealed class GameData(IOptions<ServerOptions> options, ILogger<GameData> 
         {
             if (_tables.TryGetValue(name, out var table)) return table;
             var path = Path.Combine(Root, "config", name + ".json");
-            if (File.Exists(path)) table = LoadConfig(path);
+            if (File.Exists(path)) table = new(ProcessCache.File("config", path, LoadConfig));
             else
             {
                 table = new();
@@ -90,7 +90,7 @@ public sealed class GameData(IOptions<ServerOptions> options, ILogger<GameData> 
         var custom = Custom;
         Parallel.ForEach(files, f =>
         {
-            var table = f.Config ? LoadConfig(f.Path) : LoadObject(f.Path);
+            var table = f.Config ? new(ProcessCache.File("config", f.Path, LoadConfig)) : ProcessCache.File("object", f.Path, LoadObject);
             // TaskConfig waits for the other tables: its kill steps look up MapConfig and the scene editor
             // (KillTrackTarget) to point the tracker at the monsters.
             if (f.Config && f.Key != "TaskConfig") custom.Overlay(f.Key, table, log);
@@ -229,7 +229,7 @@ public sealed class GameData(IOptions<ServerOptions> options, ILogger<GameData> 
             if (!_tables.TryGetValue(key, out var table))
             {
                 var path = Path.Combine(Root, "skills", "skill_" + scriptShow + ".json");
-                table = File.Exists(path) ? LoadObject(path) : new();
+                table = File.Exists(path) ? ProcessCache.File("object", path, LoadObject) : new();
                 _tables[key] = table;
             }
             return table.Values.Cast<JsonElement?>().FirstOrDefault();
@@ -245,7 +245,7 @@ public sealed class GameData(IOptions<ServerOptions> options, ILogger<GameData> 
         {
             if (_tables.TryGetValue(key, out var table)) return table;
             var path = Path.Combine(Root, "skills", name + ".json");
-            table = File.Exists(path) ? LoadObject(path) : new();
+            table = File.Exists(path) ? ProcessCache.File("object", path, LoadObject) : new();
             _tables[key] = table;
             return table;
         }
@@ -262,8 +262,7 @@ public sealed class GameData(IOptions<ServerOptions> options, ILogger<GameData> 
         if ((Row("MapConfig", map) ?? Row("DungeonConfig", map)) is not { } config
             || !config.TryGetProperty("_kResSceneEditorName", out var name) || name.GetString() is not { Length: > 0 } module
             || DataFiles.Find(Path.Combine(Root, "sceneeditor"), module + ".json") is not { } path) return null;
-        using var doc = JsonDocument.Parse(File.ReadAllBytes(path));
-        return doc.RootElement.TryGetProperty("m_kTaskPoints", out var points) && points.ValueKind == JsonValueKind.Object
+        return ProcessCache.Json(path).TryGetProperty("m_kTaskPoints", out var points) && points.ValueKind == JsonValueKind.Object
             && points.TryGetProperty(point.ToString(System.Globalization.CultureInfo.InvariantCulture), out var entry)
             ? Int(entry, "npcId") : null;
     }
@@ -280,8 +279,7 @@ public sealed class GameData(IOptions<ServerOptions> options, ILogger<GameData> 
         if ((Row("MapConfig", map) ?? Row("DungeonConfig", map)) is not { } config
             || !config.TryGetProperty("_kResSceneEditorName", out var name) || name.GetString() is not { Length: > 0 } module
             || DataFiles.Find(Path.Combine(Root, "sceneeditor"), module + ".json") is not { } path) return null;
-        using var doc = JsonDocument.Parse(File.ReadAllBytes(path));
-        var se = doc.RootElement;
+        var se = ProcessCache.Json(path);
         if (!se.TryGetProperty("m_kWorldMonsterSpawnPoints", out var points) || points.ValueKind != JsonValueKind.Object) return null;
         bool Spawns(JsonElement list, string? field) => list.ValueKind == JsonValueKind.Array && list.EnumerateArray().Any(e =>
             (field is null ? Number(e) : e.ValueKind == JsonValueKind.Object && e.TryGetProperty(field, out var f) ? Number(f) : null) is { } n

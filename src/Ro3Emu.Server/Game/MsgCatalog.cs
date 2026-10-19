@@ -15,13 +15,16 @@ public sealed class MsgCatalog
 
     private readonly Dictionary<uint, Entry> _entries = new();
 
+    // The generated message types by protobuf full name: the same for every server in the process.
+    private static readonly Lazy<Dictionary<string, MessageDescriptor>> Descriptors = new(() => typeof(MsgCatalog).Assembly.GetTypes()
+        .Where(t => typeof(IMessage).IsAssignableFrom(t) && !t.IsAbstract)
+        .Select(t => t.GetProperty("Descriptor", BindingFlags.Public | BindingFlags.Static)?.GetValue(null) as MessageDescriptor)
+        .Where(d => d != null)
+        .ToDictionary(d => d!.FullName, d => d!));
+
     public MsgCatalog(IOptions<ServerOptions> options, ILogger<MsgCatalog> log)
     {
-        var types = typeof(MsgCatalog).Assembly.GetTypes()
-            .Where(t => typeof(IMessage).IsAssignableFrom(t) && !t.IsAbstract)
-            .Select(t => t.GetProperty("Descriptor", BindingFlags.Public | BindingFlags.Static)?.GetValue(null) as MessageDescriptor)
-            .Where(d => d != null)
-            .ToDictionary(d => d!.FullName, d => d!);
+        var types = Descriptors.Value;
 
         // The table is exported from the client like config/ (tools/msgtable.js), so a realm whose DataDir only holds
         // its own state (a fresh realm after a wipe: new DataDir, GameDataDir on the exported data) reads it from

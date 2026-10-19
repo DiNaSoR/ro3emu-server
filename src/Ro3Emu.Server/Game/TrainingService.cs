@@ -58,8 +58,7 @@ public sealed class TrainingService : IGameTicker
             {
                 if (DataFiles.Find(Path.Combine(options.Value.GameDataDir ?? options.Value.DataDir, "sceneeditor"), editor.GetString() + ".json") is not { } path)
                     continue;
-                using var doc = JsonDocument.Parse(File.ReadAllBytes(path));
-                if (!doc.RootElement.TryGetProperty("m_kMonsterSpawnPoints", out var spawns)) continue;
+                if (!ProcessCache.Json(path).TryGetProperty("m_kMonsterSpawnPoints", out var spawns)) continue;
                 foreach (var point in spawns.EnumerateObject())
                 {
                     var position = point.Value.GetProperty("position");

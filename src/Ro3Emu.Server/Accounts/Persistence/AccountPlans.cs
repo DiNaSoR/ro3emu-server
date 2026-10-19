@@ -6,8 +6,12 @@ namespace Ro3Emu.Server.Accounts.Persistence;
 
 internal static class AccountHash
 {
+    /// <summary>PBKDF2 rounds. The count is not stored with the hash, so it must stay the same for a database's
+    /// lifetime; only the test suite lowers it (its databases live for one test, and ~10% of its CPU went here).</summary>
+    internal static int Iterations { get; set; } = 100_000;
+
     internal static byte[] Hash(string password, byte[] salt) =>
-        Rfc2898DeriveBytes.Pbkdf2(Encoding.UTF8.GetBytes(password), salt, 100_000, HashAlgorithmName.SHA256, 32);
+        Rfc2898DeriveBytes.Pbkdf2(Encoding.UTF8.GetBytes(password), salt, Iterations, HashAlgorithmName.SHA256, 32);
 }
 
 /// <summary>Credentials of one account; <see cref="Name"/> is the stored (canonical) spelling of its name.</summary>

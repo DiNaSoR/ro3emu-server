@@ -5,6 +5,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <!-- Each test starts a server, so the run keeps compiling new code; profile-guided recompiles cost ~30% of the
+         suite's CPU and pay back only in long-running processes. -->
+    <TieredPGO>false</TieredPGO>
   </PropertyGroup>
 
   <ItemGroup>
