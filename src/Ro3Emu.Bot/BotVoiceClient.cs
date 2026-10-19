@@ -169,12 +169,17 @@ public static class BotVoiceEcho
         }
     }
 
+    /// <summary>The party's voice room, as <see cref="RunAsync(BotClient, long, string, TimeSpan, Action{string}, CancellationToken)"/>.</summary>
+    public static Task<BotVoiceEchoEnd> RunAsync(BotClient bot, long roleId, long teamId, TimeSpan delay,
+        Action<string> log, CancellationToken ct) =>
+        RunAsync(bot, roleId, teamId.ToString(System.Globalization.CultureInfo.InvariantCulture), delay, log, ct);
+
     /// <summary>
-    /// Ticket, connect, Auth, Join <paramref name="teamId"/>, mic on, then echo until Kicked (for example removed
-    /// from the room after leaving the party), the voice gate closes the connection, or <paramref name="ct"/>.
-    /// Audio bytes are never logged.
+    /// Ticket, connect, Auth, Join <paramref name="room"/> (a team id, or a guild voice channel "2_&lt;guildId&gt;_&lt;n&gt;"
+    /// the bot sits in), mic on, then echo until Kicked (for example removed from the room after leaving the party or
+    /// the channel), the voice gate closes the connection, or <paramref name="ct"/>. Audio bytes are never logged.
     /// </summary>
-    public static async Task<BotVoiceEchoEnd> RunAsync(BotClient bot, long roleId, long teamId, TimeSpan delay,
+    public static async Task<BotVoiceEchoEnd> RunAsync(BotClient bot, long roleId, string room, TimeSpan delay,
         Action<string> log, CancellationToken ct)
     {
         var ticket = await BotVoiceTicket.RequestAsync(bot, ReplyTimeout);
@@ -186,7 +191,7 @@ public static class BotVoiceEcho
         try
         {
             await voice.AuthAsync(ticket.RoleId, ticket.Token, ticket.Secret, live.Token);
-            var setup = await SetupAsync(voice, teamId, log, live.Token);
+            var setup = await SetupAsync(voice, room, log, live.Token);
             if (setup != null) return setup;
             var echoes = Channel.CreateUnbounded<(long DueMs, byte[] Opus)>(new UnboundedChannelOptions { SingleReader = true });
             var stats = new EchoStats();
@@ -209,14 +214,14 @@ public static class BotVoiceEcho
         }
     }
 
-    /// <summary>Waits for AuthOk, joins the team room and turns the mic on; returns an end result if that fails.</summary>
-    private static async Task<BotVoiceEchoEnd?> SetupAsync(BotVoiceClient voice, long teamId, Action<string> log, CancellationToken ct)
+    /// <summary>Waits for AuthOk, joins the room and turns the mic on; returns an end result if that fails.</summary>
+    private static async Task<BotVoiceEchoEnd?> SetupAsync(BotVoiceClient voice, string room, Action<string> log, CancellationToken ct)
     {
         var (type, payload) = await voice.ReadFrameAsync(ct);
         if (type == VoiceDown.Kicked) return new(BotVoiceEchoEndKind.Kicked, payload.Length > 0 ? payload[0] : (byte)0);
         if (type != VoiceDown.AuthOk) return new(BotVoiceEchoEndKind.Closed);
         log("voice auth ok");
-        await voice.JoinAsync(teamId.ToString(System.Globalization.CultureInfo.InvariantCulture), ct);
+        await voice.JoinAsync(room, ct);
         while (true)
         {
             (type, payload) = await voice.ReadFrameAsync(ct);
@@ -225,13 +230,13 @@ public static class BotVoiceEcho
             byte code = payload.Length > 0 ? payload[0] : byte.MaxValue;
             if (code != VoiceJoinCode.Ok)
             {
-                log($"voice join of team {teamId} refused (code {code})");
+                log($"voice join of room {room} refused (code {code})");
                 return new(BotVoiceEchoEndKind.JoinRefused, code);
             }
             break;
         }
         await voice.MicAsync(true, ct);
-        log($"in voice room {teamId}, mic on, echoing");
+        log($"in voice room {room}, mic on, echoing");
         return null;
     }
 

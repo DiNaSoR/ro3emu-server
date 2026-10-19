@@ -15,7 +15,7 @@ namespace Ro3Emu.Server.Voice;
 /// and drains in <see cref="StopAsync"/>, like <see cref="Net.GateListener"/>.
 /// </summary>
 public sealed class VoiceGateServer(IOptions<ServerOptions> options, VoiceTicketRegistry tickets, VoiceRooms rooms,
-    TeamService teams, SessionRegistry sessions, GameLoop loop, GmCommands gm, ILogger<VoiceGateServer> log)
+    SessionRegistry sessions, GameLoop loop, GmCommands gm, ILogger<VoiceGateServer> log)
     : BackgroundService
 {
     private const long IpBanDurationMs = 60_000;
@@ -209,11 +209,12 @@ public sealed class VoiceGateServer(IOptions<ServerOptions> options, VoiceTicket
     {
         string channel = ReadLengthPrefixedAscii(payload, out bool wellFormed);
         if (!wellFormed) return;
-        if (!long.TryParse(channel, out long requested))
+        if (!VoiceRoomKey.TryParse(channel, out var key))
         {
             connection.SendJoinResult(VoiceJoinCode.UnsupportedRoom, channel);
             return;
         }
+        long requested = key.Value;
         // A repeated Join of the room it is in: confirmed again, but no loop hop and nothing to the others.
         if (rooms.IsIn(connection, requested))
         {
@@ -223,9 +224,8 @@ public sealed class VoiceGateServer(IOptions<ServerOptions> options, VoiceTicket
         var (code, forbidden) = await loop.InvokeAsync(() =>
         {
             bool alive = sessions.All().Any(s => s.Role?.Id == connection.RoleId);
-            var (teamId, _) = teams.TeamOf(connection.RoleId);
-            byte result = alive && teamId != 0 && teamId == requested ? VoiceJoinCode.Ok : VoiceJoinCode.NotMember;
-            return Task.FromResult((result, teams.IsForbiddenChat(connection.RoleId)));
+            byte result = alive && rooms.Belongs(connection.RoleId, key) ? VoiceJoinCode.Ok : VoiceJoinCode.NotMember;
+            return Task.FromResult((result, rooms.MicHeldOff(connection.RoleId, requested)));
         });
         if (code != VoiceJoinCode.Ok)
         {
