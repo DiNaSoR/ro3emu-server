@@ -306,7 +306,7 @@ public sealed partial class CombatService : IGameTicker
         WireGuardSkills();
         WireTriggerSkills();
         WireDelayedSkills();
-        WireAstralBodies();
+        WireAstralBodies(); WireChains();
     }
 
     private static long Now => MonsterService.NowMs;

@@ -196,6 +196,8 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
     internal int FlightAttackRowId { get; set; }
     /// <summary>When Psychokinetic Astral Body gathers its next orb.</summary>
     internal long AstralNextMs { get; set; }
+    /// <summary>Where Move back Shadow Echo left its shadow (CombatService.Chains).</summary>
+    internal Romsg.Vec3? ShadowEchoPos { get; set; }
     public int ImmuneRecoveryPercent { get; set; }
     public Dictionary<int, long> SkillCds { get; } = new();
     public Dictionary<int, long> ItemCds { get; } = new();

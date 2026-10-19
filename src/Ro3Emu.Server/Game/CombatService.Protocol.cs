@@ -163,6 +163,8 @@ public sealed partial class CombatService
                 && plan.ManualLoadSkill[slot - 1].SkillId == group ? plan.ManualLoadSkill[slot - 1].SkillLevel : learned;
             int baseId = learned > 0 && selected > 0 && selected <= learned ? skills.RealId(group, selected) : 0;
             int next = baseId > 0 && EffectiveSkillRow(session, baseId) is { } row ? (int)GameData.Int(row, "_iID") : baseId;
+            // A follow-up offered by a status buff takes the slot while it lasts (CombatService.Chains).
+            if (baseId > 0 && ChainOffer(session, group) is { } chain) next = (int)GameData.Int(chain.Row, "_iID");
             int current = old.GetValueOrDefault(slot);
             if (next == baseId && current == 0) continue;
             if (current == next) continue;
