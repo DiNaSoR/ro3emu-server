@@ -29,6 +29,9 @@ public sealed class AppearanceShopTests : IAsyncLifetime
     private const int Stroll = 5000007, StrollSuit = 40030010;        // [3,680], no award, no pieces.
     private const int Potions = 12105, PotionItem = 1003100;          // [1,1000], cd13a/shop-buy.
     private const int BigPoringLook = 5000038, BigPoring = 60030010;  // class 50202 [3,980]; WardRobeConfig type 6 -> MountsConfig.
+    // content/costume-shop.json: Worldscorch Feather [3,2980], award 180001 (headwear, backwear and Ashen Embers vouchers).
+    private const int Worldscorch = 5000061, WorldscorchSuit = 40060010, WorldscorchBrilliantGold = 20060010, WorldscorchFeatherstep = 90040001;
+    private const int WorldscorchHeadwearVoucher = 3016101;
     private readonly string directory = Path.Combine(RepoRoot(), ".loadtest-temp", "fashion-shop-" + Guid.NewGuid().ToString("N"));
     private WebApplication app = null!;
     private string http = "";
@@ -47,6 +50,7 @@ public sealed class AppearanceShopTests : IAsyncLifetime
             o.DataDir = directory; o.GameDataDir = Path.Combine(RepoRoot(), "data");
             o.HttpPort = web; o.MicroGatePort = micro; o.GameGatePort = game;
             o.PlayBook = 101;
+            o.CustomContentDir = Path.Combine(RepoRoot(), "content"); // content/costume-shop.json adds the unsold looks.
         });
         await app.StartAsync();
         http = $"http://127.0.0.1:{web}";
@@ -110,6 +114,24 @@ public sealed class AppearanceShopTests : IAsyncLifetime
         Assert.DoesNotContain(result.Issues, i => i.Kind == EconomyIssueKind.Corruption);
         Assert.All(result.Assets, x => { Assert.Equal("0", x.Residual); Assert.Equal("0", x.LegResidual); });
         Assert.All(result.Locations, x => Assert.Equal("0", x.Residual));
+    }
+
+    [ClientDataFact]
+    public async Task CustomCostumeRowSellsASuitWhosePiecesTheClientPartlyDisables()
+    {
+        await using var bot = await Enter();
+        long crystals = Crystals;
+
+        var reply = await Batch(bot, (Worldscorch, 1, 2980));
+        Assert.Equal(0, reply.Result);
+        Assert.Equal(0, Assert.Single(reply.Results).Result);
+        await Next(bot, WardrobeService.WardrobeSync, DBWardRobeInfoIncrement.Parser, i => i.AllLightUpAppearances.ContainsKey(WorldscorchSuit));
+        Assert.Equal(crystals - 2980, Crystals);
+        Assert.True(SavedWardrobe.AllLightUpAppearances.ContainsKey(WorldscorchSuit));
+        // Brilliant Gold and Featherstep are _iDisable 1: left out instead of refusing the purchase.
+        Assert.False(SavedWardrobe.AllLightUpAppearances.ContainsKey(WorldscorchBrilliantGold));
+        Assert.False(SavedWardrobe.AllLightUpAppearances.ContainsKey(WorldscorchFeatherstep));
+        Assert.Equal(1, Bag(WorldscorchHeadwearVoucher));
     }
 
     [ClientDataFact]
