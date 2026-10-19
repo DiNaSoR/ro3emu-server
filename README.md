@@ -162,7 +162,7 @@ show is playable from day one, without season or server-day gates ([details](doc
   (bubbles, bells, rhythm stages) are plain area attacks, and knockback does not move players yet.
 - **Mock Battle extras:** the arena's monsters and the 40-player team frame.
 - **War of Emperium extras:** commander tools, siege weapons and vehicles.
-- **Survivor Battle extras:** Kafra adventure tasks.
+- **Survivor Battle extras:** the "Go, Kafra, Go!" weekly tasks.
 - **Guild extras:** merging, impeachment, group mail.
 - **Smaller missing pieces:** shop gifting, titles, Paragon (Astral Level), and some stages of the story dungeons
   that are still simplified.

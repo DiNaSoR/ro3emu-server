@@ -11,7 +11,7 @@ internal sealed class ChickenNpcUnit : WorldUnit
 {
     public required int NpcId { get; init; }
     public required string Name { get; init; }
-    /// <summary>ShopConfig _iShopId; 0 for a Rescue Wagon.</summary>
+    /// <summary>ShopConfig _iShopId; 0 for a Rescue Wagon or a Magic Die.</summary>
     public int ShopId { get; init; }
 
     public override EntityBase Entity() => new()
@@ -50,8 +50,9 @@ public sealed partial class TimedBattleService
             .Where(r => GameData.Int(r, "_iMapid") == ChickenScene).OrderBy(r => GameData.Int(r, "_iId")))
         {
             int regionId = (int)GameData.Int(row, "_iRespawnregionid");
-            if (ServiceRegions.FirstOrDefault(r => r.Region == regionId) is not { Region: > 0 } region
-                || !row.TryGetProperty("_iNpcrespawngroup", out var groups) || groups.ValueKind != JsonValueKind.Array) continue;
+            var region = regionId == MagicDiePoint ? (Region: MagicDiePoint, X: IslandX, Z: IslandZ, Width: IslandRadius * 2, Length: IslandRadius * 2)
+                : ServiceRegions.FirstOrDefault(r => r.Region == regionId);
+            if (region.Region <= 0 || !row.TryGetProperty("_iNpcrespawngroup", out var groups) || groups.ValueKind != JsonValueKind.Array) continue;
             foreach (var groupId in groups.EnumerateArray())
             {
                 if (data.Row("NpcRespawnGroupConfig", (long)(GameData.Number(groupId) ?? 0)) is not { } group
@@ -61,7 +62,7 @@ public sealed partial class TimedBattleService
                 {
                     int npc = (int)(GameData.Number(npcs[i]) ?? 0), count = (int)(GameData.Number(counts[i]) ?? 0);
                     int shop = ShopOfNpc(npc);
-                    if (shop == 0 && npc != RescueWagon) continue;
+                    if (shop == 0 && npc != RescueWagon && npc != MagicDie) continue;
                     for (int n = 0; n < count && !match.Settled; n++)
                         if (ServicePoint(run, region) is { } at) await SpawnServiceNpcAsync(match, run, npc, shop, at);
                 }
@@ -226,14 +227,15 @@ public sealed partial class TimedBattleService
     {
         if (!IsChickenNpcUid(req.NpcUid)) return false;
         int result = ErrorCodes.NpcMissing;
-        if (Chicken(session) is (var match, var run, _))
-            await RunMatchTransitionAsync(match, "chicken npc interact", () =>
+        if (Chicken(session) is (var match, var run, var me))
+            await RunMatchTransitionAsync(match, "chicken npc interact", async () =>
             {
-                if (NpcInReach(run, session, req.NpcUid, out result) is { } npc
-                    && (data.Row("NPCConfig", npc.NpcId) is not { } row || !row.TryGetProperty("_iInteractID", out var ids)
-                        || ids.ValueKind != JsonValueKind.Array || ids.EnumerateArray().All(x => GameData.Number(x) != req.InteractionId)))
+                if (NpcInReach(run, session, req.NpcUid, out result) is not { } npc) return;
+                if (data.Row("NPCConfig", npc.NpcId) is not { } row || !row.TryGetProperty("_iInteractID", out var ids)
+                    || ids.ValueKind != JsonValueKind.Array || ids.EnumerateArray().All(x => GameData.Number(x) != req.InteractionId))
                     result = ErrorCodes.NpcParameter;
-                return Task.CompletedTask;
+                else if (npc.NpcId == MagicDie && (result = CanAct(run, me, session)) == 0)
+                    await TriggerAdventureAsync(match, run, session, me, npc);
             });
         await session.SendGameAsync(SceneService.NpcInteraction, new NpcInteractionRsp { Result = result, Req = req });
         return true;
@@ -254,7 +256,7 @@ public sealed partial class TimedBattleService
             await RunMatchTransitionAsync(match, "chicken wagon revive", async () =>
             {
                 if ((result = CanAct(run, me, session)) != 0) return;
-                if (NpcInReach(run, session, req.NpcId, out result) is not { ShopId: 0 } wagon)
+                if (NpcInReach(run, session, req.NpcId, out result) is not { NpcId: RescueWagon } wagon)
                 { if (result == 0) result = ErrorCodes.NpcParameter; return; }
                 var targets = Team(match, match.Faction[session]).Where(mate => mate != session && mate.Dead
                     && match.Fallen.Contains(mate) && !match.Absent.Contains(mate) && run.Players[mate] is { GaveUp: false } t

@@ -76,6 +76,10 @@ public sealed partial class TimedBattleService
         /// the player fell (its view returns there).</summary>
         public GameSession? Watching;
         public long AutoWatchAtMs;
+        /// <summary>Magic Die picks (TimedBattleService.ChickenAdventure): open ones by operateId, and the cards taken.</summary>
+        public SortedDictionary<long, AdventureEventSelectInfo> Picks { get; } = new();
+        public List<long> Cards { get; } = new();
+        public long NextOperate;
         public (Romsg.Vec3 At, float Face)? FellAt;
         public Dictionary<GameSession, long> LastHitBy { get; } = new(ReferenceEqualityComparer.Instance);
         public List<(long PerTick, long UntilMs)> Heals { get; } = new();
@@ -365,8 +369,11 @@ public sealed partial class TimedBattleService
         await session.SendGameAsync(DungeonService.BaseInfo, ChickenBaseInfo(match, run));
         if (run.Stage == StageChoosePos) await SendTeamPicksAsync(match, run, match.Faction[session]);
         if (run.Follow.Count > 0) await session.SendGameAsync(FollowNotify, FollowState(match, run, session));
+        session.Synced.Remove(AdventureSync);
+        if (run.Players.TryGetValue(session, out var me) && (me.Picks.Count > 0 || me.Cards.Count > 0))
+            await SyncAdventureAsync(match, session, me);
         // The scene join showed the spectator again: hide it and re-bind the camera.
-        if (run.Players.TryGetValue(session, out var me) && me.Watching is { } watched)
+        if (me != null && me.Watching is { } watched)
         {
             await world.SetHiddenAsync(session, true);
             await SendCameraBindAsync(match, session, match.Participants[watched].Id);
@@ -390,6 +397,7 @@ public sealed partial class TimedBattleService
             await PublishZoneAsync(match, run, now);
             await TickLifeAsync(match, run, now);
             await TickWatchAsync(match, run, now);
+            await TickAdventureAsync(match, run);
             if (now - run.LastTickMs >= PoisonTickMs)
             {
                 run.LastTickMs = now;

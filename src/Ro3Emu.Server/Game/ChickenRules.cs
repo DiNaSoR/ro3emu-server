@@ -91,6 +91,12 @@ public static class ChickenRules
     /// <summary>NPCConfig 15000055: interact 2900004, EXEC action 319 (LC_InteractActions.OpenAmbulancePanel ->
     /// UI_Com_ChickenAmbulanceRevivalPanel, which spends ID cards 50001 through 82662).</summary>
     public const int RescueWagon = 15000055;
+    /// <summary>NPCConfig 15000301 "Magic Die" (NpcRespawnGroupConfig 10011 x50 at scene point 899): interact 2900010
+    /// EXEC [[325 TriggerAdventureEvent, 10001, 1], [3 RemoveInteractionNpc]]. Point 899 is a single position (426, 415),
+    /// so the dice are spread over the island instead (inferred).</summary>
+    public const int MagicDie = 15000301, MagicDiePoint = 899;
+    /// <summary>AdventureEventConfig 10001: function / deck 1003 (AdventureDeckConfig, AdventureCardConfig _iPoolId 1003).</summary>
+    public const int AdventureEvent = 10001, AdventureFunction = 1003;
     /// <summary>ShopConfig _iShopType 8 (enum_ShopType ChickenShop).</summary>
     public const int ChickenShopType = 8;
     /// <summary>(inferred) ShopCommodityConfig _iPurchaseTimesLimit 6 on every chicken commodity: _iPurchaseNum is per

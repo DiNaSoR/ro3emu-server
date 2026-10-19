@@ -335,6 +335,8 @@ public sealed partial class TimedBattleService
     {
         player.Synced.Remove(RoundSync);
         if (match.Chicken is { } watching && watching.Players.TryGetValue(player, out var me)) await StopWatchAsync(match, player, me);
+        // The Magic Die picks belong to the match: an empty 5039 closes the panel (LC_DAL_Roguelike).
+        if (player.Synced.ContainsKey(AdventureSync)) await CharacterService.SyncAsync(player, AdventureSync, new DBAdventureInfo());
         if (match.Chicken is { } run && run.Channels.Count > 0) await InterruptChannelsAsync(match, run, c => c.Reviver == player);
         if (player.Role != null && player.Progress != null)
         {
