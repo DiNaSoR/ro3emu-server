@@ -195,15 +195,15 @@ namespace Ro3Emu.ClientHooks
         }
 
         /// <summary>
-        /// Reruns OnInitDatas on the table's instance and, when it holds its own data, on the Lua_DBManager proxy.
+        /// Reruns OnInitDatas on the table's instance and, when it holds fields of its own, on the Lua_DBManager proxy.
         /// Lua_DBManager.ReLoadAllCfg (on a language load) calls proxy:ctor(name), which runs Lua_CFG_Base's ctor
-        /// with self = the proxy: the proxy then keeps its own m_kConfigData and index maps (ShopItemsMap), which
+        /// with self = the proxy: the proxy then keeps its own index maps (ShopItemsMap), which
         /// shadow the instance's for every proxy:OnGet... call the UI makes. With no instance found, the proxy only.
         /// </summary>
         private static void Reindex(Obf_R.Obf_ff global, Obf_R.Obf_Ef rawget, string table, string method, Obf_R.Obf_ff instance)
         {
             var proxy = global.Obf_LuA<Obf_R.Obf_ff>("Lua_DBManager.m_kCFG_" + table);
-            bool proxyOwnsData = proxy != null && Raw(rawget, proxy, "m_kConfigData") != null;
+            bool proxyOwnsData = proxy != null && OwnsFields(global, proxy);
             var done = new List<string>();
             if (instance != null) Init(global, rawget, method, instance, "instance", done);
             if (proxy != null && (proxyOwnsData || instance == null)) Init(global, rawget, method, proxy, "proxy", done);
@@ -220,6 +220,24 @@ namespace Ro3Emu.ClientHooks
             var tab = Raw(rawget, self.Obf_RuA<Obf_R.Obf_ff>("ShopItemsMap"), 50201L) as Obf_R.Obf_ff;
             var len = tab == null ? null : global.Obf_LuA<Obf_R.Obf_Ef>("rawlen")?.Obf_HuA(tab);
             done.Add("the " + name + (len != null && len.Length > 0 ? " (Fashion tab 50201: " + LuaPatches.ToLong(len[0]) + " item(s))" : ""));
+        }
+
+        /// <summary>
+        /// Whether the proxy holds fields of its own besides ConfigName (set by its __index) and m_kAllIDList (cleared
+        /// above). After ReLoadAllCfg it holds its own ShopItemsMap though not m_kConfigData (seen in a Player.log).
+        /// </summary>
+        private static bool OwnsFields(Obf_R.Obf_ff global, Obf_R.Obf_ff proxy)
+        {
+            var next = global.Obf_LuA<Obf_R.Obf_Ef>("next");
+            object key = null;
+            for (int i = 0; next != null && i < 64; i++)
+            {
+                var r = next.Obf_HuA(proxy, key);
+                if (r == null || r.Length == 0 || r[0] == null) return false;
+                key = r[0];
+                if (!(key is string name) || (name != "ConfigName" && name != "m_kAllIDList")) return true;
+            }
+            return false;
         }
 
         private static object Raw(Obf_R.Obf_Ef rawget, Obf_R.Obf_ff table, object key)
