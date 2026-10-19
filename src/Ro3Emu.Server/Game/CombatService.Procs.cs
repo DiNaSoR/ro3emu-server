@@ -78,6 +78,7 @@ public sealed partial class CombatService
             if (!current() || main.Dead || main.Hp <= 0) break;
             if (Rolls.Proc(10000) < proc.Chance) await ProcCastAsync(s, proc.Row, main);
         }
+        await BurnAsync(s, row, landed, current);
     }
 
     /// <summary>
@@ -116,6 +117,7 @@ public sealed partial class CombatService
                     break;
             }
         }
+        foreach (var learned in LearnedProcs(s, row, normal)) yield return learned;
         if (s.Progress is not { } progress) yield break;
         if (group == JudexGroup && skills.Level(progress, DoubleHolyLightGroup) is var holy and > 0
             && data.Row("BuffConfig", skills.RealId(DoubleHolyLightGroup, holy)) is { } light)
@@ -213,6 +215,7 @@ public sealed partial class CombatService
         bool melee = row is not { } r || GameData.Int(r, "_iDistanceType") != 2;
         bool physical = row is not { } dmg || GameData.Int(dmg, "_iDmgType") != 2;
         long now = MonsterService.NowMs;
+        await ReactWithTriggersAsync(attacker, p, now);
         foreach (var buff in p.Buffs.Where(b => b.ExpireMs > now).ToArray())
         {
             if (p.Dead || data.Row("BuffConfig", buff.ConfigId) is not { } config) continue;
