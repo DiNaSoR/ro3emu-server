@@ -315,6 +315,10 @@ public sealed class SocialMessages(ChatService chat, TeamService teams, EmblemSe
         {
             await guilds.EditAsync(session, GuildEditReq.Parser.ParseFrom(body.Span));
         });
+        routes.Map(GuildService.BroadEmail, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.BroadEmailAsync(session, GuildBroadEmailReq.Parser.ParseFrom(body.Span));
+        });
         routes.Map(GuildCaravanService.Show, "caravan", async (session, msgId, body) =>
         {
             await caravan.ShowAsync(session);
