@@ -169,16 +169,17 @@ public sealed partial class ShopService
         if (Presents.Values.Any(o => o.ReceiverId == target && o.AppranceId == appearance && o.State == EPresentOrderState.Pending))
             return ErrDuplicateGift;
 
+        // Ro3Emu:CashShop:Free pays a crystal price; the order then refunds nothing.
+        var cost = freeCashShop && currency == CrystalItem ? [] : new List<(int Entry, long Count)> { (currency, unit) };
         // Taken now, before the commit's await: two senders paying at once must not share an id.
         long orderId = lastOrderId = Math.Max(lastOrderId, Presents.Keys.DefaultIfEmpty(0).Max()) + 1;
         var order = new PresentOrderInfo
         {
             OrderId = orderId, SenderId = me, ReceiverId = target, AppranceId = appearance,
-            AppranceAwardId = GameData.Int(row, "_iAppearanceAwardId"), CurrencyId = currency, CurrencyCount = unit,
+            AppranceAwardId = GameData.Int(row, "_iAppearanceAwardId"), CurrencyId = currency, CurrencyCount = cost.Count == 0 ? 0 : unit,
             CreateTime = NowMs, State = EPresentOrderState.Pending, GiftContent = text,
         };
         var next = With(order);
-        var cost = new List<(int Entry, long Count)> { (currency, unit) };
         var economy = character.FamilyEconomy(session, Economy.CharacterFamilyEconomy.ShopGiftKind, cost, [],
             new { Version = 1, Order = orderId, Commodity = commodityId, Target = target, Appearance = appearance, Payment = currency, Unit = unit });
         var paid = await character.ExchangeLockedAsync(session, cost, [],
@@ -274,7 +275,7 @@ public sealed partial class ShopService
             try
             {
                 await mail.SendTemplateOnceAsync(order.SenderId, template,
-                    [new MailService.Attachment((int)order.CurrencyId, order.CurrencyCount)], $"present-refund:{id}",
+                    order.CurrencyCount > 0 ? [new MailService.Attachment((int)order.CurrencyId, order.CurrencyCount)] : [], $"present-refund:{id}",
                     tx => tx.RoleBlob(order.SenderId, "present_sent", Blob(order.SenderId, true, next.Values)), loop.Owners?.Current);
                 presents = With(refunded);
                 log.LogInformation("Gift order {Order} expired: {Count}x {Currency} back to {Sender}", id, order.CurrencyCount, order.CurrencyId, order.SenderId);

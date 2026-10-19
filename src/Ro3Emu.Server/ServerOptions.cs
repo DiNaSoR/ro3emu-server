@@ -87,6 +87,9 @@ public sealed class ServerOptions
     /// <summary>The in-game Top Up screen and currency exchange (ShopService.TopUp, docs/systems/cash-shop.md).</summary>
     public TopUpOptions TopUp { get; set; } = new();
 
+    /// <summary>Crystal prices in the cash shop cost nothing (ShopService.Payment, docs/systems/cash-shop.md).</summary>
+    public CashShopOptions CashShop { get; set; } = new();
+
     /// <summary>
     /// Accounts allowed to use GM commands in game ("!" lines in chat, the client's GM panel, 1031/1034). Empty:
     /// <see cref="GmOpenWhenEmpty"/> decides. docs/guide/gm-access.md.
@@ -381,6 +384,17 @@ public sealed class TopUpOptions
     /// <summary>
     /// Every Top Up tier, month card and pass purchase is granted at once and for free (no payment provider): the
     /// crystals, the bound bonus and the first-purchase double, or the product's award. Off: 2001-2003 are refused.
+    /// </summary>
+    public bool Free { get; set; }
+}
+
+/// <summary>Off by default so the tests keep real prices; a realm turns it on.</summary>
+public sealed class CashShopOptions
+{
+    /// <summary>
+    /// Every crystal price (item 3) is paid by the server: Mall and Fashion buys, Fashion gifts and the crystal to Zeny
+    /// exchange take no crystals, and the client hook BoundCrystals (told by game message 77021) reports a crystal
+    /// balance large enough that the client's own checks let every buy through.
     /// </summary>
     public bool Free { get; set; }
 }
