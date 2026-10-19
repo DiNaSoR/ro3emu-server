@@ -97,7 +97,10 @@ public sealed partial class BuffService : IGameTicker
         int pile = explicitPileCount ?? (existing != null && stackType is 1 or 2 or 3 or 7
             ? Math.Min(maxStack, existing.PileCount + 1) : 1);
         var changes = GameData.Pairs(row, "_kChangeAttri").Select(c => (c.Id, c.Value * pile)).ToList();
-        var buff = new ActiveBuff(existing?.Guid ?? Interlocked.Increment(ref _guids), configId,
+        // Another level of the same group (Angelus 5 over Angelus 1) is a new buff to the client: it keeps the first
+        // config of a GUID it already holds, so the old one is removed and the new one gets its own GUID.
+        bool replaced = existing != null && existing.ConfigId != configId;
+        var buff = new ActiveBuff(existing != null && !replaced ? existing.Guid : Interlocked.Increment(ref _guids), configId,
             lasting ? long.MaxValue : now + durationMs, durationMs, changes, sourceId, pile, StateOrdinal: StateFor(row),
             ShieldRemaining: Math.Max(0, shieldAmount));
         if (existing != null) p.Buffs.Remove(existing);
@@ -105,12 +108,13 @@ public sealed partial class BuffService : IGameTicker
         TrackPeriodic(p, null, buff);
         TrackHalo(p, buff);
         log.LogInformation("{Name} gets buff {Buff} x{Pile} for {Ms} ms", p.Role.Name, configId, pile, durationMs);
+        if (replaced && Visible(existing!))
+            await ToPlayerAndViewersAsync(p, BuffRemove, new BuffRemoveNotify { UnitId = p.Role.Id, BuffGuids = { existing!.Guid } });
         var info = Wire(buff);
         await ToPlayerAndViewersAsync(p, BuffUpdate, new BuffUpdateNotify { UnitId = p.Role.Id, Buffs = { info } });
-        await ToPlayerAndViewersAsync(p, AoiAttrChange, new AOIAttrChange
-        {
-            EntityUuid = (ulong)p.Role.Id, BuffInfo = new AoIBuffInfo { AddBuffs = { info } },
-        });
+        var aoi = new AoIBuffInfo { AddBuffs = { info } };
+        if (replaced && Visible(existing!)) aoi.RemoveBuffs.Add(existing!.Guid);
+        await ToPlayerAndViewersAsync(p, AoiAttrChange, new AOIAttrChange { EntityUuid = (ulong)p.Role.Id, BuffInfo = aoi });
         if (existing?.StateOrdinal != buff.StateOrdinal || buff.StateOrdinal != 0) await RefreshControlAsync(p);
         if (buff.Changes.Count > 0 || existing?.Changes.Count > 0 || buff.ShieldRemaining > 0 || existing?.ShieldRemaining > 0)
             await character.RefreshStatsAsync(p);
@@ -209,7 +213,8 @@ public sealed partial class BuffService : IGameTicker
         // (inferred) Match the player path: named layer types increase piles; other types refresh.
         int pile = existing != null && stackType is 1 or 2 or 3 or 7
             ? Math.Min(maxStack, existing.PileCount + 1) : 1;
-        var buff = new ActiveBuff(existing?.Guid ?? Interlocked.Increment(ref _guids), configId,
+        bool replaced = existing != null && existing.ConfigId != configId; // a new GUID per config, as for players
+        var buff = new ActiveBuff(existing != null && !replaced ? existing.Guid : Interlocked.Increment(ref _guids), configId,
             MonsterService.NowMs + durationMs, durationMs,
             GameData.Pairs(row, "_kChangeAttri").Select(c => (c.Id, c.Value * pile)).ToArray(), sourceId, pile,
             StateOrdinal: StateFor(row), ShieldRemaining: Math.Max(0, shieldAmount));
@@ -217,8 +222,11 @@ public sealed partial class BuffService : IGameTicker
         list.Add(buff);
         TrackPeriodic(null, unit, buff);
         var info = Wire(buff);
+        if (replaced)
+            await world.ToUnitViewersAsync(unit, BuffRemove, new BuffRemoveNotify { UnitId = unit.Uid, BuffGuids = { existing!.Guid } });
         await world.ToUnitViewersAsync(unit, BuffUpdate, new BuffUpdateNotify { UnitId = unit.Uid, Buffs = { info } });
         var changed = new AOIAttrChange { EntityUuid = (ulong)unit.Uid, BuffInfo = new AoIBuffInfo { AddBuffs = { info } } };
+        if (replaced) changed.BuffInfo.RemoveBuffs.Add(existing!.Guid);
         if (buff.ShieldRemaining > 0 || existing?.ShieldRemaining > 0)
             changed.Property.Add(new AoIProperty { Idx = 2003, Data = ShieldAmount(unit) });
         await world.ToUnitViewersAsync(unit, AoiAttrChange, changed);

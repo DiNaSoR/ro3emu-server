@@ -98,6 +98,28 @@ public sealed class SkillBuffTests : IAsyncLifetime
     }
 
     [ClientDataFact]
+    public async Task HigherLevelOfTheSameBuffReplacesTheLowerOne()
+    {
+        await using var alice = await InWorld("Alice");
+        var session = Session("alice");
+        await Run(() => Buffs.AddAsync(session, 1401501, 120000, session.Role!.Id)); // Angelus Lv1
+        var first = await Next(alice, BuffService.BuffUpdate, BuffUpdateNotify.Parser, x => x.Buffs.Any(b => b.ConfigId == 1401501));
+        long oldGuid = first.Buffs.Single().BuffGuid;
+
+        await Run(() => Buffs.AddAsync(session, 1401505, 120000, session.Role!.Id)); // Angelus Lv5
+        Assert.Contains(oldGuid, (await Next(alice, BuffService.BuffRemove, BuffRemoveNotify.Parser)).BuffGuids);
+        var second = await Next(alice, BuffService.BuffUpdate, BuffUpdateNotify.Parser, x => x.Buffs.Any(b => b.ConfigId == 1401505));
+        Assert.NotEqual(oldGuid, second.Buffs.Single().BuffGuid);
+        var buff = Assert.Single(session.Buffs, b => b.ConfigId is >= 1401501 and <= 1401505);
+        Assert.Equal(1401505, buff.ConfigId);
+
+        // Recasting the same level only refreshes it under its GUID.
+        await Run(() => Buffs.AddAsync(session, 1401505, 120000, session.Role!.Id));
+        var refreshed = await Next(alice, BuffService.BuffUpdate, BuffUpdateNotify.Parser, x => x.Buffs.Any(b => b.ConfigId == 1401505));
+        Assert.Equal(second.Buffs.Single().BuffGuid, refreshed.Buffs.Single().BuffGuid);
+    }
+
+    [ClientDataFact]
     public async Task HandRemovableBuffRequestRemovesTheOwnedInstance()
     {
         await using var alice = await InWorld("Alice");
