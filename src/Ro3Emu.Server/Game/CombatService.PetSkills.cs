@@ -49,8 +49,12 @@ public sealed partial class CombatService
             || pet.SkillId != action.Request.SkillId) return;
         var target = FindMonster(s.WorldScene, action.Request.TargetId);
         if (target != null && !CanHitMonster(s, target)) target = null;
+        await MoveCasterAsync(s, action);
+        if (s.Dead || s.Role == null) return;
         await GuardianCastAsync(s, row, () => ProcCastAsync(s, row, target, face: action.Request.Face,
             at: target == null ? action.Request.TargetPos : null, petId: pet.PetId));
         StartPetAuras(s, action.Row, row);
+        StartOwlStrikes(s, row, target, pet.PetId);
+        StartRadiantRing(s, row);
     }
 }
