@@ -50,7 +50,8 @@ public static partial class EconomySnapshotReader
         ["growth_class"] = BlobFormat.Protobuf, ["first_heart"] = BlobFormat.Protobuf,
         ["personal"] = BlobFormat.Protobuf, ["personal_upvote"] = BlobFormat.Protobuf, ["popularity"] = BlobFormat.Protobuf,
         ["social_outfit"] = BlobFormat.Protobuf, ["emoji_info"] = BlobFormat.Protobuf,
-        ["barroom"] = BlobFormat.Protobuf, ["title"] = BlobFormat.Protobuf, ["paragon"] = BlobFormat.Json
+        ["barroom"] = BlobFormat.Protobuf, ["title"] = BlobFormat.Protobuf, ["paragon"] = BlobFormat.Json,
+        ["present_sent"] = BlobFormat.Protobuf, ["present_received"] = BlobFormat.Protobuf
     };
 
     private enum BlobFormat { Json, Protobuf, Mailbox, TerritoryRole, RawEpoch, StringSet }

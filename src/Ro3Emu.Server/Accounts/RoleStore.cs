@@ -397,6 +397,8 @@ public sealed class RoleStore
     public byte[]? LoadTavern(long id) => LoadBlob(id, "barroom");
     public byte[]? LoadTitle(long id) => LoadBlob(id, "title");
     public byte[]? LoadParagon(long id) => LoadBlob(id, "paragon");
+    public byte[]? LoadPresentSent(long id) => LoadBlob(id, "present_sent");
+    public byte[]? LoadPresentReceived(long id) => LoadBlob(id, "present_received");
     public byte[]? LoadPersonalUpvotes(long id, RoleItemPlanBuilder? transaction = null) => LoadBlob(id, "personal_upvote", transaction);
     public void SavePersonalUpvotes(long id, byte[] value, RoleItemPlanBuilder transaction) => SaveBlob(id, "personal_upvote", value, transaction);
     public byte[]? LoadPopularity(long id, RoleItemPlanBuilder? transaction = null) => LoadBlob(id, "popularity", transaction);

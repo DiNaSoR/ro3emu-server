@@ -132,7 +132,7 @@ show is playable from day one, without season or server-day gates ([details](doc
 
 **Economy and social**
 - trade center, stalls, auctions (guild, world, event), mail
-- NPC, point and guild shops, battle pass, cash shop and Top Up
+- NPC, point and guild shops, battle pass, cash shop and Top Up, Fashion gifts to friends
 - friends and gifts, parties and raids, chat channels and horns
 - party voice chat through the server (off by default, see below)
 - Tavern rooms with text and voice chat, mic rules, gifts and the Daily Tavern
@@ -164,7 +164,7 @@ show is playable from day one, without season or server-day gates ([details](doc
 - **War of Emperium extras:** commander tools, siege weapons and vehicles.
 - **Survivor Battle extras:** the "Go, Kafra, Go!" weekly tasks.
 - **Guild extras:** merging, impeachment, group mail.
-- **Smaller missing pieces:** shop gifting, and some stages of the story dungeons
+- **Smaller missing pieces:** some stages of the story dungeons
   that are still simplified.
 - **Guild voice:** only party and Tavern voice are implemented.
 

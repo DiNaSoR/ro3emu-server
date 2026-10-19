@@ -99,6 +99,7 @@ public sealed class RoleSystems(Maps.World world, ChatService chat, CharacterSer
         await emblems.LoginAsync(session); // after 5009: plan GUIDs refer to item instances
         checkpoint();
         await shops.LoginAsync(session); // after 5066: purchase replies read PlayerBasicInfo.id
+        await shops.PresentLoginAsync(session); // 82337/82339: the gift cards' order states
         checkpoint();
         await trade.LoginAsync(session); // 5033 before 5056 makes the trade UI reachable.
         checkpoint();

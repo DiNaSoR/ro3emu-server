@@ -32,10 +32,15 @@ public sealed partial class ShopService : IGameTicker
     private readonly TimeProvider clock;
     private readonly SessionRegistry sessions;
     private readonly GameLoop loop;
+    private readonly MailService mail;
+    private readonly FriendStore friends;
+    private readonly AccountStore accounts;
+    private readonly Deadlines deadlines;
     private readonly ILogger<ShopService> log;
 
     public ShopService(GameData data, CharacterService character, FunctionService functions, RoleStore roles, SeasonService seasons,
         WardrobeService wardrobe, AwardService awards, TimeProvider clock, SessionRegistry sessions, GameLoop loop,
+        MailService mail, FriendStore friends, AccountStore accounts, Deadlines deadlines,
         ILogger<ShopService> log, Microsoft.Extensions.Options.IOptions<ServerOptions>? options = null)
     {
         freeTopUp = options?.Value.TopUp.Free ?? false;
@@ -49,6 +54,10 @@ public sealed partial class ShopService : IGameTicker
         this.clock = clock;
         this.sessions = sessions;
         this.loop = loop;
+        this.mail = mail;
+        this.friends = friends;
+        this.accounts = accounts;
+        this.deadlines = deadlines;
         this.log = log;
     }
 
@@ -220,24 +229,6 @@ public sealed partial class ShopService : IGameTicker
     /// AppearanceShopTests pins that no row is dated.
     public Task CommodityInfoAsync(GameSession session, CommodityGetInfoReq req) =>
         session.SendGameAsync(CommodityGetInfo, new CommodityGetInfoResp());
-
-    /// <summary>
-    /// 82335 COMMODITY_PRESENT (gift a Fashion commodity to a friend) is refused until gifting exists. On any zero result
-    /// LC_DAL_Shop.CommodityPresentResp (LC_DAL_Shop.lua:1178-1216) pops "gift sent" and posts a gift card in the
-    /// friend's private chat, so the generic empty reply (result 0) faked a gift nobody paid for or received. A non-zero
-    /// result takes LC_BaseDAL.DecodeError (LC_BaseDAL.lua:536-663) to the ErrorCodeConfig tip and skips that handler.
-    /// 2317 "This shop does not allow gifts" is the inferred code. Nothing is charged, granted, counted or saved.
-    /// </summary>
-    public async Task RefusePresentAsync(GameSession session, CommodityPresentReq req)
-    {
-        log.LogInformation("{Name} tries to gift commodity {Id} to {Target}: refused, gifting is not implemented",
-            session.Role!.Name, req.BuyReq?.CommodityId ?? 0, req.TargetId);
-        await session.SendGameAsync(CommodityPresent, new CommodityPresentResp
-        {
-            Result = ErrorCodes.ShopGiftNotAllowed, CommodityId = req.BuyReq?.CommodityId ?? 0, TargetId = req.TargetId,
-            GiftContent = req.GiftContent,
-        });
-    }
 
     /// <summary>
     /// E01: one server-admitted NPC purchase (ShopConfig type 3) authorizes its exact payment and

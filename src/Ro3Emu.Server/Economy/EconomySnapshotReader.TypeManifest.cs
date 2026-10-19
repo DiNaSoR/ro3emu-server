@@ -77,7 +77,11 @@ public static partial class EconomySnapshotReader
     // Astral Level: role.paragon (ParagonService.State) holds the Paragon level and EXP, the points on each star and the
     // item ids of socketed Star Cores. No balance; a socketed core is spent from the bag by the same exchange that writes
     // it here and granted back by the exchange that clears it, so it is never held twice.
-    public const string ExpectedFormatManifestHash = "1E30C4D728B85399A0899E16BE44525F6E97E551767E1496935C58625C0A7E44";
+    // Fashion gifts: role.present_sent and role.present_received are DBPresentInfo orders. No balance and no asset: the
+    // sender's price is spent by the cd13a/shop-gift exchange that writes present_sent, comes back only as the refund
+    // letter that marks the order Refunded, and the receiver's claim is a cost-free cd13a/shop-appearance unlock that writes
+    // present_received; the orders only decide which of the two happens, once.
+    public const string ExpectedFormatManifestHash = "248124F733950AC5AF7ABD78B066DBC7BB8F6CD1B90CC93FD79285158049B007";
     public static string FormatManifestHash => State.FormatManifestHash;
 
     private sealed partial class State

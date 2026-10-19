@@ -288,8 +288,8 @@ public sealed class AppearanceShopTests : IAsyncLifetime
             BuyReq = new BuyCommodityReq { CommodityId = TeaParty, Count = 1, Price = 1880 },
         });
         var reply = await Next(bot, ShopService.CommodityPresent, CommodityPresentResp.Parser);
-        // Non-zero: LC_DAL_Shop.CommodityPresentResp (the "gift sent" tip and chat card) never runs.
-        Assert.Equal(ErrorCodes.ShopGiftNotAllowed, reply.Result);
+        // Non-zero: LC_DAL_Shop.CommodityPresentResp (the "gift sent" tip and chat card) never runs. No such role: 2312.
+        Assert.Equal(2312, reply.Result);
         Assert.Equal(crystals, Crystals);
         Assert.Empty(Alice.Shop!.Bought);
         Assert.False(Alice.Wardrobe!.AllLightUpAppearances.ContainsKey(TeaPartySuit));
