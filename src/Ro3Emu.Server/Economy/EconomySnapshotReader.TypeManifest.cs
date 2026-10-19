@@ -72,7 +72,9 @@ public static partial class EconomySnapshotReader
     // CasualSettled the once-only markers of each match's event/casual-battle receipt; no balance, no asset.
     // Tavern: role.barroom DBBarRoomInfo holds Star Power received (popularity, weekPopularity) and the Daily Tavern
     // seconds and days; counters, no balance and no asset (the gift items are paid by their own exchange).
-    public const string ExpectedFormatManifestHash = "7B2DD5C94777212F27DA335DF41821B8132478A22D787F72303CDA03D4BF3647";
+    // Titles: role.title DBTitleInfo holds the title rank; a marker, no balance and no asset (the crest items are paid by
+    // their own exchange).
+    public const string ExpectedFormatManifestHash = "9798CA8FBE465A00408359A6255100445D18E27FF947708795F41DE20C064FD8";
     public static string FormatManifestHash => State.FormatManifestHash;
 
     private sealed partial class State

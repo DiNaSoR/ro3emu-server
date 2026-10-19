@@ -665,4 +665,173 @@ public sealed class SurvivorBattleTests : IAsyncLifetime
             return Task.CompletedTask;
         });
     }
+
+    [ClientDataFact]
+    public async Task EliminatedPlayerWatchesAStandingTeammate()
+    {
+        await HostAsync(4, 2);
+        await using var alice = await InWorld("Alice");
+        await using var bob = await InWorld("Bob");
+        await using var cara = await InWorld("Cara");
+        await using var dan = await InWorld("Dan");
+        var players = new[] { alice, bob, cara, dan };
+        var battle = await BattleAsync(players, await StartAsync(players));
+        Assert.Equal(Round(alice).TeamId, Round(bob).TeamId);
+        long start = battle.StageModuleData.StageStartTime / 1000;
+        await PastFreeReviveAsync(players, battle);
+
+        // Out for good: the countdown to watching, then the server picks Alice.
+        await KillAsync(bob);
+        var offer = await Next(bob, TimedBattleService.WatchNotify, ChickenWatchNotify.Parser);
+        Assert.InRange(offer.AutoWatchTime, start + 181 + 9, start + 181 + 11);
+        await Tick(offer.AutoWatchTime + 1);
+        var bind = await Next(bob, WorldCoreService.CustomChange, CustomDataChange.Parser, c => c.CustomDatas.Any(d => d.Id == 1002));
+        Assert.Equal((Id(bob), Id(alice)), (bind.EntityId, bind.CustomDatas.Single().CustomParam.IntParam));
+        await OnLoop(() =>
+        {
+            var b = Session(bob);
+            Assert.True(b.AoiHidden);
+            Assert.Contains(Session(alice), b.Visible);
+            Assert.DoesNotContain(b, Session(cara).Visible);
+            Assert.DoesNotContain(b, Session(alice).Visible);
+            return Task.CompletedTask;
+        });
+
+        // Only a standing teammate can be watched; the view follows Alice.
+        await bob.SendGameAsync(TimedBattleService.ChangeWatch, new ChickenChangeWatchPlayerReq { PlayerId = Id(cara) });
+        await MoveAsync(alice, 300, 300);
+        await Tick(offer.AutoWatchTime + 2);
+        for (int i = 0; ; i++)
+        {
+            bool there = false;
+            await OnLoop(() =>
+            {
+                there = MonsterService.Distance(Session(bob).Position.X, Session(bob).Position.Z, 300, 300) < 1;
+                return Task.CompletedTask;
+            });
+            if (there) break;
+            Assert.True(i < 50, "the spectator's view did not follow");
+            await Task.Delay(100);
+        }
+    }
+
+    /// <summary>Magic Dice: a touch opens a 3-card pick through 5039; Kaka Coin redraws it; a pick applies the card;
+    /// an unanswered pick takes the first card at its endTime.</summary>
+    [ClientDataFact]
+    public async Task MagicDieOffersACardPickThatRefreshesAndApplies()
+    {
+        await HostAsync(2, 1);
+        await using var alice = await InWorld("Alice");
+        await using var bob = await InWorld("Bob");
+        var players = new[] { alice, bob };
+        await BattleAsync(players, await StartAsync(players));
+        ChickenNpcUnit die = null!;
+        await OnLoop(() =>
+        {
+            var dice = Battles.NpcsForTest(Session(alice)).Where(n => n.NpcId == 15000301).ToArray();
+            Assert.Equal(50, dice.Length);
+            die = dice[0];
+            return Task.CompletedTask;
+        });
+        DBAdventureInfo Seen(BotClient bot) => (DBAdventureInfo)Session(bot).Synced[TimedBattleService.AdventureSync];
+        AdventureEventSelectInfo Open(BotClient bot) => Seen(bot).FunctionInfos[1003].Deck.Values.Single().NeedSelectMap.Values.Single();
+
+        await MoveAsync(alice, die.X, die.Z);
+        await alice.SendGameAsync(SceneService.NpcInteraction, new NpcInteractionReq { NpcUid = die.Uid, InteractionId = 2900010 });
+        Assert.Equal(0, (await Next(alice, SceneService.NpcInteraction, NpcInteractionRsp.Parser)).Result);
+        var first = await Next(alice, TimedBattleService.AdventureSync, DBAdventureInfoIncrement.Parser);
+        Assert.True(first.SyncAllMark);
+        Assert.Equal(1003, first.CurActiveFunctionId);
+        AdventureEventSelectInfo pick = null!;
+        var pool = Service<GameData>().Table("AdventureCardConfig").Values
+            .Where(r => GameData.Int(r, "_iPoolId") == 1003).Select(r => GameData.Int(r, "_iCardId")).ToHashSet();
+        await OnLoop(() =>
+        {
+            Assert.DoesNotContain(Battles.NpcsForTest(Session(alice)), n => n.Uid == die.Uid); // used up
+            pick = Open(alice).Clone();
+            Assert.Equal((1003, 1, 0), (pick.PoolId, pick.ChooseCount, pick.RefreshCount));
+            Assert.Equal(new[] { 1, 2, 3 }, pick.Cards.Keys.Order().ToArray());
+            Assert.Equal(3, pick.Cards.Values.Distinct().Count());
+            Assert.All(pick.Cards.Values, c => Assert.Contains(c, pool));
+            Assert.InRange(pick.EndTime - clock.GetUtcNow().ToUnixTimeSeconds(), 9, 10);
+            return Task.CompletedTask;
+        });
+
+        // A redraw costs 1000 Kaka Coin, then 2000.
+        await alice.SendGameAsync(TimedBattleService.AdventureRefresh, new AdventureRefreshReq { OperateId = pick.OperateId });
+        Assert.Equal(ErrorCodes.CurrencyShort, (await Next(alice, TimedBattleService.AdventureRefresh, AdventureRefreshResp.Parser)).Result);
+        long chest = 0;
+        await OnLoop(async () => chest = await Battles.PlaceChestForTestAsync(Session(alice), 15000501, (10006, 5000), (30002, 1)));
+        await alice.SendGameAsync(TimedBattleService.PickupAll, new PickUpAllChickenItemReq { NpcIds = { chest } });
+        Assert.Equal(0, (await Next(alice, TimedBattleService.PickupAll, PickUpAllChickenItemResp.Parser)).Result);
+        await alice.SendGameAsync(TimedBattleService.AdventureRefresh, new AdventureRefreshReq { OperateId = pick.OperateId });
+        Assert.Equal(0, (await Next(alice, TimedBattleService.AdventureRefresh, AdventureRefreshResp.Parser)).Result);
+        await OnLoop(() =>
+        {
+            Assert.Equal(1, Open(alice).RefreshCount);
+            Assert.Equal(4000, Round(alice).PackInfos.Values.Single(i => i.ItemEntry == 10006).Stack);
+            pick = Open(alice).Clone();
+            return Task.CompletedTask;
+        });
+
+        // Only an offered card, exactly chooseCount of them; the pick closes and the card joins the deck.
+        await alice.SendGameAsync(TimedBattleService.AdventureSelect, new AdventureEventSelectReq { OperateId = pick.OperateId, CardId = { 1 } });
+        Assert.Equal(ErrorCodes.Parameter, (await Next(alice, TimedBattleService.AdventureSelect, AdventureEventSelectResp.Parser)).Result);
+        long chosen = pick.Cards[1];
+        await alice.SendGameAsync(TimedBattleService.AdventureSelect, new AdventureEventSelectReq { OperateId = pick.OperateId, CardId = { chosen } });
+        var selected = await Next(alice, TimedBattleService.AdventureSelect, AdventureEventSelectResp.Parser);
+        Assert.Equal((0, pick.OperateId), (selected.Result, selected.Req.OperateId));
+        await OnLoop(() =>
+        {
+            var deck = Seen(alice).FunctionInfos[1003].Deck.Values.Single();
+            Assert.Empty(deck.NeedSelectMap);
+            Assert.Equal(chosen, deck.Cards.Values.Single().CardId);
+            return Task.CompletedTask;
+        });
+
+        // Golden Thief Bug: +5000 Kaka Coin. Baphomet: the worn 30002 becomes 30102 (max HP +1600 -> +3200).
+        long coins = 0;
+        await OnLoop(() => { coins = Round(alice).PackInfos.Values.Where(i => i.ItemEntry == 10006).Sum(i => (long)i.Stack); return Task.CompletedTask; });
+        long equip = 0;
+        await OnLoop(() => { equip = Round(alice).PackInfos.Values.First(i => i.ItemEntry == 30002).ItemGuid; return Task.CompletedTask; });
+        await alice.SendGameAsync(TimedBattleService.InsertItem, new InsertChickenItemReq { Type = ChickenItemType.Equip, Index = 1, ItemGuid = equip });
+        Assert.Equal(0, (await Next(alice, TimedBattleService.InsertItem, InsertChickenItemResp.Parser)).Result);
+        foreach (long card in new long[] { 3001011, 3001014 })
+        {
+            await OnLoop(() => Battles.OfferForTestAsync(Session(alice), card));
+            long operate = 0;
+            await OnLoop(() => { operate = Open(alice).OperateId; return Task.CompletedTask; });
+            await alice.SendGameAsync(TimedBattleService.AdventureSelect, new AdventureEventSelectReq { OperateId = operate, CardId = { card } });
+            Assert.Equal(0, (await Next(alice, TimedBattleService.AdventureSelect, AdventureEventSelectResp.Parser)).Result);
+        }
+        await OnLoop(() =>
+        {
+            var pack = Round(alice).PackInfos.Values.Where(i => i.ItemEntry != 0).ToArray();
+            Assert.Equal(coins + 5000, pack.Where(i => i.ItemEntry == 10006).Sum(i => (long)i.Stack));
+            Assert.DoesNotContain(pack, i => i.ItemEntry == 30002);
+            var better = pack.Single(i => i.ItemEntry == 30102);
+            Assert.Equal(better.ItemGuid, Round(alice).ExtendInfo.ChickenDungeonInfo.Equips[1]);
+            Assert.Equal(15400 + 3200, Service<CharacterService>().Stats(Session(alice))[101]);
+            return Task.CompletedTask;
+        });
+
+        // Unanswered: the first card at endTime.
+        await OnLoop(() => Battles.OfferForTestAsync(Session(alice), 3001016, 3001017, 3001018));
+        long end = 0;
+        await OnLoop(() => { end = Open(alice).EndTime; return Task.CompletedTask; });
+        await Tick(end);
+        for (int i = 0; ; i++)
+        {
+            bool done = false;
+            await OnLoop(() =>
+            {
+                var deck = Seen(alice).FunctionInfos[1003].Deck.Values.Single();
+                done = deck.NeedSelectMap.Count == 0 && deck.Cards.Values.Any(c => c.CardId == 3001016);
+                return Task.CompletedTask;
+            });
+            if (done) break;
+            Assert.True(i < 50, "the pick was not taken at its end time");
+            await Task.Delay(100);
+        }
+    }
 }

@@ -157,6 +157,9 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
     public int EnergyCareer { get; set; }
     /// <summary>A live stealth buff (BuffConfig category 31) hides the player from monsters (BuffService.Stealth).</summary>
     public bool Stealthed { get; set; }
+    /// <summary>No other player shows this one (World): a Survivor Battle spectator whose view follows the watched
+    /// teammate. Set through World.SetHiddenAsync; a scene join clears it.</summary>
+    public bool AoiHidden { get; internal set; }
     /// <summary>Hits taken under the current stealth buff (its GUID), toward its "revealed after taking damage N times".</summary>
     internal (long Guid, int Hits) StealthHits { get; set; }
     /// <summary>Lasting buffs the falcon, wolf or Madogear grant right now (CombatService.Companions).</summary>
@@ -304,6 +307,9 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
     /// <summary>Tavern Star Power, today's seconds in a room and completed days (5043, role blob "barroom"); TavernService.
     /// barRoomId is the room the role is in now (rooms live in memory).</summary>
     public Romsg.DBBarRoomInfo? Tavern { get; set; }
+
+    /// <summary>The title rank (5031, role blob "title"); TitleService.</summary>
+    public Romsg.DBTitleInfo? Title { get; set; }
 
     /// <summary>When this role's tavern seconds were last counted (unix seconds; 0 when not in a room); TavernService.</summary>
     public long TavernCountedAt { get; set; }

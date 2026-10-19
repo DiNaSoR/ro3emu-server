@@ -126,7 +126,7 @@ show is playable from day one, without season or server-day gates ([details](doc
 - crafting with its guarantee counters, award and choice boxes
 - cards (collection stars, insert rules, Flash cards, card effects)
 - Soul Echo, pets and the hatchery, mounts, wardrobe, totems, job items
-- achievements, codex, Growth Classroom, Seven-Day Goal, profile card
+- achievements, codex, Growth Classroom, Seven-Day Goal, profile card, title ranks
 
 </td><td valign="top" width="50%">
 
@@ -162,9 +162,9 @@ show is playable from day one, without season or server-day gates ([details](doc
   (bubbles, bells, rhythm stages) are plain area attacks, and knockback does not move players yet.
 - **Mock Battle extras:** the arena's monsters and the 40-player team frame.
 - **War of Emperium extras:** commander tools, siege weapons and vehicles.
-- **Survivor Battle extras:** spectating and Kafra adventure tasks.
+- **Survivor Battle extras:** the "Go, Kafra, Go!" weekly tasks.
 - **Guild extras:** merging, impeachment, group mail.
-- **Smaller missing pieces:** shop gifting, titles, Paragon (Astral Level), and some stages of the story dungeons
+- **Smaller missing pieces:** shop gifting, Paragon (Astral Level), and some stages of the story dungeons
   that are still simplified.
 - **Guild voice:** only party and Tavern voice are implemented.
 

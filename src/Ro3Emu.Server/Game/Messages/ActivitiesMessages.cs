@@ -229,6 +229,12 @@ public sealed class ActivitiesMessages(PraiseService praise, CasualBattleService
             await timedBattles.SelectFollowAsync(session, SelectFollowReq.Parser.ParseFrom(body.Span)));
         routes.Map(TimedBattleService.OpenPanel, "timedBattles", async (session, msgId, body) =>
             await timedBattles.OpenPanelAsync(session, ChickenOpenPanelReq.Parser.ParseFrom(body.Span)));
+        routes.Map(TimedBattleService.AdventureSelect, "timedBattles", async (session, msgId, body) =>
+            await timedBattles.AdventureSelectAsync(session, AdventureEventSelectReq.Parser.ParseFrom(body.Span)));
+        routes.Map(TimedBattleService.AdventureRefresh, "timedBattles", async (session, msgId, body) =>
+            await timedBattles.AdventureRefreshAsync(session, AdventureRefreshReq.Parser.ParseFrom(body.Span)));
+        routes.Map(TimedBattleService.ChangeWatch, "timedBattles", async (session, msgId, body) =>
+            await timedBattles.ChangeWatchAsync(session, ChickenChangeWatchPlayerReq.Parser.ParseFrom(body.Span)));
         routes.Map(TimedBattleService.InsertItem, "timedBattles", async (session, msgId, body) =>
             await timedBattles.InsertAsync(session, InsertChickenItemReq.Parser.ParseFrom(body.Span)));
         routes.Map(TimedBattleService.UseItem, "timedBattles", async (session, msgId, body) =>

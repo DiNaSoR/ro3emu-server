@@ -144,7 +144,8 @@ public sealed class PowerTests : IAsyncLifetime
         Assert.Equal(GameData.Int(Row("CardConfig", r => GameData.Int(r, "_iCardID") == cardEntry && GameData.Int(r, "_iTier") == 1), "_iPower") + upgrade,
             p.CardFillInEquipScore.NormalPower);
         Assert.Equal(0, Sum(p.CardSuitScore));
-        Assert.Equal(0, Sum(p.TitleScore));
+        // Every role holds title row 1 "Beginner" (TitleService.FirstTitle).
+        Assert.Equal(GameData.Int(Data.Row("TitleConfig", TitleService.FirstTitle)!.Value, "_iPowerAdd"), Sum(p.TitleScore));
         Assert.Equal(BaseLv(1) + Sum(p), Sum(changed.CurPower));
         Assert.Equal(Sum(changed.CurPower) - Sum(login.CurPower), Sum(changed.ChangePower));
         Assert.Equal(changed.CurPower, changed.MaxHistoryPower);

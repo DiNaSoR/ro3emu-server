@@ -1,8 +1,8 @@
-# Survivor Battle shops, Rescue Wagons and follow
+# Survivor Battle shops, Rescue Wagons, Magic Dice, follow and spectating
 
 Kafra Survivor Battle ("Chicken", scene 2240101) already runs its stages, items, poison zone and revives in
 `TimedBattleService.Chicken*` (see [timed activities](activities-timed-events.md)). This page covers the match's
-service NPCs and team follow: `TimedBattleService.ChickenShop` and `.ChickenFollow`, tests in `SurvivorBattleTests`.
+service NPCs, Magic Dice, team follow and spectating: `TimedBattleService.ChickenShop`, `.ChickenAdventure`, `.ChickenFollow` and `.ChickenWatch`, tests in `SurvivorBattleTests`.
 
 ## Service NPCs
 
@@ -13,6 +13,7 @@ At the battle start the server places the NPCs of the scene's respawn regions (`
 |---|---|---|
 | 877 | 商店和救护车刷新区域 (shops and ambulances) | 3 × shop NPC 15000054 (shop 801), 2 × Rescue Wagon 15000055 |
 | 866 | 武器商人（大圈） (weapon merchant) | 5 × shop NPC 15000060 (shop 802) |
+| 899 | a single point (426, 415) | 50 × Magic Die 15000301, spread over the island instead *(inferred)* |
 
 The regions are 400 m and 380 m squares with no inner points, so each NPC stands at a random walkable point inside
 its region and the island circle *(inferred)*. Interacting (32700) is answered by the match: the client only waits
@@ -60,8 +61,45 @@ At the landing a follower lands with the end of its follow chain when that playe
 adventure, ambulance). The others in the match get 31018 with that id at 1 (open) or 0 (closed), which shows or
 hides the sign over the player's head.
 
+## Spectating
+
+A player out of the battle (dead, no revive map open, not given up) watches a teammate who still stands:
+
+- The elimination sends 82675 `ChickenWatchNotify {autoWatchTime}` (seconds) when a teammate still stands. The
+  client shows "auto spectate in N s" while it watches nobody. After `EatChickenObserve` 10 s *(inferred: the same
+  value as the revive map time)* the server picks the first standing teammate in team order.
+- The watch itself is custom data 1002 (`Unit_CameraBindUnitCustomData`) on the spectator's own player, sent only to
+  it: the client binds its camera to that unit and opens the spectating widget. 0 ends it.
+- 82640 `ChickenChangeWatchPlayerReq {player_id}` (the widget's arrows, the team list) switches to another standing
+  teammate. Anyone else is ignored (the response is NullArg).
+- *(inferred)* On the server the spectator's view point moves with the watched teammate (every tick, once 4 m off),
+  and World hides the spectator from every other player, so its client gets the units around the watched teammate.
+  The Death crate and ID tag stay where it fell.
+- When the watched teammate falls or leaves, the next standing one is watched, or the watch ends. A revive map, a
+  revive, giving up or leaving the match also ends it, and the view goes back to where the player fell.
+
+## Magic Dice
+
+The in-match adventure (奇遇) is a card pick, not a task list. A die's interact 2900010 runs action 325
+TriggerAdventureEvent 10001 and 3 RemoveInteractionNpc: the die disappears, and the player gets a pick from
+AdventureDeckConfig 1003.
+
+- The pick travels only in the 5039 `DBAdventureInfo` autosync (`LC_DAL_Roguelike`):
+  `functionInfos[1003].deck[match].needSelectMap[operateId]` = `{poolId 1003, refreshCount, chooseCount, cards 1..n,
+  endTime (s)}`. The client queues the picks and opens `UI_Sys_Chicken_AdventurePanel`; an empty map closes it.
+  `deck.cards` holds the cards already taken (the decks panel).
+- `_kRewardStagePersonal [3, 1]`: 3 different cards drawn by `_iWeight` from AdventureCardConfig pool 1003, choose 1
+  *(inferred meaning)*.
+- 83421 `AdventureEventSelectReq {operateId, cardId[]}` takes exactly `chooseCount` offered cards (else 82).
+- 83422 `AdventureRefreshReq {operateId}` redraws for Kaka Coin 10006: 1000, 2000, 3000, then 4000 each
+  (`_kRewardStageAuction`), at most `_iLimit` 10 times (2304), 192 without the coin.
+- After `_iAutoSelection` 10 s the server takes the first card *(inferred)*.
+- Card effects (`_kEffect`): 203 a buff (8 MVP cards), 326 Kaka Coin (Golden Thief Bug, 5000), 338 UpgradeList
+  (Baphomet: every worn equipment becomes its `_iUpgradeItem`, one quality up, in the same slot).
+- Leaving the match sends an empty 5039. 82671 `ChickenSelectTaskReq` is never sent by the client.
+
 ## Not done
 
-- Spectating after elimination (82640, 82675): the camera follows a unit through custom data 1002, which needs the
-  server to show the spectator what the watched player sees.
-- Kafra adventure tasks (adventure NPCs 15000301 in region 899, 82671) and the messenger monsters 15000058 (region 855).
+- The messenger monsters 15000058 (region 855): camera NPCs with no client or config link found.
+- The adventure pre-announcement (dungeon var `CChickenAdventureTimerTips`): the dice are all placed at the start.
+- The "Go, Kafra, Go!" weekly tasks (TaskConfig type 10, 2501-2507) are ordinary quests and not counted yet.
