@@ -119,6 +119,7 @@ public sealed partial class CombatService
         await SyncUnionAsync(s);
         await KingsGraceSlowAsync(s);
         await UncoverAroundAsync(s);
+        await GatherAstralBodiesAsync(s);
     }
 
     private async Task SyncUnionAsync(GameSession s)

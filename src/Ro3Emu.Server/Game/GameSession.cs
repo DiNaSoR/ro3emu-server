@@ -188,6 +188,8 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
     internal int FirepowerUses { get; set; }
     /// <summary>High-Energy Impact's attack row for the current flight.</summary>
     internal int FlightAttackRowId { get; set; }
+    /// <summary>When Psychokinetic Astral Body gathers its next orb.</summary>
+    internal long AstralNextMs { get; set; }
     public int ImmuneRecoveryPercent { get; set; }
     public Dictionary<int, long> SkillCds { get; } = new();
     public Dictionary<int, long> ItemCds { get; } = new();
