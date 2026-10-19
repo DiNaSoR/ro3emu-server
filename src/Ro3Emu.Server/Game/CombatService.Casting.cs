@@ -165,17 +165,33 @@ public sealed partial class CombatService
         if (GameData.Int(row!.Value, "_iIfAutoAtk") == 2 && owned == null && target != null && CanHitMonster(s, target))
         {
             s.Attack = new AttackLoop { Target = target, SkillId = loopSkill,
-                NextSwingMs = Now + SkillMs(s, row.Value) + Math.Max(0, GameData.Int(row.Value, "_iChantFix") + GameData.Int(row.Value, "_iChantVar")) + 1,
+                NextSwingMs = Now + SkillMs(s, row.Value) + ChantTime(s, row.Value) + 1,
                 StartX = s.Position.X, StartZ = s.Position.Z, StartedWalking = s.Walking, StartMs = Now, ArrivalSlack = arrival };
         }
         else s.Attack = null;
         if (GameData.Int(row.Value, "_iIfAutoAtk") == 2 && owned == null && playerTarget != null)
             eventAttacks[s] = new EventAttack(playerTarget, loopSkill,
-                Now + SkillMs(s, row.Value) + Math.Max(0, GameData.Int(row.Value, "_iChantFix") + GameData.Int(row.Value, "_iChantVar")) + 1,
+                Now + SkillMs(s, row.Value) + ChantTime(s, row.Value) + 1,
                 s.Position.X, s.Position.Z);
         var cooldowns = await StartCooldownAsync(s, row.Value);
         await StartCastAsync(s, row.Value, req, id, owned, chanted ? costs : null, arrival, cooldowns);
     }
+
+    /// <summary>
+    /// The chant: _iChantFix plus _iChantVar cut by Cast Speed 116 ("cspd": 2 per DEX by AttributeConversionConfig 5,
+    /// Suffragium +10, Mystical Amplification +1 a level). The client has no formula; this is classic RO's renewal rule
+    /// (inferred), where the variable cast shrinks by sqrt((DEX x 2 + INT) / 530) and the fixed part stays. Cast Speed
+    /// below 0 ("Cast Speed decreases") lengthens it the same way. Before, Cast Speed changed nothing.
+    /// </summary>
+    internal int ChantTime(GameSession s, JsonElement row)
+    {
+        long fix = Math.Max(0, GameData.Int(row, "_iChantFix")), variable = Math.Max(0, GameData.Int(row, "_iChantVar"));
+        if (variable == 0) return (int)fix;
+        return (int)(fix + Math.Round(variable * ChantFactor(character.Stats(s)[116])));
+    }
+
+    internal static double ChantFactor(long castSpeed) =>
+        Math.Max(0, 1 - Math.Sign(castSpeed) * Math.Sqrt(Math.Min(Math.Abs(castSpeed), 530) / 530.0));
 
     /// <summary>The distance the client's stop right after a cast may land from where the server had it (in-game 11.10).</summary>
     private static float ArrivalSlack(GameSession s) => s.Speed / 100f * 0.75f + 0.5f;
@@ -554,7 +570,7 @@ public sealed partial class CombatService
         {
             Id = id, OwnerId = s.Role!.Id, WorldScene = s.WorldScene, SceneGeneration = s.SceneGeneration,
             Attachment = s.Attachment, Request = req, Row = row, Origin = origin, StartedWalking = actor == null && s.Walking, WalkStart = origin.Clone(), ArrivalSlack = arrivalSlack ?? ArrivalSlack(s),
-            StartMs = Now, ChantMs = (int)Math.Max(0, GameData.Int(row, "_iChantFix") + GameData.Int(row, "_iChantVar")), ActionMs = SkillMs(s, row), Operator = actor,
+            StartMs = Now, ChantMs = ChantTime(s, row), ActionMs = SkillMs(s, row), Operator = actor,
             Cooldowns = cooldowns,
         };
         if (chantCosts is { } owed) action.ChantCost = () => PayChantCostAsync(s, action, owed);

@@ -65,9 +65,10 @@ public sealed partial class CombatService
 
     /// <summary>A heal: Healing Done% 207 and Global Healing Effect% 241 of the healer, Healing Taken% 208 and Global
     /// Healing Received% 242 of the recipient (inferred: two factors, like the damage pairs). 1208 ("per_cure1", the
-    /// same "Healing Taken" name; Angeling's 2328301 "Increases this unit's healing received") adds to 208 (inferred).</summary>
+    /// same "Healing Taken" name; Angeling's 2328301 "Increases this unit's healing received") adds to 208, and 1207
+    /// ("per_treat1", Prayer of Gratitude's "Healing Efficiency") to 207 (inferred).</summary>
     internal static double HealFactor(Fighter healer, Fighter recipient) =>
-        Math.Max(0, 1 + (S(healer, 207) + S(healer, 241)) / 10000) * Math.Max(0, 1 + (S(recipient, 208) + S(recipient, 242) + S(recipient, 1208)) / 10000);
+        Math.Max(0, 1 + (S(healer, 207) + S(healer, 241) + S(healer, 1207)) / 10000) * Math.Max(0, 1 + (S(recipient, 208) + S(recipient, 242) + S(recipient, 1208)) / 10000);
 
     /// <summary>
     /// A skill's _kBuff1 tuples for this caster. Divine Insight ("Inspiration") lists both of its buffs: 1162305

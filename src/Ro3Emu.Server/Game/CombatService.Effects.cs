@@ -478,9 +478,15 @@ public sealed partial class CombatService
               && c.EnumerateArray().Any(v => GameData.Number(v) == 30))) return 0;
         int dmgType = (int)GameData.Int(buff, "_iDmgType");
         double ratio = Numbers(buff, "_kData1").FirstOrDefault();
-        if (ratio > 0 && dmgType is 1 or 2) return (long)Math.Floor((dmgType == 2 ? caster[104] : caster[103]) * ratio / 10000);
-        return PetCombatRules.AttributeAmount(buff, caster, recipient);
+        long amount = ratio > 0 && dmgType is 1 or 2 ? (long)Math.Floor((dmgType == 2 ? caster[104] : caster[103]) * ratio / 10000)
+            : PetCombatRules.AttributeAmount(buff, caster, recipient);
+        return ShieldEfficiency(amount, caster, recipient);
     }
+
+    /// <summary>Shield Efficiency: the caster's 1205 ("per_shieldbonus", Prayer of Gratitude) and the recipient's 1206
+    /// ("per_beshieldbonus") raise a granted shield (inferred: two factors, like <see cref="HealFactor"/>).</summary>
+    internal static long ShieldEfficiency(long amount, StatSheet caster, StatSheet recipient) => amount <= 0 ? amount
+        : (long)Math.Floor(amount * Math.Max(0, 1 + caster[1205] / 10000.0) * Math.Max(0, 1 + recipient[1206] / 10000.0));
 
     /// <summary>
     /// What a cleansing skill removes. Healing Skills/Recovery (Cleanse, Cleanse2) list status kinds in _kLogicData,
@@ -522,7 +528,7 @@ public sealed partial class CombatService
         return id > 0 && Rolls.Proc(10000) < (GameData.Number(tuple[1]) ?? 0);
     }
 
-    internal enum DisplaceKind { CasterForward, CasterBack, TargetPush, TargetPull, CasterToTarget, CasterToPoint }
+    internal enum DisplaceKind { CasterForward, CasterBack, TargetPush, TargetPull, CasterToTarget, CasterToPoint, PullToCenter }
 
     /// <summary>
     /// Skills whose show has a displacement EffectData (m_kPoint.m_bMovement) and whose description names the
@@ -552,6 +558,24 @@ public sealed partial class CombatService
             ["HesperusLit"] = (DisplaceKind.CasterToPoint, -1),
             // Fire Ninja's Main Skill 2302201: "moves its master ${2} meters in the designated direction" (show 2300311).
             ["petmove"] = (DisplaceKind.CasterForward, 1),
+            // "applying 【Knockback】 for ${4} meters" (Spear Stab), "knocking them back ${5} meters" (Sightrasher).
+            ["Spear_Stab"] = (DisplaceKind.TargetPush, 3),
+            ["Sightrasher"] = (DisplaceKind.TargetPush, 4),
+            // "Pulls the targets closer" (Spear Formation - Crescent Moon).
+            ["MoonSlasher2"] = (DisplaceKind.TargetPull, -1),
+            // "applying 【Pull】" (Tetra Vortex), "continuously pulling them in" (Gravitational Impact): toward the chosen
+            // target, around which the area is centred (inferred: they end 1 m from it).
+            ["TetraVortex"] = (DisplaceKind.PullToCenter, -1),
+            ["VectorShock"] = (DisplaceKind.PullToCenter, -1),
+            // "Swing your Axe to Move rapidly in front of the target" (Heavy Axe Smash 1630505 冲锋攻击).
+            ["PowerSwing"] = (DisplaceKind.CasterToTarget, -1),
+            // "Charges to a point ${5} meters in front of the target" (Dark Illusion 1540104).
+            ["hesehuanying"] = (DisplaceKind.CasterToTarget, 4),
+            // "Choose a direction to dash ${1} meters as a phantom" (Flowing Shadow 1542101).
+            ["yingliu"] = (DisplaceKind.CasterForward, 0),
+            // "Move ${12} meters in that direction" (Fearless Charge 1162411 黄昏之光水平移动). Its _kDescData has 11 values,
+            // so ${12} is missing; the 12 m of ${1}, the area's length, stands in (inferred).
+            ["PinpointAttack2"] = (DisplaceKind.CasterForward, 0),
         };
 
     private readonly System.Collections.Concurrent.ConcurrentDictionary<long, (int Id, int Ms)> _movementEffects = new();
@@ -583,7 +607,9 @@ public sealed partial class CombatService
     {
         if (!Displacements.TryGetValue(Script(row), out var rule)) return null;
         var (effect, ms) = MovementEffect(GameData.Int(row, "_iScriptShow"));
-        if (effect == 0) return null;
+        // The caster's own move needs the show's displacement effect (the client ignores a 31112 without one); a monster
+        // is moved by its position update alone when the show has none (Spear Stab, Sightrasher, Crescent Moon).
+        if (effect == 0 && rule.Kind is not (DisplaceKind.TargetPush or DisplaceKind.TargetPull or DisplaceKind.PullToCenter)) return null;
         // (inferred) "pulling them in front of you": 1 m ahead of the caster; a charge also stops 1 m short.
         float distance = rule.DescIndex < 0 ? 1 : (float)Numbers(row, "_kDescData").ElementAtOrDefault(rule.DescIndex);
         return distance > 0 ? (rule.Kind, distance, effect, ms) : null;
@@ -632,19 +658,26 @@ public sealed partial class CombatService
 
     private async Task DisplaceTargetAsync(GameSession s, ActiveSkillCast action, MonsterUnit target)
     {
-        if (Displacement(action.Row) is not { Kind: DisplaceKind.TargetPush or DisplaceKind.TargetPull } move) return;
+        if (Displacement(action.Row) is not { Kind: DisplaceKind.TargetPush or DisplaceKind.TargetPull or DisplaceKind.PullToCenter } move) return;
         var from = s.Position;
+        if (move.Kind == DisplaceKind.PullToCenter)
+        {
+            // The centre is the chosen target (or the chosen point); the chosen target itself stays.
+            if (FindMonster(s.WorldScene, action.Request.TargetId) is { } centre) { if (centre == target) return; from = centre.Pos; }
+            else if (action.Request.TargetPos is { } point) from = point;
+            else return;
+        }
         float dx = target.X - from.X, dz = target.Z - from.Z;
         float length = MathF.Sqrt(dx * dx + dz * dz);
         if (length < 0.001f) return;
         // A push goes away from the caster; a pull stops the given distance in front of it.
         float distance = move.Kind == DisplaceKind.TargetPush ? move.Distance : -(length - move.Distance);
-        if (move.Kind == DisplaceKind.TargetPull && length <= move.Distance) return;
+        if (move.Kind != DisplaceKind.TargetPush && length <= move.Distance) return;
         var start = target.Pos;
         var end = WalkableEnd(s.SceneEntry, start, dx / length * distance, dz / length * distance);
         target.Moving = false;
         target.X = end.X; target.Y = end.Y; target.Z = end.Z;
-        await world.ToUnitViewersAsync(target, SkillMove, new SkillStartMoveNotify
+        if (move.EffectId > 0) await world.ToUnitViewersAsync(target, SkillMove, new SkillStartMoveNotify
         {
             EntityID = (ulong)target.Uid, StartPos = start, EndPos = end, SkillConfigId = action.Request.SkillId,
             EffectId = move.EffectId, MoveType = 2, StartTimestampMs = Now, Face = target.Face,
