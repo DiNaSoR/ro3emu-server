@@ -160,6 +160,36 @@ public sealed partial class SkillCombatTests
     }
 
     [ClientDataFact]
+    public async Task ShieldReflectStrikesBackAtAMeleeAttacker()
+    {
+        await using var alice = await InWorld("Alice");
+        await Gm("alice", "!job 1210"); await Teach("alice", 11410); await Seasoned("alice"); await Wield("alice", 2500120, 2);
+        var monster = await Spawn("alice", t => t);
+        Assert.Equal(0, await CastSelf(alice, 1141001, Session("alice").Role!.Id));
+        await Until(s => s.Buffs.Any(b => b.ConfigId == 1140401), "alice");
+        long hp = monster.Hp;
+        await Loop.InvokeAsync(() => Combat.ReactToMonsterHitAsync(monster, Session("alice"), null, 100));
+        Assert.True(monster.Hp < hp, "no reflected hit");
+        hp = monster.Hp;
+        await Loop.InvokeAsync(() => Combat.ReactToMonsterHitAsync(monster, Session("alice"), null, 100));
+        Assert.Equal(hp, monster.Hp); // "up to 1 times per second"
+    }
+
+    [ClientDataFact]
+    public async Task ReflectDamageAnswersAnyHitAroundTheGuard()
+    {
+        await using var alice = await InWorld("Alice");
+        await Gm("alice", "!job 1410"); await Teach("alice", 11609); await Seasoned("alice"); await Wield("alice", 2500120, 2);
+        var monster = await Spawn("alice", t => t);
+        Assert.Equal(0, await CastSelf(alice, 1160901, Session("alice").Role!.Id));
+        await Until(s => s.Buffs.Any(b => b.ConfigId == 1161001), "alice");
+        long hp = monster.Hp;
+        var magic = Data.Row("SkillConfig", 1200801)!.Value; // a ranged magic hit still counts
+        await Loop.InvokeAsync(() => Combat.ReactToMonsterHitAsync(monster, Session("alice"), magic, 100));
+        Assert.True(monster.Hp < hp, "no thorn hit");
+    }
+
+    [ClientDataFact]
     public void HigherLevelAurasReuseTheirFirstLevelHalo()
     {
         var halos = BuffRuleTables.For(Data).Halos;
