@@ -116,6 +116,8 @@ public sealed class UserDataService(SocialOwnerCache cache, OwnerRegistry owners
             Career = live?.Career ?? role.Career, Gender = role.Sex, JobLevel = live?.JobLevel ?? 1, BornArea = role.Area,
             GuildID = guild?.Id ?? 0, GuildOfficial = member?.Official ?? 0,
             CantBeInvited = personal?.CantBeInvited ?? false, Offlinetime = offline,
+            // The head-info Title line and the chat icon (LC_DAL_RolePublic.ParseRolePublicBaseInfo -> m_iTitle).
+            Title = session?.Title != null ? Game.TitleService.Current(session) : Game.TitleService.Stored(profile.Title),
         };
         additional.Appearances.Add(session?.Wardrobe?.CurUseAppearances.ToDictionary(p => p.Key, p => p.Value)
             ?? RoleProto.Appearances(role, profile.Wardrobe));

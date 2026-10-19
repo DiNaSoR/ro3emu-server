@@ -25,7 +25,7 @@ namespace Ro3Emu.Server.Game;
 /// SpecialEffectConfig._iPower (CalcSpecialScore). Inferred: no skill table carries a power column, and the
 /// configured powers that do exist equal their rows' attribute weights (StrengthenTable 1050/1050 rows exactly).</item>
 /// <item>titleScore: TitleConfig._iPowerAdd of the current title (UI_Sys_Role_Title_CellWidgetCtrl shows it) plus its
-/// _kAttr weights. This server has no title rank system yet (5031/43102), so <see cref="TitleId"/> is empty.</item>
+/// _kAttr weights. The title comes from TitleService through <see cref="TitleId"/>.</item>
 /// <item>equipRankScore: the worn pieces' instance score (EquipmentRating, itemInfos[2]), EquipConfig._iPower
 /// (Lua_CFG_EquipConfig.GetPower; absent in this export) and their Enchantment._iPower (season part
 /// _iSeasonPower). Counting enchantments under rank is inferred: no package field names them.</item>
@@ -82,7 +82,7 @@ public sealed class PowerService : IGameTicker
     private Dictionary<(long Card, long Star), JsonElement>? cardRows;
     private Dictionary<(long Level, long Part, long Quality), JsonElement>? cardUpgrades;
 
-    /// <summary>The role's current TitleConfig id; no title rank owner exists on this server yet.</summary>
+    /// <summary>The role's current TitleConfig id (TitleService).</summary>
     public Func<GameSession, long>? TitleId { get; set; }
 
     public PowerService(GameData data, CharacterService character, SkillService skills, TotemService totems,

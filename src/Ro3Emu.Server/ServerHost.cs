@@ -89,6 +89,7 @@ public static class ServerHost
         builder.Services.AddSingleton<PersonalService>();
         builder.Services.AddSingleton<SocialOutfitService>();
         builder.Services.AddSingleton<TavernService>();
+        builder.Services.AddSingleton<TitleService>();
         builder.Services.AddSingleton<AchievementService>();
         builder.Services.AddSingleton<TeamService>();
         builder.Services.AddSingleton<MvpService>();
@@ -179,6 +180,7 @@ public static class ServerHost
         builder.Services.AddSingleton<Game.Messaging.IMessageModule, ActivitiesMessages>();
         builder.Services.AddSingleton<Game.Messaging.IMessageModule, AdventureGroupMessages>();
         builder.Services.AddSingleton<Game.Messaging.IMessageModule, TavernMessages>();
+        builder.Services.AddSingleton<Game.Messaging.IMessageModule, TitleMessages>();
         builder.Services.AddSingleton<Game.Messaging.IMessageModule, Voice.VoiceTicketService>();
         builder.Services.AddSingleton<GameMessageHandler>();
         builder.Services.AddSingleton(sp => GateCrypto.LoadOrCreate(options.DataDir, sp.GetRequiredService<ILogger<GateCrypto>>()));
@@ -379,6 +381,7 @@ public static class ServerHost
         app.Services.GetRequiredService<PersonalService>().Upvoted.Add(questTasks.OnProfileLiked); // 106902
         app.Services.GetRequiredService<GuildCampfireService>().Joined.Add(questTasks.OnCampfireJoined); // 106018
         app.Services.GetRequiredService<GuildService>().MembershipChanged.Add(questTasks.OnStateChanged); // 104007
+        app.Services.GetRequiredService<PowerService>().TitleId = TitleService.Current; // the title's _iPowerAdd
         var tavern = app.Services.GetRequiredService<TavernService>();
         questTasks.TavernSecondsToday = tavern.SecondsToday; // 106010, the Daily Tavern quest
         tavern.TimeSpent.Add((s, _) => questTasks.OnStateChanged(s));

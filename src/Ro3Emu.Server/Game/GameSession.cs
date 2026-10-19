@@ -308,6 +308,9 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
     /// barRoomId is the room the role is in now (rooms live in memory).</summary>
     public Romsg.DBBarRoomInfo? Tavern { get; set; }
 
+    /// <summary>The title rank (5031, role blob "title"); TitleService.</summary>
+    public Romsg.DBTitleInfo? Title { get; set; }
+
     /// <summary>When this role's tavern seconds were last counted (unix seconds; 0 when not in a room); TavernService.</summary>
     public long TavernCountedAt { get; set; }
 
