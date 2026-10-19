@@ -54,6 +54,7 @@ public sealed partial class CombatService
     {
         DealtAsync.Add(PetBuffDealtAsync);
         Killed.Add(PetBuffKilledAsync);
+        TakenAsync.Add(PetBuffTakenAsync);
     }
 
     /// <summary>The rows a pet buff casts (Malicious Curse, the Headless Warrior's extra hit): Adaptive like the pet's.</summary>
@@ -62,7 +63,7 @@ public sealed partial class CombatService
         if (_petProcRows == null)
         {
             var found = new HashSet<long>();
-            foreach (int group in new[] { EvilCurseGroup, WarriorFuryGroup })
+            foreach (int group in new[] { EvilCurseGroup, WarriorFuryGroup, IronBallGroup, FlameFistGroup })
                 foreach (var (_, buff) in data.Table("BuffConfig"))
                     if (GameData.Int(buff, "_iBuffID") == group && Numbers(buff, "_kLogicData") is [var id, ..]
                         && data.Row("SkillConfig", (long)id) != null) found.Add((long)id);
@@ -121,6 +122,7 @@ public sealed partial class CombatService
             if (RollHostileBuff(tuple.RootElement, s, null, null, target, out int id, out int duration))
                 await buffs.ShowOnUnitAsync(target, id, duration, s.Role!.Id);
         }
+        await PetTriggerHitAsync(s, target, desc);
         if (now >= (state?.FuryReadyMs ?? 0) && LivePetBuff(s, WarriorFuryGroup) is { Row: var fury }
             && Numbers(fury, "_kLogicData") is [var extraId, ..] && data.Row("SkillConfig", (long)extraId) is { } extra)
         {
@@ -161,16 +163,21 @@ public sealed partial class CombatService
     /// <summary>Count the guardian row's enemy hits while it lands (it lands in one pass), then drain.</summary>
     private async Task GuardianCastAsync(GameSession s, JsonElement row, Func<Task> cast)
     {
-        if (!PetDrains.TryGetValue((int)GameData.Int(row, "_iSkillID"), out var kind))
+        int group = (int)GameData.Int(row, "_iSkillID");
+        bool drains = PetDrains.TryGetValue(group, out var kind);
+        if (!drains && !GuardianHitGroups.Contains(group))
         {
             await cast();
+            await GuardianAfterAsync(s, row, 0);
             return;
         }
         _guardianHits[s] = (GameData.Int(row, "_iID"), 0);
         int hits;
         try { await cast(); }
         finally { hits = _guardianHits.Remove(s, out var count) ? count.Hits : 0; }
-        if (hits <= 0 || s.Role == null || s.Dead) return;
+        if (s.Role == null || s.Dead) return;
+        await GuardianAfterAsync(s, row, hits);
+        if (!drains || hits <= 0) return;
         var desc = MainSkillDesc(s);
         double percent = desc.ElementAtOrDefault(4);
         var recipients = new List<GameSession> { s };
