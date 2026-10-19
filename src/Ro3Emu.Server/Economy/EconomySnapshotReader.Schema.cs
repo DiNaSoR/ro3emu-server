@@ -19,7 +19,7 @@ public static partial class EconomySnapshotReader
         ["role"] = "id account area name sex career level hair create_time last_login_time scene_entry pos_x pos_y pos_z face settings job_level exp job_exp stats bonus_points currency starter_kit skills skill_bar skill_plans tasks task_runtime task_followup guides emoji_play achievements achievement_runtime adventure_group library card_plans shop trade_info stalls_info mailbox auction guild_info guild_challenge pet_books daily new_activities activity_runtime timed_activity timed_battle training lottery tower wild_afk dungeons territory_wars territory_escort lifejob life_restrict life_runtime season_talent season_page season_page_meta season_refine equip_levels equip_plans auto_decompose bag_state stat_plans world_state emblems pets mounts wardrobe totems totem_refine_epoch genre career_special heroic_spirit area_concur growth_class first_heart personal personal_upvote popularity social_outfit emoji_info deleted_time barroom title paragon present_sent present_received",
         ["server_state"] = "key value", ["tower_first_pass"] = "floor record",
         ["item"] = "guid role_id entry stack pack sort grid attrs enchantments str_attrs is_locked bind_type bind_expire bind expire_time",
-        ["friend"] = "owner other since intimacy", ["friend_apply"] = "target applicant time",
+        ["friend"] = "owner other since intimacy activity_day activity_gain", ["friend_apply"] = "target applicant time",
         ["blacklist"] = "owner other", ["friend_metadata"] = "role data",
         ["friend_chat_group"] = "id owner name created", ["friend_chat_member"] = "group_id role dnd",
         ["recent_team_peer"] = "owner other last_seen",

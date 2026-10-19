@@ -624,7 +624,7 @@ public sealed partial class MvpService : IGameTicker
         online = online.Where(pair => pair.Value.Role?.Id == pair.Key && pair.Value.Progress != null
             && pair.Value.Attachment?.Cancelled != true).ToDictionary();
         var taskPlans = online.ToDictionary(pair => pair.Key,
-            pair => tasks.StageMvpParticipant(pair.Value, parentSource));
+            pair => tasks.StageMvpParticipant(pair.Value, parentSource, st.Def.NpcId));
         var counters = new Dictionary<long, MVPPlayerInfo>();
         foreach (long player in online.Keys)
             counters[player] = (await LoadCountersAsync(player)).Info;

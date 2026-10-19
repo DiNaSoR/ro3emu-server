@@ -652,9 +652,11 @@ public sealed partial class TaskService
         // Daily owns reissuing a Running instance even after a previous completion; history is not that instance's status.
         if (session.Tasks == null || !Active(session, id)) return ErrorCodes.TaskStatus;
         var daily = PrepareDailyDelivery?.Invoke(session, id);
-        if (IsDelivered(session, id) && daily?.MirrorChanged != true) return ErrorCodes.TaskStatus;
         var def = Defs()[id];
-        if (!TryDeliveryActions(session, context, def, out var costs, out bool cutScene, out int? questMount)) return ErrorCodes.TaskRequirements;
+        // Connect Quests repeat (TaskService.ConnectQuests.cs): history is not the running instance's status.
+        if (IsDelivered(session, id) && daily?.MirrorChanged != true && def.Type != ConnectType) return ErrorCodes.TaskStatus;
+        if (!TryDeliveryActions(session, context, def, out var costs, out bool cutScene, out int? questMount, out var sociality))
+            return ErrorCodes.TaskRequirements;
         foreach (var target in def.Targets.Where(t => t[0] == TSubmit))
         {
             if (!Supported(target) || target[2] > int.MaxValue) return ErrorCodes.TaskRequirements;
@@ -668,6 +670,7 @@ public sealed partial class TaskService
         next.Infos[id].Status = Delivered;
         next.CompleteTaskNum[id] = next.CompleteTaskNum.GetValueOrDefault(id) + 1;
         if (daily?.Repeat == true) next.Infos[id] = NewInfo(id, Running);
+        if (def.Type == ConnectType) next.Infos[id] = NewInfo(id, Running); // re-armed in the same transaction
         try
         {
             // 5021 is the authoritative season snapshot sent to this session, also used by client previews.
@@ -714,6 +717,7 @@ public sealed partial class TaskService
         if (cutScene) session.InCutScene = true;
         if (cutScene || def.ExecActions.Any(StartsCutscene)) session.BeginCutscene();
         if (deliveredPlan != null) foreach (var handler in QuestDelivered) handler(session, id, deliveredPlan);
+        PublishSociality(session, sociality);
         log.LogInformation("{Name} delivers task {Task} {TaskName}: exp {Exp}", session.Role?.Name, id,
             data.TextOf(data.Row("TaskConfig", id)!.Value, "_iName"), character.QuestExp(def.Exp));
         return 0;
@@ -750,7 +754,8 @@ public sealed partial class TaskService
             Accept(session, root);
             accepted++;
         }
-        return accepted + AcceptGrowthTitle(session) + AcceptGrowthClass(session) + AcceptActivityTasks(session);
+        return accepted + AcceptGrowthTitle(session) + AcceptGrowthClass(session) + AcceptActivityTasks(session)
+            + AcceptConnectQuests(session);
     }
 
     private bool Ready(GameSession session, TaskDef def) =>

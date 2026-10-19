@@ -38,10 +38,11 @@ public sealed partial class TaskService
     /// This method only builds a plan, so a refusal cannot mutate action state or consume inventory.
     /// </summary>
     private bool TryDeliveryActions(GameSession session, Ownership.OwnerContext context, TaskDef def,
-        out List<(int Entry, int Count)> costs, out bool cutScene, out int? questMount)
+        out List<(int Entry, int Count)> costs, out bool cutScene, out int? questMount, out List<long> sociality)
     {
         context.AssertRole(session.Role!.Id);
         costs = new();
+        sociality = new();
         cutScene = false;
         questMount = null;
         var actions = def.ExecActions.ToList();
@@ -70,6 +71,8 @@ public sealed partial class TaskService
                     if ((questMount ?? session.MountState.QuestMount) == recycle) questMount = 0;
                     break;
                 case 621 when action.Length == 1: cutScene = true; break;
+                // 116 UpdateSocialityScore [116, SocialRelationsConfig id] (Connect Quests): applied after the commit.
+                case UpdateSocialityScore when SocialityScore(action) is { } score: sociality.Add(score); break;
                 default:
                     log.LogWarning("Task {Task} held at server action {Action}: resource semantics not implemented", def.Id, string.Join(',', action));
                     return false;

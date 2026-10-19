@@ -138,6 +138,17 @@ public sealed partial class FriendStore
         transaction.FriendIntimacy(owner, other, value);
     }
 
+    /// <summary>
+    /// Adds activity Intimacy to a friend pair, at most <paramref name="dailyLimit"/> per pair on game day
+    /// <paramref name="day"/> and never above <paramref name="max"/>. Returns the new Intimacy, or null when nothing changed.
+    /// </summary>
+    public async Task<int?> AddActivityIntimacyAsync(long a, long b, int amount, long day, int dailyLimit, int max)
+    {
+        if (a == b || amount <= 0) return null;
+        int result = await _accounts.WriteLegacyAsync<int>(new FriendActivityIntimacyPlan(a, b, amount, day, dailyLimit, max));
+        return result < 0 ? null : result;
+    }
+
     public void RecordTeammates(long joined, IEnumerable<long> existing)
         => Write(new(FriendWriteKind.RecordTeammates, joined, time: DateTimeOffset.UtcNow.ToUnixTimeSeconds(), members: existing));
     public Task<bool> RecordTeammatesAsync(long joined, IEnumerable<long> existing)

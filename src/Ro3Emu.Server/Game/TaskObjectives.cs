@@ -174,6 +174,10 @@ public sealed partial class TaskService
             or TEchoUpgrade or TTowerJoin or TTowerWin or TTowerFloorReached or TLike or TLiveness or TCampfire or TTavernTime
             or TGvgJoin or TGvgWin or TLogin, var n] => n,
         [TTenBossWin, var n, _, ..] => n,
+        // Connect Quests (TaskService.ConnectQuests.cs); 106014 counts seconds against its minutes (inferred).
+        [TPartyMvp or TPartyBoss, var n, _] => n,
+        [TPartyBattleRoyale, var n] => n,
+        [TPartyAutoBattle, var minutes] when minutes > 0 && minutes <= int.MaxValue / 60 => minutes * 60,
         [TLeagueJoin, _, var n] => n,
         [TLeagueScore, _, _, var n] => n,
         [TSiegeScore, _, var n] => n,
@@ -230,6 +234,8 @@ public sealed partial class TaskService
             TExplorePhase => data.Row("ExplorePhaseConfig", t[1]) != null && t[2] is > 0 and <= 100,
             TStunts => t[1] >= 1 && t[2] == 0 && t[3] == 0,
             TTenBossWin => t[2..].All(boss => data.Row("TenGameplayBossConfig", boss) != null),
+            TPartyMvp => data.Row("NPCConfig", t[2]) != null,
+            TPartyBoss => data.Row("TenGameplayBossConfig", t[2]) != null,
             TLeagueJoin => t[1] is >= 0 and <= 3,
             TLeagueScore => t[1] is >= 0 and <= 2 && t[2] >= 0,
             TSiegeScore => t[1] >= 0,
