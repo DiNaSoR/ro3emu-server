@@ -269,6 +269,7 @@ public sealed partial class CombatService
         bool firstBolt = bolt == 0 && stage?.First != false;
         if (shownHits > 1) hit.Split = shownHits;
         var killed = new List<MonsterUnit>();
+        var shownOnly = new List<DamageInfo>();
         var processed = new List<MonsterUnit>();
         var landed = new List<(MonsterUnit Target, long Amount)>();
         bool damage = Numbers(row, "_kDamageParam1").Any(v => v > 0) || Numbers(row, "_kDamageParam2").Any(v => v > 0)
@@ -358,12 +359,18 @@ public sealed partial class CombatService
                     foreach (var tuple in Buff1(s, row, script))
                         if (CanApplyMoreEffects() && RollBuff(tuple, out int id, out int duration)) await GrantSkillBuffAsync(s, s, id, duration);
             }
-            if (friendly && damage)
+            // A support cast with no number to show (Blessing, Increase AGI, Angelus, cleanses) still needs its recipient in
+            // 31101: the client plays the hit effect's gfx (fx_buff_angelblessing on Blessing's 1400102) only per dst
+            // (LC_DamageHelper._ActionJumpDamage -> ShowHitDisplay). DamageShare with a Normal result maps to no HUD
+            // word (LC_DamageHelper damage-word type -> None), so the entry shows the effect and no "0" (inferred).
+            if (friendly && !damage && field == null && firstBolt)
+                shownOnly.Add(new DamageInfo { DstID = recipient.Role!.Id, DamageType = DamageType.DamageShare, DstElement = 1 });
+            if (friendly && damage && !PetAuraGuardian(row))
             {
                 double multiplier = Numbers(row, "_kDamageParam1").FirstOrDefault(), flat = Numbers(row, "_kDamageParam2").FirstOrDefault();
                 // Heal's friendly branch is P1[0]/P2[0]; its enemy branch is [1] (description + select race mask).
                 var before = character.Stats(recipient);
-                long amount = (long)Math.Max(0, Math.Round((stats[104] * multiplier / 10000 + flat)
+                long amount = (long)Math.Max(0, Math.Round((HealPower(row, stats) * multiplier / 10000 + flat)
                     * FormulaFactor(attacker, row, 0, heal: true) * HealFactor(attacker, PlayerDefender(recipient, before))));
                 foreach (var modifier in ExtraHeal) amount = modifier(s, amount);
                 long actual = Math.Min(amount, Math.Max(0, before[101] - before[2000]));
@@ -379,7 +386,7 @@ public sealed partial class CombatService
                 foreach (var buff in recipient.Buffs.Where(b => data.Row("BuffConfig", b.ConfigId) is { } br && HasCategory(br, categories)).ToArray())
                     await buffs.RemoveAsync(recipient, buff);
         }
-        if (hit.Dsts.Count > 0)
+        if (hit.Dsts.Count > 0 || shownOnly.Count > 0)
         {
             foreach (var result in hit.Dsts)
             {
@@ -395,8 +402,10 @@ public sealed partial class CombatService
                 await buffs.RecoverEnergyOnHitAsync(s, row);
                 if (CurrentCaster()) await ConvertChargesAsync(s, row);
             }
+            hit.Dsts.AddRange(shownOnly); // display only: no statistics, energy or charges
             var sourceViewers = CurrentCaster() ? world.Viewers(s).Append(s) : Enumerable.Empty<GameSession>();
-            foreach (var viewer in processed.SelectMany(t => t.Viewers).Concat(sourceViewers).Distinct()) await viewer.SendGameAsync(SkillHit, hit);
+            var recipients = shownOnly.Count > 0 ? allies.Where(a => shownOnly.Any(d => d.DstID == a.Role?.Id)) : Enumerable.Empty<GameSession>();
+            foreach (var viewer in processed.SelectMany(t => t.Viewers).Concat(sourceViewers).Concat(recipients).Distinct()) await viewer.SendGameAsync(SkillHit, hit);
             if (CurrentCaster() && field?.Trap == true)
                 await ToPlayerAndViewersAsync(s, TrapDamage, new TrapDamageNtf { SkillConfigId = action.Request.SkillId, DamageValue = hit.Dsts.Sum(d => d.Damage), Pos = center.Clone() });
         }

@@ -75,7 +75,7 @@ public sealed partial class CombatService
     /// physical follow-up JudexMix1 ("Physical damage equal to your Magic ATK * 30%"), and Soul Destroyer, whose
     /// one ratio covers both ("Physical ATK * 45% + Magic ATK * 45% + 50").
     /// </summary>
-    private static double AttackPower(Fighter a, JsonElement skill, bool magic) => magic ? a.Matk : Script(skill) switch
+    private double AttackPower(Fighter a, JsonElement skill, bool magic) => magic ? a.Matk : Script(skill) switch
     {
         _ when AdaptiveGuardian(skill) => Math.Max(a.Atk, a.Matk),
         "MoJiShu" or "MoJiPao" or "JudexMix1" => a.Matk,
