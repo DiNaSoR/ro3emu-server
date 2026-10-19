@@ -707,6 +707,7 @@ public sealed class SkillService
             if (code == 0)
             {
                 var selected = plans.SkillAssignPlans[req.Plan];
+                var before = selected.Clone();
                 foreach (var (group, target) in req.LevelUpList)
                 {
                     code = !tree.Contains(group) ? ErrorCodes.SkillNotInTree
@@ -740,7 +741,7 @@ public sealed class SkillService
                         code = ErrorCodes.SkillPrerequisite;
                     if (code == 0)
                     {
-                        PruneLoads(selected, candidate);
+                        PruneLoads(selected, candidate, group => PlanLevel(p, before, group));
                         await CommitAsync(session, plans, req.Plan == oldIndex ? candidate : null,
                             "cd13c/skill-update");
                         learned = true;
@@ -771,6 +772,7 @@ public sealed class SkillService
             var plans = Build(session);
             int index = plans.CurrentPlanIndex;
             var selected = plans.SkillAssignPlans[index];
+            var before = selected.Clone();
             var tree = Tree(p.Career);
             for (bool more = true; more;)
             {
@@ -793,7 +795,7 @@ public sealed class SkillService
             {
                 var candidate = CharacterService.GenreCloneProgress(p);
                 if (StageSkillPlan(session, plans, candidate, index) != 0) return 0;
-                PruneLoads(selected, candidate);
+                PruneLoads(selected, candidate, group => PlanLevel(p, before, group));
                 await CommitAsync(session, plans, candidate, "cd13c/skill-update");
                 await SyncAsync(session);
             }
@@ -827,22 +829,30 @@ public sealed class SkillService
         return true;
     }
 
-    private void PruneLoads(SkillPlan plan, RoleProgress progress)
+    /// <summary>
+    /// Fit the plan's bar, auto and queue loads to its new levels. A load is capped at the learned level; when
+    /// <paramref name="before"/> gives the levels the plan had, a load that sat at the old top level follows a raise
+    /// (Angelus 1 on the bar becomes Angelus 2 when level 2 is learned), while one deliberately set lower stays.
+    /// </summary>
+    private void PruneLoads(SkillPlan plan, RoleProgress progress, Func<int, int>? before = null)
     {
+        int Fit(SkillData load, int level) =>
+            before != null && before(load.SkillId) is var old and > 0 && load.SkillLevel >= old && level > old
+                ? level : Math.Min(load.SkillLevel, level);
         foreach (var list in new[] { plan.ManualLoadSkill, plan.AutoLoadSkill })
             foreach (var load in list)
                 if (load.SkillId > 0)
                 {
                     int level = Level(progress, load.SkillId);
                     if (level <= 0) { load.SkillId = 0; load.SkillLevel = 0; }
-                    else load.SkillLevel = Math.Min(load.SkillLevel, level);
+                    else load.SkillLevel = Fit(load, level);
                 }
         foreach (var key in plan.SkillQueue.Keys.ToArray())
         {
             var load = plan.SkillQueue[key];
             int level = Level(progress, load.SkillId);
             if (load.SkillId > 0 && level <= 0) plan.SkillQueue[key] = new SkillData();
-            else if (load.SkillId > 0) load.SkillLevel = Math.Min(load.SkillLevel, level);
+            else if (load.SkillId > 0) load.SkillLevel = Fit(load, level);
         }
         if (plan.SkillQueue.Count == 0) plan.SkillQueue[0] = new SkillData();
     }
