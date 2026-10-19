@@ -150,7 +150,8 @@ public sealed class RewardService
             return ([], 0, 0);
         if (data.Row("NPCConfig", monster.Template.NpcId) is not { } npc) return ([], 0, 0);
         var drops = new List<(int Entry, int Count)>();
-        double chanceRate = Rate(options.Value.Rates.ItemDrop);
+        // The party's item drop bonus (TeamService.DropBonus, +30% per extra member on the map) multiplies the server rate.
+        double chanceRate = Rate(options.Value.Rates.ItemDrop) * teams.DropBonus(player) / 10000;
         // (inferred) NPCDropConfig environment 0 is reduced and 1 is Bonus Time: the former carries
         // small EXP at player levels 1-99, the latter larger EXP. Fatigue environment 2 has no proven trigger.
         // _iNormalDrop remains additive under its own level/map conditions; no numeric multiplier is invented.
@@ -208,10 +209,10 @@ public sealed class RewardService
     internal static double ScaledChance(double chance, double rate) => rate == 1 ? chance : Math.Min(1_000_000, chance * Rate(rate));
 
     /// <summary>A configured rate: negative or NaN reads as 0, and anything over 1000x is capped.</summary>
-    private static double Rate(double rate) => double.IsNaN(rate) || rate <= 0 ? 0 : Math.Min(rate, 1000);
+    internal static double Rate(double rate) => double.IsNaN(rate) || rate <= 0 ? 0 : Math.Min(rate, 1000);
 
     /// <summary>A positive amount times a rate, rounded, at least 1 while the rate is above 0.</summary>
-    private static long Scale(long amount, double rate) =>
+    internal static long Scale(long amount, double rate) =>
         rate == 1 ? amount : rate <= 0 || amount <= 0 ? 0 : Math.Max(1, (long)Math.Min(long.MaxValue / 2, Math.Round(amount * rate)));
 
     private bool IsCurrency(int entry) => data.Row("ItemConfig", entry) is { } row && GameData.Int(row, "_iType") == ItemTypeCurrency;

@@ -231,11 +231,12 @@ public sealed class PetOptions
 
 /// <summary>
 /// Multipliers on monster kill rewards, like a classic server's exp and drop rates. They apply to ordinary kills
-/// (field, dungeon, AFK) only, not to quests, mail, award chests or other awards. 1 keeps the original values.
+/// (field, dungeon, AFK), and BaseExp also to quest Base EXP; not to quest items, mail, award chests or other awards.
+/// 1 keeps the original values.
 /// </summary>
 public sealed class RatesOptions
 {
-    /// <summary>Base EXP from a kill, after the level-gap and party corrections.</summary>
+    /// <summary>Base EXP from a kill, after the level-gap and party corrections, and a quest's Base EXP (_kEXP).</summary>
     public double BaseExp { get; set; } = 1;
 
     /// <summary>

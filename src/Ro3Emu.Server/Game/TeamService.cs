@@ -90,12 +90,25 @@ public sealed partial class TeamService : IGameTicker
     }
 
     /// <summary>Party EXP multiplier for a kill (‱ of TeamExpBuffNum by same-map members; the split rule itself is inferred).</summary>
-    public int ExpBonus(GameSession killer)
+    public int ExpBonus(GameSession killer) => ExpBuff[Math.Clamp(SameMapMembers(killer), 1, ExpBuff.Length) - 1];
+
+    /// <summary>
+    /// Party item drop multiplier for a kill (‱): PublicParamConfig.TeamDropBuffWeights (3000) for each other member on
+    /// the same map. The party buff text (24112-24116) promises +0/30/60/90/120% for 1 to 5 members.
+    /// </summary>
+    public int DropBonus(GameSession killer)
     {
-        if (killer.Role is not { } role || !_byMember.TryGetValue(role.Id, out var team)) return 10000;
-        int sameMap = team.Members.Count(m => Session(m) is { } s && s.WorldScene == killer.WorldScene);
-        return ExpBuff[Math.Clamp(sameMap, 1, ExpBuff.Length) - 1];
+        _dropBuffPerMember ??= data.Table("PublicParamConfig").TryGetValue("TeamDropBuffWeights", out var v)
+            && GameData.Number(v) is { } n && n >= 0 ? (int)n : 3000;
+        return 10000 + (Math.Clamp(SameMapMembers(killer), 1, ExpBuff.Length) - 1) * _dropBuffPerMember.Value;
     }
+
+    private int? _dropBuffPerMember;
+
+    /// <summary>Party members (the killer included) on the killer's map; 0 when solo.</summary>
+    private int SameMapMembers(GameSession killer) =>
+        killer.Role is { } role && _byMember.TryGetValue(role.Id, out var team)
+            ? team.Members.Count(m => Session(m) is { } s && s.WorldScene == killer.WorldScene) : 0;
 
     /// <summary>The party a role is in: (team id, leader), or (0, the role itself) when solo.</summary>
     public (long TeamId, long Leader) TeamOf(long role) =>

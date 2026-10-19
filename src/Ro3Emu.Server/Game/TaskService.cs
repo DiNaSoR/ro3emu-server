@@ -678,7 +678,7 @@ public sealed partial class TaskService
                     id, skipped, AwardSource(delivery));
             }
             string awardSource = AwardSource(delivery);
-            if (!await character.ApplyAwardAsync(session, plan, def.Exp, costs, next.ToByteArray(),
+            if (!await character.ApplyAwardAsync(session, plan, character.QuestExp(def.Exp), costs, next.ToByteArray(),
                 JsonSerializer.SerializeToUtf8Bytes(runtime), expectedDaily: daily?.Before, nextDaily: daily?.After,
                 expectedTasks: expectedTasks, persist: questMount is { } ride ? tx => mounts.PersistQuestRide(session, ride, tx) : null,
                 committed: questMount is { } appliedRide ? () => mounts.ApplyQuestRideCore(session, context, appliedRide) : null,
@@ -706,7 +706,7 @@ public sealed partial class TaskService
         if (cutScene || def.ExecActions.Any(StartsCutscene)) session.BeginCutscene();
         if (deliveredPlan != null) foreach (var handler in QuestDelivered) handler(session, id, deliveredPlan);
         log.LogInformation("{Name} delivers task {Task} {TaskName}: exp {Exp}", session.Role?.Name, id,
-            data.TextOf(data.Row("TaskConfig", id)!.Value, "_iName"), def.Exp);
+            data.TextOf(data.Row("TaskConfig", id)!.Value, "_iName"), character.QuestExp(def.Exp));
         return 0;
     }
 
