@@ -1032,7 +1032,8 @@ public sealed partial class CombatService : IGameTicker
         }
     }
 
-    /// <summary>HP/SP regeneration every 5 s out of combat: FinalReHp = ReHP + MaxHP × per_rehp (117/118, inferred).</summary>
+    /// <summary>HP/SP regeneration every 5 s out of combat: FinalReHp = ReHP + MaxHP × per_rehp (117/118, inferred).
+    /// MP also takes 243 ("temporary_per_magicrecover", Meditatio's "MP Recovery Speed") beside per_resp 1081 (inferred).</summary>
     private async Task RegenAsync(GameSession s)
     {
         if (s.Role == null || s.Progress == null) return;
@@ -1042,7 +1043,7 @@ public sealed partial class CombatService : IGameTicker
         var st = character.Stats(s);
         if (st[2000] >= st[101] && st[2001] >= st[102]) return;
         long rehp = st[107] + st[101] * st.Data.GetValueOrDefault(1071) / 10000;
-        long resp = st[108] + st[102] * st.Data.GetValueOrDefault(1081) / 10000;
+        long resp = st[108] + st[102] * (st.Data.GetValueOrDefault(1081) + st.Data.GetValueOrDefault(243)) / 10000;
         await character.SetHpSpAsync(s, st[2000] + Math.Max(1, rehp), st[2001] + Math.Max(1, resp));
     }
 

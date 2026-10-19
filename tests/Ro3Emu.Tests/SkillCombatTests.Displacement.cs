@@ -29,14 +29,17 @@ public sealed partial class SkillCombatTests
         Assert.Equal((0, 0), Combat.MovementEffect(15112));            // Disguise: _bMovement 1, no displacement
         var data = app.Services.GetRequiredService<GameData>();
         var skills = data.Table("SkillConfig").Values.ToList();
-        // Every displacement rule meets a skill whose show has its effect and whose description has the distance.
-        foreach (var (script, _) in CombatService.Displacements)
+        // Every displacement rule meets a skill; a rule that moves the caster needs its show's effect (a monster moved
+        // by a show without one, Spear Stab or Sightrasher, only has its position updated).
+        foreach (var (script, rule) in CombatService.Displacements)
             Assert.Contains(skills, r => Script(r) == script
-                && Combat.MovementEffect(GameData.Int(r, "_iScriptShow")).Id != 0);
+                && (rule.Kind is CombatService.DisplaceKind.TargetPush or CombatService.DisplaceKind.TargetPull
+                    or CombatService.DisplaceKind.PullToCenter || Combat.MovementEffect(GameData.Int(r, "_iScriptShow")).Id != 0));
         // The skills the old reading moved (Stasis, Choral, VolleyArrows, ShieldsProtection...) are no rules.
         var unlocked = skills.Where(r => GameData.Int(r, "_bMovement") == 1).Select(r => Script(r)).ToHashSet();
         Assert.True(unlocked.Count > 40);
-        Assert.Equal(["BackSlide", "RetreatingShadows", "RetreatingShadowsS1"],
+        // Crescent Moon and Gravitational Impact let their caster walk and pull their targets.
+        Assert.Equal(["BackSlide", "MoonSlasher2", "RetreatingShadows", "RetreatingShadowsS1", "VectorShock"],
             unlocked.Where(CombatService.Displacements.ContainsKey).Order().ToArray());
     }
 
