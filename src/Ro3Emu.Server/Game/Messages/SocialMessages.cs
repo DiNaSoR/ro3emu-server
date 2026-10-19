@@ -327,6 +327,30 @@ public sealed class SocialMessages(ChatService chat, TeamService teams, EmblemSe
         {
             await guilds.PeachApplyAsync(session);
         });
+        routes.Map(GuildService.MergeLists, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.MergeListsAsync(session);
+        });
+        routes.Map(GuildService.MergeRecommend, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.MergeRecommendAsync(session);
+        });
+        routes.Map(GuildService.MergeDetail, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.MergeDetailAsync(session, MergeGuildDetailDataReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(GuildService.MergeSaveMembers, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.MergeSaveMembersAsync(session, SaveMergeMemberReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(GuildService.MergeAnswer, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.MergeAnswerAsync(session, MergeGuildOpeReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(GuildService.MergeInvite, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.MergeInviteAsync(session, InviteMergeGuildReq.Parser.ParseFrom(body.Span));
+        });
         routes.Map(GuildCaravanService.Show, "caravan", async (session, msgId, body) =>
         {
             await caravan.ShowAsync(session);

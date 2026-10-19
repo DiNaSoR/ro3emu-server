@@ -210,6 +210,7 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
             JoinLevelLimit = g.JoinLevelLimit, LastChangeNameTime = g.LastChangeNameTime,
             LastChangeNoticeTime = (int)g.LastChangeNoticeTime, IsJoin = isJoin, ActivityInfo = ActivityInfo(g),
             NextBroadEmailTime = g.NextBroadEmailMs, BroadEmailLimit = BroadEmailUsed(g), PeachInfo = ImpeachView(g),
+            PendingMergeGuildId = g.PendingMergeGuildId,
         };
         full.HistoryNames.AddRange(g.HistoryNames.Count > 0 ? g.HistoryNames : [g.Name]);
         full.MemberInfo.AddRange(g.Members.Values.Select(m => MemberInfo(m)));
@@ -887,13 +888,7 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
                 await RefreshMembers(g);
                 if (tp is 1 or 2 or 5 or 10)
                 {
-                    var change = new GuildBaseInfoChangeNtf { Tp = GuildBaseInfoChangeNtf.Types.ChangeType.ChangeBase,
-                        Base = new GuildBaseInfoChangeNtf.Types.BaseChangeInfo { Name = g.Name, Level = g.Level,
-                        Announce = g.Announce, Notice = g.Notice, Status = (GuildStatus)g.Status,
-                        MaxMemberCount = MaxMembers(g), LastChangeNameTime = g.LastChangeNameTime,
-                        LastChangeNoticeTime = (int)g.LastChangeNoticeTime } };
-                    change.Base.HistoryNames.AddRange(g.HistoryNames.Count > 0 ? g.HistoryNames : [g.Name]);
-                    foreach (var m in g.Members.Values) if (Online(m.RoleId) is { } peer) await peer.SendGameAsync(BaseChange, change);
+                    await PushBase(g, BaseInfoChange(g));
                 }
                 if (tp == 10)
                 {
@@ -997,6 +992,18 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
         ? PushBase(guild, new GuildBaseInfoChangeNtf { Tp = GuildBaseInfoChangeNtf.Types.ChangeType.ChangeResource,
             Resource = Resource(guild) }) : Task.CompletedTask;
 
+    /// <summary>32231 tp=1: the client overwrites every base field from it, so all of them go out.</summary>
+    private GuildBaseInfoChangeNtf BaseInfoChange(GuildStore.State g)
+    {
+        var change = new GuildBaseInfoChangeNtf { Tp = GuildBaseInfoChangeNtf.Types.ChangeType.ChangeBase,
+            Base = new GuildBaseInfoChangeNtf.Types.BaseChangeInfo { Name = g.Name, Level = g.Level,
+            Announce = g.Announce, Notice = g.Notice, Status = (GuildStatus)g.Status,
+            MaxMemberCount = MaxMembers(g), LastChangeNameTime = g.LastChangeNameTime,
+            LastChangeNoticeTime = (int)g.LastChangeNoticeTime, PendingMergeGuildId = g.PendingMergeGuildId } };
+        change.Base.HistoryNames.AddRange(g.HistoryNames.Count > 0 ? g.HistoryNames : [g.Name]);
+        return change;
+    }
+
     private async Task PushBase(GuildStore.State g, GuildBaseInfoChangeNtf change)
     {
         foreach (var m in g.Members.Values)
@@ -1022,6 +1029,7 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
         await ExpireApplicationsAsync();
         await ExpireHelpersAsync();
         await ExpireImpeachmentsAsync();
+        await MergeDueAsync();
         long now = NowMs();
         foreach (var g in store.List().Where(g => g.BuildingEndTimes.Values.Any(end => end > 0 && end <= now)))
         {
