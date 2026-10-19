@@ -110,6 +110,13 @@ public sealed class ServerOptions
     /// <summary>Server rates for monster kill rewards (RewardService, docs/guide/rates.md). 1 keeps the client's tables.</summary>
     public RatesOptions Rates { get; set; } = new();
 
+    /// <summary>
+    /// Field Bonus Time never runs down (WildAfkService, docs/guide/bonus-time.md). Not original behaviour; off by default.
+    /// Kills still count as Bonus Time kills, the daily "1 hour of Bonus Time" row still fills, and the daily refill and
+    /// 180-minute cap still apply.
+    /// </summary>
+    public bool FreezeBonusTime { get; set; }
+
     /// <summary>Pet presentation in the open world (PetFollowerService).</summary>
     public PetOptions Pets { get; set; } = new();
 
