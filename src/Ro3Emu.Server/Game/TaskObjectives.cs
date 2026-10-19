@@ -142,6 +142,11 @@ public sealed partial class TaskService
     // - 106801 [n] "Log in ${1} times" (110007, Lost Treasure): one per login while the quest runs; the login that
     //   accepts it counts as the first (inferred).
     private const int TGvgJoin = 106605, TGvgWin = 106606, TLogin = 106801;
+    // - 107101 [phase, percent] "Reach @{1}% completion for the First Movement" (Genesis Movement 111, tasks 2101001-2101004,
+    //   "[Symphony of Genesis] Movement @{1}"): the ExplorePhaseConfig phase's note-filling progress (NewActivityService
+    //   WorldFillCoreAsync, DBWorldExplorationPhase.totalRate in basis points) in whole percent; R = p3. The client has no
+    //   formatter for the id; the phase ids 101-103 and the 100 match ExplorePhaseConfig and the text (inferred).
+    private const int TExplorePhase = 107101;
 
     private readonly ConditionalWeakTable<MonsterUnit, HashSet<long>> _participants = new();
     private readonly HashSet<GameSession> _refreshQueued = new();
@@ -180,6 +185,7 @@ public sealed partial class TaskService
             ? GameData.Int(restrict, "_iMaxRestrictNum") : -1,
         [TKillOnMap, var n, _] => n,
         [TMonsterHunt, _, var n] => n,
+        [TExplorePhase, _, var n] => n,
         [TDungeonPass, _, var n] => n,
         [TSaplingChosen or TDeclaration, var n] => n, // Adventure Group (TaskService.AdventureGroup.cs)
         [TWaterSapling, var n, _] => n,
@@ -221,6 +227,7 @@ public sealed partial class TaskService
             TCraft => t[1] >= 0 && t[2] > 0 && t[4] is >= 0 and <= 10,
             TValhallaLayer => data.Row("HeroicSpiritLayerConfig", t[1]) != null,
             TMonsterHunt => data.Row("AreaConcurConfig", t[1]) != null,
+            TExplorePhase => data.Row("ExplorePhaseConfig", t[1]) != null && t[2] is > 0 and <= 100,
             TStunts => t[1] >= 1 && t[2] == 0 && t[3] == 0,
             TTenBossWin => t[2..].All(boss => data.Row("TenGameplayBossConfig", boss) != null),
             TLeagueJoin => t[1] is >= 0 and <= 3,
@@ -297,6 +304,12 @@ public sealed partial class TaskService
             TRentCareerSpecial => CareerSpecialService.HoldsSubType(s, data, t[1]) ? 1 : 0,
             TValhallaLayer => DungeonService.ValhallaCleared(s.Dungeons).Contains(t[1]) ? 1 : 0,
             TMonsterHunt => MonsterHuntService.AreaProgress(s, t[1]),
+            // Activities load after the quests at login: keep the stored value until NewActivityService is ready.
+            TExplorePhase => !s.ActivitiesReady || s.NewActivities == null ? -1
+                : data.Row("ExplorePhaseConfig", t[1]) is { } phaseRow
+                  && s.NewActivities.ActivityInfo.TryGetValue(GameData.Int(phaseRow, "_iActivityid"), out var activity)
+                  && activity.ActivityParam?.WorldExploration?.PhaseInfos.TryGetValue(t[1], out var phase) == true
+                    ? phase.TotalRate / 100 : 0,
             // Pets load after the quests at login (RoleSystems): keep the stored value until the post-login refresh.
             TPetQuality => s.Pets?.ListPet.Values.LongCount(pet => PetQuality(pet.PetId) >= t[1]) ?? -1,
             TPetLevel => s.Pets?.ListPet.Values.LongCount(pet => pet.Level >= t[1]) ?? -1,

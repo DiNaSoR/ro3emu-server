@@ -1188,6 +1188,58 @@ public sealed class ActivityAdventuresTests : IAsyncLifetime
         Assert.Equal(0, finder.ActivityRuntime.AdventureTreasure.PendingMonsterAward);
     }
 
+    /// <summary>
+    /// 107101 [phase, percent] reads a Genesis Movement phase's fill progress (TotalRate / 100): 2101001 [107101,101,100]
+    /// finishes when every note slot of phase 101 is filled, while 2101004 also needs phases 102 and 103.
+    /// </summary>
+    [ClientDataFact]
+    public async Task GenesisMovementTasksFinishWhenThePhaseIsFullyFilled()
+    {
+        var season = app.Services.GetRequiredService<SeasonService>();
+        var gameData = app.Services.GetRequiredService<Ro3Emu.Server.Data.GameData>();
+        long phaseStart = new SeasonClock(gameData, season.Start, 101, season.Zone).Build().StageTimeInfo[101002].StartTime;
+        clock.Set(phaseStart + 60);
+        var alice = await InWorld("Alice");
+        await Next(alice, NewActivityService.ActivitySync, DBNewActivityInfoIncrement.Parser);
+        await Gm("alice", "!lvl 99");
+        await QuestProbe.AcceptAsync(app, http, "alice", 2101001);
+        await QuestProbe.AcceptAsync(app, http, "alice", 2101004);
+        await QuestProbe.AtAsync(app, "alice", 2101001, 0);
+
+        // ExplorePhaseConfig 101 holds nodes 1011-1014; each slot takes the matching _kPiecesID item.
+        var nodes = new (int Node, int[] Pieces)[]
+        {
+            (1011, [1113001, 1113002, 1113003, 1113004, 1113005]),
+            (1012, [1113006, 1113007, 1113001, 1113002]),
+            (1013, [1113002, 1113005, 1113006, 1113007]),
+            (1014, [1113003, 1113004, 1113005, 1113006, 1113007]),
+        };
+        foreach (var group in nodes.SelectMany(n => n.Pieces).GroupBy(i => i))
+            await Gm("alice", $"!item {group.Key} {group.Count()}");
+        int request = 0;
+        foreach (var (node, pieces) in nodes)
+            for (int position = 1; position <= pieces.Length; position++)
+            {
+                if (node == 1014 && position == pieces.Length)
+                    await QuestProbe.AtAsync(app, "alice", 2101001, 94); // 17 of 18 slots
+                await alice.SendGameAsync(NewActivityService.Common, new CommonActivityReq
+                {
+                    ActivityId = 111, RequestId = ++request,
+                    FillPhaseNodeReq = new WorldExplorationFillPhaseNodeReq
+                    {
+                        PhaseCfgId = 101, NodeCfgId = node, ItemId = pieces[position - 1], Position = position,
+                    },
+                });
+                int id = request;
+                Assert.Equal(0, (await Next(alice, NewActivityService.Common, CommonActivityRes.Parser, r => r.RequestId == id)).Result);
+            }
+
+        await QuestProbe.DoneAsync(app, "alice", 2101001);
+        var all = await QuestProbe.ReadAsync(app, "alice", 2101004);
+        Assert.NotEqual(TaskState.Finish, all!.Status);
+        Assert.Equal([100L, 0L, 0L], all.CompleteNum.ToArray());
+    }
+
     /// <summary>106802 counts a committed dig at the Treasure Map's point (growth title 4's 704090 [106802,20], the
     /// activity quest 110008 [106802,1]); using the map alone is not a dig. The count survives a relogin.</summary>
     [ClientDataFact]
