@@ -415,16 +415,16 @@ public sealed partial class CardService
 
     // ---- card progression ----
 
-    private JsonElement? CardRow(int entry, long tier) => data.Table("CardConfig").Values
-        .FirstOrDefault(r => GameData.Int(r, "_iCardID") == entry && GameData.Int(r, "_iTier") == tier) is var row
-        && row.ValueKind == JsonValueKind.Object ? row : null;
+    private JsonElement? CardRow(int entry, long tier) =>
+        data.Index("CardConfig", "_iCardID,_iTier", r => (GameData.Int(r, "_iCardID"), GameData.Int(r, "_iTier"))).First((entry, tier))
+            is { ValueKind: JsonValueKind.Object } row ? row : null;
 
     private JsonElement? UpgradeRow(InvItem card, long level)
     {
         if (data.Row("ItemConfig", card.Entry) is not { } item) return null;
-        var row = data.Table("CardUpgradeConfig").Values.FirstOrDefault(r => GameData.Int(r, "_iLevel") == level
-            && GameData.Int(r, "_iParts") == GameData.Int(item, "_iCardPart") && GameData.Int(r, "_iQuality") == GameData.Int(item, "_iQuality"));
-        return row.ValueKind == JsonValueKind.Object ? row : null;
+        return data.Index("CardUpgradeConfig", "_iLevel,_iParts,_iQuality",
+                r => (GameData.Int(r, "_iLevel"), GameData.Int(r, "_iParts"), GameData.Int(r, "_iQuality")))
+            .First((level, GameData.Int(item, "_iCardPart"), GameData.Int(item, "_iQuality"))) is { ValueKind: JsonValueKind.Object } row ? row : null;
     }
 
     private InvItem? ProgressTarget(GameSession session, int sourceType, long guid, int grid, int socket)

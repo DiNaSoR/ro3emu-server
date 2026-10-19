@@ -287,7 +287,7 @@ public sealed class DraculaWeddingService : IGameTicker
     }
 
     /// <summary>The lair's dungeon task for the wave being played (TaskConfig 9000100-9000110, in chain order).</summary>
-    private long[] LairTaskIds() => data.Table("TaskConfig").Values.Where(r => GameData.Int(r, "_iDungeonID") == Lair)
+    private long[] LairTaskIds() => data.Index("TaskConfig", "_iDungeonID", r => GameData.Int(r, "_iDungeonID")).All(Lair)
         .Select(r => GameData.Int(r, "_iTaskID")).Order().ToArray();
 
     /// <summary>

@@ -63,9 +63,8 @@ internal static class PetCombatRules
 
     internal static JsonElement? Star(GameData data, int id, PetData pet)
     {
-        var row = data.Table("PetStarConfig").Values.FirstOrDefault(r => GameData.Int(r, "_iPetID") == id
-            && GameData.Int(r, "_iStar") == pet.Star && GameData.Int(r, "_iStage") == pet.StarProgress);
-        return row.ValueKind == JsonValueKind.Undefined ? null : row;
+        return data.Index("PetStarConfig", "_iPetID,_iStar,_iStage",
+            r => (GameData.Int(r, "_iPetID"), GameData.Int(r, "_iStar"), GameData.Int(r, "_iStage"))).First((id, pet.Star, pet.StarProgress));
     }
 
     /// <summary>

@@ -133,7 +133,7 @@ public sealed partial class GuildService
     private IEnumerable<ShopCommodityInfo> StoreCounts(GuildStore.State g)
     {
         bool current = g.ShopCommodityWeek == WeekStart;
-        return data.Table("ShopCommodityConfig").Values.Where(r => GameData.Int(r, "_iClassID") == GuildStoreClass)
+        return data.Index("ShopCommodityConfig", "_iClassID", r => GameData.Int(r, "_iClassID")).All(GuildStoreClass)
             .Select(r => (int)GameData.Int(r, "_iID")).Order()
             .Select(id => new ShopCommodityInfo { Commodityid = id, Buycount = current ? g.ShopCommodityBuys.GetValueOrDefault(id) : 0 });
     }

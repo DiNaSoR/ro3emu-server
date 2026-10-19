@@ -75,8 +75,8 @@ public sealed partial class DungeonService
                 || actions[0].GetArrayLength() < 3 || GameData.Number(actions[0][0]) != 407
                 || GameData.Number(actions[0][1]) != sceneEntry) continue;
             long npc = (long)(GameData.Number(actions[0][2]) ?? 0);
-            return data.Table("NpcLevelPointRespawnConfig").Values.Any(r =>
-                GameData.Int(r, "_iMapid") == sceneEntry && GameData.Int(r, "_iNpcid") == npc);
+            return data.Index("NpcLevelPointRespawnConfig", "_iMapid,_iNpcid",
+                r => (GameData.Int(r, "_iMapid"), GameData.Int(r, "_iNpcid"))).Contains((sceneEntry, npc));
         }
         return false;
     }
