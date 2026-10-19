@@ -34,6 +34,34 @@ public sealed class GameLoopTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task AnOrphanContinuationLeftLastInTheQueueStillFinishesTheDrain()
+    {
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        async Task Late() => await release.Task;
+        await _loop.InvokeAsync(() => { _ = Late(); return Task.CompletedTask; });
+        var until = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        while (_loop.DrainStatus.Outstanding != 0 && DateTime.UtcNow < until) await Task.Delay(5);
+
+        // Hold the loop thread so the orphan waits in the queue behind admitted work while the loop starts draining.
+        using var gate = new ManualResetEventSlim();
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var blocker = _loop.InvokeAsync(() => { entered.SetResult(); gate.Wait(); return Task.CompletedTask; });
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        release.SetResult();
+        until = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        while (_loop.DrainStatus.Queued == 0 && DateTime.UtcNow < until) await Task.Delay(5);
+        Assert.Equal(1, _loop.DrainStatus.Queued);
+
+        var stop = _loop.StopAsync(default);
+        gate.Set();
+        await blocker;
+        // The admitted work closes first; the orphan runs after it, and nothing else would finish the drain.
+        await stop.WaitAsync(TimeSpan.FromSeconds(3));
+        Assert.True(_loop.DrainStatus.Clean);
+        Assert.Equal(GameLoopPhase.Stopped, _loop.DrainStatus.Phase);
+    }
+
+    [Fact]
     public async Task LateUntrackedContinuationRunsOnTheLoopInsteadOfThrowing()
     {
         var resumed = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
