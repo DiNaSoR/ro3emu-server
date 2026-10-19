@@ -158,8 +158,7 @@ namespace Ro3Emu.ClientHooks
                     // Some Lua_CFG modules index their rows once, at load (OnInitDatas). Lua_CFG_ShopCommodityConfig builds
                     // ShopItemsMap (the shop tabs' lists by _iClassID) and AppearanceIdMap there, so added commodities
                     // stay out of the shop until it runs again; it starts from new tables, so a rerun is safe.
-                    if (instance != null && Reindexed.Contains(table.Key))
-                        instance.Obf_RuA<Obf_R.Obf_Ef>("OnInitDatas")?.Obf_HuA(instance);
+                    if (Reindexed.Contains(table.Key)) Reindex(global, table.Key, instance);
                     Note(table.Key + ": " + table.Value.Count + " row(s) set (" + added + " new)");
                 }
                 if (content.Npcs.Count > 0)
@@ -182,6 +181,24 @@ namespace Ro3Emu.ClientHooks
         }
 
         /// <summary>
+        /// Reruns OnInitDatas on the table's instance. Without one (not found), on the Lua_DBManager proxy: the method
+        /// comes through its __index and the rebuilt maps land on the proxy, where the UI's proxy:OnGet... calls read them.
+        /// </summary>
+        private static void Reindex(Obf_R.Obf_ff global, string table, Obf_R.Obf_ff instance)
+        {
+            var self = instance ?? global.Obf_LuA<Obf_R.Obf_ff>("Lua_DBManager.m_kCFG_" + table);
+            var init = self?.Obf_RuA<Obf_R.Obf_Ef>("OnInitDatas");
+            if (init == null) { Once(table + ": OnInitDatas not found, rows not reindexed"); return; }
+            init.Obf_HuA(self);
+            // Logs the Fashion tab's size so a Player.log shows whether the added commodities made it in.
+            var map = self.Obf_RuA<Obf_R.Obf_ff>("ShopItemsMap");
+            var tab = map == null ? null : global.Obf_LuA<Obf_R.Obf_Ef>("rawget")?.Obf_HuA(map, 50201L);
+            var len = tab != null && tab.Length > 0 && tab[0] != null ? global.Obf_LuA<Obf_R.Obf_Ef>("rawlen")?.Obf_HuA(tab[0]) : null;
+            Note(table + ": reindexed on the " + (instance != null ? "instance" : "proxy")
+                + (len != null && len.Length > 0 ? ", Fashion tab 50201 has " + LuaPatches.ToLong(len[0]) + " item(s)" : ""));
+        }
+
+        /// <summary>
         /// The live m_kValues of a config table: through Lua_DBManager (its proxy's __index builds the global
         /// m_kMeta&lt;Table&gt; on first use), else the module itself (package.loaded or require of the lower-case name).
         /// </summary>
@@ -193,7 +210,9 @@ namespace Ro3Emu.ClientHooks
             if (proxy != null)
             {
                 data = proxy.Obf_RuA<Obf_R.Obf_ff>("m_kConfigData"); // builds m_kMeta<Table> when not built yet
-                instance = global.Obf_RuA<Obf_R.Obf_ff>("m_kMeta" + table);
+                // The proxy's __index keeps the instance on the Lua_DBManager class (main chunk local, not a global).
+                instance = global.Obf_LuA<Obf_R.Obf_ff>("Lua_DBManager.m_kMeta" + table)
+                    ?? global.Obf_RuA<Obf_R.Obf_ff>("m_kMeta" + table);
                 if (instance != null) data = instance.Obf_RuA<Obf_R.Obf_ff>("m_kConfigData") ?? data;
             }
             if (data == null)
