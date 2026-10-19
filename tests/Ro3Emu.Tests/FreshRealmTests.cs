@@ -34,6 +34,8 @@ public sealed class FreshRealmTests : IAsyncLifetime
         {
             o.DataDir = _dataDir;
             o.GameDataDir = RepoData();
+            // The shipped content: the Season menu's level-50 gate comes from content/reopened-content.json.
+            o.CustomContentDir = Path.Combine(RepoData(), "..", "content");
             o.HttpPort = httpPort;
             o.MicroGatePort = microPort;
             o.GameGatePort = gamePort;

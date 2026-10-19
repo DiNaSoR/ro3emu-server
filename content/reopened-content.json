@@ -1,0 +1,29 @@
+{
+  "//": "Content the client's source server switched off with impossible values (level 9999, a pre-quest that does not exist), opened again. See /docs/guide/reopened-content.md. Delete this file to keep them closed.",
+  "rows": {
+    "LC_ConditionList": {
+      // Season menu (FunctionConfig 69). The 2026-10-18 client update moved its condition from base level 50 to 9999.
+      "2000062": {
+        "m_eType": 1,
+        "m_kSubConditionList": [ { "m_bInverse": false, "m_eType": 3, "m_kData": [1002, 50], "m_kDynamicData": {} } ]
+      }
+    },
+    "TaskConfig": {
+      // "Dejected Young Man", root of the 75-quest blue side chain 201010..205200. It needed quest 9999999 (no such
+      // quest) and condition 88000010 (base level 999). Now offered from base level 20 (condition 2000056, [1002, 20]).
+      "201010": { "_base": 201010, "_kPreTask": {}, "_iCondition": 2000056 },
+      // "Allen's Request": nothing in the client gives the Pearl (1253001) or the Four-leaf Clover (1253002) that the
+      // next step, 201100 "Gather Materials", collects. Allen hands them over when this step is done.
+      "201090": { "_base": 201090, "_iAward": 99201090 },
+      // "Bunny Hair Band": the turn-in used mode 0, which the server leaves pending; mode 1 is the NPC turn-in the
+      // main story uses (e.g. 10102050), so the two items are handed to the Headgear Merchant.
+      "201120": { "_base": 201120, "_kProgressTarget": [[103051, 1253001, 1, 1], [103051, 1253002, 1, 1]] }
+    },
+    "MultiverseGroupConfig": {
+      "99201090": { "_iID": 99201090, "_iValue_default": 99201090, "_itype": 0 }
+    },
+    "AwardConfig": {
+      "99201090": [ { "_iID": 99201090, "_kAward": [[1253001, 1, 0], [1253002, 1, 0]], "_kPreview": [[1253001, 1], [1253002, 1]] } ]
+    }
+  }
+}

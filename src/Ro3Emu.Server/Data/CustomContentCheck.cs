@@ -54,6 +54,8 @@ public static class CustomContentCheck
                                 long[] n = t.ValueKind == JsonValueKind.Array ? t.EnumerateArray().Select(e => GameData.Number(e) is { } d ? (long)d : 0).ToArray() : [];
                                 if (n is [104001, var npc, var map, var dialog, ..])
                                 {
+                                    // The NPC, or a scene task point on the map that shows an NPC (the client's own rows).
+                                    if (data.Row("NPCConfig", npc) is null && data.TaskPointNpc(map, npc) is { } shown) npc = shown;
                                     Need("NPC", "NPCConfig", npc, by); NeedMap(map, by); Need("dialogue", "DialogueConfig", dialog, by);
                                 }
                                 else if (n is [104002 or 104014, .. var rest] && rest.Length >= 2)
