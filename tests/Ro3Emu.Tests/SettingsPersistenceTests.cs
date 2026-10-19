@@ -97,6 +97,23 @@ public sealed class SettingsPersistenceTests : IAsyncLifetime
         Assert.Equal(new byte[] { 0x08, 0x02 }, stored.ClientSetting[11].ToByteArray());
     }
 
+    /// <summary>A client adding fresh keys cannot grow the stored settings past the limit; what fits is kept.</summary>
+    [Fact]
+    public async Task SettingsStopGrowingAtTheLimit()
+    {
+        var (bot, s) = await InWorld("Hoarder");
+        await using var _ = bot;
+        var big = new byte[60 * 1024];
+        for (int key = 1; key <= 6; key++) await bot.SaveClientSettingAsync(1000 + key, big);
+        var kept = await OnLoop(() => s.Settings!.Clone());
+        Assert.True(kept.CalculateSize() <= RoleSessionService.MaxSettingsBytes);
+        Assert.True(kept.ClientSetting.ContainsKey(1001));
+        Assert.False(kept.ClientSetting.ContainsKey(1006));
+        // A small change still goes through after a refusal.
+        await bot.SaveClientSettingAsync(12, [0x08, 0x01]);
+        Assert.True((await OnLoop(() => s.Settings!.ClientSetting.ContainsKey(12))));
+    }
+
     /// <summary>
     /// Picking Old School turns click-to-attack (403001) on and any other mode turns it off, on every pick: the client
     /// sets it only on the first pick and hides it in the settings menu. The 5061 resync carries it to the client.

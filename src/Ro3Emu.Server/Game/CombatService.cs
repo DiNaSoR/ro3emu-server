@@ -97,7 +97,7 @@ public sealed partial class CombatService : IGameTicker
             && ReferenceEquals(player.Attachment, attachment) && attachment?.Cancelled != true
             && !player.SceneLoading && player.SceneGeneration == sceneGeneration
             && player.WorldScene == worldScene && player.WorldScene == monster.WorldScene
-            && sessions.All().Contains(player);
+            && sessions.Contains(player);
         InstanceDeathGate? gate = null;
         if (monster.InstanceId != 0)
         {
@@ -162,7 +162,7 @@ public sealed partial class CombatService : IGameTicker
             && ReferenceEquals(player.Attachment, attachment) && attachment?.Cancelled != true
             && !player.SceneLoading && player.SceneGeneration == sceneGeneration
             && player.WorldScene == worldScene && player.WorldScene == monster.WorldScene
-            && sessions.All().Contains(player);
+            && sessions.Contains(player);
         try
         {
             if (monster.Hp == 0) monster.StagedLethalDamage = damage;

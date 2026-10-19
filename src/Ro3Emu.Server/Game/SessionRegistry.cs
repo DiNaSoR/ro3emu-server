@@ -18,7 +18,26 @@ public sealed class SessionRegistry(ILogger<SessionRegistry> log, Ownership.Owne
     /// <summary>Copy-on-write snapshot for <see cref="All"/>: tickers enumerate it many times a second; it changes
     /// only on (un)registration.</summary>
     private volatile GameSession[] _snapshot = [];
+    private volatile HashSet<GameSession> _members = new(ReferenceEqualityComparer.Instance);
     internal Action<GameSession>? UnregisteredForTest { get; set; }
+
+    /// <summary>
+    /// The one account transition of a game connection; nothing else sets <see cref="GameSession.Account"/>. The first
+    /// sign-in binds the account (and registers the session for a new connection). Another account on the same
+    /// connection first drops the old account's key, so no key of it keeps pointing here, and is refused (false) while a
+    /// role of the old account is selected: that role's world state belongs to the old account.
+    /// </summary>
+    public async Task<bool> SignInAsync(GameSession session, string account, bool register)
+    {
+        if (session.Account != null && !string.Equals(session.Account, account, StringComparison.Ordinal))
+        {
+            if (session.Role != null) return false;
+            Unregister(session);
+        }
+        session.Account = account;
+        if (register) await RegisterAsync(session);
+        return true;
+    }
 
     public async Task RegisterAsync(GameSession session)
     {
@@ -32,7 +51,7 @@ public sealed class SessionRegistry(ILogger<SessionRegistry> log, Ownership.Owne
             session.AccountGeneration = checked(generation + 1);
             _generations[session.Account!] = session.AccountGeneration;
             _byAccount[session.Account!] = session;
-            _snapshot = _byAccount.Values.ToArray();
+            Publish();
         }
         if (previous == null || previous == session) return;
         // Claim the newest account generation before any kick send or old cleanup can suspend.
@@ -65,7 +84,7 @@ public sealed class SessionRegistry(ILogger<SessionRegistry> log, Ownership.Owne
             if (session.Account != null && _byAccount.TryGetValue(session.Account, out var current) && current == session)
             {
                 _byAccount.Remove(session.Account);
-                _snapshot = _byAccount.Values.ToArray();
+                Publish();
                 UnregisteredForTest?.Invoke(session);
             }
         }
@@ -73,4 +92,17 @@ public sealed class SessionRegistry(ILogger<SessionRegistry> log, Ownership.Owne
 
     /// <summary>The registered sessions; an immutable snapshot (callers must not cast and mutate it).</summary>
     public IReadOnlyList<GameSession> All() => _snapshot;
+
+    /// <summary>
+    /// Whether <paramref name="session"/> is registered: All().Contains in O(1). Combat checks it on every hit.
+    /// </summary>
+    public bool Contains(GameSession session) => _members.Contains(session);
+
+    /// <summary>Under _sync: replaces both immutable views together.</summary>
+    private void Publish()
+    {
+        var all = _byAccount.Values.ToArray();
+        _members = new HashSet<GameSession>(all, ReferenceEqualityComparer.Instance);
+        _snapshot = all;
+    }
 }

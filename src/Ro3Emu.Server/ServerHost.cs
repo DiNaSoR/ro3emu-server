@@ -170,6 +170,7 @@ public static class ServerHost
         builder.Services.AddHostedService<DatabaseBackup>();
         builder.Services.AddSingleton<Game.Persistence.PositionPersistence>();
         builder.Services.AddSingleton<Game.Persistence.SettingsPersistence>();
+        builder.Services.AddSingleton<Game.Persistence.WildAfkPersistence>();
         builder.Services.AddSingleton<RoleSystems>();
         builder.Services.AddSingleton<RoleSessionService>();
         // Message modules in this order: it is the order of their interceptors (World before Economy before Character).
@@ -208,6 +209,8 @@ public static class ServerHost
         builder.Services.AddHostedService<GameLoopQuiesceService>();
         // Stops before the quiesce: roles waiting for a reconnect are logged out while cleanup is still admitted.
         builder.Services.AddHostedService<ReconnectShutdownService>();
+
+        builder.Services.AddSingleton<CredentialLimiter>();
 
         var app = builder.Build();
         app.Services.GetRequiredService<RealmLock>();
@@ -274,8 +277,9 @@ public static class ServerHost
         });
         // Character deletion for the launcher / website (the client itself has none): POST form identity, credential,
         // role (id or name). A role that is in the world cannot be deleted.
-        app.MapPost("/ro3emu/account/delete-role", async (HttpRequest request, AccountStore accounts, RoleStore roles, SessionRegistry sessions, GameLoop loop, Game.Ownership.OwnerRegistry owners, ILogger<RoleStore> log) =>
+        app.MapPost("/ro3emu/account/delete-role", async (HttpRequest request, CredentialLimiter limiter, AccountStore accounts, RoleStore roles, SessionRegistry sessions, GameLoop loop, Game.Ownership.OwnerRegistry owners, ILogger<RoleStore> log) =>
         {
+            if (!limiter.TryAcquire(request.HttpContext.Connection.RemoteIpAddress)) return Results.StatusCode(StatusCodes.Status429TooManyRequests);
             var form = await request.ReadFormAsync();
             string typed = form["identity"].ToString().Trim(), credential = form["credential"].ToString(), which = form["role"].ToString().Trim();
             // Roles are keyed by the account's stored name, whatever letter case the form used.
@@ -507,6 +511,7 @@ internal sealed class GameLoopTickers(IServiceProvider services) : IHostedServic
         Add<TotemEffects>();
         Add<Game.Persistence.PositionPersistence>();
         Add<Game.Persistence.SettingsPersistence>();
+        Add<Game.Persistence.WildAfkPersistence>();
         Add<ShopService>(); // 05:00 purchase-limit rollover
         Add<ItemBoxService>(); // award boxes; 05:00 item use-time rollover
         Add<PowerService>(); // throttled 31502/31503 republish of changed power

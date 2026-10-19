@@ -59,7 +59,7 @@ public sealed partial class DungeonService
         {
             foreach (var member in members) rolling.Remove(member);
             // A member who went offline, died or entered elsewhere during the card's countdown stays behind (inferred).
-            var going = members.Where(s => sessions.All().Contains(s) && Admission(s, drawn, continuation: true) == 0).ToArray();
+            var going = members.Where(s => sessions.Contains(s) && Admission(s, drawn, continuation: true) == 0).ToArray();
             if (going.Length == 0) return;
             await BeginAsync(drawn, going, going.Any(s => s.Role!.Id == leader) ? leader : going[0].Role!.Id, team, matched);
         });

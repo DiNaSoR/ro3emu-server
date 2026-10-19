@@ -210,7 +210,7 @@ public sealed partial class CombatService
         var castingRole = s.Role;
         bool CurrentCaster() => ReferenceEquals(s.Role, castingRole) && !s.SceneLoading
             && s.SceneGeneration == action.SceneGeneration && (field != null ? !field.Removing : !action.Cancelled || action.Launched)
-            && s.WorldScene == action.WorldScene && sessions.All().Contains(s);
+            && s.WorldScene == action.WorldScene && sessions.Contains(s);
         bool CanApplyMoreEffects() => CurrentCaster() && ReferenceEquals(s.Attachment, action.Attachment)
             && action.Attachment?.Cancelled != true;
         // A published death still owes its callbacks after the cast/field is cancelled.
@@ -218,7 +218,7 @@ public sealed partial class CombatService
         bool CurrentKillRecipient() => ReferenceEquals(s.Role, castingRole) && !s.SceneLoading
             && s.SceneGeneration == action.SceneGeneration && s.WorldScene == action.WorldScene
             && ReferenceEquals(s.Attachment, action.Attachment)
-            && sessions.All().Contains(s);
+            && sessions.Contains(s);
         string script = Script(row);
         var targets = only != null
             ? only.Hp > 0 && !only.Dead && CanHitMonster(s, only) && Hostile(action, only) ? [only] : new List<MonsterUnit>()
@@ -423,7 +423,7 @@ public sealed partial class CombatService
         if (processed.Count > 0 && CurrentCaster()) await FightingAsync(s);
         foreach (var target in killed.Where(target => target.Hp == 0 && target.DeathDurable))
         {
-            log.LogInformation("{Name} killed {Monster} ({Npc})", castingRole.Name, target.Uid, target.Template.NpcId);
+            log.LogDebug("{Name} killed {Monster} ({Npc})", castingRole.Name, target.Uid, target.Template.NpcId);
             await monsters.KillAsync(target);
             foreach (var other in sessions.All().Where(o => o.Attack?.Target == target))
             {

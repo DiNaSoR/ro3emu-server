@@ -32,6 +32,7 @@ public sealed class WildAfkService : IGameTicker
     private readonly SessionRegistry sessions;
     private readonly World world;
     private readonly GameLoop loop;
+    private readonly Persistence.WildAfkPersistence lazySave;
 
     /// <summary>Durable dataset and reset/accounting metadata; clock anchors and the UI power-saving flag are session-only.</summary>
     public sealed class State
@@ -49,14 +50,18 @@ public sealed class WildAfkService : IGameTicker
         [JsonIgnore] public string LastReason { get; set; } = "";
         /// <summary>The bytes last written to the role row; an identical state is not written again.</summary>
         [JsonIgnore] public byte[]? Persisted { get; set; }
+        /// <summary>The bytes last handed to the lazy save (WildAfkPersistence), not necessarily on disk yet.</summary>
+        [JsonIgnore] public byte[]? LazyMarked { get; set; }
         /// <summary>The 5035 body this session last synced; an identical one is not diffed again.</summary>
         [JsonIgnore] public byte[]? SyncedInfo { get; set; }
         [JsonIgnore] public SemaphoreSlim Gate { get; } = new(1, 1);
     }
 
     public WildAfkService(GameData data, RoleStore roles, FunctionService functions, TaskService tasks, DailyActivityService daily,
-        SessionRegistry sessions, World world, GameLoop loop, SceneService scene, CombatService combat, RewardService rewards)
+        SessionRegistry sessions, World world, GameLoop loop, SceneService scene, CombatService combat, RewardService rewards,
+        Persistence.WildAfkPersistence lazySave)
     {
+        this.lazySave = lazySave;
         this.data = data;
         this.roles = roles;
         this.functions = functions;
@@ -99,7 +104,8 @@ public sealed class WildAfkService : IGameTicker
         && GameData.Int(map, "_iSceneType") == 1; // enum scene type: field; private/dungeon maps never qualify.
     private bool Ordinary(MonsterUnit monster) => data.Row("NPCConfig", monster.Template.NpcId) is { } npc
         && GameData.Int(npc, "_iWildMonsters") == 1 && GameData.Int(npc, "_iNPCSubType") is 1 or 2;
-    private bool MvpAggro(GameSession s) => world.AllUnits().OfType<MonsterUnit>().Any(m => !m.Dead && !m.Returning
+    // Only the player's own map: this runs every second per auto-battling player, and every map's units were scanned.
+    private bool MvpAggro(GameSession s) => world.UnitsIn(s.WorldScene).OfType<MonsterUnit>().Any(m => !m.Dead && !m.Returning
         && m.WorldScene == s.WorldScene && m.Target == s && data.Row("NPCConfig", m.Template.NpcId) is { } npc
         && GameData.Int(npc, "_iNPCSubType") is 3 or 4);
 
@@ -143,13 +149,25 @@ public sealed class WildAfkService : IGameTicker
     /// the same bytes every time (AccountedAtMs is not persisted) and still committed them: one durable UPDATE per
     /// eligible role per second.
     /// </summary>
-    private void Save(GameSession s)
+    /// <param name="lazy">Only the running clock moved (the tick reconcile): mark the lazy part instead of a durable
+    /// write now (WildAfkPersistence). Anything else is written at once and is a barrier for the lazy part.</param>
+    private void Save(GameSession s, bool lazy = false)
     {
         var state = s.WildAfk!;
         var bytes = JsonSerializer.SerializeToUtf8Bytes(state);
-        if (state.Persisted is { } last && last.AsSpan().SequenceEqual(bytes)) return;
+        if (lazy)
+        {
+            if ((state.LazyMarked ?? state.Persisted) is { } seen && seen.AsSpan().SequenceEqual(bytes)) return;
+            state.LazyMarked = bytes;
+            lazySave.MarkDirty(s, urgent: false);
+            return;
+        }
+        // Compared with the last durable write only: a lazily marked value may not be on disk yet.
+        if (state.Persisted is { } last && last.AsSpan().SequenceEqual(bytes) && !lazySave.IsDirty(s)) return;
         roles.SaveWildAfk(s.Role!.Id, bytes);
         state.Persisted = bytes;
+        state.LazyMarked = null;
+        lazySave.Persisted(s);
     }
 
     private async Task SyncAsync(GameSession s)
@@ -194,7 +212,7 @@ public sealed class WildAfkService : IGameTicker
     /// pause/relogin; requests cannot create free time by toggling. A backwards wall-clock correction costs zero.
     /// (inferred) sumHighMultiplierTime is lifetime consumed seconds; daily tracking uses its own reset counter.
     /// </summary>
-    private async Task ReconcileCoreAsync(GameSession s, long now, bool forceSuspended = false, bool publish = true)
+    private async Task ReconcileCoreAsync(GameSession s, long now, bool forceSuspended = false, bool publish = true, bool tick = false)
     {
         var state = s.WildAfk!;
         var info = state.Info;
@@ -227,7 +245,10 @@ public sealed class WildAfkService : IGameTicker
         bool wasSuspended = info.IsSuspended;
         info.IsSuspended = info.IsHighMagnification && reason != "active";
         if (info.IsSuspended && !wasSuspended) info.HighMultiplierPausedAt = now / 1000;
-        Save(s);
+        // The tick's reconcile of a running clock is saved lazily; a reset, a pause or resume, or the end of Bonus
+        // Time is durable at once.
+        bool clockOnly = tick && publish && !reset && running && info.IsHighMagnification && !info.IsSuspended;
+        Save(s, lazy: clockOnly);
         if (!publish) return; // Disconnected sockets must not interrupt durable accounting or world cleanup.
         if ((reset || consumed > 0 || PendingDailyAward(state, s.Daily, s.Tasks, s.DailyRows))
             && s.Tasks != null && s.DailyReady) await tasks.RefreshAsync(s);
@@ -317,7 +338,7 @@ public sealed class WildAfkService : IGameTicker
             if (Owns(s, state) && ReferenceEquals(s.Role, role) && (currentTick == null || currentTick()))
             {
                 if (s.Owner is { } owner) scope?.Context.Pin(owner);
-                await ReconcileCoreAsync(s, Now);
+                await ReconcileCoreAsync(s, Now, tick: currentTick != null);
             }
         }
         finally { state.Gate.Release(); }

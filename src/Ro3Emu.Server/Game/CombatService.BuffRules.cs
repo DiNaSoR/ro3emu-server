@@ -150,7 +150,7 @@ public sealed partial class CombatService
         var attachment = s.Attachment;
         long generation = s.SceneGeneration, scene = s.WorldScene;
         bool Current() => ReferenceEquals(s.Role, role) && ReferenceEquals(s.Attachment, attachment) && !s.SceneLoading
-            && s.SceneGeneration == generation && s.WorldScene == scene && sessions.All().Contains(s);
+            && s.SceneGeneration == generation && s.WorldScene == scene && sessions.Contains(s);
         var rule = effect.Rule;
         var defender = AsDefender(m);
         long amount = PeriodicAmount(attacker, defender, rule, buff.PileCount);
@@ -184,7 +184,7 @@ public sealed partial class CombatService
                 return;
             }
             if (!lethal) return;
-            log.LogInformation("{Name} killed {Monster} ({Npc}) with {Buff}", role.Name, m.Uid, m.Template.NpcId, buff.ConfigId);
+            log.LogDebug("{Name} killed {Monster} ({Npc}) with {Buff}", role.Name, m.Uid, m.Template.NpcId, buff.ConfigId);
             await monsters.KillAsync(m);
             foreach (var other in sessions.All().Where(o => o.Attack?.Target == m))
             {

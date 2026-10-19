@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Options;
 using Ro3Emu.Server.Accounts;
 
+using Microsoft.AspNetCore.Builder;
 namespace Ro3Emu.Server.Http;
 
 /// <summary>
@@ -12,10 +13,17 @@ namespace Ro3Emu.Server.Http;
 public static class SdkEndpoints
 {
     public const string LoginPath = "/sdk/login";
+
     public const string ServerListPath = "/serverlist/v2/168/serverlist.json";
 
     /// <summary>Plain-JSON marker understood by Lua_UT_Utils.Decrypt (otherwise it expects base64 AES).</summary>
     private const string RecoveryJsonPrefix = "RO3_RECOVERY_JSON:";
+
+    /// <summary>
+    /// Longest account name and password accepted. A first login registers the name, so without a bound any form post
+    /// (up to ASP.NET's 4 MB per value) became a stored account name, and a log line.
+    /// </summary>
+    public const int MaxIdentityChars = 64, MaxCredentialChars = 256;
 
     public const int BigArea = 168;
     public const int AreaId = 1;
@@ -27,12 +35,14 @@ public static class SdkEndpoints
     {
         app.MapGet(GateKeyPath, (Net.GateCrypto crypto) => Results.Text(crypto.PublicKeyPem, "application/x-pem-file"));
 
-        app.MapPost(LoginPath, async (HttpRequest request, AccountStore accounts, ILogger<AccountStore> log) =>
+        app.MapPost(LoginPath, async (HttpRequest request, CredentialLimiter limiter, AccountStore accounts, ILogger<AccountStore> log) =>
         {
+            if (!limiter.TryAcquire(request.HttpContext.Connection.RemoteIpAddress)) return Results.StatusCode(StatusCodes.Status429TooManyRequests);
             var form = await request.ReadFormAsync();
             string identity = form["identity"].ToString().Trim();
             string credential = form["credential"].ToString();
-            if (identity.Length == 0 || credential.Length == 0)
+            if (identity.Length == 0 || credential.Length == 0 || identity.Length > MaxIdentityChars || credential.Length > MaxCredentialChars
+                || identity.Any(char.IsControl))
             {
                 return Results.Json(new { code = 401 });
             }

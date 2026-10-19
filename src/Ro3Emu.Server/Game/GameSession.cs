@@ -37,7 +37,8 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
 
     public long HandshakeToken { get; set; }
 
-    public string? Account { get; set; }
+    /// <summary>The signed-in account; set only by <see cref="SessionRegistry.SignInAsync"/> (tests may set it).</summary>
+    public string? Account { get; internal set; }
     internal long AccountGeneration { get; set; }
     internal Task PredecessorFence { get; set; } = Task.CompletedTask;
 
@@ -122,6 +123,8 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
     /// <summary>C/D 17: the role's client settings, merged in memory and written lazily (SettingsPersistence).</summary>
     internal Romsg.DBSettingInfo? Settings { get; set; }
     internal Persistence.LazyRolePart.State? SettingsPart { get; set; }
+    /// <summary>The Bonus Time clock's lazy save (WildAfkPersistence).</summary>
+    internal Persistence.LazyRolePart.State? WildAfkPart { get; set; }
 
     /// <summary>Dead (HP 0, 31049 state 1) until revived (31013).</summary>
     public bool Dead { get; set; }

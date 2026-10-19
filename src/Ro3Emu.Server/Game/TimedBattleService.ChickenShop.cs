@@ -198,8 +198,9 @@ public sealed partial class TimedBattleService
                 int currency = (int)(GameData.Number(cost[0]) ?? 0);
                 long total = (long)(GameData.Number(cost[1]) ?? 0) * req.Count;
                 int entry = (int)GameData.Int(row, "_iItemId");
-                int amount = (int)Math.Max(1, GameData.Int(row, "_iItemPerMount")) * req.Count;
-                if (ItemRow(entry) == null || total is < 0 or > int.MaxValue) { result = ErrorCodes.ShopNoConfig; return; }
+                long units = Math.Max(1, GameData.Int(row, "_iItemPerMount")) * (long)req.Count;
+                if (ItemRow(entry) == null || total is < 0 or > int.MaxValue || units > int.MaxValue) { result = ErrorCodes.ShopNoConfig; return; }
+                int amount = (int)units;
                 if (me.Pack.Values.Where(i => i.Entry == currency).Sum(i => (long)i.Stack) < total) { result = ErrorCodes.CurrencyShort; return; }
                 if (Fits(me, entry, amount) < amount) { result = ErrorCodes.BagFull; return; }
                 long due = total;
