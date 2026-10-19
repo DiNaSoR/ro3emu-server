@@ -82,7 +82,7 @@ public sealed partial class CombatService
         if (!CurrentCastMap(s, action)) return;
         await SpendCastResourcesAsync(s, action);
         if (!CurrentCastMap(s, action)) return;
-        await ResolveHitsAsync(s, action);
+        if (!await StartFlightAsync(s, action.Row)) await ResolveHitsAsync(s, action);
         if (CurrentCastMap(s, action)) await AfterCastResourcesAsync(s, action);
     }
 
@@ -274,6 +274,7 @@ public sealed partial class CombatService
         var landed = new List<(MonsterUnit Target, long Amount)>();
         bool damage = Numbers(row, "_kDamageParam1").Any(v => v > 0) || Numbers(row, "_kDamageParam2").Any(v => v > 0)
             || action.ProcFixedDamage > 0;
+        if (DelayedHitScripts.Contains(Script(row))) damage = false;
         try
         {
         foreach (var target in targets)

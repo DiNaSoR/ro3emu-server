@@ -188,6 +188,8 @@ public sealed partial class CombatService
     /// </summary>
     internal bool CastYieldsTo(ActiveSkillCast active, JsonElement next)
     {
+        // High-Energy Impact's flight (its 5 s action) is cut short by "Tap the skill again".
+        if (FlightScript(Script(active.Row)) && FlightAttackScript(Script(next))) return true;
         switch (GameData.Int(active.Row, "_iInterruptedType"))
         {
             case 1:
@@ -440,9 +442,11 @@ public sealed partial class CombatService
         return false;
     }
 
-    private async Task<IReadOnlyList<CooldownStamp>?> StartCooldownAsync(GameSession s, JsonElement row)
+    private async Task<IReadOnlyList<CooldownStamp>?> StartCooldownAsync(GameSession s, JsonElement row, bool landing = false)
     {
         if (s.GmNoCooldown) return null; // GM panel GmNoCD
+        // High-Energy Impact's take-off shares its cooldown with the attack it arms; the cooldown starts on landing.
+        if (!landing && FlightScript(Script(row))) return null;
         int group = (int)GameData.Int(row, "_iSkillID"), mode = (int)GameData.Int(row, "_iMode");
         long now = Now, cd = GameData.Int(row, "_iCD");
         var notice = new SkillCdNotify { Uuid = s.Role!.Id };

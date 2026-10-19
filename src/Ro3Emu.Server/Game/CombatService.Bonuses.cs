@@ -83,6 +83,13 @@ public sealed partial class CombatService
         // King's Grace's two auras are the Crusader's own; Devotion's "Self-Link" marks the Crusader, not the ally.
         if (script == "KingsGrace" && recipient != null && recipient != s) return [];
         if (script == "Sacrifice" && tuples.Length == 2) return [tuples[recipient == null || recipient == s ? 1 : 0]];
+        // Firepower Loaded and Energy Release's countdown are granted by CombatService.Delayed (load counts, shield).
+        if (script is "VulcanArm" or "FlameLauncher")
+            return tuples.Where(t => (int)(GameData.Number(t[0]) ?? 0) != FirepowerLoadedBuff).ToArray();
+        if (script.StartsWith("AxeLeapAttack2", StringComparison.Ordinal))
+            return tuples.Where(t => (int)(GameData.Number(t[0]) ?? 0) != HighEnergyShieldBuff).ToArray();
+        if (script == "BombSuicide1")
+            return tuples.Where(t => (int)(GameData.Number(t[0]) ?? 0) != EnergyReleaseCountdownBuff).ToArray();
         if (script.StartsWith("AdrenalineRush", StringComparison.Ordinal) && tuples.Length == 2
             && !BlacksmithLine(recipient ?? s))
             return [tuples[0]];

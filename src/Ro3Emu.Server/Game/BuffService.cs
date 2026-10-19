@@ -36,6 +36,12 @@ public sealed partial class BuffService : IGameTicker
     /// <summary>Subscribers publish effective unit stats after a timed attribute buff changes.</summary>
     public List<Func<WorldUnit, Task>> UnitChanged { get; } = new();
 
+    /// <summary>Buffs that ran their course on a player (not dispelled, cleansed or cleared by death).</summary>
+    public List<Func<GameSession, ActiveBuff, Task>> Expired { get; } = new();
+
+    /// <summary>Buffs that ran their course on a unit.</summary>
+    public List<Func<WorldUnit, ActiveBuff, Task>> UnitExpired { get; } = new();
+
     public BuffService(GameData data, World world, SessionRegistry sessions, CharacterService character, GameLoop loop, ILogger<BuffService> log)
     {
         this.data = data;
@@ -449,7 +455,12 @@ public sealed partial class BuffService : IGameTicker
         SweepDecay(now);
         foreach (var s in sessions.All())
         {
-            foreach (var b in s.Buffs.Where(b => b.ExpireMs <= now).ToList()) loop.TrackLegacyDetached("buff expiration", () => RemoveAsync(s, b));
+            foreach (var b in s.Buffs.Where(b => b.ExpireMs <= now).ToList()) loop.TrackLegacyDetached("buff expiration", async () =>
+            {
+                if (!s.Buffs.Contains(b)) return;
+                await RemoveAsync(s, b);
+                foreach (var handler in Expired) await handler(s, b);
+            });
             TickEnergy(s, now);
             TickImmuneDeath(s, now);
         }
@@ -458,7 +469,12 @@ public sealed partial class BuffService : IGameTicker
             foreach (var buff in list.Where(b => b.ExpireMs <= now).ToList())
             {
                 var unit = world.AllUnits().FirstOrDefault(u => u.Uid == uid);
-                if (unit != null) loop.TrackLegacyDetached("unit buff expiration", () => RemoveUnitBuffAsync(unit, buff));
+                if (unit != null) loop.TrackLegacyDetached("unit buff expiration", async () =>
+                {
+                    if (!_unitBuffs.TryGetValue(unit.Uid, out var live) || !live.Contains(buff)) return;
+                    await RemoveUnitBuffAsync(unit, buff);
+                    foreach (var handler in UnitExpired) await handler(unit, buff);
+                });
                 else list.Remove(buff);
             }
             if (list.Count == 0) _unitBuffs.Remove(uid);

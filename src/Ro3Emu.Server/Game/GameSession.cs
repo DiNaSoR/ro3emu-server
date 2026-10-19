@@ -184,6 +184,12 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
     internal int UnionPiles { get; set; }
     /// <summary>Melt Down's Weapon Damage state the last stat sheet was sent with.</summary>
     internal bool WeaponDamagedShown { get; set; }
+    /// <summary>Arm Cannon attacks left on the Madogear's Firepower Loaded (CombatService.Delayed).</summary>
+    internal int FirepowerUses { get; set; }
+    /// <summary>High-Energy Impact's attack row for the current flight.</summary>
+    internal int FlightAttackRowId { get; set; }
+    /// <summary>When Psychokinetic Astral Body gathers its next orb.</summary>
+    internal long AstralNextMs { get; set; }
     public int ImmuneRecoveryPercent { get; set; }
     public Dictionary<int, long> SkillCds { get; } = new();
     public Dictionary<int, long> ItemCds { get; } = new();
