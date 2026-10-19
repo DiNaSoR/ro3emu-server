@@ -233,6 +233,21 @@ public sealed class GameData(IOptions<ServerOptions> options, ILogger<GameData> 
     public string MapName(long sceneEntry) => Row("MapConfig", sceneEntry) is { } row ? TextOf(row, "_iName") : "";
 
     /// <summary>
+    /// The NPCConfig id a scene-editor task point (m_kTaskPoints) on <paramref name="map"/> shows, or null when the map
+    /// has no such point. The client's own talk targets often name one (TaskConfig 201010: point 2010101, NPC 400049).
+    /// </summary>
+    public long? TaskPointNpc(long map, long point)
+    {
+        if ((Row("MapConfig", map) ?? Row("DungeonConfig", map)) is not { } config
+            || !config.TryGetProperty("_kResSceneEditorName", out var name) || name.GetString() is not { Length: > 0 } module
+            || DataFiles.Find(Path.Combine(Root, "sceneeditor"), module + ".json") is not { } path) return null;
+        using var doc = JsonDocument.Parse(File.ReadAllBytes(path));
+        return doc.RootElement.TryGetProperty("m_kTaskPoints", out var points) && points.ValueKind == JsonValueKind.Object
+            && points.TryGetProperty(point.ToString(System.Globalization.CultureInfo.InvariantCulture), out var entry)
+            ? Int(entry, "npcId") : null;
+    }
+
+    /// <summary>
     /// Where the quest tracker should walk for a custom kill step on <paramref name="map"/>: a scene-editor id that
     /// LC_InteractActions.GetPosByTargetID finds (action 142). That function looks in m_kRegins first and in
     /// m_kWorldMonsterSpawnPoints last, so the id is a region next to a spawn point of one of the monsters (the

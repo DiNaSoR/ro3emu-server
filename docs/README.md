@@ -8,6 +8,7 @@
 - [Trade Exchange for solo play](guide/exchange.md): a built-in seller that stocks the exchange and buys cheap listings back (`Ro3Emu:Exchange`)
 - [Starter kit](guide/starter-kit.md): what a new character starts with (nothing by default; `Ro3Emu:StarterKit`)
 - [Custom content](guide/custom-content.md): your own quests, NPCs, dialogue and text (`content/*.json`)
+- [Reopened content](guide/reopened-content.md): the Season menu and the "Dejected Young Man" side chain, switched off in the client data, opened again
 - [Bug reports](guide/feedback.md): the in-game Feedback button and `/bug`, and how to read the reports
 - [Launcher and patch repository](guide/launcher.md): hosting the client for your players
 

@@ -38,6 +38,9 @@ public sealed class SeasonPageTests : IAsyncLifetime
         app = ServerHost.Create([], o =>
         {
             o.DataDir = dataDir; o.GameDataDir = Path.Combine(RepoRoot(), "data");
+            // The shipped content: since the 2026-10-18 client the Season menu's level-50 gate comes from
+            // content/reopened-content.json (the client data says 9999).
+            o.CustomContentDir = Path.Combine(RepoRoot(), "content");
             o.HttpPort = port; o.MicroGatePort = micro; o.GameGatePort = game;
             o.PlayBook = 101; o.SeasonStart = "2026-10-05";
         }, clock);

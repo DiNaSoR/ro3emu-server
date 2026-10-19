@@ -1,0 +1,104 @@
+{
+  "//": "Content the client's source server switched off with impossible values (level 9999, a pre-quest that does not exist), opened again. See /docs/guide/reopened-content.md. Delete this file to keep them closed.",
+  "rows": {
+    "LC_ConditionList": {
+      // Season menu (FunctionConfig 69). The 2026-10-18 client update moved its condition from base level 50 to 9999.
+      "2000062": {
+        "m_eType": 1,
+        "m_kSubConditionList": [ { "m_bInverse": false, "m_eType": 3, "m_kData": [1002, 50], "m_kDynamicData": {} } ]
+      }
+    },
+    "TaskConfig": {
+      // "Dejected Young Man", root of the 75-quest blue side chain 201010..205200. It needed quest 9999999 (no such
+      // quest) and condition 88000010 (base level 999). Now offered from base level 20 (condition 2000056, [1002, 20]).
+      "201010": { "_base": 201010, "_kPreTask": {}, "_iCondition": 2000056, "_kEXP": [1, 10000] },
+      // "Allen's Request": nothing in the client gives the Pearl (1253001) or the Four-leaf Clover (1253002) that the
+      // next step, 201100 "Gather Materials", collects. Allen hands them over when this step is done.
+      "201090": { "_base": 201090, "_iAward": 99201090, "_kEXP": [1, 10000] },
+      // "Bunny Hair Band": the turn-in used mode 0, which the server leaves pending; mode 1 is the NPC turn-in the
+      // main story uses (e.g. 10102050), so the two items are handed to the Headgear Merchant.
+      "201120": { "_base": 201120, "_kProgressTarget": [[103051, 1253001, 1, 1], [103051, 1253002, 1, 1]], "_kEXP": [1, 10000] },
+      // Base EXP. The client gives every step 100 and each arc's last step 100,000 (about 507,000 in all, so a level-20
+      // character gained about 6 levels). Every step now gives 10,000 and the arc finales 150,000 to 300,000, in line with
+      // the main story's chapter finales at levels 25 to 46 (1,850,000 in all: level 20 to about 34, or 40 to about 44).
+      "201020": { "_base": 201020, "_kEXP": [1, 10000] },
+      "201030": { "_base": 201030, "_kEXP": [1, 10000] },
+      "201040": { "_base": 201040, "_kEXP": [1, 10000] },
+      "201050": { "_base": 201050, "_kEXP": [1, 10000] },
+      "201060": { "_base": 201060, "_kEXP": [1, 10000] },
+      "201070": { "_base": 201070, "_kEXP": [1, 10000] },
+      "201080": { "_base": 201080, "_kEXP": [1, 10000] },
+      "201100": { "_base": 201100, "_kEXP": [1, 10000] },
+      "201110": { "_base": 201110, "_kEXP": [1, 10000] },
+      "201130": { "_base": 201130, "_kEXP": [1, 150000] },
+      "202010": { "_base": 202010, "_kEXP": [1, 10000] },
+      "202020": { "_base": 202020, "_kEXP": [1, 10000] },
+      "202030": { "_base": 202030, "_kEXP": [1, 10000] },
+      "202040": { "_base": 202040, "_kEXP": [1, 10000] },
+      "202050": { "_base": 202050, "_kEXP": [1, 10000] },
+      "202060": { "_base": 202060, "_kEXP": [1, 10000] },
+      "202070": { "_base": 202070, "_kEXP": [1, 10000] },
+      "202080": { "_base": 202080, "_kEXP": [1, 10000] },
+      "202090": { "_base": 202090, "_kEXP": [1, 10000] },
+      "202100": { "_base": 202100, "_kEXP": [1, 10000] },
+      "202110": { "_base": 202110, "_kEXP": [1, 10000] },
+      "202120": { "_base": 202120, "_kEXP": [1, 10000] },
+      "202130": { "_base": 202130, "_kEXP": [1, 10000] },
+      "202140": { "_base": 202140, "_kEXP": [1, 10000] },
+      "202150": { "_base": 202150, "_kEXP": [1, 10000] },
+      "202160": { "_base": 202160, "_kEXP": [1, 10000] },
+      "202170": { "_base": 202170, "_kEXP": [1, 10000] },
+      "202180": { "_base": 202180, "_kEXP": [1, 10000] },
+      "202190": { "_base": 202190, "_kEXP": [1, 10000] },
+      "202200": { "_base": 202200, "_kEXP": [1, 200000] },
+      "203010": { "_base": 203010, "_kEXP": [1, 10000] },
+      "203020": { "_base": 203020, "_kEXP": [1, 10000] },
+      "203030": { "_base": 203030, "_kEXP": [1, 10000] },
+      "203040": { "_base": 203040, "_kEXP": [1, 10000] },
+      "203050": { "_base": 203050, "_kEXP": [1, 10000] },
+      "203060": { "_base": 203060, "_kEXP": [1, 10000] },
+      "203070": { "_base": 203070, "_kEXP": [1, 10000] },
+      "203080": { "_base": 203080, "_kEXP": [1, 10000] },
+      "203090": { "_base": 203090, "_kEXP": [1, 10000] },
+      "203100": { "_base": 203100, "_kEXP": [1, 250000] },
+      "204010": { "_base": 204010, "_kEXP": [1, 10000] },
+      "204020": { "_base": 204020, "_kEXP": [1, 10000] },
+      "204030": { "_base": 204030, "_kEXP": [1, 10000] },
+      "204040": { "_base": 204040, "_kEXP": [1, 10000] },
+      "204050": { "_base": 204050, "_kEXP": [1, 10000] },
+      "204060": { "_base": 204060, "_kEXP": [1, 10000] },
+      "204070": { "_base": 204070, "_kEXP": [1, 10000] },
+      "204080": { "_base": 204080, "_kEXP": [1, 10000] },
+      "204090": { "_base": 204090, "_kEXP": [1, 10000] },
+      "204100": { "_base": 204100, "_kEXP": [1, 10000] },
+      "204110": { "_base": 204110, "_kEXP": [1, 10000] },
+      "204120": { "_base": 204120, "_kEXP": [1, 250000] },
+      "205010": { "_base": 205010, "_kEXP": [1, 10000] },
+      "205020": { "_base": 205020, "_kEXP": [1, 10000] },
+      "205030": { "_base": 205030, "_kEXP": [1, 10000] },
+      "205040": { "_base": 205040, "_kEXP": [1, 10000] },
+      "205050": { "_base": 205050, "_kEXP": [1, 10000] },
+      "205060": { "_base": 205060, "_kEXP": [1, 10000] },
+      "205070": { "_base": 205070, "_kEXP": [1, 10000] },
+      "205080": { "_base": 205080, "_kEXP": [1, 10000] },
+      "205090": { "_base": 205090, "_kEXP": [1, 10000] },
+      "205100": { "_base": 205100, "_kEXP": [1, 10000] },
+      "205110": { "_base": 205110, "_kEXP": [1, 10000] },
+      "205120": { "_base": 205120, "_kEXP": [1, 10000] },
+      "205130": { "_base": 205130, "_kEXP": [1, 10000] },
+      "205140": { "_base": 205140, "_kEXP": [1, 10000] },
+      "205150": { "_base": 205150, "_kEXP": [1, 10000] },
+      "205160": { "_base": 205160, "_kEXP": [1, 10000] },
+      "205170": { "_base": 205170, "_kEXP": [1, 10000] },
+      "205180": { "_base": 205180, "_kEXP": [1, 10000] },
+      "205190": { "_base": 205190, "_kEXP": [1, 10000] },
+      "205200": { "_base": 205200, "_kEXP": [1, 300000] }
+    },
+    "MultiverseGroupConfig": {
+      "99201090": { "_iID": 99201090, "_iValue_default": 99201090, "_itype": 0 }
+    },
+    "AwardConfig": {
+      "99201090": [ { "_iID": 99201090, "_kAward": [[1253001, 1, 0], [1253002, 1, 0]], "_kPreview": [[1253001, 1], [1253002, 1]] } ]
+    }
+  }
+}

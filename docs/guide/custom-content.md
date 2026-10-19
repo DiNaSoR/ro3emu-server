@@ -101,8 +101,8 @@ A quest can say its `type`: `"main"`, `"side"` (the default) or `"guide"`. The t
 bubble over the NPC a talk step sends you to, in the client's colours: orange `[Main Quest]`, blue `[Side Quest]` or
 green `[Guide]`. Every step of the quest takes it.
 
-Optional on any step: `exp` (Base EXP when handed in; Job EXP follows at 20%), `award` (an AwardConfig item
-package), `track` (a raw `_kTrack` entry, replacing the one the server picks), and `fields` (any TaskConfig fields,
+Optional on any step: `exp` (Base EXP when handed in; Job EXP follows at 20%), `award` (a MultiverseGroupConfig id, whose
+`_iValue_default` names the AwardConfig item package), `track` (a raw `_kTrack` entry, replacing the one the server picks), and `fields` (any TaskConfig fields,
 written over the generated row).
 
 Text can carry colour tags like `<color=#CC762A>5 Porings</color>`. Write the whole text, numbers included: there are

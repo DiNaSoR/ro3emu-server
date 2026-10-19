@@ -199,7 +199,7 @@ public sealed class CustomContentQuestFormatTests : IDisposable
         var problems = CustomContentCheck.Problems(data);
         Assert.Contains(problems, p => p.Contains("NPCConfig 91000060: model 999999999 is not in UnitConfig"));
         Assert.Contains(problems, p => p.Contains("TaskConfig 91000061: monster 999999999 is not in NPCConfig"));
-        Assert.Contains(problems, p => p.Contains("TaskConfig 91000061: reward 999999999 is not in AwardConfig"));
+        Assert.Contains(problems, p => p.Contains("TaskConfig 91000061: reward 999999999 is not in MultiverseGroupConfig"));
         Assert.Equal(3, problems.Count);
     }
 
