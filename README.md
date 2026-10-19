@@ -251,6 +251,12 @@ to test) and on main, where it publishes them to the rolling
 [`client-dlls` release](https://github.com/akreao/ro3emu-server/releases/tag/client-dlls).
 `tools/update-client-dlls.sh` installs that build (or a folder you give it) into RO3Emu and the game.
 
+This fork's own `RO3Emu.exe` is built by the `release` workflow on every change to main that goes into it (the
+launcher, patcher and client DLL sources) and published to the rolling
+[`launcher` release](https://github.com/akreao/ro3emu-server/releases/tag/launcher) as `RO3Emu-win-x64.zip`.
+`tools/update-launcher.sh` installs it into RO3Emu (backing up the old exe) and then runs `update-client-dlls.sh`
+with the DLLs from the same zip.
+
 ### Architecture
 
 ```mermaid
