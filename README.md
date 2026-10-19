@@ -83,6 +83,8 @@ Open TCP `5380`, `20000` and `33100`.
   on your own PC. A hosted server gives them only to the accounts you name with `--gm` ([GM access](docs/guide/gm-access.md)).
 - **Bug reports from players:** the Feedback button in the game menu or `/bug <text>` in chat ([feedback](docs/guide/feedback.md)).
 - **Rates:** `Ro3Emu:Rates` multiplies the EXP, item and Zeny that monsters give ([rates](docs/guide/rates.md)).
+- **Bonus Time:** `Ro3Emu:FreezeBonusTime` keeps field Bonus Time from running down (off by default;
+  [frozen Bonus Time](docs/guide/bonus-time.md)).
 - **Free Top Up:** the in-game Top Up and currency exchange work without any payment (`Ro3Emu:TopUp:Free`, on in
   RO3Emu.exe and `server.sh`; [cash shop](docs/systems/cash-shop.md)).
 - **Solo play:** a built-in Trade Exchange seller and buy-back fill the market when few people play; on for local play,

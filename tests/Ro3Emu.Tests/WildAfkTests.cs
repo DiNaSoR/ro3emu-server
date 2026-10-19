@@ -367,6 +367,47 @@ public sealed class WildAfkTests : IAsyncLifetime
     }
 
     [ClientDataFact]
+    public async Task FreezeBonusTimeKeepsTheBankAndTheClientCountdownStill()
+    {
+        await using var bot = await InWorld();
+        await Eligible(bot);
+        await Warp(bot, 10111);
+        await Auto(bot, true);
+        await Kill(bot);
+        Service<Microsoft.Extensions.Options.IOptions<ServerOptions>>().Value.FreezeBonusTime = true;
+        await OnOwnedLoop(bot, "AFK frozen fixture", _ =>
+        {
+            long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            var s = Session(bot).WildAfk!;
+            s.Info.HighMultiplierTimeSeconds = 3600; s.Info.IsSuspended = false; s.ConsumedTodaySeconds = 0;
+            s.AccountedAtMs = now - 5_000; s.LastKillAtMs = now; s.RemainderMs = 0;
+            return Task.CompletedTask;
+        });
+        Assert.Equal(3600, await Query(bot));
+        // Still running on the server and still counted as played Bonus Time (daily row 106).
+        Assert.False(await State(bot, s => s.WildAfk!.Info.IsSuspended));
+        Assert.InRange(await State(bot, s => s.WildAfk!.ConsumedTodaySeconds), 5, 7);
+        // The client is told it is suspended, so LC_OnHookHelper's local countdown stays at 3600.
+        var view = await Next(bot, WildAfkService.Sync, DBWildAFKInfoIncrement.Parser,
+            x => !x.SyncAllMark && x.HasIsSuspended && x.IsSuspended);
+        Assert.False(view.HasHighMultiplierTimeSeconds);
+
+        await bot.SendGameAsync(WildAfkService.Pause, new PauseHighMultiplierTimeReq());
+        var paused = await Next(bot, WildAfkService.Pause, PauseHighMultiplierTimeRsp.Parser);
+        Assert.Equal(0, paused.Result);
+        Assert.Equal(3600, paused.RemainingTimeSeconds);
+        // The pause reply resets the client's anchors; the full 5035 after it keeps it suspended (no "Resumed" tip).
+        var off = await Next(bot, WildAfkService.Sync, DBWildAFKInfoIncrement.Parser, x => x.SyncAllMark && !x.IsHighMagnification);
+        Assert.True(off.IsSuspended);
+        await Task.Delay(1100); // the toggle cooldown
+        await bot.SendGameAsync(WildAfkService.Start, new StartHighMultiplierTimeReq());
+        Assert.Equal(3600, (await Next(bot, WildAfkService.Start, StartHighMultiplierTimeRsp.Parser)).RemainingTimeSeconds);
+        var on = await Next(bot, WildAfkService.Sync, DBWildAFKInfoIncrement.Parser, x => x.SyncAllMark && x.IsHighMagnification);
+        Assert.True(on.IsSuspended);
+        Assert.Equal(3600, on.HighMultiplierTimeSeconds);
+    }
+
+    [ClientDataFact]
     public async Task ConsumedHourCompletesDailyRowAndAwardsLivenessExactlyOnce()
     {
         await using var bot = await InWorld();

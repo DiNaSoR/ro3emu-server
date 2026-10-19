@@ -6,6 +6,7 @@ using Ro3Emu.Server.Accounts;
 using Ro3Emu.Server.Data;
 using Ro3Emu.Server.Game.Ownership;
 using Ro3Emu.Server.Maps;
+using Microsoft.Extensions.Options;
 
 namespace Ro3Emu.Server.Game;
 
@@ -33,6 +34,9 @@ public sealed class WildAfkService : IGameTicker
     private readonly World world;
     private readonly GameLoop loop;
     private readonly Persistence.WildAfkPersistence lazySave;
+    private readonly IOptions<ServerOptions> options;
+    /// <summary>ServerOptions.FreezeBonusTime: running Bonus Time is still counted as consumed, but not taken off the bank.</summary>
+    private bool Frozen => options.Value.FreezeBonusTime;
 
     /// <summary>Durable dataset and reset/accounting metadata; clock anchors and the UI power-saving flag are session-only.</summary>
     public sealed class State
@@ -59,9 +63,10 @@ public sealed class WildAfkService : IGameTicker
 
     public WildAfkService(GameData data, RoleStore roles, FunctionService functions, TaskService tasks, DailyActivityService daily,
         SessionRegistry sessions, World world, GameLoop loop, SceneService scene, CombatService combat, RewardService rewards,
-        Persistence.WildAfkPersistence lazySave)
+        Persistence.WildAfkPersistence lazySave, IOptions<ServerOptions> options)
     {
         this.lazySave = lazySave;
+        this.options = options;
         this.data = data;
         this.roles = roles;
         this.functions = functions;
@@ -173,10 +178,28 @@ public sealed class WildAfkService : IGameTicker
     private async Task SyncAsync(GameSession s)
     {
         var state = s.WildAfk!;
-        var bytes = state.Info.ToByteArray();
+        var info = ClientView(state.Info);
+        var bytes = info.ToByteArray();
         if (state.SyncedInfo is { } last && last.AsSpan().SequenceEqual(bytes)) return; // the diff would be empty
-        await CharacterService.SyncAsync(s, Sync, state.Info.Clone());
+        await CharacterService.SyncAsync(s, Sync, info);
         state.SyncedInfo = bytes;
+    }
+
+    /// <summary>
+    /// The 5035 body the client is sent. The client runs its own countdown while Bonus Time is on and not suspended
+    /// (LC_OnHookHelper.GetValidGetOnHookHighMultiplierTimeSeconds: seconds minus the time since the last
+    /// highMultiplierTimeSeconds update, less the suspended spans) and re-anchors only when that field arrives, so a
+    /// frozen bank would still be shown running down. With FreezeBonusTime the client is always told Bonus Time is
+    /// suspended, so its countdown stays at the server's value. Every path that resets the client's suspend anchor
+    /// (the 43409/43410 replies) is followed by a full 5035 (ToggleAsync), which sets it again. isSuspended has no other
+    /// client effect than the "High-Rate Auto Mode Resumed" tip (UIWords 37120) on a suspended -> running change, which
+    /// therefore never pops; the server's own suspension and its 43412 reasons are unchanged.
+    /// </summary>
+    private DBWildAFKInfo ClientView(DBWildAFKInfo info)
+    {
+        var view = info.Clone();
+        if (Frozen) view.IsSuspended = true;
+        return view;
     }
 
     /// <summary>Calendar-day catch-up (not 86400-second division, so local DST cannot skip a reset).</summary>
@@ -314,7 +337,8 @@ public sealed class WildAfkService : IGameTicker
         long until = Math.Min(end, state.LastKillAtMs + MonitorMs);
         state.RemainderMs += Math.Max(0, until - state.AccountedAtMs);
         long consumed = Math.Min(state.Info.HighMultiplierTimeSeconds, state.RemainderMs / 1000);
-        state.Info.HighMultiplierTimeSeconds -= consumed;
+        // FreezeBonusTime: the seconds still count as Bonus Time played (daily row 106, the pause summary), the bank stays.
+        if (!Frozen) state.Info.HighMultiplierTimeSeconds -= consumed;
         // Nothing beyond an exhausted allowance may carry into the next day's freshly restored bank.
         state.RemainderMs = state.Info.HighMultiplierTimeSeconds > 0 ? state.RemainderMs % 1000 : 0;
         state.Info.SumHighMultiplierTime += consumed;
