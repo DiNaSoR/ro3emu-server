@@ -54,6 +54,23 @@ public sealed class LogoutScopeAuditTests(ITestOutputHelper output) : IAsyncLife
     }
 
     [Fact]
+    public async Task LogoutLeavesNoContinuationBehindTheHandover()
+    {
+        var loop = app.Services.GetRequiredService<GameLoop>();
+        var (bot, id) = await InWorld("OutOrphan");
+        long before = loop.OrphanContinuations;
+        await bot.DisposeAsync();
+        await WaitDetached(id);
+        // A save the cleanup dropped (the tavern blob) resumed after the handover's permit closed, as an orphan.
+        for (int i = 0; i < 20; i++)
+        {
+            await Task.Delay(25);
+            await loop.InvokeAsync(() => Task.CompletedTask);
+        }
+        Assert.Equal(before, loop.OrphanContinuations);
+    }
+
+    [Fact]
     public async Task GuildMemberLogoutStaysInsideItsReservation()
     {
         var audit = Audit();

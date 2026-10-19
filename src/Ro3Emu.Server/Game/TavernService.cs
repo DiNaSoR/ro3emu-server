@@ -226,17 +226,19 @@ public sealed partial class TavernService : IGameTicker
     {
         if (s.Role is not { } role || s.Tavern == null) return;
         if (_byMember.TryGetValue(role.Id, out var room)) await LeaveRoomAsync(s, room, notifySelf: false);
-        Save(s);
+        await SaveAsync(s);
     }
 
-    private void Save(GameSession s)
+    /// <summary>Awaited by every caller: a dropped commit resumes on the loop after its caller's work (a role
+    /// handover's cleanup) has finished, as an untracked orphan continuation.</summary>
+    private Task SaveAsync(GameSession s)
     {
-        if (s.Role == null || s.Tavern == null) return;
+        if (s.Role == null || s.Tavern == null) return Task.CompletedTask;
         var stored = s.Tavern.Clone();
         stored.BarRoomId = 0;
         var transaction = roles.NewTransaction();
         transaction.RoleBlob(s.Role.Id, "barroom", stored.ToByteArray());
-        _ = roles.CommitAsync(transaction, "tavern/save");
+        return roles.CommitAsync(transaction, "tavern/save");
     }
 
     /// <summary>The counters of a new day (05:00 realm time) and week (Monday 05:00, as Popularity), inferred.
@@ -319,7 +321,7 @@ public sealed partial class TavernService : IGameTicker
         {
             info.IsToDayActComplete = true;
             info.ActDays++;
-            Save(s);
+            await SaveAsync(s);
         }
         foreach (var handler in TimeSpent) handler(s, seconds);
         if (done) foreach (var handler in Changed) handler(s);

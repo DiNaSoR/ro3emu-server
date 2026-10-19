@@ -85,6 +85,47 @@ public sealed class GameLoopTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task OrphanWarningNamesTheAsyncMethodThatResumed()
+    {
+        var log = new CapturingLog();
+        var loop = new GameLoop(log);
+        await loop.StartAsync(default);
+        try
+        {
+            var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var resumed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            await loop.InvokeAsync(() => { _ = DroppedSave(release.Task, resumed); return Task.CompletedTask; });
+            var until = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+            while (loop.DrainStatus.Outstanding != 0 && DateTime.UtcNow < until) await Task.Delay(5);
+            release.SetResult();
+            await resumed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            // An await posts the state machine's MoveNext Action; the warning used to read "Action".
+            var warning = Assert.Single(log.Lines, l => l.Contains("runs as an orphan"));
+            Assert.Contains($"{nameof(GameLoopTests)}+<{nameof(DroppedSave)}>", warning);
+        }
+        finally
+        {
+            await loop.StopAsync(default);
+            loop.Dispose();
+        }
+    }
+
+    private static async Task DroppedSave(Task release, TaskCompletionSource resumed)
+    {
+        await release;
+        resumed.SetResult();
+    }
+
+    private sealed class CapturingLog : Microsoft.Extensions.Logging.ILogger<GameLoop>
+    {
+        public System.Collections.Concurrent.ConcurrentQueue<string> Lines { get; } = new();
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel level) => true;
+        public void Log<TState>(Microsoft.Extensions.Logging.LogLevel level, Microsoft.Extensions.Logging.EventId id, TState state,
+            Exception? exception, Func<TState, Exception?, string> formatter) => Lines.Enqueue(formatter(state, exception));
+    }
+
+    [Fact]
     public async Task AwaitContinuationsComeBackToTheLoop()
     {
         bool onLoopAfterAwait = await _loop.InvokeAsync(async () =>
