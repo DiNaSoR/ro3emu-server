@@ -17,6 +17,9 @@
       "201090": { "_base": 201090, "_iAward": 99201090, "_kEXP": [1, 10000] },
       // "Bunny Hair Band": the turn-in used mode 0, which the server leaves pending; mode 1 is the NPC turn-in the
       // main story uses (e.g. 10102050), so the two items are handed to the Headgear Merchant.
+      // "Learn About Kafra: Survivor Battle", the intro side quest of the Prontera series 10200010..10200090. Its
+      // siblings only need a base level; this one also needed quest 9999999 (no such quest). Its own level stays: 49.
+      "10200060": { "_base": 10200060, "_kPreTask": {} },
       "201120": { "_base": 201120, "_kProgressTarget": [[103051, 1253001, 1, 1], [103051, 1253002, 1, 1]], "_kEXP": [1, 10000] },
       // Base EXP. The client gives every step 100 and each arc's last step 100,000 (about 507,000 in all, so a level-20
       // character gained about 6 levels). Every step now gives 10,000 and the arc finales 150,000 to 300,000, in line with
@@ -93,6 +96,19 @@
       "205180": { "_base": 205180, "_kEXP": [1, 10000] },
       "205190": { "_base": 205190, "_kEXP": [1, 10000] },
       "205200": { "_base": 205200, "_kEXP": [1, 300000] }
+    },
+    "ShopCommodityConfig": {
+      // Totem goods locked at base level 999 (show and buy conditions). They now open with the Divine Totem system
+      // (function 29, condition 2000026: base level 40). Zeny Shop: Random Divine Arts Totem, Low-Tier Totem Skill Book.
+      "12107": { "_base": 12107, "_iIsLock": 2000026, "_iIsBuy": 2000026 },
+      "12108": { "_base": 12108, "_iIsLock": 2000026, "_iIsBuy": 2000026 },
+      // Crystal Shop: Surprise Chest and the three Candles of Contemplation (totem refining materials).
+      "13101": { "_base": 13101, "_iIsLock": 2000026, "_iIsBuy": 2000026 },
+      "13120": { "_base": 13120, "_iIsLock": 2000026, "_iIsBuy": 2000026 },
+      "13121": { "_base": 13121, "_iIsLock": 2000026, "_iIsBuy": 2000026 },
+      "13122": { "_base": 13122, "_iIsLock": 2000026, "_iIsBuy": 2000026 },
+      // Competition Shop: Random Divine Arts Totem.
+      "25103": { "_base": 25103, "_iIsLock": 2000026, "_iIsBuy": 2000026 }
     },
     "MultiverseGroupConfig": {
       "99201090": { "_iID": 99201090, "_iValue_default": 99201090, "_itype": 0 }
