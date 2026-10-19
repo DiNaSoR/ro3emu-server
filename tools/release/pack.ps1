@@ -4,12 +4,11 @@
 # Nothing from the game goes in: the archives are checked against an allowlist and the DLLs' embedded resources are
 # checked too, and the build fails if a client DLL, Lua, config JSON or exported data would ship.
 #
-# The hooks DLL is compiled against the 7 Oct 2026 client's own DLLs (the originals from ro3emu-backup when that client
-# is patched); RO3Emu.exe check confirms it resolves in the 16 Oct client too. Without a client (CI) it takes the
-# committed prebuilt/client DLLs, after checking they were built from the current hooks and loc sources.
+# The hooks DLL is compiled against the client's own DLLs (the originals from ro3emu-backup when the client is patched).
+# Without -ClientDir (CI) only the client's managed DLLs are downloaded from the publisher: tools/release/client-dlls.ps1.
 #
 # usage: pwsh tools/release/pack.ps1 [-ClientDir <game folder>] [-Version 1.0.0] [-UpdatePrebuiltClientDlls]
-#        pwsh tools/release/pack.ps1 -UsePrebuiltClientDlls        (CI: no client on the machine)
+#        pwsh tools/release/pack.ps1 -UsePrebuiltClientDlls        (DLLs from prebuilt/client, not built)
 param(
     [string]$ClientDir = $env:RO3_CLIENT_DIR,
     [string]$Version = '1.0.0',
@@ -30,48 +29,28 @@ function Run([string]$exe, [string[]]$arguments) {
     if ($LASTEXITCODE -ne 0) { throw "failed ($LASTEXITCODE): $exe $($arguments -join ' ')" }
 }
 
-# The hooks and loc sources, as git hashes them (line endings normalized): the prebuilt DLLs carry this stamp.
-function SourceStamp {
-    Push-Location $root
-    try {
-        $files = git ls-files src/Ro3Emu.ClientHooks src/Ro3Emu.Loc | Where-Object { $_ -notmatch '/(bin|obj)/' }
-        $hashes = $files | git hash-object --stdin-paths
-        $text = (0..($files.Count - 1) | ForEach-Object { "$($files[$_]) $($hashes[$_])" }) -join "`n"
-        $sha = [Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($text))
-        return [Convert]::ToHexStringLower($sha)
-    } finally { Pop-Location }
-}
-
-# 1. Client DLLs (hooks + loc).
+# 1. Client DLLs (hooks + loc), built by client-dlls.ps1 against the client's own DLLs. Without a client on the machine
+#    it downloads just the client's managed DLLs from the publisher (CI does that). -UsePrebuiltClientDlls takes them
+#    from prebuilt/client instead (not in git; e.g. the client-dlls release), after checking their source stamp.
 $clientDlls = Join-Path $work 'client-dlls'
-New-Item -ItemType Directory $clientDlls | Out-Null
 $prebuilt = Join-Path $root 'prebuilt\client'
+$build = Join-Path $PSScriptRoot 'client-dlls.ps1'
 if ($UsePrebuiltClientDlls) {
     $stamp = (Get-Content (Join-Path $prebuilt 'source.sha256') -Raw).Trim()
-    $current = SourceStamp
+    $current = & $build -StampOnly
     if ($stamp -ne $current) {
-        throw "prebuilt/client was built from other hooks/loc sources ($stamp, now $current). On a machine with the 7 Oct client run: pwsh tools/release/pack.ps1 -UpdatePrebuiltClientDlls, then commit prebuilt/client."
+        throw "prebuilt/client was built from other hooks/loc sources ($stamp, now $current). Rebuild: pwsh tools/release/client-dlls.ps1 -Out prebuilt/client"
     }
+    New-Item -ItemType Directory $clientDlls | Out-Null
     Copy-Item (Join-Path $prebuilt '*.dll') $clientDlls
 } else {
-    if (-not (Test-Path (Join-Path $ClientDir 'ro3_Data\Managed\Assembly-CSharp.dll'))) { throw "no client at $ClientDir (or use -UsePrebuiltClientDlls)" }
-    # The client's original DLLs: Managed, with the originals of anything RO3Emu patched, without our own DLLs.
-    $managed = Join-Path $work 'managed'
-    New-Item -ItemType Directory $managed | Out-Null
-    Copy-Item (Join-Path $ClientDir 'ro3_Data\Managed\*.dll') $managed
-    $backup = Join-Path $ClientDir 'ro3emu-backup'
-    if (Test-Path $backup) { Copy-Item (Join-Path $backup '*.dll') $managed -Force }
-    Get-ChildItem $managed -Filter 'Ro3Emu.*.dll' | Remove-Item
-    Run dotnet @('build', (Join-Path $root 'src\Ro3Emu.ClientHooks'), '-c', 'Release', '--no-incremental', '-nologo', '-v', 'q', "-p:ClientManaged=$managed", '-o', (Join-Path $work 'hooks-build'))
-    Run dotnet @('build', (Join-Path $root 'src\Ro3Emu.Loc'), '-c', 'Release', '--no-incremental', '-nologo', '-v', 'q', "-p:ClientManaged=$managed", '-p:Ro3EmuNoClientData=true', '-o', (Join-Path $work 'loc-build'))
-    Copy-Item (Join-Path $work 'hooks-build\Ro3Emu.ClientHooks.dll') $clientDlls
-    Copy-Item (Join-Path $work 'loc-build\Ro3Emu.Loc.dll') $clientDlls
+    & $build -ClientDir $ClientDir -Out $clientDlls
     if ($UpdatePrebuiltClientDlls) {
         New-Item -ItemType Directory -Force $prebuilt | Out-Null
-        Copy-Item (Join-Path $clientDlls '*.dll') $prebuilt -Force
-        Set-Content (Join-Path $prebuilt 'source.sha256') (SourceStamp) -NoNewline
-        Write-Host "updated prebuilt/client (commit it)"
+        Copy-Item (Join-Path $clientDlls '*') $prebuilt -Force
+        Write-Host "updated prebuilt/client"
     }
+    Remove-Item (Join-Path $clientDlls 'source.sha256')
 }
 
 # 2. Publish: self-contained single files, so players and hosts need no .NET.

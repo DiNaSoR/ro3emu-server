@@ -27,3 +27,8 @@ tools/unluac-batch/*.class
 /downloads/
 /RO3Emu.settings.json
 /RO3Emu-diagnostics.zip
+
+# Client DLLs are built by CI (.github/workflows/client-dlls.yml), never committed
+/prebuilt/
+/.client/
+/client-dlls/

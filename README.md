@@ -242,8 +242,14 @@ with the evidence.
 `pwsh tools/release/pack.ps1` builds both archives (self-contained, single file) and fails if anything from the game
 would ship. `pwsh tools/release/smoke.ps1` then tests the zip as a stranger would: a fresh folder, a copy of the
 client, no .NET, Java or Node on the PATH, export, server, patch, a bot logging in, join, restore. CI has no game
-client, so a tag build uses the committed `prebuilt/client` DLLs: refresh them with
-`pack.ps1 -UpdatePrebuiltClientDlls` whenever `src/Ro3Emu.ClientHooks` or `src/Ro3Emu.Loc` change.
+client, so `pack.ps1` downloads just the client's managed DLLs from the publisher and builds the client hooks/loc DLLs
+against them (`tools/release/client-dlls.ps1`).
+
+The client DLLs (`Ro3Emu.ClientHooks.dll`, `Ro3Emu.Loc.dll`) are not committed. The `client DLLs` workflow builds them
+the same way on every pull request that touches `src/Ro3Emu.ClientHooks` or `src/Ro3Emu.Loc` (a `client-dlls` artifact
+to test) and on main, where it publishes them to the rolling
+[`client-dlls` release](https://github.com/akreao/ro3emu-server/releases/tag/client-dlls).
+`tools/update-client-dlls.sh` installs that build (or a folder you give it) into RO3Emu and the game.
 
 ### Architecture
 
