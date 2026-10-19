@@ -580,6 +580,96 @@ public sealed class PetTests : IAsyncLifetime
     }
 
     [ClientDataFact]
+    public async Task OwlAngelingBaphometAndFireNinjaMainSkillsDoTheRestOfTheirDescription()
+    {
+        await using var bot = await InWorld();
+        await Unlock();
+        await Gm("!lvl 33");
+        var combat = _app.Services.GetRequiredService<CombatService>();
+        var loop = _app.Services.GetRequiredService<GameLoop>();
+        var buffService = _app.Services.GetRequiredService<BuffService>();
+        var character = _app.Services.GetRequiredService<CharacterService>();
+        var monsters = _app.Services.GetRequiredService<MonsterService>();
+        combat.Rolls = new SureRolls();
+        int deployed = 0;
+        async Task Deploy(int pet, int fragment)
+        {
+            if (deployed > 0)
+            {
+                await bot.SendGameAsync(PetService.StateUpdate, new PetStateUpdateReq
+                {
+                    PetId = deployed, Source = (PetStateSource_Type)1, SourceSlotIndex = 1, Target = (PetStateSource_Type)0,
+                });
+                Assert.Equal(0, (await Next(bot, PetService.StateUpdate, PetStateUpdateResp.Parser)).Result);
+            }
+            await Gm($"!item {fragment} 50");
+            await bot.SendGameAsync(PetService.Combine, new PetCombineReq { PetId = pet });
+            Assert.Equal(0, (await Next(bot, PetService.Combine, PetCombineResp.Parser)).Result);
+            await bot.SendGameAsync(PetService.StateUpdate, new PetStateUpdateReq { PetId = pet, Target = (PetStateSource_Type)1, TargetSlotIndex = 1 });
+            Assert.Equal(0, (await Next(bot, PetService.StateUpdate, PetStateUpdateResp.Parser)).Result);
+            deployed = pet;
+        }
+        Task<MonsterUnit> Spawn(float dx) => loop.InvokeAsync(async () =>
+        {
+            var s = Session;
+            var unit = await monsters.SpawnSingleAsync(s.SceneEntry, 5000001, new MapPoint(s.Position.X + dx, s.Position.Y, s.Position.Z, 0),
+                s.InstanceId, customTemplate: monsters.Template(5000001)! with { RoamDistance = 0, AttackRange = 0, SwingIntervalMs = 3_600_000 });
+            unit!.Hp = 10_000_000;
+            return unit;
+        });
+        async Task<List<BotEvent>> Cast(int skill, MonsterUnit? target, int waitMs, float face = 0)
+        {
+            int from = bot.Inbox.Snapshot().Count;
+            await bot.SendGameAsync(CombatService.UseSkill, new CastSkillReq
+            {
+                SkillId = skill, TargetId = target?.Uid ?? 0, TargetPos = (target?.Pos ?? Session.Position).Clone(), Face = face,
+            });
+            Assert.Equal(0, (await Next(bot, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
+            await Task.Delay(waitMs);
+            return bot.Inbox.Snapshot().Skip(from).ToList();
+        }
+        static IEnumerable<T> Of<T>(List<BotEvent> events, uint id, MessageParser<T> parser) where T : IMessage<T> =>
+            events.Where(e => e.IsGame(id)).Select(e => parser.ParseFrom(e.Body));
+
+        // Owl Baron: five Lightning Strikes in all, 0.5 s apart, on enemies around the locked one.
+        var owlTarget = await Spawn(1);
+        await Spawn(3);
+        await Deploy(30002, 1630002);
+        var events = await Cast(2311301, owlTarget, 3000);
+        Assert.Equal(5, Of(events, CombatService.ExtraUseInSkill, UseInSkillInfo.Parser).Count(u => u.SkillID == 2311401));
+        Assert.Equal(5, Of(events, CombatService.SkillHit, SkillHitInfo.Parser).Count(h => h.SkillId == 2311401 && h.Dsts.Any(d => d.Damage > 0)));
+
+        // Baphomet Jr.: the Immobilize lands only on a target that was already slowed.
+        var slowed = await Spawn(1);
+        var plain = await Spawn(1.5f);
+        await loop.InvokeAsync(() => buffService.ShowOnUnitAsync(slowed, 2336201, 10_000, 0));
+        await Deploy(22001, 1622001);
+        await Cast(2340001, slowed, 600);
+        Assert.Contains(buffService.UnitBuffs(slowed), b => b.ConfigId == 902401);
+        Assert.Contains(buffService.UnitBuffs(plain), b => b.ConfigId == 2340001);
+        Assert.DoesNotContain(buffService.UnitBuffs(plain), b => b.ConfigId == 902401);
+
+        // Angeling: the Radiant Ring raises healing received and heals the master every second.
+        await Deploy(31301, 1631301);
+        await loop.InvokeAsync(() => character.SetHpSpAsync(Session, 1, null));
+        events = await Cast(2328001, null, 1400);
+        Assert.Contains(Session.Buffs, b => b.ConfigId == 2328301 && b.ExpireMs > MonsterService.NowMs);
+        Assert.Contains(Of(events, CombatService.SkillHit, SkillHitInfo.Parser),
+            h => h.SkillId == 2328301 && h.Dsts.Any(d => d.DstID == Session.Role!.Id && d.DamageType == DamageType.Heal && d.Damage > 0));
+
+        // Fire Ninja: the master moves up to 5 m the way the cast faces.
+        await Deploy(33101, 1633101);
+        var before = Session.Position.Clone();
+        events = await Cast(2302201, null, 600, face: 90);
+        var move = Assert.Single(Of(events, CombatService.SkillMove, SkillStartMoveNotify.Parser), m => m.EntityID == (ulong)Session.Role!.Id);
+        Assert.Equal(2302201, move.SkillConfigId);
+        float moved = MathF.Sqrt(MathF.Pow(move.EndPos.X - before.X, 2) + MathF.Pow(move.EndPos.Z - before.Z, 2));
+        Assert.InRange(moved, 0.25f, 5.05f);
+        Assert.True(move.EndPos.X > before.X); // face 90 is +X
+        Assert.Equal(move.EndPos.X, Session.Position.X, 2);
+    }
+
+    [ClientDataFact]
     public async Task AuraMainSkillsKeepActingFromTheMasterWhileTheirBuffLasts()
     {
         await using var bot = await InWorld();

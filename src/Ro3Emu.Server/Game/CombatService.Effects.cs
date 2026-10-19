@@ -330,8 +330,10 @@ public sealed partial class CombatService
             {
                 var tuples = Tuples(row, "_kBuff2").ToArray();
                 var rolled = stage is { Buff2: >= 0 } ? tuples.Skip(stage.Buff2).Take(1) : stage?.Fallback >= 0 ? tuples.Take(stage.Fallback) : tuples;
-                foreach (var tuple in rolled)
-                    if (CanApplyMoreEffects() && RollHostileBuff(tuple, s, null, null, target, out int id, out int duration))
+                bool slowedBefore = Slowed(target);
+                foreach (var (tuple, index) in rolled.Select((t, i) => (t, i)).ToArray())
+                    if (CanApplyMoreEffects() && !GaleSkipsBuff(row, index, slowedBefore)
+                        && RollHostileBuff(tuple, s, null, null, target, out int id, out int duration))
                     {
                         await buffs.ShowOnUnitAsync(target, id, duration, castingRole.Id);
                         action.StatusLanded.Add(target.Uid);
@@ -548,6 +550,8 @@ public sealed partial class CombatService
             // "Dives toward a designated location" (Rift Impact 1130109), "Leap to a selected area" (Twilight 1160707).
             ["IgnitionBreak"] = (DisplaceKind.CasterToPoint, -1),
             ["HesperusLit"] = (DisplaceKind.CasterToPoint, -1),
+            // Fire Ninja's Main Skill 2302201: "moves its master ${2} meters in the designated direction" (show 2300311).
+            ["petmove"] = (DisplaceKind.CasterForward, 1),
         };
 
     private readonly System.Collections.Concurrent.ConcurrentDictionary<long, (int Id, int Ms)> _movementEffects = new();
