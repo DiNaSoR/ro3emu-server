@@ -1,11 +1,10 @@
-using System.Diagnostics;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace Ro3Emu.Desktop;
 
-/// <summary>What the window does: server status, the client DLL update and running RO3Emu.exe join.</summary>
+/// <summary>What the window does: server status, the client DLL update and the join flow (patch, log in, start).</summary>
 public static class Engine
 {
     public static string AppDir { get; } = AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
@@ -41,8 +40,8 @@ public static class Engine
     }
 
     /// <summary>
-    /// Puts the newest CI build of the client DLLs into client\ next to RO3Emu.exe (RO3Emu.exe copies them into the game
-    /// on every patch). The current ones are kept in client\backups\&lt;time&gt;. Returns the build's commit.
+    /// Puts the newest CI build of the client DLLs into client\ next to this exe (Play copies them into the game on every
+    /// patch). The current ones are kept in client\backups\&lt;time&gt;. Returns the build's commit.
     /// </summary>
     public static async Task<string> UpdateClientDllsAsync(Action<string> log, CancellationToken ct, string? releaseBase = null, string? clientDir = null)
     {
@@ -78,17 +77,7 @@ public static class Engine
         return commit.Length > 12 ? commit[..12] : commit;
     }
 
-    public static string? FindRo3Emu()
-    {
-        foreach (var name in new[] { "RO3Emu.exe", "RO3Emu" })
-        {
-            var path = Path.Combine(AppDir, name);
-            if (File.Exists(path)) return path;
-        }
-        return null;
-    }
-
-    /// <summary>The RO3Emu.exe command line for Play (the password goes in RO3EMU_PASSWORD, never on the command line).</summary>
+    /// <summary>The join command line (RO3Emu.exe's own options); the password is added in memory only, by PlayAsync.</summary>
     public static List<string> JoinArguments(string address, string? account, string? clientDir)
     {
         var args = new List<string> { "join", address.Trim(), "--yes" };
@@ -97,36 +86,64 @@ public static class Engine
         return args;
     }
 
-    /// <summary>Runs RO3Emu.exe join (patch for this server, log in, start the game); each output line goes to log.</summary>
-    public static async Task<int> PlayAsync(string address, string? account, string? password, string? clientDir, Action<string> log, CancellationToken ct)
+    private static readonly SemaphoreSlim OneAtATime = new(1, 1);
+
+    /// <summary>
+    /// RO3Emu.exe join, run in this process (Ro3Emu.Setup.Flows.JoinAsync): checks the game folder, fetches the server's
+    /// gate key, patches the game with client\*.dll, makes the English text map, logs in and starts the game. Its
+    /// console output goes to log line by line. Returns null on success, or what went wrong and what to do.
+    /// </summary>
+    public static async Task<string?> PlayAsync(string address, string? account, string? password, string? clientDir, Action<string> log)
     {
-        var exe = FindRo3Emu() ?? throw new FileNotFoundException("RO3Emu.exe is not next to RO3EmuDesktop.exe.");
-        var start = new ProcessStartInfo(exe)
+        var args = JoinArguments(address, account, clientDir);
+        if (!string.IsNullOrEmpty(account) && !string.IsNullOrEmpty(password)) args.AddRange(["--password", password]);
+        await OneAtATime.WaitAsync();
+        var console = Console.Out;
+        using var writer = new LineWriter(log);
+        try
         {
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardInput = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            WorkingDirectory = AppDir,
-        };
-        foreach (var a in JoinArguments(address, account, clientDir)) start.ArgumentList.Add(a);
-        if (!string.IsNullOrEmpty(account) && !string.IsNullOrEmpty(password)) start.Environment["RO3EMU_PASSWORD"] = password;
-        using var process = Process.Start(start) ?? throw new InvalidOperationException("RO3Emu.exe did not start");
-        process.StandardInput.Close(); // no questions: RO3Emu.exe takes the defaults
-        var output = Pump(process.StandardOutput, log);
-        var errors = Pump(process.StandardError, log);
-        await process.WaitForExitAsync(ct);
-        await Task.WhenAll(output, errors);
-        return process.ExitCode;
+            Setup.Ui.Interactive = false; // never wait for an answer on a console nobody sees
+            Console.SetOut(writer);
+            var options = Setup.Options.Parse([.. args]);
+            Setup.SetupLog.Write($"RO3EmuDesktop join {address} {(account != null ? "as " + account : "")}");
+            await Task.Run(() => Setup.Flows.JoinAsync(options));
+            return null;
+        }
+        catch (Setup.SetupException e) { return e.Message + Environment.NewLine + e.Fix; }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or HttpRequestException or InvalidOperationException)
+        {
+            return e.Message;
+        }
+        finally
+        {
+            writer.Flush();
+            Console.SetOut(console);
+            OneAtATime.Release();
+        }
     }
 
-    private static async Task Pump(StreamReader reader, Action<string> log)
+    /// <summary>Console output as lines; a progress line redrawn with \r keeps only its last state.</summary>
+    private sealed class LineWriter(Action<string> log) : TextWriter
     {
-        while (await reader.ReadLineAsync() is { } line)
+        private readonly System.Text.StringBuilder _line = new();
+        public override System.Text.Encoding Encoding => System.Text.Encoding.UTF8;
+
+        public override void Write(char value)
         {
-            // RO3Emu.exe redraws progress lines with \r; keep the last state of each.
-            var text = line.Split('\r').Last().TrimEnd();
+            lock (_line)
+            {
+                if (value == '\r') { _line.Clear(); return; }
+                if (value != '\n') { _line.Append(value); return; }
+                Emit();
+            }
+        }
+
+        public override void Flush() { lock (_line) Emit(); }
+
+        private void Emit()
+        {
+            var text = _line.ToString().TrimEnd();
+            _line.Clear();
             if (text.Trim().Length > 0) log(text);
         }
     }

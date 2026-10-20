@@ -2,7 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="Ro3Emu.Desktop.MainWindow"
         Title="RO3Emu Launcher"
-        Width="860" Height="560" MinWidth="720" MinHeight="480"
+        Width="860" Height="600" MinWidth="720" MinHeight="480"
         Background="#14171C">
   <Grid ColumnDefinitions="300,*" RowDefinitions="*,170" Margin="20">
 
@@ -50,8 +50,11 @@
           </StackPanel>
           <CheckBox x:Name="RememberBox" Content="Remember my password on this PC" />
           <StackPanel>
-            <TextBlock Classes="label" Text="Game folder (the one with ro3.exe; empty = the one RO3Emu.exe already knows)" />
-            <TextBox x:Name="ClientBox" Watermark="for example D:\ROO_PC" />
+            <TextBlock Classes="label" Text="Game folder (the one with ro3.exe; empty = find it)" />
+            <Grid ColumnDefinitions="*,8,Auto">
+              <TextBox x:Name="ClientBox" Grid.Column="0" Watermark="for example D:\ROO_PC" />
+              <Button x:Name="BrowseButton" Grid.Column="2" Content="Browse..." VerticalAlignment="Stretch" />
+            </Grid>
           </StackPanel>
         </StackPanel>
       </DockPanel>

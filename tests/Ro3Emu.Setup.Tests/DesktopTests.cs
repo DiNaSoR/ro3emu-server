@@ -25,6 +25,23 @@ public class DesktopTests
     }
 
     [Fact]
+    public async Task PlayRunsTheJoinFlowInProcessAndReportsWhatToFix()
+    {
+        var console = Console.Out;
+        var lines = new List<string>();
+        var dir = Directory.CreateTempSubdirectory("ro3emu-desktop-");
+        try
+        {
+            var failure = await Engine.PlayAsync("127.0.0.1:1", "alice", "pw", dir.FullName, lines.Add);
+            Assert.NotNull(failure);
+            Assert.Contains("is not a Ragnarok 3 game folder", failure);
+            Assert.Contains(lines, l => l.Contains("join a server"));
+            Assert.Same(console, Console.Out);
+        }
+        finally { dir.Delete(recursive: true); }
+    }
+
+    [Fact]
     public void SettingsRoundTrip()
     {
         var dir = Directory.CreateTempSubdirectory("ro3emu-desktop-");

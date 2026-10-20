@@ -39,6 +39,8 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Ro3Emu.Setup.Tests" />
+    <!-- RO3EmuDesktop.exe runs the same join flow in its own process (no RO3Emu.exe needed next to it). -->
+    <InternalsVisibleTo Include="RO3EmuDesktop" />
   </ItemGroup>
 
 </Project>

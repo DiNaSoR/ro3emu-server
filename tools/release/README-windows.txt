@@ -17,7 +17,8 @@ Log in with any account name and password: the account is created on first login
 Keep the RO3Emu window open while you play; press Q there (or close it) to stop the server.
 Next time, just double-click RO3Emu.exe again.
 
-To play on servers that someone else runs, double-click RO3EmuDesktop.exe instead:
+To play on servers that someone else runs, double-click RO3EmuDesktop.exe instead
+(it works on its own, RO3Emu.exe is not needed for it):
 pick a server (or add one with its address), type your account and password and
 click Play. It patches the game for that server, logs you in and the game opens on
 character select. "Update DLLs" fetches the newest RO3Emu game DLLs first.

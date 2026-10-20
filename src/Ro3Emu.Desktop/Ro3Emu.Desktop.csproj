@@ -1,8 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- RO3EmuDesktop.exe: the window launcher next to RO3Emu.exe. It keeps a list of servers, logs in for the player
-       (the game then skips its login and server screens), fetches the newest client DLLs and runs RO3Emu.exe join,
-       which patches the game for the chosen server and starts it. Avalonia, so it also runs under Wine. -->
+  <!-- RO3EmuDesktop.exe: a window launcher that stands alone. It keeps a list of servers, fetches the newest client
+       DLLs, patches the game for the chosen server, logs in for the player (the game then skips its login and server
+       screens) and starts it. It runs RO3Emu.exe's own join flow in-process (Ro3Emu.Setup is a library here), so both
+       patch exactly the same way. Avalonia, so it also runs under Wine. -->
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
@@ -27,7 +28,17 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Ro3Emu.Setup\Ro3Emu.Setup.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="Ro3Emu.Setup.Tests" />
   </ItemGroup>
+
+  <!-- Ro3Emu.Setup is an exe project, so its runtimeconfig is copied along; the single-file publish does not need it
+       (and in the release folder it would sit next to RO3Emu.exe, which has its own embedded). -->
+  <Target Name="DropReferencedExeRuntimeConfig" AfterTargets="Publish">
+    <Delete Files="$(PublishDir)RO3Emu.runtimeconfig.json" Condition="'$(PublishSingleFile)' == 'true'" />
+  </Target>
 
 </Project>

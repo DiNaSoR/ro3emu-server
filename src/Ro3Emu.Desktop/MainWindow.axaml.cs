@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Media;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 
 namespace Ro3Emu.Desktop;
@@ -30,12 +31,12 @@ public partial class MainWindow : Window
         RemoveButton.Click += RemoveServer;
         UpdateButton.Click += async (_, _) => await UpdateDllsAsync();
         PlayButton.Click += async (_, _) => await PlayAsync();
+        BrowseButton.Click += async (_, _) => await BrowseAsync();
         _statusTimer.Tick += (_, _) => _ = RefreshStatusAsync();
         _statusTimer.Start();
         Opened += (_, _) =>
         {
             _ = RefreshStatusAsync();
-            if (Engine.FindRo3Emu() == null) Log("RO3Emu.exe was not found next to RO3EmuDesktop.exe: put both in the same folder.");
             if (Program.UnderWine()) Log("Running under Wine.");
         };
         Closing += (_, _) => Save();
@@ -122,11 +123,26 @@ public partial class MainWindow : Window
         try
         {
             Log($"Starting {server}...");
-            int code = await Engine.PlayAsync(server.Address, account, password, ClientBox.Text, Log, CancellationToken.None);
-            Log(code == 0 ? "Done. Have fun!" : $"RO3Emu.exe stopped with code {code}; see the lines above.");
+            var failure = await Engine.PlayAsync(server.Address, account, password, ClientBox.Text, Log);
+            Log(failure == null ? "Done. Have fun!" : "Stopped: " + failure);
         }
         catch (Exception e) { Log("Could not start: " + e.Message); }
         finally { End(); }
+    }
+
+    private async Task BrowseAsync()
+    {
+        var picked = await StorageProvider.OpenFolderPickerAsync(new Avalonia.Platform.Storage.FolderPickerOpenOptions
+        {
+            Title = "Ragnarok 3 game folder (the one with ro3.exe)",
+            AllowMultiple = false,
+        });
+        if (picked.Count > 0 && picked[0].TryGetLocalPath() is { } path)
+        {
+            ClientBox.Text = path;
+            if (!File.Exists(Path.Combine(path, "ro3.exe"))) Log($"{path} has no ro3.exe; pick the folder that contains it.");
+            Save();
+        }
     }
 
     private bool Begin()
