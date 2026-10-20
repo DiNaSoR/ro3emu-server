@@ -355,6 +355,19 @@ public sealed class TowerTests : IAsyncLifetime
     }
 
     [ClientDataFact]
+    public async Task RoleScreenFirstPassQueryAnswersWithoutError()
+    {
+        // The client sends 32807 for floors 1-230 while the character list is up; error 28 showed a popup there.
+        await using var lobby = new BotClient(http, File.ReadAllText(Path.Combine(dataDir, "gate_rsa_public.pem")));
+        await lobby.LoginAsync("lobby", "pw");
+        await lobby.EnterGateAsync();
+        await lobby.SendGameAsync(TowerService.FirstPassRange, new QueryClimbTowerFirstPassRangeReq { MinLayer = 1, MaxLayer = 230 });
+        var range = await Next(lobby, TowerService.FirstPassRange, QueryClimbTowerFirstPassRangeResp.Parser);
+        Assert.Equal(0, range.Result);
+        Assert.Equal(230, range.Results.Count);
+    }
+
+    [ClientDataFact]
     public async Task BossFirstPassBelongsToFirstWinnerAndOtherPlayersClaimItsMilestoneOnce()
     {
         await using var winner = await InWorld("Winner", cleared: 9);

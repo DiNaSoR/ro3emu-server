@@ -571,11 +571,16 @@ public sealed partial class TowerService
                 catch (Exception e) { log.LogError(e, "Tower settlement hook failed for {Role}", s.Role.Id); }
     }
 
-    /// <summary>Inclusive bounded range of actual catalog floor numbers, including genuine uncleared records.</summary>
+    /// <summary>
+    /// Inclusive bounded range of actual catalog floor numbers, including genuine uncleared records. The client also
+    /// asks for floors 1-230 on the role screen (Steven's traffic log, 2026-10-20); the records are server-wide, so a
+    /// session without a role gets them too instead of error 28, which the client shows as a "This feature is
+    /// unavailable" tip on the character list.
+    /// </summary>
     public Task FirstPassRangeAsync(GameSession s, QueryClimbTowerFirstPassRangeReq req)
     {
         var floors = Floors();
-        int error = !Open(s) ? ErrorCodes.FeatureUnavailable : floors.Count == 0 || req.MinLayer < 1
+        int error = s.Role != null && !Open(s) ? ErrorCodes.FeatureUnavailable : floors.Count == 0 || req.MinLayer < 1
             || req.MaxLayer < req.MinLayer || req.MaxLayer > GameData.Int(floors[^1], "_iFloor") ? ErrorCodes.Parameter : 0;
         var response = new QueryClimbTowerFirstPassRangeResp { Result = error };
         if (error == 0)
