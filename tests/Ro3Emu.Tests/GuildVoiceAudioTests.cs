@@ -187,8 +187,11 @@ public sealed class GuildVoiceAudioTests : IAsyncLifetime
 
         // Given the mic: his own Mic=on comes back and his audio reaches the room.
         Assert.Equal(0, (await Ask(alice, GuildVoiceService.SetSpeakPermissionMsg,
-            new GuildVoiceChannelSetSpeakPermissionReq { ChannelIndex = 0, SpeakMode = GuildSpeakAuthorityType.Order,
-                PermissionItems = { new GuildVoiceChannelSpeakPermissionItem { TargetPlayerId = bobId, GrantPermission = true } } },
+            new GuildVoiceChannelSetSpeakPermissionReq
+            {
+                ChannelIndex = 0, SpeakMode = GuildSpeakAuthorityType.Order,
+                PermissionItems = { new GuildVoiceChannelSpeakPermissionItem { TargetPlayerId = bobId, GrantPermission = true } }
+            },
             GuildVoiceChannelSetSpeakPermissionRsp.Parser)).ErrorCode);
         await aliceVoice.WaitAsync((t, p) => MicIs(t, p, bobId, true), Wait);
         await bobVoice.SendAudioAsync(1, [8, 8, 8]);

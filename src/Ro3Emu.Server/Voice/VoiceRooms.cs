@@ -246,11 +246,6 @@ public sealed class VoiceRooms(IOptions<ServerOptions> options, TeamService team
             foreach (var member in MembersOf(room)) member.SendVad(connection.RoleId, false);
     }
 
-    /// <summary>
-    /// Re-validates every joined connection against TeamService/SessionRegistry: a session that is gone, switched
-    /// teams or no longer matches its room is removed (Kicked + MemberChange to the rest). The leader's mute is not
-    /// here: <see cref="SweepMuteAndVad"/> applies it every tick.
-    /// </summary>
     /// <summary>Whether <paramref name="role"/> may be in room <paramref name="key"/>: its party, or the guild voice
     /// channel it sits in on the panel. Loop-owned reads (TeamService).</summary>
     public bool Belongs(long role, VoiceRoomKey key) => key.IsGuild
@@ -261,6 +256,11 @@ public sealed class VoiceRooms(IOptions<ServerOptions> options, TeamService team
     /// guild channel.</summary>
     public bool MicHeldOff(long role, long room) => room < 0 ? !guildVoice.MaySpeak(role) : teams.IsForbiddenChat(role);
 
+    /// <summary>
+    /// Re-validates every joined connection against SessionRegistry and <see cref="Belongs"/>: a session that is gone,
+    /// switched teams or left its guild voice channel is removed (Kicked + MemberChange to the rest). The held-off
+    /// mic is not here: <see cref="SweepMuteAndVad"/> applies it every tick.
+    /// </summary>
     private void SweepMembership()
     {
         VoiceConnection[] snapshot;
