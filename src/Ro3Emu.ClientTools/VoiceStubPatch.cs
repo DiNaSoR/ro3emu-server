@@ -300,7 +300,7 @@ public static class VoiceStubPatch
         {
             foreach (var call in ctor.Body.Instructions.Where(i => i.Operand is MethodReference m && IsNative(m.DeclaringType, native)).ToList())
             {
-                var target = (MethodReference)call.Operand;
+                var target = (MethodReference)call.Operand!; // the filter above matched a MethodReference
                 if (call.OpCode != OpCodes.Call || target.HasThis || target.Parameters.Count != 0 || target.ReturnType.IsValueType)
                     throw new InvalidOperationException($"VoiceCallAdapter constructor: unexpected GME call {target.FullName}");
                 call.OpCode = OpCodes.Ldnull;

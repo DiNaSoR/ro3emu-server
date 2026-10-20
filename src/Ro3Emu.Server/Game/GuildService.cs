@@ -42,7 +42,6 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
     public Func<long, GuildItemData>? ItemDataOf { get; set; }
 
     private readonly Dictionary<long, Invitation> invites = new();
-    private readonly TimeProvider marketClock = clock;
     private long nextToken = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
     private sealed record Invitation(long GuildId, long Recipient, long Inviter, long ExpiresMs);
     private static long NowMs() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
