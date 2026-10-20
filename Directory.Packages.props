@@ -8,7 +8,7 @@
   <ItemGroup>
     <PackageVersion Include="Google.Protobuf" Version="3.36.2" />
     <PackageVersion Include="Grpc.Tools" Version="2.84.0" />
-    <PackageVersion Include="KeraLua" Version="1.4.10" />
+    <PackageVersion Include="KeraLua" Version="1.4.11" />
     <PackageVersion Include="MessagePack" Version="3.1.11" />
     <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.12" />
     <PackageVersion Include="Microsoft.Web.WebView2" Version="1.0.4258.31" />
