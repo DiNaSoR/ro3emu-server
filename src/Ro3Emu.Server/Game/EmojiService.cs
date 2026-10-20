@@ -340,7 +340,7 @@ public sealed partial class EmojiService : IGameTicker
     private async Task ToPlayerAndViewersAsync(GameSession p, IMessage body)
     {
         await p.SendGameAsync(AoiAttrChange, body);
-        foreach (var viewer in world.Viewers(p).Where(v => v != p)) await viewer.SendGameAsync(AoiAttrChange, body);
+        await PreparedMessage.SendToAsync(world.Viewers(p).Where(v => v != p), AoiAttrChange, body);
     }
 
     /// <summary>Target 106903 CheckAreaAction [map, region, emojiId]: counted when the emote really plays.</summary>
