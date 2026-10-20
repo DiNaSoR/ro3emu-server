@@ -95,6 +95,12 @@ public sealed class MapWorld
     public MapPoint Grounded(MapPoint p) =>
         Nav?.WalkHeight(p.X, p.Z, p.Y) is { } h ? p with { Y = h } : p;
 
+    /// <summary>The height of the nearest layer under a flyer, walkable or not; null off the map's grid (no nav: as sent).</summary>
+    public float? FloorHeight(MapPoint p) => Nav is { } nav ? nav.FloorHeight(p.X, p.Z, p.Y) : p.Y;
+
+    /// <summary>The point moved onto the nearest walkable layer, or null where its cell has none (water, off the grid).</summary>
+    public MapPoint? Landing(MapPoint p) => Nav == null ? p : Nav.WalkHeight(p.X, p.Z, p.Y) is { } h ? p with { Y = h } : null;
+
     public bool IsWalkable(float x, float y, float z) => Nav?.IsWalkable(x, y, z) ?? true;
 }
 

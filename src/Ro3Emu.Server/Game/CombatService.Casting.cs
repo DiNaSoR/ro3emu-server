@@ -60,6 +60,9 @@ public sealed partial class CombatService
     /// <summary>Runs under the role lock once a cast is accepted, before the client hears of it (MountService dismounts).</summary>
     public List<Func<GameSession, int, Task>> BeforeCast { get; } = new();
 
+    /// <summary>WorldCoreService.CanLand: whether a flying mount's landing skill may be cast where the rider is.</summary>
+    public Func<GameSession, bool>? CanLand { get; set; }
+
     /// <summary>
     /// 31102: row identity, ownership, selector, mode, all costs and cooldowns are checked before the cast commits.
     /// Target/position come from CastSkillReq; m_kSelectInfo uses relation masks, never _iDmgType as a selector.
@@ -309,7 +312,8 @@ public sealed partial class CombatService
         if (skills.NormalGroups(s.Progress!.Career).Contains(group)
             && data.Row("SkillConfig", normal) is { } current && GameData.Int(current, "_iSkillID") != group) return false;
         // The flying mount's take-off on the ground, its landing in the air (MountService.FlySkills, SkillWheelMount1).
-        if (MountService.FlySkills(s, data) is { } fly && GameData.Int(row, "_iID") == (s.WorldState.Flying ? fly.Down : fly.Up)) return true;
+        if (MountService.FlySkills(s, data) is { } fly && GameData.Int(row, "_iID") == (s.WorldState.Flying ? fly.Down : fly.Up))
+            return !s.WorldState.Flying || CanLand?.Invoke(s) != false;
         if (GameData.Int(row, "_iSystemType") == ActiveGuardSkill) return skills.PetMainSkill?.Invoke(s)?.SkillId == GameData.Int(row, "_iID");
         if (ChainOffers(s, row)) return true; // Thousand Shadows, Shadow Loop, Shadow Echo's return (CombatService.Chains)
         return skills.Level(s.Progress, (int)GameData.Int(row, "_iSkillID")) >= GameData.Int(row, "_iLevel");

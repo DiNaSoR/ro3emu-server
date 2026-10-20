@@ -62,6 +62,15 @@ public sealed class NavGrid
         return best;
     }
 
+    /// <summary>Height of the layer of any kind (water, cliff, floor) nearest to <paramref name="yHint"/>, or null off the grid.</summary>
+    public float? FloorHeight(float x, float z, float yHint)
+    {
+        float? best = null;
+        foreach (var (_, h) in Layers(x, z))
+            if (best == null || MathF.Abs(h - yHint) < MathF.Abs(best.Value - yHint)) best = h;
+        return best;
+    }
+
     /// <summary>
     /// The client's skill line-of-sight test (Lua_SceneSpace.CheckIndirectPass -> PF_AStar.CheckRayLine): from the cell
     /// of a to the cell of b, one-metre steps along the line, every visited cell must be walkable or carry a GridLevel

@@ -22,6 +22,8 @@ public sealed class WorldSessionState
     public string TeamTargetSnapshot { get; set; } = "";
     public bool Flying { get; set; }
     public long LastFlyMs { get; set; }
+    /// <summary>Where the current flight left the ground: a forced landing over water ends there (LandAsync).</summary>
+    public Vec3? TakeOff { get; set; }
     public bool Watching { get; set; }
     public EFightStatus? FightStatus { get; set; }
     public HashSet<long> Hatred { get; } = new();
@@ -95,6 +97,7 @@ public sealed partial class WorldCoreService : IGameTicker
         scene.Leaving.Add(LeavingAsync);
         monsters.TargetChanged.Add(TargetChangedAsync);
         combat.ReviveOffer = OfferReviveAsync;
+        combat.CanLand = CanLand;
         combat.BeforeCast.Add(MountFlightCastAsync); // a flying mount's take-off and landing (WorldCoreService.MountFlight)
         FlightChanged.Add(combat.FlightChangedAsync);
         combat.ReviveCheck = dungeons.ExternalReviveError;
@@ -452,7 +455,7 @@ public sealed partial class WorldCoreService : IGameTicker
         {
             await BoardsAsync(s, boards);
             if (s.WorldState.MiniMap) await MiniMapSnapshotAsync(s);
-            if (s.WorldState.Flying && !CanFly(s)) await LandAsync(s, s.Position, s.Face);
+            if (s.WorldState.Flying && !CanFly(s)) await LandAsync(s, s.Position, s.Face, forced: true);
             if (s.WorldState.TemporaryLeaveUntilMs > 0 && s.WorldState.TemporaryLeaveUntilMs <= Now) await ForceLeaveAsync(s);
         }
         await AdmitQueuedAsync();
