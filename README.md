@@ -144,7 +144,7 @@ show is playable from day one, without season or server-day gates ([details](doc
 - NPC, point and guild shops, battle pass, cash shop and Top Up, Fashion gifts to friends
 - friends and gifts, parties and raids, chat channels and horns
 - Connect Quests and activity Intimacy between party friends
-- party voice chat through the server (off by default, see below)
+- party and guild voice chat through the server (off by default, see below)
 - Tavern rooms with text and voice chat, mic rules, gifts and the Daily Tavern
 - adventure groups
 
@@ -175,7 +175,7 @@ show is playable from day one, without season or server-day gates ([details](doc
 - **Survivor Battle extras:** the "Go, Kafra, Go!" weekly tasks.
 - **Smaller missing pieces:** some stages of the story dungeons
   that are still simplified.
-- **Guild voice:** only party and Tavern voice are implemented.
+- **Guild voice invites:** guild voice rooms work, but voice invites are not answered yet.
 - **Guild Technology and Timed Strategies**, the Starshatter Dragon Summon Ritual, party teleport invites and big-map
   marks: the client sends these requests and the server does not answer them yet.
 - **Leaderboard rewards:** the boards show, but they don't pay out their rewards yet.
