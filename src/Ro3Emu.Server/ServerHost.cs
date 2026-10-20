@@ -418,6 +418,10 @@ public static class ServerHost
         app.Services.GetRequiredService<GateCrypto>();
         app.Logger.LogInformation("Data dir {DataDir}", options.DataDir);
         LogGmPolicy(app.Logger, options, builder.Environment.EnvironmentName);
+        // Release v2026.10.20 had one Ro3Emu:WalkCheck for both checks; it is no longer read (docs/guide/walk-check.md).
+        if (builder.Configuration["Ro3Emu:WalkCheck"] is { Length: > 0 } oldWalkCheck)
+            app.Logger.LogWarning("!!! Ro3Emu:WalkCheck={Mode} is no longer read: set Ro3Emu:WalkSpeedCheck and Ro3Emu:WalkPathCheck " +
+                "instead (now {Speed} and {Path}; docs/guide/walk-check.md)", oldWalkCheck, options.WalkSpeedCheck, options.WalkPathCheck);
         // D1 inventory across many short-lived servers (a whole test suite): each appends its loop waits on stop.
         if (Environment.GetEnvironmentVariable("RO3EMU_LOOPWAIT_DUMP") is { Length: > 0 } dump)
             app.Lifetime.ApplicationStopped.Register(() => Diagnostics.LoopWaitDump.Append(dump, app.Services.GetRequiredService<AccountStore>().AccessMetrics));
