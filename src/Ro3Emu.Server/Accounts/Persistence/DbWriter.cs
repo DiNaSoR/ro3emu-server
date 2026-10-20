@@ -142,7 +142,7 @@ public sealed class DbWriter : IDisposable
     // about 6 ms and a new role's login a dozen of them, one after another: the writer queue, not the loop, was what
     // a login storm waited on.
     internal const int MaxGroupJobs = 64;
-    private static readonly TimeSpan MaxGroupExecution = TimeSpan.FromMilliseconds(25);
+    internal TimeSpan MaxGroupExecution { get; set; } = TimeSpan.FromMilliseconds(25);
 
     private sealed class Pending(Job job)
     {
