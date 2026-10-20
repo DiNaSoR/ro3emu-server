@@ -77,10 +77,10 @@ public sealed class MicroSession(PhonestChannel channel)
 {
     public PhonestChannel Channel { get; } = channel;
 
-    private static long s_nextId;
+    private static long _nextId;
 
     /// <summary>Process-unique id: an unverified session's own reservation key.</summary>
-    public long Id { get; } = Interlocked.Increment(ref s_nextId);
+    public long Id { get; } = Interlocked.Increment(ref _nextId);
 
     public long HandshakeToken { get; set; }
 

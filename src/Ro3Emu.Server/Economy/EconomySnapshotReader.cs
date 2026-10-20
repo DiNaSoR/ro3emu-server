@@ -220,13 +220,13 @@ public static partial class EconomySnapshotReader
         internal List<EconomyHolding> Holdings { get; } = [];
         internal List<EconomyIssue> Issues { get; } = [];
         internal Dictionary<string, (long Rows, long Blobs, long Bytes)> Metrics { get; } = new(StringComparer.Ordinal);
-        private readonly HashSet<long> roles = [];
-        private readonly HashSet<long> deletedRoles = [];
-        private readonly HashSet<long> unknownRoleDeletion = [];
-        private readonly HashSet<long> deletionRecoveryNoted = [];
-        private readonly HashSet<long> guilds = [];
-        private readonly HashSet<long> recoveredGuilds = [];
-        private readonly HashSet<string> mailDeliveryKeys = [];
+        private readonly HashSet<long> _roles = [];
+        private readonly HashSet<long> _deletedRoles = [];
+        private readonly HashSet<long> _unknownRoleDeletion = [];
+        private readonly HashSet<long> _deletionRecoveryNoted = [];
+        private readonly HashSet<long> _guilds = [];
+        private readonly HashSet<long> _recoveredGuilds = [];
+        private readonly HashSet<string> _mailDeliveryKeys = [];
 
         internal void Issue(EconomyIssueKind kind, string key, string detail) => Issues.Add(new(kind, key, detail));
         internal void ReadDungeonPending()
@@ -270,11 +270,11 @@ public static partial class EconomySnapshotReader
         private static string Id(long value) => value.ToString(CultureInfo.InvariantCulture);
         private EconomyOwner Role(long role, string key)
         {
-            if (roles.Contains(role))
+            if (_roles.Contains(role))
             {
-                if (deletedRoles.Contains(role) || unknownRoleDeletion.Contains(role))
+                if (_deletedRoles.Contains(role) || _unknownRoleDeletion.Contains(role))
                 {
-                    if (deletedRoles.Contains(role) && deletionRecoveryNoted.Add(role))
+                    if (_deletedRoles.Contains(role) && _deletionRecoveryNoted.Add(role))
                         Issue(EconomyIssueKind.RecoveryDebt, "role/" + Id(role) + "/deleted_time",
                             "Soft-deleted role retains assets; recovery ownership requires policy.");
                     return new(EconomyOwnerKind.Recovery, "role:" + Id(role));
@@ -286,7 +286,7 @@ public static partial class EconomySnapshotReader
         }
         private EconomyOwner Guild(long guild, string key)
         {
-            if (guilds.Contains(guild) || recoveredGuilds.Contains(guild)) return new(EconomyOwnerKind.Guild, Id(guild));
+            if (_guilds.Contains(guild) || _recoveredGuilds.Contains(guild)) return new(EconomyOwnerKind.Guild, Id(guild));
             Issue(EconomyIssueKind.RecoveryDebt, key, $"Guild {guild} has persisted assets but no guild row.");
             return new(EconomyOwnerKind.Recovery, "guild:" + Id(guild));
         }

@@ -705,19 +705,19 @@ public static class EconomyLedgerReader
             internal int Target = target, Reverse = reverse;
             internal long Capacity = capacity;
         }
-        private readonly List<Edge>[] graph = Enumerable.Range(0, nodes).Select(_ => new List<Edge>()).ToArray();
+        private readonly List<Edge>[] _graph = Enumerable.Range(0, nodes).Select(_ => new List<Edge>()).ToArray();
 
         internal void Add(int from, int to, long capacity)
         {
             if (capacity <= 0) return;
-            graph[from].Add(new Edge(to, graph[to].Count, capacity));
-            graph[to].Add(new Edge(from, graph[from].Count - 1, 0));
+            _graph[from].Add(new Edge(to, _graph[to].Count, capacity));
+            _graph[to].Add(new Edge(from, _graph[from].Count - 1, 0));
         }
 
         internal long MaxFlow(int source, int sink)
         {
             long total = 0;
-            var previous = new (int Node, int Edge)[graph.Length];
+            var previous = new (int Node, int Edge)[_graph.Length];
             while (true)
             {
                 Array.Fill(previous, (-1, -1));
@@ -727,9 +727,9 @@ public static class EconomyLedgerReader
                 while (queue.Count != 0 && previous[sink].Node < 0)
                 {
                     int from = queue.Dequeue();
-                    for (int i = 0; i < graph[from].Count; i++)
+                    for (int i = 0; i < _graph[from].Count; i++)
                     {
-                        var edge = graph[from][i];
+                        var edge = _graph[from][i];
                         if (edge.Capacity <= 0 || previous[edge.Target].Node >= 0) continue;
                         previous[edge.Target] = (from, i);
                         queue.Enqueue(edge.Target);
@@ -740,14 +740,14 @@ public static class EconomyLedgerReader
                 for (int node = sink; node != source; node = previous[node].Node)
                 {
                     var (from, index) = previous[node];
-                    amount = Math.Min(amount, graph[from][index].Capacity);
+                    amount = Math.Min(amount, _graph[from][index].Capacity);
                 }
                 for (int node = sink; node != source; node = previous[node].Node)
                 {
                     var (from, index) = previous[node];
-                    var edge = graph[from][index];
+                    var edge = _graph[from][index];
                     edge.Capacity -= amount;
-                    graph[node][edge.Reverse].Capacity = checked(graph[node][edge.Reverse].Capacity + amount);
+                    _graph[node][edge.Reverse].Capacity = checked(_graph[node][edge.Reverse].Capacity + amount);
                 }
                 total = checked(total + amount);
             }
