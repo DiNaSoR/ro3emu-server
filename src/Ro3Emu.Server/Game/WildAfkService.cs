@@ -273,6 +273,8 @@ public sealed class WildAfkService : IGameTicker
         bool clockOnly = tick && publish && !reset && running && info.IsHighMagnification && !info.IsSuspended;
         Save(s, lazy: clockOnly);
         if (!publish) return; // Disconnected sockets must not interrupt durable accounting or world cleanup.
+        // Connect Quest 106014 "Auto-battle in a party": the consumed auto-battle seconds (TaskService.ConnectQuests.cs).
+        if (consumed > 0 && s.Tasks != null) await tasks.OnAutoBattleSecondsAsync(s, consumed);
         if ((reset || consumed > 0 || PendingDailyAward(state, s.Daily, s.Tasks, s.DailyRows))
             && s.Tasks != null && s.DailyReady) await tasks.RefreshAsync(s);
         await SyncAsync(s);

@@ -9,7 +9,8 @@ namespace Ro3Emu.Server.Game;
 
 /// <summary>82200-82210 friend metadata, chat groups and gifts.</summary>
 public sealed partial class FriendExtraService(FriendStore friends, RoleStore roles, SessionRegistry sessions,
-    CharacterService character, ChatService chat, Micro.FriendService micro, GameLoop loop, PersonalService personal)
+    CharacterService character, ChatService chat, Micro.FriendService micro, GameLoop loop, PersonalService personal,
+    Data.GameData data)
 {
     public const uint CreateGroup = 82200, RenameGroup = 82201, InviteGroup = 82202, KickGroup = 82203,
         DismissGroup = 82204, LeaveGroup = 82205, SetGroupDnd = 82206, FetchMetadata = 82207,
@@ -193,6 +194,40 @@ public sealed partial class FriendExtraService(FriendStore friends, RoleStore ro
         if (req.RecentlyData != null) resp.RecentlyData = data.RecentlyData = req.RecentlyData.Clone();
         await friends.SaveMetadataAsync(s.Role.Id, data);
         await s.SendGameAsync(SetMetadata, resp);
+    }
+
+    /// <summary>The Intimacy maximum, FriendlinessConfig's top level (18, 180,000), as gifts use it.</summary>
+    private const int IntimacyMax = 180000;
+
+    /// <summary>
+    /// Connect Quests (TaskService.ConnectQuests.cs): <paramref name="amount"/> Intimacy between the role and each party
+    /// member who is its friend. Localization 10960000069 limits what activities give each day; PublicParamConfig
+    /// FriendIntimacyLimit (1000) is read as that limit for each pair, and FriendIntimacyResetTime [1, 1, 5] as a daily
+    /// reset at 05:00 (both inferred: the client never reads them). Gifts are not limited.
+    /// </summary>
+    public async Task GrantActivityIntimacyAsync(GameSession s, int amount, IReadOnlyList<long> party)
+    {
+        if (s.Role is not { } role || amount <= 0) return;
+        long self = role.Id, day = GameDay(DateTimeOffset.Now);
+        int limit = data.Table("PublicParamConfig").TryGetValue("FriendIntimacyLimit", out var v)
+            && Data.GameData.Number(v) is { } n && n > 0 ? (int)n : 1000;
+        foreach (long other in party.Where(id => id != self).Distinct())
+        {
+            // The pair's friend rows belong to both roles: reserve the friend's too, as gifts do.
+            int? changed = null;
+            await RunSocialAsync(s, "friend/connect-intimacy", [other], async () =>
+                changed = await friends.AddActivityIntimacyAsync(self, other, amount, day, limit, IntimacyMax));
+            if (changed is not { } intimacy) continue;
+            await micro.IntimacyChangedAsync(self, other, intimacy);
+            await micro.IntimacyChangedAsync(other, self, intimacy);
+        }
+    }
+
+    /// <summary>The game day (its 05:00 start, local time, in Unix seconds) holding <paramref name="now"/>.</summary>
+    internal static long GameDay(DateTimeOffset now)
+    {
+        var local = now.ToLocalTime();
+        return new DateTimeOffset(local.AddHours(-5).Date.AddHours(5), local.Offset).ToUnixTimeSeconds();
     }
 
     /// <summary>82209 pays the inventory cost and saves both gift records in one SQLite transaction; intimacy +1 is inferred.</summary>

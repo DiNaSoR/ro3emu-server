@@ -293,6 +293,9 @@ internal sealed class FriendSchemaPlan : DbPlan
             CREATE TABLE IF NOT EXISTS blacklist (owner INTEGER NOT NULL, other INTEGER NOT NULL, PRIMARY KEY (owner, other));
             """;
         cmd.ExecuteNonQuery();
+        // Activity Intimacy gained by the pair on one game day (Connect Quests, FriendActivityIntimacyPlan).
+        SchemaSql.AddColumn(db, tx, "friend", "activity_day", "INTEGER NOT NULL DEFAULT 0");
+        SchemaSql.AddColumn(db, tx, "friend", "activity_gain", "INTEGER NOT NULL DEFAULT 0");
         EnsureExtra(db, tx);
         SchemaSql.Execute(db, tx, """
             INSERT OR IGNORE INTO owner_revision(kind,id,part,revision)

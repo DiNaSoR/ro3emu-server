@@ -230,3 +230,52 @@ internal sealed class FriendGroupRolesReadPlan(long group) : DbReadPlan
         return result.Distinct().ToArray();
     }
 }
+
+/// <summary>
+/// Activity Intimacy between two friends (Connect Quests): adds up to <c>amount</c> to both directions of the pair,
+/// limited by what the pair may still gain on game day <c>day</c> (friend.activity_day / activity_gain) and by the
+/// Intimacy maximum. Returns the pair's new Intimacy, or -1 when they are not friends or nothing was added.
+/// </summary>
+internal sealed class FriendActivityIntimacyPlan : DbPlan
+{
+    private readonly long _a, _b, _day;
+    private readonly int _amount, _dailyLimit, _max;
+
+    internal FriendActivityIntimacyPlan(long a, long b, int amount, long day, int dailyLimit, int max)
+    {
+        _a = a; _b = b; _amount = amount; _day = day; _dailyLimit = dailyLimit; _max = max;
+    }
+
+    internal override int Bytes => 96;
+    internal override string Label => "friend/activity-intimacy";
+    internal override IReadOnlyList<RoleRevisionKey> RoleWrites =>
+        [RevisionStore.Role(_a, RevisionStore.FriendRelation), RevisionStore.Role(_b, RevisionStore.FriendRelation)];
+
+    internal override object Execute(SqliteConnection db, SqliteTransaction tx)
+    {
+        int intimacy, gained;
+        using (var cmd = DbSql.Command(db, tx, """
+            SELECT f.intimacy, CASE WHEN f.activity_day=$day THEN f.activity_gain ELSE 0 END FROM friend f
+            WHERE f.owner=$a AND f.other=$b AND EXISTS (SELECT 1 FROM friend r WHERE r.owner=$b AND r.other=$a)
+            """))
+        {
+            cmd.Parameters.AddWithValue("$a", _a); cmd.Parameters.AddWithValue("$b", _b); cmd.Parameters.AddWithValue("$day", _day);
+            using var row = cmd.ExecuteReader();
+            if (!row.Read()) return -1;
+            intimacy = row.GetInt32(0); gained = row.GetInt32(1);
+        }
+        int grant = Math.Min(_amount, Math.Min(_dailyLimit - gained, _max - intimacy));
+        if (grant <= 0) return -1;
+        using (var cmd = DbSql.Command(db, tx, """
+            UPDATE friend SET intimacy=MIN($max, intimacy+$grant),
+                activity_gain=(CASE WHEN activity_day=$day THEN activity_gain ELSE 0 END)+$grant, activity_day=$day
+            WHERE (owner=$a AND other=$b) OR (owner=$b AND other=$a)
+            """))
+        {
+            cmd.Parameters.AddWithValue("$a", _a); cmd.Parameters.AddWithValue("$b", _b); cmd.Parameters.AddWithValue("$day", _day);
+            cmd.Parameters.AddWithValue("$grant", grant); cmd.Parameters.AddWithValue("$max", _max);
+            cmd.ExecuteNonQuery();
+        }
+        return Math.Min(_max, intimacy + grant);
+    }
+}

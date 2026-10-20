@@ -11,9 +11,13 @@ public sealed partial class TaskService
         ProgressAsync(session, TGuildHunt, target => target.Length == 2 ? 1 : 0);
 
     /// <summary>One actual PvP match settlement in Kafra Survivor or Dragon Coffin Island.</summary>
-    public Task OnTimedBattleSettlementAsync(GameSession session, int matchEntry) => matchEntry is 2 or 6
-        ? ProgressAsync(session, null, target => TimedBattleTarget(target, matchEntry) ? 1 : 0)
-        : Task.CompletedTask;
+    public Task OnTimedBattleSettlementAsync(GameSession session, int matchEntry)
+    {
+        bool party = matchEntry == 2 && InParty(session); // Connect Quest 106013, the battle royale as a party
+        return matchEntry is 2 or 6
+            ? ProgressAsync(session, null, target => TimedBattleTarget(target, matchEntry) || party && target is [TPartyBattleRoyale, _] ? 1 : 0)
+            : Task.CompletedTask;
+    }
 
     /// <summary>106509 and 210012 count both Kafra Survivor (2) and Dragon Coffin Island (6); 210009 only the latter.</summary>
     private static bool TimedBattleTarget(long[] target, int matchEntry) =>

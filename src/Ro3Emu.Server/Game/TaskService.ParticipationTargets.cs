@@ -46,7 +46,7 @@ public sealed partial class TaskService
     public void OnStateChanged(GameSession s) => QueueRefresh(s);
 
     /// <summary>
-    /// 106602: a committed successful clear of the TenGameplay boss <paramref name="boss"/> by <paramref name="party"/>
+    /// 106602 / 107005: a committed successful clear of the TenGameplay boss <paramref name="boss"/> by <paramref name="party"/>
     /// (DungeonService.MultiBossCleared). Guild and Adventure Party quests also need a fellow member in that party.
     /// </summary>
     public async Task OnTenBossClearedAsync(GameSession s, long boss, IReadOnlyCollection<GameSession> party)
@@ -56,7 +56,14 @@ public sealed partial class TaskService
         long guild = s.Guild?.GuildId ?? 0, group = s.AdventureGroupRole?.AdventureGroupId ?? 0;
         bool guildMate = guild > 0 && party.Any(o => !ReferenceEquals(o, s) && o.Guild?.GuildId == guild);
         bool groupMate = group > 0 && party.Any(o => !ReferenceEquals(o, s) && o.AdventureGroupRole?.AdventureGroupId == group);
-        await ProgressCoreAsync(s, TTenBossWin, t => t is [TTenBossWin, _, _, ..] && t[2..].Contains(boss) ? 1 : 0,
+        // Connect Quest 107005 [107005, n, boss]: the same clear with at least one other player in the run.
+        bool partied = party.Any(o => !ReferenceEquals(o, s));
+        await ProgressCoreAsync(s, null, t => t switch
+            {
+                [TTenBossWin, _, _, ..] when t[2..].Contains(boss) => 1,
+                [TPartyBoss, _, var cleared] when partied && cleared == boss => 1,
+                _ => 0,
+            },
             def => def.Type switch { GuildQuestType => guildMate, AdventureGroupQuestType => groupMate, _ => true });
     }
 

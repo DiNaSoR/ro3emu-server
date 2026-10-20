@@ -398,6 +398,9 @@ public static class ServerHost
         questTasks.LoadFriendCount = async s => s.Role is { } role
             ? (await social.LoadSocialAsync([role.Id])).GetValueOrDefault(role.Id)?.Friends.LongLength : null; // 103019
         app.Services.GetRequiredService<Micro.FriendService>().RelationChanged.Add(questTasks.OnRelationChanged);
+        // Connect Quests (TaskService.ConnectQuests.cs): party rosters and the friend Intimacy of action 116.
+        questTasks.PartyMembers = app.Services.GetRequiredService<TeamService>().MembersOf;
+        questTasks.SocialityScored = app.Services.GetRequiredService<FriendExtraService>().GrantActivityIntimacyAsync;
         app.Services.GetRequiredService<ReconnectService>(); // hooks the handover and registers !netdrop
         app.Services.GetRequiredService<CardEffects>(); // socketed-card passives and procs (sockets, scene loads, hits)
         app.Services.GetRequiredService<SeasonTalentEffects>(); // season talent job node buffs and skill modifiers
