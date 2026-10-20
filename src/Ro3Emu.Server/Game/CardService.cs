@@ -36,7 +36,15 @@ public sealed partial class CardService
     /// </summary>
     private static int[] GridsFor(long part) => part switch
     {
-        1 => [1], 2 => [2], 3 => [3], 4 => [4], 5 => [5], 6 => [6, 7], 7 => [8], 8 => [9], 9 => [10],
+        1 => [1],
+        2 => [2],
+        3 => [3],
+        4 => [4],
+        5 => [5],
+        6 => [6, 7],
+        7 => [8],
+        8 => [9],
+        9 => [10],
         _ => [],
     };
 
@@ -218,8 +226,8 @@ public sealed partial class CardService
             : !GridsFor(Part(src.Entry)).Contains(dstGrid) ? ErrorCodes.EquipSlot // (inferred)
             : SocketError(session, dstGrid, req.DestEquipSlot) is var d and not 0 ? d
             : dst != null && !GridsFor(Part(dst.Entry)).Contains(srcGrid) ? ErrorCodes.EquipSlot // (inferred)
-            // The client sends 31408 without CheckCardInsert: a move or swap keeps the socketed set. (inferred) The
-            // server still holds each moved card to the insert rules against the cards it stays beside.
+                                                                                                 // The client sends 31408 without CheckCardInsert: a move or swap keeps the socketed set. (inferred) The
+                                                                                                 // server still holds each moved card to the insert rules against the cards it stays beside.
             : InsertRuleError(src.Entry, SocketedExcept(session.Items, (srcGrid, req.SrcEquipSlot), (dstGrid, req.DestEquipSlot))
                 .Concat(dst == null ? [] : [dst.Entry])) is var srcRule and not 0 ? srcRule
             : dst != null ? InsertRuleError(dst.Entry, SocketedExcept(session.Items, (srcGrid, req.SrcEquipSlot), (dstGrid, req.DestEquipSlot))
@@ -789,11 +797,14 @@ public sealed partial class CardService
                 builder.RoleBlob(role, "library", next.ToByteArray());
                 builder.RoleBlob(role, "task_followup", JsonSerializer.SerializeToUtf8Bytes(pending));
             },
-            () => { session.Library = next;
+            () =>
+            {
+                session.Library = next;
                 if (attachment?.Cancelled != true && ReferenceEquals(session.Attachment, attachment))
                     loop.TrackLegacyDetached("card library sync", () =>
                         attachment?.Cancelled == true || !ReferenceEquals(session.Attachment, attachment)
-                            ? Task.CompletedTask : CharacterService.SyncAsync(session, LibrarySync, session.Library!.Clone())); });
+                            ? Task.CompletedTask : CharacterService.SyncAsync(session, LibrarySync, session.Library!.Clone()));
+            });
     }
 
     /// <summary>

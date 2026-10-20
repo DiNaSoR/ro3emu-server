@@ -22,7 +22,7 @@ namespace Ro3Emu.Server.Game;
 /// small nodes. Job nodes open while their branch point would open; they cost what their row says (nothing in the
 /// export), need a row for the role's job, and do not count toward the total levels of tree and node thresholds.
 /// </summary>
-public sealed class SeasonTalentService
+public sealed partial class SeasonTalentService
 {
     public const uint TalentSync = 5050, Upgrade = 83550, SetPlan = 83552, RenamePlan = 83553;
     private const long TalentFunction = 1003, ParentFunction = 10, TalentTask = 10103160, ParentTask = 10101170;
@@ -354,8 +354,11 @@ public sealed class SeasonTalentService
                     try
                     {
                         var economy = character.ProgressionEconomy(s, "cd13c/season-talent-upgrade", cost, [],
-                            new { Node = node, Oath = isOath, Level = isOath ? next.BattleOathLevel
-                                : next.Plan[next.CurPlanId].TalentNodes[node].CurrentLevel, Plan = next.CurPlanId });
+                            new
+                            {
+                                Node = node, Oath = isOath, Level = isOath ? next.BattleOathLevel
+                                : next.Plan[next.CurPlanId].TalentNodes[node].CurrentLevel, Plan = next.CurPlanId
+                            });
                         paid = await character.ExchangeLockedAsync(s, cost, [], popup: false, sync: false,
                             persist: tx => { tx.RoleBlob(s.Role!.Id, "season_talent", next.ToByteArray()); tx.WithEconomy(economy); },
                             committed: () => s.SeasonTalent = next, asyncCommit: true);

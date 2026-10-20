@@ -32,20 +32,20 @@ public sealed partial class TimedBattleService
                 switch (req.Type)
                 {
                     case EChickenFollowNotifyType.Invite:
-                    {
-                        if (req.FollowedRoleId != self || (req.RoleId != 0 && (!Mate(req.RoleId) || req.RoleId == self))) return;
-                        long now = time.GetUtcNow().ToUnixTimeSeconds();
-                        var invited = (req.RoleId == 0 ? mates.Keys.Where(id => id != self) : [req.RoleId])
-                            .Where(id => run.InviteCd.GetValueOrDefault((self, id)) <= now).ToArray();
-                        if (invited.Length == 0) { result = ErrorCodes.DungeonBusy; return; }
-                        foreach (long id in invited)
                         {
-                            run.InviteCd[(self, id)] = now + InviteCdSeconds();
-                            if (InRoom(match).Contains(mates[id]))
-                                await mates[id].SendGameAsync(InviteFollowNotify, new ChickenInviteFollowNotify { FollowedRoleId = self });
+                            if (req.FollowedRoleId != self || (req.RoleId != 0 && (!Mate(req.RoleId) || req.RoleId == self))) return;
+                            long now = time.GetUtcNow().ToUnixTimeSeconds();
+                            var invited = (req.RoleId == 0 ? mates.Keys.Where(id => id != self) : [req.RoleId])
+                                .Where(id => run.InviteCd.GetValueOrDefault((self, id)) <= now).ToArray();
+                            if (invited.Length == 0) { result = ErrorCodes.DungeonBusy; return; }
+                            foreach (long id in invited)
+                            {
+                                run.InviteCd[(self, id)] = now + InviteCdSeconds();
+                                if (InRoom(match).Contains(mates[id]))
+                                    await mates[id].SendGameAsync(InviteFollowNotify, new ChickenInviteFollowNotify { FollowedRoleId = self });
+                            }
+                            break;
                         }
-                        break;
-                    }
                     case EChickenFollowNotifyType.Followed:
                         // The follower itself, or (inferred) the one followed calling its teammates (the map's
                         // "everyone follow me", UI_Sys_Chicken_MapPanelModel.lua:86-98).

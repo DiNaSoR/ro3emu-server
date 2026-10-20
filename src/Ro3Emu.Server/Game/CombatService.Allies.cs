@@ -51,7 +51,7 @@ public sealed partial class CombatService
         bool ally = IsAlly(target);
         var defender = ally
             ? new Fighter(0, 0, 0, 0, target.Template.Level, target.Template.Element)
-                { Def = target.Template.Def, Mdef = target.Template.Mdef, Flee = target.Template.Flee }
+            { Def = target.Template.Def, Mdef = target.Template.Mdef, Flee = target.Template.Flee }
             : AsDefender(target);
         var (damage, result) = Damage(attacker, defender, row);
         damage = ScaleMonsterDamage(damage, source.DamageRatio);
@@ -97,8 +97,11 @@ public sealed partial class CombatService
             log.LogInformation("Companion hit on {Uid} not settled: {Reason}", target.Uid, e.Message);
             return 0;
         }
-        hit.Dsts.Add(new DamageInfo { DstID = target.Uid, Damage = damage, HitResult = result,
-            DstElement = target.Template.Element, IsDead = target.Hp == 0 });
+        hit.Dsts.Add(new DamageInfo
+        {
+            DstID = target.Uid, Damage = damage, HitResult = result,
+            DstElement = target.Template.Element, IsDead = target.Hp == 0
+        });
         await world.ToUnitViewersAsync(target, SkillHit, hit);
         await world.ToUnitViewersAsync(target, AoiAttrChange, MonsterService.Hp(target));
         if (!lethal)
@@ -141,8 +144,11 @@ public sealed partial class CombatService
         if (source.Dead) return;
         long amount = Math.Max(0, (long)Math.Floor(source.Template.Matk * Numbers(row, "_kDamageParam1").FirstOrDefault() / 10000
             + Numbers(row, "_kDamageParam2").FirstOrDefault()));
-        var hit = new SkillHitInfo { SrcID = source.Uid, SkillId = (int)GameData.Int(row, "_iID"), SessionId = castId,
-            SrcElement = source.Template.Element, ShowPoint = HitEffect(GameData.Int(row, "_iScriptShow")) };
+        var hit = new SkillHitInfo
+        {
+            SrcID = source.Uid, SkillId = (int)GameData.Int(row, "_iID"), SessionId = castId,
+            SrcElement = source.Template.Element, ShowPoint = HitEffect(GameData.Int(row, "_iScriptShow"))
+        };
         foreach (var unit in units.Where(u => !u.Dead && u.Hp > 0))
         {
             long actual = Math.Min(amount, Math.Max(0, unit.Template.MaxHp - unit.Hp));

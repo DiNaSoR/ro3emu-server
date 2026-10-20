@@ -160,7 +160,7 @@ namespace Ro3Emu.ClientHooks
             _on = true;
             Debug.Log("[Ro3Emu.Hitch] timing on: " + (_dispatch != null ? "events" : "no events (DispatchEvent not found)")
                 + ", " + Wrapped.Count + " LC_TaskHelper function(s), " + _eventNames.Count + " event names"
-            + ", " + _methods + " method(s)" );
+            + ", " + _methods + " method(s)");
         }
 
         private static void Disable()

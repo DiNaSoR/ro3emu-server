@@ -106,14 +106,20 @@ public sealed partial class ShopService
         var orders = Presents.Values.OrderBy(o => o.OrderId).ToList();
         var received = new CommodityPresentListNtf();
         foreach (var o in orders.Where(o => o.ReceiverId == me))
-            received.Orders.Add(new PresentOrderClientInfo { OrderId = o.OrderId, SenderId = o.SenderId, SenderName = NameOf(o.SenderId),
+            received.Orders.Add(new PresentOrderClientInfo
+            {
+                OrderId = o.OrderId, SenderId = o.SenderId, SenderName = NameOf(o.SenderId),
                 AppranceId = o.AppranceId, AppranceAwardId = o.AppranceAwardId, CreateTime = o.CreateTime, State = (int)o.State,
-                GiftContent = o.GiftContent });
+                GiftContent = o.GiftContent
+            });
         var sent = new SentGiftsListNtf();
         foreach (var o in orders.Where(o => o.SenderId == me))
-            sent.SentGifts.Add(new SentGiftInfo { OrderId = o.OrderId, RecipientId = o.ReceiverId, RecipientName = NameOf(o.ReceiverId),
+            sent.SentGifts.Add(new SentGiftInfo
+            {
+                OrderId = o.OrderId, RecipientId = o.ReceiverId, RecipientName = NameOf(o.ReceiverId),
                 AppranceId = o.AppranceId, AppranceAwardId = o.AppranceAwardId, CreateTime = o.CreateTime, State = (int)o.State,
-                GiftContent = o.GiftContent, CurrencyId = (int)o.CurrencyId, CurrencyCount = o.CurrencyCount });
+                GiftContent = o.GiftContent, CurrencyId = (int)o.CurrencyId, CurrencyCount = o.CurrencyCount
+            });
         await session.SendGameAsync(PresentList, received);
         await session.SendGameAsync(SentGiftsList, sent);
     }
