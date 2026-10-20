@@ -9,24 +9,52 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
 jobs:
+  format:
+    name: Formatting
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      # Layout rules are in .editorconfig. Fix locally with: dotnet format whitespace --folder
+      - name: Check C# layout
+        run: dotnet format whitespace --folder --verify-no-changes
+
   build-and-test:
     name: Server and export tools build; patcher tests
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: 10.0.x
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: |
+            Directory.Packages.props
+            **/*.csproj
+      # Warnings are errors (Directory.Build.props), so every build step below also checks for new warnings.
       - name: Build server
-        run: dotnet build src/Ro3Emu.Server/Ro3Emu.Server.csproj -c Release --nologo -clp:ErrorsOnly
-      - name: Build export tools
+        run: dotnet build src/Ro3Emu.Server/Ro3Emu.Server.csproj -c Release
+      - name: Build export tools and launcher
         run: |
-          dotnet build tools/LuaDecode/LuaDecode.csproj -c Release --nologo -clp:ErrorsOnly
+          dotnet build tools/LuaDecode/LuaDecode.csproj -c Release
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          dotnet build tools/ConfigExport/ConfigExport.csproj -c Release --nologo -clp:ErrorsOnly
+          dotnet build tools/ConfigExport/ConfigExport.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet build src/Ro3Emu.Launcher/Ro3Emu.Launcher.csproj -c Release
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         shell: pwsh
       - name: Test patcher
-        run: dotnet test tests/Ro3Emu.Patcher.Tests/Ro3Emu.Patcher.Tests.csproj -c Release --nologo
+        run: dotnet test tests/Ro3Emu.Patcher.Tests/Ro3Emu.Patcher.Tests.csproj -c Release

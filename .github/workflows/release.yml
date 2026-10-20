@@ -16,11 +16,14 @@ permissions:
 jobs:
   pack:
     runs-on: windows-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
+      - name: Server tests
+        run: dotnet test tests/Ro3Emu.Tests -c Release --filter "Category!=Slow"
       - name: Setup tests
         run: dotnet test tests/Ro3Emu.Setup.Tests -c Release --filter "Category!=Slow"
       - name: Pack
