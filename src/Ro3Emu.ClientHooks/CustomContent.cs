@@ -47,7 +47,15 @@ namespace Ro3Emu.ClientHooks
         private static volatile Content _content;
         private static volatile bool _dirty;            // _content changed since it was last applied
         /// <summary>Tables whose Lua_CFG module indexes its rows in OnInitDatas, rerun after rows are added.</summary>
-        private static readonly HashSet<string> Reindexed = new HashSet<string> { "ShopConfig", "ShopCommodityConfig" };
+        private static readonly Dictionary<string, string> Reindexed = new Dictionary<string, string>
+        {
+            ["ShopConfig"] = "OnInitDatas", ["ShopCommodityConfig"] = "OnInitDatas",
+            // Lua_CFG_WardRobeConfig.ctor builds the wardrobe's type lists and suit pieces, leaving out _iDisable looks.
+            ["WardRobeConfig"] = "ctor",
+        };
+        /// <summary>Per table, the first row last set: a row that replaces one of the client's own is never missing,
+        /// so a reload that brings the client's row back shows as a different row there.</summary>
+        private static readonly Dictionary<string, Obf_R.Obf_ff> Applied = new Dictionary<string, Obf_R.Obf_ff>();
         private static volatile byte[] _toCache;        // received, not written to the cache file yet
         private static string _cachePath;
         private static bool _cacheRead;
@@ -140,7 +148,8 @@ namespace Ro3Emu.ClientHooks
                 {
                     var values = Values(global, table.Key, out var instance, out var data);
                     if (values == null) { Once("table " + table.Key + " not found"); continue; }
-                    if (!force && !Missing(rawget, values, First(table.Value.Keys))) continue;
+                    long firstKey = First(table.Value.Keys);
+                    if (!force && !Missing(rawget, values, firstKey) && !Replaced(global, rawget, values, table.Key, firstKey)) continue;
                     int added = 0;
                     var meta = RowMeta(global, rawget, values, table.Value);
                     if (meta == null) Once(table.Key + ": no row metatable found, rows keep no defaults");
@@ -162,7 +171,8 @@ namespace Ro3Emu.ClientHooks
                     // ShopItemsMap (the shop tabs' lists by _iClassID) and AppearanceIdMap there, and Lua_CFG_ShopConfig
                     // ShopTypeMap/SubShopMap/npcShopMap (the shops by type and id, for UI_Sys_ShopNpcPanel), so added rows
                     // stay out of the shop until it runs again; it starts from new tables, so a rerun is safe.
-                    if (Reindexed.Contains(table.Key)) Reindex(global, rawget, table.Key, instance);
+                    if (First(rawget.Obf_HuA(values, firstKey)) is Obf_R.Obf_ff firstRow) Applied[table.Key] = firstRow;
+                    if (Reindexed.TryGetValue(table.Key, out var method)) Reindex(global, rawget, table.Key, method, instance);
                     Note(table.Key + ": " + table.Value.Count + " row(s) set (" + added + " new)");
                 }
                 if (content.Npcs.Count > 0)
@@ -190,20 +200,20 @@ namespace Ro3Emu.ClientHooks
         /// with self = the proxy: the proxy then keeps its own m_kConfigData and index maps (ShopItemsMap), which
         /// shadow the instance's for every proxy:OnGet... call the UI makes. With no instance found, the proxy only.
         /// </summary>
-        private static void Reindex(Obf_R.Obf_ff global, Obf_R.Obf_Ef rawget, string table, Obf_R.Obf_ff instance)
+        private static void Reindex(Obf_R.Obf_ff global, Obf_R.Obf_Ef rawget, string table, string method, Obf_R.Obf_ff instance)
         {
             var proxy = global.Obf_LuA<Obf_R.Obf_ff>("Lua_DBManager.m_kCFG_" + table);
             bool proxyOwnsData = proxy != null && Raw(rawget, proxy, "m_kConfigData") != null;
             var done = new List<string>();
-            if (instance != null) Init(global, rawget, table, instance, "instance", done);
-            if (proxy != null && (proxyOwnsData || instance == null)) Init(global, rawget, table, proxy, "proxy", done);
-            if (done.Count == 0) Once(table + ": OnInitDatas not found, rows not reindexed");
+            if (instance != null) Init(global, rawget, method, instance, "instance", done);
+            if (proxy != null && (proxyOwnsData || instance == null)) Init(global, rawget, method, proxy, "proxy", done);
+            if (done.Count == 0) Once(table + ": " + method + " not found, rows not reindexed");
             else Note(table + ": reindexed on " + string.Join(", ", done));
         }
 
-        private static void Init(Obf_R.Obf_ff global, Obf_R.Obf_Ef rawget, string table, Obf_R.Obf_ff self, string name, List<string> done)
+        private static void Init(Obf_R.Obf_ff global, Obf_R.Obf_Ef rawget, string method, Obf_R.Obf_ff self, string name, List<string> done)
         {
-            var init = self.Obf_RuA<Obf_R.Obf_Ef>("OnInitDatas");
+            var init = self.Obf_RuA<Obf_R.Obf_Ef>(method);
             if (init == null) return;
             init.Obf_HuA(self);
             // The Fashion tab's size (sets, 50201) shows in a Player.log whether the added commodities made it in.
@@ -293,6 +303,19 @@ namespace Ro3Emu.ClientHooks
             }
             else setmetatable.Obf_HuA(table, meta);
         }
+
+        private static bool Replaced(Obf_R.Obf_ff global, Obf_R.Obf_Ef rawget, Obf_R.Obf_ff values, string table, long key)
+        {
+            if (!Applied.TryGetValue(table, out var mine)) return true;
+            try
+            {
+                var rawequal = global.Obf_LuA<Obf_R.Obf_Ef>("rawequal");
+                return rawequal == null || !(First(rawequal.Obf_HuA(First(rawget.Obf_HuA(values, key)), mine)) is bool same && same);
+            }
+            catch (Exception) { return true; } // a row from an earlier LuaEnv
+        }
+
+        private static object First(object[] r) => r != null && r.Length > 0 ? r[0] : null;
 
         private static bool Missing(Obf_R.Obf_Ef rawget, Obf_R.Obf_ff table, long key)
         {

@@ -31,7 +31,7 @@ public sealed class AppearanceShopTests : IAsyncLifetime
     private const int BigPoringLook = 5000038, BigPoring = 60030010;  // class 50202 [3,980]; WardRobeConfig type 6 -> MountsConfig.
     // content/costume-shop.json: Worldscorch Feather [3,2980], award 180001 (headwear, backwear and Ashen Embers vouchers).
     private const int Worldscorch = 5000061, WorldscorchSuit = 40060010, WorldscorchBrilliantGold = 20060010, WorldscorchFeatherstep = 90040001;
-    private const int WorldscorchHeadwearVoucher = 3016101;
+    private const int WorldscorchHeadwearVoucher = 3016101, WorldscorchAshenVoucher = 3016701, WorldscorchAshenEmbers = 70060010;
     private readonly string directory = Path.Combine(RepoRoot(), ".loadtest-temp", "fashion-shop-" + Guid.NewGuid().ToString("N"));
     private WebApplication app = null!;
     private string http = "";
@@ -128,10 +128,17 @@ public sealed class AppearanceShopTests : IAsyncLifetime
         await Next(bot, WardrobeService.WardrobeSync, DBWardRobeInfoIncrement.Parser, i => i.AllLightUpAppearances.ContainsKey(WorldscorchSuit));
         Assert.Equal(crystals - 2980, Crystals);
         Assert.True(SavedWardrobe.AllLightUpAppearances.ContainsKey(WorldscorchSuit));
-        // Brilliant Gold and Featherstep are _iDisable 1: left out instead of refusing the purchase.
-        Assert.False(SavedWardrobe.AllLightUpAppearances.ContainsKey(WorldscorchBrilliantGold));
+        // Featherstep is _iDisable 1: left out instead of refusing the purchase. Brilliant Gold is disabled in the client
+        // data too, but content/wardrobe-unlocks.json enables it, so it comes with the suit.
+        Assert.True(SavedWardrobe.AllLightUpAppearances.ContainsKey(WorldscorchBrilliantGold));
         Assert.False(SavedWardrobe.AllLightUpAppearances.ContainsKey(WorldscorchFeatherstep));
         Assert.Equal(1, Bag(WorldscorchHeadwearVoucher));
+
+        // The gift's Ashen Embers voucher unlocks its look (also enabled by content/wardrobe-unlocks.json).
+        long ashen = Alice.Items.First(i => i.Entry == WorldscorchAshenVoucher && i.Grid == 0).Guid;
+        await bot.SendGameAsync(CharacterService.ItemUse, new ItemUseReq { ItemGuid = ashen, ItemCount = 1 });
+        Assert.Equal(0, (await Next(bot, CharacterService.ItemUse, ItemUseResp.Parser)).Result);
+        Assert.True(SavedWardrobe.AllLightUpAppearances.ContainsKey(WorldscorchAshenEmbers));
     }
 
     [ClientDataFact]
