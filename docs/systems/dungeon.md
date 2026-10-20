@@ -33,6 +33,12 @@ Implemented:
   All participants settle independently before result sends, so one failed connection cannot prevent another payout.
 - Daily/weekly **reward allowances**, not hard entry limits: the client supports joining to help without a reward.
   Normal/Hard raw counters remain separate; the client may count Hard extras toward Normal eligibility.
+- Matchmaking: the MatchConfig type-2 five-person queue (82681, ready panel 82636/82637, `DungeonMatchService`) hands
+  the matched members to `DungeonService.BeginMatchedAsync`, which admits them and starts the run like a 30400 entry
+  without a second 42033 vote.
+- Auction lots: each participant's committed clear joins the run's auction journal (`AuctionService.RecordDungeonClear`,
+  tiers from the boss's `_iGuildAward`); once every participant is settled the configured group is rolled once and its
+  lots published ([auction.md](auction.md#authoritative-reward-publication), `AuctionTests.Dungeon`).
 
 Realm of the Gods extras (`DungeonService.RealmOfGods`, TenGameplayConfig 100101-100103):
 
@@ -49,12 +55,6 @@ Realm of the Gods extras (`DungeonService.RealmOfGods`, TenGameplayConfig 100101
   (the team pool, inferred), 7004 seconds left before enrage (`Ro3Emu:RaidEnrageSeconds`, default 600, inferred),
   7006 another goal done. 82584 lists the goals the run finished, 5062 their states, 82589 pays `_iPersonAward` once per
   goal (event receipt `event/dungeon/honor-award`).
-- Matchmaking: the MatchConfig type-2 five-person queue (82681, ready panel 82636/82637, `DungeonMatchService`) hands
-  the matched members to `DungeonService.BeginMatchedAsync`, which admits them and starts the run like a 30400 entry
-  without a second 42033 vote.
-- Auction lots: each participant's committed clear joins the run's auction journal (`AuctionService.RecordDungeonClear`,
-  tiers from the boss's `_iGuildAward`); once every participant is settled the configured group is rolled once and its
-  lots published ([auction.md](auction.md#authoritative-reward-publication), `AuctionTests.Dungeon`).
 - 30125 Start Battle: the raid scenes 3020101-3020104/3020108 open in a preparation phase with dungeon var 1001 = [1]
   (DungeonLua `FunctionButtons`); the leader's button or `Ro3Emu:RaidPreparationSeconds` (default 120, inferred) starts
   the boss fight.
@@ -279,7 +279,7 @@ Not implemented or unqualified:
   [dungeon-inventory.md](dungeon-inventory.md) for the per-scene inventory.
 - Exported team-boss identity and scene are used, but boss phases, scripted waves/delays, mechanics and task scores
   are not recovered from UI phase descriptions. The team test qualifies a basic boss combat loop, not its encounter.
-- Tactical-team changes: a run keeps its preformed squad (`DungeonService` roster setup); there is no reorganization.
+- Tactical-team changes: a run keeps its preformed squad (`DungeonService.SendRosterAsync`); there is no reorganization.
 - The first-pass award (`_iPartAward`, claimed with 82587) is not mapped: 82587 refuses with RewardMissing. Auction
   lots come only from the boss's configured `_iGuildAward` roll; `_iPartAward` and preview items never become lots.
 - 30123 belongs to Dragon Island and 30132 to Dragon Island/LeisureForty client paths, so ordinary dungeons do not
