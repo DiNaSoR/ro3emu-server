@@ -106,6 +106,10 @@ public sealed class AppearanceShopTests : IAsyncLifetime
         return await Next(bot, ShopService.BuyCommodity, BuyCommodityResp.Parser);
     }
 
+    // A look voucher is _QuickUse [3, 0]: the server uses it as soon as the purchase commits (ItemAutoUseService).
+    private static async Task AutoUsed(BotClient bot, int item) =>
+        Assert.Equal(0, (await Next(bot, CharacterService.ItemUse, ItemUseResp.Parser, m => m.ItemId == item)).Result);
+
     private long Crystals => Service<CharacterService>().CountOf(Alice, Fashion);
     private int Bag(int entry) => Alice.Items.Where(i => i.Entry == entry).Sum(i => i.Stack);
     private DBWardRobeInfo SavedWardrobe => DBWardRobeInfo.Parser.ParseFrom(Service<RoleStore>().LoadWardrobe(Alice.Role!.Id));
@@ -151,19 +155,14 @@ public sealed class AppearanceShopTests : IAsyncLifetime
         // data too, but content/wardrobe-unlocks.json enables it, so it comes with the suit.
         Assert.True(SavedWardrobe.AllLightUpAppearances.ContainsKey(WorldscorchBrilliantGold));
         Assert.False(SavedWardrobe.AllLightUpAppearances.ContainsKey(WorldscorchFeatherstep));
-        Assert.Equal(1, Bag(WorldscorchHeadwearVoucher));
 
-        // The gift's Ashen Embers voucher unlocks its look (also enabled by content/wardrobe-unlocks.json).
-        long ashen = Alice.Items.First(i => i.Entry == WorldscorchAshenVoucher && i.Grid == 0).Guid;
-        await bot.SendGameAsync(CharacterService.ItemUse, new ItemUseReq { ItemGuid = ashen, ItemCount = 1 });
-        Assert.Equal(0, (await Next(bot, CharacterService.ItemUse, ItemUseResp.Parser)).Result);
+        // The gift's vouchers are used on receipt. Ashen Embers is also enabled by content/wardrobe-unlocks.json, and so
+        // is the headwear look, which the 2026-10-17 export disables with the rest of the set.
+        await AutoUsed(bot, WorldscorchAshenVoucher);
+        await AutoUsed(bot, WorldscorchHeadwearVoucher);
         Assert.True(SavedWardrobe.AllLightUpAppearances.ContainsKey(WorldscorchAshenEmbers));
-
-        // So does the headwear voucher's look, which the 2026-10-17 export disables with the rest of the set.
-        long headwear = Alice.Items.First(i => i.Entry == WorldscorchHeadwearVoucher && i.Grid == 0).Guid;
-        await bot.SendGameAsync(CharacterService.ItemUse, new ItemUseReq { ItemGuid = headwear, ItemCount = 1 });
-        Assert.Equal(0, (await Next(bot, CharacterService.ItemUse, ItemUseResp.Parser)).Result);
         Assert.True(SavedWardrobe.AllLightUpAppearances.ContainsKey(WorldscorchHeadwear));
+        Assert.Equal(0, Bag(WorldscorchAshenVoucher) + Bag(WorldscorchHeadwearVoucher));
     }
 
     // The client data disables these looks too; content/wardrobe-unlocks.json enables them, so they sell.
@@ -184,11 +183,10 @@ public sealed class AppearanceShopTests : IAsyncLifetime
         Assert.True(SavedWardrobe.AllLightUpAppearances.ContainsKey(StarMountLook));
         Assert.True(Alice.Mounts!.Mounts.ContainsKey(StarMountLook));
 
-        // The other two pieces come as the gift's vouchers (award 180004); one of them lights its look.
-        long voucher = Alice.Items.First(i => i.Entry == SilverwingPieceVoucher && i.Grid == 0).Guid;
-        await bot.SendGameAsync(CharacterService.ItemUse, new ItemUseReq { ItemGuid = voucher, ItemCount = 1 });
-        Assert.Equal(0, (await Next(bot, CharacterService.ItemUse, ItemUseResp.Parser)).Result);
+        // The other two pieces come as the gift's vouchers (award 180004), used on receipt; one of them lights its look.
+        await AutoUsed(bot, SilverwingPieceVoucher);
         Assert.True(SavedWardrobe.AllLightUpAppearances.ContainsKey(SilverwingVoucherLook));
+        Assert.Equal(0, Bag(SilverwingPieceVoucher));
     }
 
     // Every look a custom costume row sells must be enabled once content/ is applied, or the buy answers 28.
@@ -223,12 +221,14 @@ public sealed class AppearanceShopTests : IAsyncLifetime
         Assert.Equal(TeaPartySuit, (await Next(bot, WardrobeService.UnlockNotice, WardRobeUnLockNtf.Parser)).AppearanceId);
         var counter = await Next(bot, ShopService.ShopSync, DBShopInfoIncrement.Parser, s => s.CommodityBuyTimes.ContainsKey(TeaParty));
         Assert.Equal(1, counter.CommodityBuyTimes[TeaParty].All);
+        // The bonus voucher ("Activate the Sweetheart Tea Party matching Headwear") is used on receipt and lights the hat.
+        await AutoUsed(bot, TeaPartyBonus);
 
         Assert.Equal(crystals - 1880, Crystals);
-        Assert.Equal(bonus + 1, Bag(TeaPartyBonus));
+        Assert.Equal(bonus, Bag(TeaPartyBonus));
         Assert.Equal(crystals - 1880, Service<RoleStore>().LoadProgress(Alice.Role!.Id).Currency[Fashion]);
         Assert.True(SavedWardrobe.AllLightUpAppearances.ContainsKey(TeaPartySuit));
-        Assert.False(SavedWardrobe.AllLightUpAppearances.ContainsKey(TeaPartyHat));
+        Assert.True(SavedWardrobe.AllLightUpAppearances.ContainsKey(TeaPartyHat));
         Assert.Equal(1, SavedShop.Bought[TeaParty].Count);
 
         var closing = Cut();
@@ -241,13 +241,21 @@ public sealed class AppearanceShopTests : IAsyncLifetime
         var source = Assert.Single(ledger.Legs, x => x.Kind == EconomyLegKind.Source && x.OperationId == receipt.OperationId);
         Assert.Equal((EconomyReason.ShopGoods, (long)TeaPartyBonus, 1L), (source.Reason, source.Asset.Id, source.Delta));
         Exact(opening, closing, ledger);
+    }
 
-        // The bonus voucher ("Activate the Sweetheart Tea Party matching Headwear") lights the hat.
-        long voucher = Alice.Items.First(i => i.Entry == TeaPartyBonus && i.Grid == 0).Guid;
-        await bot.SendGameAsync(CharacterService.ItemUse, new ItemUseReq { ItemGuid = voucher, ItemCount = 1 });
-        Assert.Equal(0, (await Next(bot, CharacterService.ItemUse, ItemUseResp.Parser)).Result);
-        Assert.Equal(bonus, Bag(TeaPartyBonus));
-        Assert.True(SavedWardrobe.AllLightUpAppearances.ContainsKey(TeaPartyHat));
+    // A look voucher sold as an item (class 260) is used on receipt too: the look lights, the bag keeps nothing.
+    [ClientDataFact]
+    public async Task VoucherCommodityIsUsedOnPurchase()
+    {
+        const int Voucher = 26101, VoucherItem = 3005117, VoucherLook = 10050427; // [500,400], [[200,0,10050427]].
+        await using var bot = await Enter();
+        await Gm("!lvl 37"); // its shop, ShopConfig 2601, is FunctionConfig 70208 (condition 2000300).
+        await Gm("!item 500 400");
+
+        Assert.Equal(0, (await Buy(bot, Voucher, price: 400)).Result);
+        await AutoUsed(bot, VoucherItem);
+        Assert.Equal(0, Bag(VoucherItem));
+        Assert.True(SavedWardrobe.AllLightUpAppearances.ContainsKey(VoucherLook));
     }
 
     [ClientDataFact]

@@ -18,7 +18,7 @@ namespace Ro3Emu.Tests;
 public sealed class GiftTests : IAsyncLifetime
 {
     private const int Crystal = 3;
-    private const int TeaParty = 5000002, TeaPartySuit = 40050010, TeaPartyBonus = 3025101; // [3,1880], award 180002.
+    private const int TeaParty = 5000002, TeaPartySuit = 40050010, TeaPartyHat = 10050010, TeaPartyBonus = 3025101; // [3,1880], award 180002.
     private const int Macaron = 5000015, MacaronHair = 70050010;                        // [3,480].
     private readonly string directory = Path.Combine(Path.GetTempPath(), "ro3emu-gift-" + Guid.NewGuid().ToString("N"));
     private WebApplication app = null!;
@@ -125,7 +125,10 @@ public sealed class GiftTests : IAsyncLifetime
 
         Assert.Equal(0, await Pick(bob, sent.OrderId));
         Assert.True(Session("GiftBob").Wardrobe!.AllLightUpAppearances.ContainsKey(TeaPartySuit));
-        Assert.Equal(1, Count("GiftBob", TeaPartyBonus));
+        // The bonus voucher is _QuickUse [3, 0]: used on receipt, it lights the matching headwear.
+        Assert.Equal(0, (await Next(bob, CharacterService.ItemUse, ItemUseResp.Parser, m => m.ItemId == TeaPartyBonus)).Result);
+        Assert.Equal(0, Count("GiftBob", TeaPartyBonus));
+        Assert.True(Session("GiftBob").Wardrobe!.AllLightUpAppearances.ContainsKey(TeaPartyHat));
         Assert.False(Session("GiftAlice").Wardrobe!.AllLightUpAppearances.ContainsKey(TeaPartySuit));
         Assert.Single((await Next(bob, ShopService.PresentList, CommodityPresentListNtf.Parser, m => m.Orders.Any(o => o.State == 1))).Orders);
         await Next(alice, ShopService.SentGiftsList, SentGiftsListNtf.Parser, m => m.SentGifts.Any(o => o.State == 1));
