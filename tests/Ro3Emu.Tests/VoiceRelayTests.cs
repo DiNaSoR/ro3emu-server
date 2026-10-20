@@ -80,7 +80,7 @@ public sealed class VoiceRelayTests : IAsyncLifetime
         return created.TeamId;
     }
 
-    private static async Task<(long RoleId, TestVoiceKey Key)> GetTicketAsync(BotClient bot, int expectedPort = 0)
+    internal static async Task<(long RoleId, TestVoiceKey Key)> GetTicketAsync(BotClient bot, int expectedPort = 0)
     {
         var ticket = await GetRawTicketAsync(bot);
         if (expectedPort != 0) Assert.Equal(expectedPort, ticket.Port);
@@ -254,7 +254,8 @@ public sealed class VoiceRelayTests : IAsyncLifetime
         var notSeated = await carolVoice.WaitTypeAsync(VoiceDown.JoinResult, Wait);
         Assert.Equal(VoiceJoinCode.NotMember, notSeated.Payload[0]);
 
-        // Tavern rooms (talk type 3) are not served.
+        // The "3_..." string form of a Tavern room is not served; Tavern rooms join by their numeric room id
+        // (TavernVoiceTests).
         await carolVoice.JoinAsync("3_5_1");
         var unsupported = await carolVoice.WaitTypeAsync(VoiceDown.JoinResult, Wait);
         Assert.Equal(VoiceJoinCode.UnsupportedRoom, unsupported.Payload[0]);
