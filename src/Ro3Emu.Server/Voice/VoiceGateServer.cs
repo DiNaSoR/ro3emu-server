@@ -10,8 +10,8 @@ namespace Ro3Emu.Server.Voice;
 /// <summary>
 /// The voice relay's own TCP listener (VoiceFrame framing, not Phonest/PhonestChannel: the gate carries no
 /// client identity of its own, only the 77015/77016 ticket). Registered when <see cref="VoiceOptions.Port"/> is
-/// set (ServerHost.Create) and serving only when <see cref="ServerOptions.VoiceServed"/>: the stream is plaintext,
-/// so off loopback it needs <see cref="VoiceOptions.AllowPlaintextOffLoopback"/>. Binds in <see cref="StartAsync"/>
+/// set (ServerHost.Create) and serving only when <see cref="ServerOptions.VoiceServed"/>. Every frame after Auth is
+/// sealed with the ticket's secret (<see cref="VoiceConnection.Cipher"/>), so it serves off loopback as well. Binds in <see cref="StartAsync"/>
 /// and drains in <see cref="StopAsync"/>, like <see cref="Net.GateListener"/>.
 /// </summary>
 public sealed class VoiceGateServer(IOptions<ServerOptions> options, VoiceTicketRegistry tickets, VoiceRooms rooms,
@@ -36,12 +36,6 @@ public sealed class VoiceGateServer(IOptions<ServerOptions> options, VoiceTicket
         var opts = options.Value;
         if (opts.Voice.Port <= 0) return base.StartAsync(cancellationToken);
         var address = opts.ListenAddress();
-        if (!opts.VoiceServed())
-        {
-            log.LogWarning("VoiceGate not started: the voice stream is not encrypted and {Address} is not loopback "
-                + "(set Voice:AllowPlaintextOffLoopback to serve it anyway)", address);
-            return base.StartAsync(cancellationToken);
-        }
         var listener = new Socket(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
         try
         {
@@ -61,8 +55,7 @@ public sealed class VoiceGateServer(IOptions<ServerOptions> options, VoiceTicket
             connection?.Close();
             await GmCommands.ReplyAsync(s, connection == null ? "No voice connection." : "Voice connection dropped.");
         });
-        if (IPAddress.IsLoopback(address)) log.LogInformation("VoiceGate listening on {Address}:{Port}", address, opts.Voice.Port);
-        else log.LogWarning("VoiceGate listening on {Address}:{Port} WITHOUT encryption (AllowPlaintextOffLoopback)", address, opts.Voice.Port);
+        log.LogInformation("VoiceGate listening on {Address}:{Port}", address, opts.Voice.Port);
         return base.StartAsync(cancellationToken);
     }
 
@@ -191,11 +184,12 @@ public sealed class VoiceGateServer(IOptions<ServerOptions> options, VoiceTicket
 
     private async Task<bool> HandleAuthAsync(VoiceConnection connection, byte[] payload)
     {
-        if (payload.Length != 25 || payload[0] != 1) return false;
+        if (payload.Length != VoiceUp.AuthSize || payload[0] != VoiceUp.AuthVersion) return false;
         long roleId = BinaryPrimitives.ReadInt64LittleEndian(payload.AsSpan(1, 8));
         byte[] token = payload[9..25];
-        string? account = tickets.Consume(roleId, token);
-        if (account == null) return false;
+        var claim = tickets.Consume(roleId, token, payload[25..]);
+        if (claim == null) return false;
+        string account = claim.Account;
         bool alive = await loop.InvokeAsync(() => Task.FromResult(sessions.All().Any(s =>
             string.Equals(s.Account, account, StringComparison.Ordinal) && s.Role?.Id == roleId)));
         if (!alive) return false;
@@ -206,6 +200,7 @@ public sealed class VoiceGateServer(IOptions<ServerOptions> options, VoiceTicket
             Cleanup(previous);
             previous.Kick(VoiceKickCode.ReplacedByNewAuth);
         }
+        connection.Cipher = Ro3Emu.ClientHooks.VoiceCipher.ForServer(claim.Secret); // AuthOk is the first sealed frame
         connection.SendAuthOk();
         return true;
     }
@@ -288,8 +283,8 @@ public sealed class VoiceGateServer(IOptions<ServerOptions> options, VoiceTicket
             foreach (var member in rooms.MembersOf(connection.RoomId)) member.SendVad(connection.RoleId, true);
         var listeners = rooms.ListenersFor(connection);
         if (listeners.Length == 0) return;
-        byte[] frame = VoiceConnection.BuildAudioFrame(connection.RoleId, seq, opus);
-        foreach (var listener in listeners) listener.SendAudioFrame(frame);
+        byte[] audio = VoiceConnection.BuildAudioPayload(connection.RoleId, seq, opus);
+        foreach (var listener in listeners) listener.SendAudio(audio);
     }
 
     /// <summary>The control budget: false drops the frame; a sustained flood also disconnects and bans, as for Audio.</summary>

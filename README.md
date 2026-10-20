@@ -159,8 +159,8 @@ show is playable from day one, without season or server-day gates ([details](doc
 
 **Voice.** Party voice goes through a relay in the server instead of the publisher's Tencent GME, and the patched
 client records and plays it through Windows' own winmm. It is off by default: `Voice:Port` turns it on. The voice
-stream is not encrypted yet (only its one-time ticket travels through the encrypted game gate), so the relay listens
-on loopback only unless `Voice:AllowPlaintextOffLoopback` is set.
+stream is encrypted (AES-CTR with an HMAC-SHA256 tag per frame) with a fresh key per session that travels inside the
+one-time ticket over the encrypted game gate, so the relay serves off loopback too.
 
 ## For developers
 

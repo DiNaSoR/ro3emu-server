@@ -16,9 +16,8 @@ public sealed class ServerOptions
         : System.Net.IPAddress.TryParse(PublicHost, out var host) && System.Net.IPAddress.IsLoopback(host) ? System.Net.IPAddress.Loopback
         : System.Net.IPAddress.Any;
 
-    /// <summary>The voice relay serves only with a port set, and off loopback only when plaintext was allowed on purpose.</summary>
-    public bool VoiceServed() =>
-        Voice.Port > 0 && (System.Net.IPAddress.IsLoopback(ListenAddress()) || Voice.AllowPlaintextOffLoopback);
+    /// <summary>The voice relay serves whenever a port is set (the stream is sealed, so off loopback too).</summary>
+    public bool VoiceServed() => Voice.Port > 0;
 
     public int HttpPort { get; set; } = 5380;
 
@@ -261,12 +260,6 @@ public sealed class VoiceOptions
 
     /// <summary>Connections from one IP that end without a valid Auth before that IP is refused for a minute.</summary>
     public int MaxFailedAuthPerIp { get; set; } = 10;
-
-    /// <summary>
-    /// The voice stream is not encrypted yet (only the ticket travels inside the encrypted game gate), so the relay
-    /// refuses to listen on anything but loopback unless this is set on purpose.
-    /// </summary>
-    public bool AllowPlaintextOffLoopback { get; set; }
 
     /// <summary>Seconds a fresh connection has to send its Auth frame before it is closed. A test host lowers this.</summary>
     public int FirstFrameTimeoutSeconds { get; set; } = 5;
