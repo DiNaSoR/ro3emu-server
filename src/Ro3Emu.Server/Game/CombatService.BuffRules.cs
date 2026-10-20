@@ -40,6 +40,7 @@ public sealed partial class CombatService
         if (BuffRuleTables.For(data).TagsByBuff.TryGetValue(id, out var tags))
         {
             double lasting = 1;
+            using var reuse = character.ReuseStats(); // each tag reads both sides' sheets; nothing changes in between
             foreach (var tag in tags)
             {
                 double factor = BuffRuleTables.TagFactor(TagAttribute(sourcePlayer, sourceUnit, tag.AttackAttr),

@@ -61,9 +61,21 @@ public sealed partial class CharacterService
     /// Every number of the character window, the client's way (StatCalculator): raw contributions
     /// from AttriBaseLvConfig[career*1000+level], JobConfig._kAttri, worn gear (EquipConfig._kBasicAttribute) and
     /// AttributeConversionConfig per point of STR..LUK (_kAttribute2 for ranged jobs), grouped and rounded up.
-    /// Current HP/SP come from the session (full when unset).
+    /// Current HP/SP come from the session (full when unset). Inside <see cref="ReuseStats"/> a session's sheet is built
+    /// once and shared.
     /// </summary>
     public StatSheet Stats(GameSession session)
+    {
+        if (_statsMemo.Value is not { } memo) return BuildStats(session);
+        if (memo.Sheets.TryGetValue(session, out var cached)) return cached;
+        // A provider may ask for the sheet while it is being built (TotemEffects' HP conditions): that inner
+        // sheet differs from the final one, so it is neither served from nor stored in the memo.
+        if (!memo.Building.Add(session)) return BuildStats(session);
+        try { return memo.Sheets[session] = BuildStats(session); }
+        finally { memo.Building.Remove(session); }
+    }
+
+    private StatSheet BuildStats(GameSession session)
     {
         var p = session.Progress!;
         var raw = new Dictionary<int, double>();
