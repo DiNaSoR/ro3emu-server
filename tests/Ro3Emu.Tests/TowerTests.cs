@@ -137,6 +137,9 @@ public sealed class TowerTests : IAsyncLifetime
             await bot.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1000001, TargetId = (long)uid });
             int result = (await Next(bot, CombatService.UseSkill, CastSkillRsp.Parser)).Result;
             if (result == ErrorCodes.SkillDistance && attempt < 3) continue;
+            // A normal attack right after an earlier one on the same living target is refused until the swing
+            // has played out (NormalAttackTooSoon); wait for it and cast again like the client would.
+            if (result == ErrorCodes.SkillBusy && attempt < 3) { await Task.Delay(1000); continue; }
             Assert.Equal(0, result);
             break;
         }
@@ -504,6 +507,8 @@ public sealed class TowerTests : IAsyncLifetime
         await alice.SendGameAsync(MsgId.Walk, new WalkReq { Pos = position, BStop = true, SpeedRate = 1 });
         await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1000001, TargetId = final.Uid });
         await staged.Task.WaitAsync(Wait);
+        // Take this cast's own answer now, so the retry below reads the answer to its own cast.
+        Assert.Equal(0, (await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
         await Task.Delay(200); // Let the refused write return before stopping automatic repeat casts.
         await OnLoop(() => { Session(alice).Attack = null; return Task.CompletedTask; });
         hooks.Remove(stageNotice);
