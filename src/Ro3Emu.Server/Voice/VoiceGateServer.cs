@@ -160,9 +160,9 @@ public sealed class VoiceGateServer(IOptions<ServerOptions> options, VoiceTicket
         {
             frame = await connection.ReadFrameAsync(maxPayload, live.Token);
             // Kicked (flood, replaced, removed): read on until the client closes after its Kicked frame (at most
-            // VoiceConnection.KickedCloseDelay after the writer flushed it), but act on nothing, so a kicked
-            // connection cannot rejoin a room or flood the logs meanwhile. Not touched either: one whose Kicked
-            // frame never drains still ends at the idle timeout.
+            // VoiceConnection.KickedCloseDelay after that last frame is written), but act on nothing, so a kicked
+            // connection cannot rejoin a room or flood the logs meanwhile. Not touched either: a client that stops
+            // reading, so its Kicked frame never goes out, still ends at the idle timeout.
             if (connection.Kicked) continue;
             connection.Touch();
             // Everything but Audio (its own budget, in HandleAudio) shares one control budget: a Mic reaches the
