@@ -275,12 +275,21 @@ public sealed partial class DungeonTests
         await ActorsIn(alice, 0); // nothing is shown now
         await PlotEnd(alice, 140020);
 
-        await Stage(alice, 4, quest: 2);
-        var instrument = Service<WorldData>().Map(scene)!.Points[37];
-        await WalkTo(alice, instrument.X + 6, instrument.Y, instrument.Z); // not yet within its 4 m
+        var retrieve = await Stage(alice, 4, quest: 2);
+        // The guide line to the instrument: guide point 38, drawn by dungeon var 10021 (also in the snapshot).
+        Assert.Equal([38L], retrieve.Vars.Single(v => v.VarId == DungeonService.GuideWayVar).Vi64);
+        var guide = await Next(alice, DungeonService.Event, DungeonEventNotify.Parser,
+            n => (int)n.EventType == 4 && n.Vars.Any(v => v.VarId == DungeonService.GuideWayVar));
+        Assert.Equal([38L], guide.Vars.Single(v => v.VarId == DungeonService.GuideWayVar).Vi64);
+        var instrument = Assert.Single(await ActorsIn(alice, 1));
+        Assert.Equal((400046, 2, 37L), (instrument.NpcId, instrument.EntityType, instrument.Point)); // Strange Device
+        await WalkTo(alice, instrument.X + 1, instrument.Y, instrument.Z); // walking up is not picking it up
         await Task.Delay(200);
         Assert.False(Session(alice).DungeonAttempt!.Settled);
-        await WalkTo(alice, instrument.X + 1, instrument.Y, instrument.Z);
+        Assert.Equal(0, await Interact(alice, instrument, 40004601)); // its collect button
+        var cleared = await Next(alice, DungeonService.Event, DungeonEventNotify.Parser,
+            n => (int)n.EventType == 4 && n.Vars.Any(v => v.VarId == DungeonService.GuideWayVar && v.Vi64.Count == 0));
+        Assert.NotNull(cleared); // the line goes with the step
         var result = await Next(alice, DungeonService.Result, DungeonResNotify.Parser);
         Assert.Equal((DungeonRes)1, result.Res);
         await StoryMovesOn(alice, 10106270, 10106280);

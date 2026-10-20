@@ -7,7 +7,7 @@ namespace Ro3Emu.Server.Game;
 /// Scripted story scenes (Reconstructed/scripted-scenes.json; its "contract" section cites the client
 /// code for every event used here). The original server's scene script is not in the client: each scene is rebuilt as
 /// steps, each naming the DungeonQuestConfig quest the tracker shows, the scene actors shown during it, an optional
-/// run-time story the client plays, the story lines said during it, and the client events that complete it. Nothing is
+/// run-time story the client plays, the story lines said during it, the guide line drawn during it, and the client events that complete it. Nothing is
 /// keyed by a task id: a step completes on any listed event (interaction, dungeon message, region, point or plot end),
 /// or, when it has spawns (a fight step), once all of them are killed.
 /// </summary>
@@ -57,6 +57,11 @@ public sealed partial class ReconstructedDungeons
         public IReadOnlyList<StepLine> DoneLines { get; init; } = DoneLines ?? [];
         public StepSlide? Slide { get; init; }
         public StepFallback? Fallback { get; init; }
+        /// <summary>
+        /// Scene-editor guide points (m_kGuidePoints) the client draws as a guide arrow line while the step runs
+        /// (dungeon var 10021 PGuideWayList); empty: none.
+        /// </summary>
+        public IReadOnlyList<long> Guide { get; init; } = [];
         public bool Fight => Spawns.Count > 0;
     }
 
@@ -120,6 +125,7 @@ public sealed partial class ReconstructedDungeons
                 ? new StepFallback(f.GetProperty("ms").GetInt32(), f.TryGetProperty("teleport", out var t) ? t.GetInt64() : 0,
                     f.TryGetProperty("from", out var from) && from.GetString() == "mount")
                 : null,
+            Guide = s.TryGetProperty("guide", out var guide) ? guide.EnumerateArray().Select(v => v.GetInt64()).ToArray() : [],
         };
     }
 

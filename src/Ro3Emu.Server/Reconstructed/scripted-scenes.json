@@ -7,7 +7,8 @@
     "gate": "An interaction's _iNPCCondition 1004 CheckHaveBuff (LC_CommonCondition.lua:180-196) asks whether the actor carries a BuffConfig group (_iBuffID). The client shows the button only then, so the step that waits on an interaction gives its actor that buff.",
     "story": "Dungeon var 100020016 (DungeonVariableFunctionConfig: start function PlayCutSceneStory, array) with [plot] makes the client play PlotInterpretation <plot> (LC_DunGeon_Actions.lua:3476-3490, LC_CutSceneManager.PlayStory). At its end (also when skipped) the plot's action 601 VideoPerformEndClient sends 84011 PlotActingEnd {plotId} (LC_GuildServer.PlotActionEnd), its action 150 PlotActingTrigger sends 84012 {plotId} (LC_TaskHelper.PlotActingTriggerReq), and 32709 follows; either one completes the step, neither expects a reply. Sent once in a 30404 DungeonEventDungeonVarChange: LC_DunGeon_Base._pushDungeonVars calls the function on every push, so it is never kept in the 30401 snapshot.",
     "region": "The scene editor's server regions (regionType 2; no client consumer registers them with LC_TriggerAreaManager, so the client never reports them): the server tests the participant's walked position with LC_AreaHelper.CheckInArea's geometry (shapeType 1 circle radius = length, 2 rectangle length x width turned by direction).",
-    "point": "No region exists; the participant's walked position within radius metres of the scene-editor point (inferred)."
+    "point": "No region exists; the participant's walked position within radius metres of the scene-editor point (inferred).",
+    "guide": "Dungeon var 10021 PGuideWayList (LC_DunGeon_VarDefine, kProcessComp GuideGfx) lists scene-editor guide points (m_kGuidePoints); LC_SceneCom_GuideGfx, a default component of every scene (Lua_SceneComponentConfigExt), draws each one's pointList as a guide arrow line and removes the ones a new list leaves out. Sent in a 30404 DungeonEventDungeonVarChange when the step starts and, empty, when it completes; also kept in the 30401 snapshot while the step runs."
   },
   "scenes": {
     "1000201": {
@@ -407,13 +408,15 @@
         "DungeonQuestConfig 5300036 (quest 1 'Complete Louie's game', goal 'Find Kitty-Katie' [5,0,1]) and 5300037 (quest 2 'Retrieve Instrument', goal type 1 without a counter).",
         "PlotInterpretation 140010 and 140020 are run-time stories 1013 and 1014 that no task triggers. Story 1013 (StoryData_1013) shows Louie, Martha, Katie and Fervor in this Culvert, plays dialogues 1010627001-1010627003 ('Let's play a game ... The three of us will hide inside these three Bells, and you'll have to guess where each of us is') and walks Martha, Louie and Katie to x 40, 50 and 60. Story 1014 reveals them at (40, 55), (50, 55), (60, 55), Katie at x 60, and plays 1010627004 (they leave with the bow tie).",
         "NPCs 400134-400136 (bell ring effect 20002): their auto dialogues 20003001-20005001 say 'Here's Katie the kitty!' with 'Choose this one!' running action 211 TriggerNpcInteract on interaction 5300040, 5300041 or 5300042; these send dungeon messages 11 (400134) and 12 (400135, 400136). NPC 400137 is the Bell (bell model 33137).",
-        "Editor sc_pm_pve5sewb_001_dg02: point groups 24 (25-27 at z 65, where story 1013 leaves the gang) and 28 (29-31 at z 55, where story 1014 reveals them); mark point 37 at (32, 42.5) with guide point 38 leading to it from the game area."
+        "Editor sc_pm_pve5sewb_001_dg02: point groups 24 (25-27 at z 65, where story 1013 leaves the gang) and 28 (29-31 at z 55, where story 1014 reveals them); mark point 37 at (32, 42.5) with guide point 38 leading to it from the game area.",
+        "Guide point 38 is drawn by dungeon var 10021 PGuideWayList (LC_DunGeon_VarDefine; LC_SceneCom_GuideGfx draws each listed m_kGuidePoints path as a guide arrow line).",
+        "The Professor's instrument is NPC 400046 'Strange Device' (collection NPC, reach 4 m): task 10107160 'Pick up the Professor's instrument' collects it by interaction 40004601 ('Pick up the Professor's instrument' target, collect button, 2.5 s gathering). Its after-action 46 counts for task 10107160 only, and does nothing while that task is not held (LC_TaskHelper.AddClientInteractionNumByTaskId returns when GetTaskInfo is nil)."
       ],
       "guessed": [
         "The bells stand at group 28 (points 29-31), where story 1014 reveals the gang; the shuffle animation is not reproduced.",
         "Katie's ring (400134, message 11) is under the bell at x 60 (point 31), where Katie stands in both stories; which of 400135/400136 is Louie's or Martha's bell does not matter (both send 12).",
         "A wrong guess (message 12) changes nothing and the player may choose again; the original consequence ('join us as our lowest-ranking lackey') is not recovered.",
-        "Retrieving the instrument completes within 4 m of mark point 37, where guide point 38 leads; no instrument actor or item is named by the client data."
+        "The instrument stands at mark point 37, where guide point 38 leads, and is the Strange Device 400046 that the later task 10107160 picks up again; the scene's own instrument actor (if any) is not named by the client data. Picking it up (interaction 40004601) retrieves it."
       ],
       "steps": [
         {
@@ -454,8 +457,12 @@
         {
           "quest": 2,
           "stage": "Retrieve the Professor's instrument",
+          "guide": [38],
+          "actors": [
+            { "npc": 400046, "point": 37, "why": "the Professor's instrument (Strange Device) at mark point 37, where guide point 38 leads" }
+          ],
           "complete": [
-            { "point": 37, "radius": 4, "why": "mark point 37, where guide point 38 leads from the game area" }
+            { "interaction": 40004601, "why": "picking up the instrument: its collect interaction" }
           ]
         }
       ]

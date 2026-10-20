@@ -18,6 +18,8 @@ public sealed partial class DungeonService
 {
     /// <summary>DungeonVariableFunctionConfig 100020016: start function PlayCutSceneStory, array; [plot] plays it.</summary>
     public const int StoryVar = 100020016;
+    /// <summary>LC_DunGeon_VarDefine 10021 PGuideWayList: guide points drawn as guide arrow lines (GuideWays).</summary>
+    public const int GuideWayVar = 10021;
     /// <summary>
     /// Scene actor UIDs: their own namespace, so 32700 for them never reaches the world NPC lookup. It must stay below
     /// 2^53: LC_InteractManager hands unit ids to UT_SceneObjectManagerHelper through a double array (m_kShareMemory),
@@ -77,6 +79,7 @@ public sealed partial class DungeonService
         // A fight step has no client event to wait for: AdvanceAsync waits for its kills instead.
         a.StepDone = step.Fight;
         await SyncSceneActorsAsync(a, step.Actors);
+        if (step.Guide.Count > 0) await SendGuideAsync(a);
         if (step.Slide is { } slide && !a.Settled && !a.Room.Closed) await StartSlideAsync(a, slide);
         if (step.Fallback is { FromMount: false } fallback) ScheduleFallback(a, fallback);
         int wave = a.Wave;
@@ -95,6 +98,18 @@ public sealed partial class DungeonService
             });
         }
     }
+
+    /// <summary>
+    /// The guide line (GuideWays) in a var-change event, as the story var goes: drawn when a step that has one starts,
+    /// cleared when it completes.
+    /// </summary>
+    private Task SendGuideAsync(Attempt a) => GuideWays(a) is { } guide && !a.Room.Closed
+        ? BroadcastAsync(a, Event, new DungeonEventNotify
+        {
+            DungeonEntry = a.Plan.SceneEntry, EventType = (DungeonEventType)4, // DungeonEventDungeonVarChange
+            StageNum = a.Wave + 1, LevelNum = 1, Vars = { guide },
+        })
+        : Task.CompletedTask;
 
     /// <summary>
     /// A step's story lines, as the story encounters say theirs (30404 DungeonEventInvokeClientFunc): a type-2 bubble
@@ -317,6 +332,7 @@ public sealed partial class DungeonService
         log.LogInformation("Scripted scene {Scene} step {Step} '{Stage}' completed by {Role} ({Events})",
             a.Plan.SceneEntry, a.Wave + 1, step.Stage, s.Role?.Id, string.Join(", ", events));
         await EndStepMovementAsync(a);
+        if (step.Guide.Count > 0) await SendGuideAsync(a);
         if (step.TeleportAfter != 0 && catalog.ScenePoint(a.Plan.SceneEntry, step.TeleportAfter) is { } to)
             foreach (var member in Present(a).Where(m => a.Loaded.Contains(m) && !m.SceneLoading))
                 await scenes.TeleportInMapAsync(member, to);
