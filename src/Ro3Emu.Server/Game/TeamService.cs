@@ -123,6 +123,10 @@ public sealed partial class TeamService : IGameTicker
     public bool IsForbiddenChat(long role) =>
         _byMember.TryGetValue(role, out var team) && team.Muted.Contains(role);
 
+    // Create uses the same limits as change-info (42003) and recruit, so every party listing entry stays small.
+    // The area is a cluster id string (the server falls back to ClusterId); 64 characters is a generous cap (inferred).
+    internal const int MaxName = 128, MaxDescription = 512, MaxArea = 64;
+
     public Task CreateAsync(GameSession s, TeamCreateReq req) =>
         RunTeamAsync(s, "team/create", () => CreateCoreAsync(s, req));
 
@@ -134,7 +138,8 @@ public sealed partial class TeamService : IGameTicker
             await s.SendGameAsync(TeamCreate, new TeamCreateResp { Result = ErrorCodes.AlreadyInParty });
             return;
         }
-        if (req.TeamType is not (TeamType.Five or TeamType.Forty) || !ValidTarget(req.TargetId, req.TeamType))
+        if (req.TeamType is not (TeamType.Five or TeamType.Forty) || !ValidTarget(req.TargetId, req.TeamType)
+            || req.LimitScore < 0 || req.TeamDesc.Length > MaxDescription || req.TeamAreaInfo.Length > MaxArea)
         {
             await s.SendGameAsync(TeamCreate, new TeamCreateResp { Result = ErrorCodes.Parameter });
             return;

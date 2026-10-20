@@ -84,7 +84,9 @@ public static partial class EconomySnapshotReader
     // casual_battle_obligation.payout is CasualBattleService.Payout: a frozen match result (rating delta, record,
     // numbers) and the DropPool ids its payment rolls. No goods: they are granted by the role's event/casual-battle
     // receipt that also writes the timed_battle state and marks the row delivered.
-    public const string ExpectedFormatManifestHash = "274D904BF18C7B225D7D49269C6BBB8F8B332A42A01A738E2C744E819DA80F1B";
+    // Field Bonus Time: role.wild_afk WildAfkService.State.PartyAutoBattleSeconds holds party auto-battle seconds not yet
+    // added to Connect Quest 106014. A counter, no balance and no asset: the quest's only effect is friend Intimacy.
+    public const string ExpectedFormatManifestHash = "7DE402B0501C3D77772009AFB204AD2476C0560CBA1CBDFF942A2F122CCCA352";
     public static string FormatManifestHash => State.FormatManifestHash;
 
     private sealed partial class State

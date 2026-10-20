@@ -161,6 +161,51 @@ public sealed class WildAfkTests : IAsyncLifetime
         return npc;
     }
 
+    /// <summary>Moves the running clock back by <paramref name="seconds"/> with a fresh kill, so the next tick consumes them.</summary>
+    private Task Advance(BotClient bot, int seconds) => OnOwnedLoop(bot, "AFK clock fixture", s =>
+    {
+        s.WildAfk!.LastKillAtMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        s.WildAfk.AccountedAtMs -= seconds * 1000L;
+        return Task.CompletedTask;
+    });
+
+    private async Task Until(BotClient bot, Func<GameSession, bool> done, string what)
+    {
+        var deadline = DateTime.UtcNow + Wait;
+        while (!await State(bot, done))
+        {
+            Assert.True(DateTime.UtcNow < deadline, what);
+            await Task.Delay(25);
+        }
+    }
+
+    /// <summary>
+    /// Issue #146: party auto-battle seconds for Connect Quest 1902000 [106014, 1] are batched in the AFK state instead of
+    /// a quest save and full quest sync every second. They reach the quest once they would complete it.
+    /// </summary>
+    [ClientDataFact]
+    public async Task PartyAutoBattleSecondsAreBatchedUntilTheyCompleteTheConnectQuest()
+    {
+        const long quest = 1902000;
+        Service<TaskService>().PartyMembers = id => [id, id + 1_000_000]; // a party of two without a second bot
+        await using var bot = await InWorld();
+        await Eligible(bot);
+        await Warp(bot, 10111);
+        await Auto(bot, true);
+        await Kill(bot);
+
+        await Advance(bot, 30);
+        await Until(bot, s => s.WildAfk!.PartyAutoBattleSeconds >= 30, "30 party seconds were not batched");
+        Assert.Equal(0, await State(bot, s => s.Tasks!.Infos[quest].CompleteNum[0]));
+        Assert.Equal(0, await State(bot, s => s.Tasks!.CompleteTaskNum.GetValueOrDefault(quest)));
+
+        // 25 already counted + the 30-odd batched seconds reach the quest's 60 before a whole minute is batched.
+        await OnOwnedLoop(bot, "quest fixture", s => { s.Tasks!.Infos[quest].CompleteNum[0] = 25; return Task.CompletedTask; });
+        await Advance(bot, 2);
+        await Until(bot, s => s.Tasks!.CompleteTaskNum.GetValueOrDefault(quest) == 1, "1902000 was not delivered");
+        Assert.InRange(await State(bot, s => s.WildAfk!.PartyAutoBattleSeconds), 0, 5);
+    }
+
     [ClientDataFact]
     public async Task LoginInitializes5035AndLockedOrDungeonRequestsAreRefused()
     {
