@@ -39,10 +39,11 @@ server first; changes to the original rules come after.
 4. Log in with any account name and password: the account is created on first login. Keep the RO3Emu window open
    while you play; press **Q** there (or close it) to stop the server.
 
-**Don't have the game?** RO3Emu.exe downloads it from the Genesis update servers (about 24 GB) and checks every
-file against the publisher's signature: it offers this when it finds no game folder, or run `RO3Emu.exe install`.
-RO3Emu never hosts game files. Tested with the Genesis client releases of 7 and 16 October 2026. Genesis is a private
-server, not the official one: the official Ragnarok Online 3 server has not launched yet.
+**Don't have the game?** RO3Emu.exe downloads it from the Genesis update servers (about 24 GB) and checks every file
+against the publisher's signature: it offers this when it finds no game folder, or run `RO3Emu.exe install`. RO3Emu
+never hosts game files. Tested with the Genesis client releases of 7 and 16 October 2026, and adapted to the 18
+October 2026 release ([reopened content](docs/guide/reopened-content.md)). Genesis is a private server, not the
+official one: the official Ragnarok Online 3 server has not launched yet.
 
 | Command | What it does |
 |---|---|
@@ -181,9 +182,9 @@ show is playable from day one, without season or server-day gates ([details](doc
 - **Leaderboard rewards:** the boards show, but they don't pay out their rewards yet.
 
 **Voice.** Party voice goes through a relay in the server instead of the publisher's Tencent GME, and the patched
-client records and plays it through Windows' own winmm. It is off by default: `Voice:Port` turns it on. The voice
-stream is encrypted (AES-CTR with an HMAC-SHA256 tag per frame) with a fresh key per session that travels inside the
-one-time ticket over the encrypted game gate, so the relay serves off loopback too.
+client records and plays it through Windows' own winmm. It is off by default: `Ro3Emu:Voice:Port` turns it on. The
+voice stream is encrypted (AES-CTR with an HMAC-SHA256 tag per frame) with a fresh key per session that travels inside
+the one-time ticket over the encrypted game gate, so the relay serves off loopback too.
 
 ## For developers
 
