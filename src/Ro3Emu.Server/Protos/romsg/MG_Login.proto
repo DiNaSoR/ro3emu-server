@@ -1,8 +1,6 @@
 syntax = "proto3";
 package romsg;
 import "MG_Common.proto";
-import "MG_DB.proto";
-import "FieldOption.proto";
 
 enum EQueueType {
   EQueueTypeMin = 0;

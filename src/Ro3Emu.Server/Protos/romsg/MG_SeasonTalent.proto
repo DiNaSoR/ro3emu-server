@@ -1,7 +1,5 @@
 syntax = "proto3";
 package romsg;
-import "google/protobuf/descriptor.proto";
-import "FieldOption.proto";
 
 message SeasonTalentUpgradeReq {
   int32 talentId = 1;

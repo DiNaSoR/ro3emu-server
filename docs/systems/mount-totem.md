@@ -40,8 +40,12 @@ separate ownership, selected slot and visible riding. In particular:
   status word's `eObjectStateFly` (43) bit. While the mount is ridden the 5025 wheel's `SkillWheelMount1` holds the
   take-off (landing in the air), which `JoyStickSkillNormalMixin` shows as the mount button; the ground buff is
   `_kBindBuff` (3112101) and the air buff is the row sharing the landing skill's id (3112201, `FlyBuffTag`). An
-  accepted take-off sets the bit and raises the server position by the skill's rise (EffectData 3112121: 20 m); an
-  accepted landing clears it and grounds the position; getting off in the air lands at once *(inferred)*. The skill
+  accepted take-off sets the bit; the skill climbs by itself (EffectData 3112121: 20 m) while the client already sends
+  31084, so 31084 may climb or dive anywhere in the 50 m band, its speed check is horizontal, and a refused move is put
+  back without an error tip (each one showed a "parameter error" and the echo of its own moves fought the client, which
+  froze the rider). The flyer gets no echo of its own 31084. A ridden flying mount counts as able to fly, so the 1 s
+  tick no longer lands a rider in the sends between the take-off and its air buff. An accepted landing clears the bit
+  and grounds the position; getting off in the air lands at once *(inferred)*. The skill
   condition `[2009, 1]` is `CheckSceneFlyable` (`MapConfig._iFly`). The Worldscorch Feather suit's `_iSkillID`
   3112101 only shows this skill's video in the wardrobe; `content/wardrobe-unlocks.json` lists the dragon's
   disabled look so the wardrobe Mount tab lights it.

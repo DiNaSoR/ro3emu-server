@@ -339,7 +339,7 @@ public sealed partial class PetService
 
     /// <summary>
     /// 33311: owned, unique pets; stale source rejected; destination occupant swaps into source, or returns to roster.
-    /// Slot limits enforce both PublicParam levels and PetSetLimitConfig conditions (inferred conservative intersection).
+    /// Slot limits follow PetSetLimitConfig's setup/support conditions, as the lineup UI does (SlotOpen).
     /// </summary>
     public async Task LineupAsync(GameSession s, PetStateUpdateReq req)
     {
@@ -373,14 +373,15 @@ public sealed partial class PetService
 
     private static MapField<int, int> Slots(DBPetSetUpPlan plan, int source) => source == 1 ? plan.SetUpPets : plan.SupportPets;
 
-    private bool SlotOpen(GameSession s, int source, int slot)
-    {
-        int[] levels = source == 1 ? [33, 33, 45, 50] : [40, 55, 60, 65, 70]; // PublicParamConfig Pet*FieldUnlockLv.
-        return slot >= 1 && slot <= levels.Length && s.Progress!.Level >= levels[slot - 1]
-            && data.Row("PetSetLimitConfig", slot) is { } row
+    /// <summary>
+    /// UI_Sys_Pet_LineUpWidgetCtrl and LC_System_Pet lock a lineup slot only by Lua_CFG_PetSetLimitConfig
+    /// GetSetUpCondition (_iCondition1) or GetSupportCondition (_iCondition2). PublicParamConfig.Pet*FieldUnlockLv
+    /// feeds only LC_PetHelper.GetUnlockedSetUpCount, which nothing calls, and _iCondition is the tower's (TowerService).
+    /// </summary>
+    private bool SlotOpen(GameSession s, int source, int slot) =>
+        slot >= 1 && data.Row("PetSetLimitConfig", slot) is { } row
             && GameData.Int(row, source == 1 ? "_iCondition1" : "_iCondition2") is var condition and > 0
             && functions.ConditionMet(s, condition);
-    }
 
     public async Task SwitchAsync(GameSession s, PetSwitchPlanReq req)
     {

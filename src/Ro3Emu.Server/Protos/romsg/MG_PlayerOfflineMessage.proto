@@ -1,7 +1,6 @@
 syntax = "proto3";
 package romsg;
 import "MG_Auction.proto";
-import "MG_Team.proto";
 
 enum PlayerOfflineMsgID {
   OfflinePing = 0;

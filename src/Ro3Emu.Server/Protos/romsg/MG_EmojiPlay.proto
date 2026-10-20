@@ -1,6 +1,5 @@
 syntax = "proto3";
 package romsg;
-import "FieldOption.proto";
 
 message SetIdleEmojiReq {
   int32 emojiId = 1;

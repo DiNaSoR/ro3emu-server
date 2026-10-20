@@ -289,7 +289,8 @@ public sealed class WorldCoreTests : IAsyncLifetime
         Assert.True(float.IsFinite(s.Position.X));
         var far = s.Position.Clone(); far.X += 500;
         await alice.SendGameAsync(WorldCoreService.FlyMove, new FlyMoveReq { Pos = far, Dir = new Vec3 { X = 1 } });
-        await Next(alice, 99999, APIErrorMsg.Parser, p => p.OriginMsgId == WorldCoreService.FlyMove);
+        // Out of bounds: put back without an error tip (31084 comes many times a second).
+        await Next(alice, GameAoiSink.MovementChange, MovementChangeNtf.Parser, p => p.TransType == MovementTransitionType.MoveTransForceTeleport);
         Assert.NotEqual(far.X, s.Position.X);
         await alice.SendGameAsync(WorldCoreService.FlyMove, new FlyMoveReq { Pos = s.Position.Clone(), Dir = new Vec3 { X = 1 }, Face = 90 });
         var moved = await Next(bob, GameAoiSink.MovementChange, MovementChangeNtf.Parser, p => p.Uid == s.Role!.Id && p.MovementInfo.MoveType == MovementType.MoveTypeMove);

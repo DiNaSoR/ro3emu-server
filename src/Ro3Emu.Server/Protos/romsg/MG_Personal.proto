@@ -2,7 +2,6 @@ syntax = "proto3";
 package romsg;
 import "MG_Library.proto";
 import "MG_DB.proto";
-import "FieldOption.proto";
 
 message PersonalLibraryInfo {
   romsg.LibraryInfoNotify notifyInfo = 1;

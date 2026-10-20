@@ -14,11 +14,7 @@ import "MG_Activity.proto";
 import "MG_SeasonPage.proto";
 import "MG_NewActivity.proto";
 import "MG_Match.proto";
-import "MG_Season.proto";
-import "MG_Skill.proto";
-import "FieldOption.proto";
 import "MG_Auction.proto";
-import "MG_Adventure.proto";
 import "MG_AdventureGroup.proto";
 
 enum MultiDungeonFirstPassState {

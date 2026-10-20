@@ -1,7 +1,5 @@
 syntax = "proto3";
 package romsg;
-import "FieldOption.proto";
-import "MG_Auction.proto";
 
 enum TerritoryAuctionPhase {
   TERRITORY_PHASE_UNKNOWN = 0;

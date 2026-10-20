@@ -7,12 +7,13 @@ namespace Ro3Emu.Server.Game;
 
 public sealed partial class WorldCoreService
 {
-    // FlyBuffTag and MapConfig._iFly are consumed by the client's flight availability checks.
+    // FlyBuffTag and MapConfig._iFly are consumed by the client's flight availability checks. A ridden flying mount
+    // counts too: its air buff arrives a few sends after a take-off, and the 1 s tick landed riders in that gap.
     private bool CanFly(GameSession s) => Ready(s) && !s.Dead
         && data.Row("MapConfig", s.SceneEntry) is { } map && GameData.Int(map, "_iFly") == 1
-        && s.Buffs.Any(b => b.ExpireMs > Now && data.Row("BuffConfig", b.ConfigId) is { } row
+        && (MountService.FlySkills(s, data) != null || s.Buffs.Any(b => b.ExpireMs > Now && data.Row("BuffConfig", b.ConfigId) is { } row
             && row.TryGetProperty("_kBuffCategory", out var tags) && tags.ValueKind == JsonValueKind.Array
-            && tags.EnumerateArray().Any(t => GameData.Number(t) == 3100000));
+            && tags.EnumerateArray().Any(t => GameData.Number(t) == 3100000)));
 
     /// <summary>
     /// Wing use effects (ActionConfig 101 JumpSameMap / 102 JumpOtherMap, _iEXECHost 1; ItemConfig 1002001 Fly Wing and
@@ -57,21 +58,27 @@ public sealed partial class WorldCoreService
     private float FlightSpeed(GameSession s) => data.Table("PublicParamConfig").TryGetValue("MountFlyMaxSpeed", out var value)
         ? Math.Max(1, (float)(GameData.Number(value) ?? s.Speed) / 100) : Math.Max(1, s.Speed / 100f);
 
-    /// <summary>31084: AStarAgentNew sends position plus a three-dimensional direction, not a ground yaw.</summary>
+    /// <summary>
+    /// 31084: AStarAgentNew sends position plus a three-dimensional direction, not a ground yaw. Climbing and diving are
+    /// free inside the 50 m band over the ground (a mount's take-off skill climbs on its own, 20 m over 3.5 s for the
+    /// Starshatter Dragon, while the client already sends 31084), so the speed check is horizontal, and the ground under
+    /// a flyer need not be walkable (water, cliffs). A move outside these bounds is put back without an error tip: the
+    /// client sends 31084 many times a second and showed a "parameter error" for each refusal.
+    /// </summary>
     public async Task FlyMoveAsync(GameSession s, FlyMoveReq req)
     {
+        if (!Finite(req.Pos) || !Finite(req.Dir) || !float.IsFinite(req.Face) || Distance(new Vec3(), req.Dir) > 2)
+        { await ErrorAsync(s, FlyMove, ErrorCodes.Parameter); return; }
         double seconds = Math.Clamp((Now - s.WorldState.LastFlyMs) / 1000.0, 0.05, 2);
         float speed = FlightSpeed(s);
         var map = worldData.Map(s.SceneEntry);
-        var grounded = Finite(req.Pos) && map != null ? map.Grounded(new MapPoint(req.Pos.X, req.Pos.Y, req.Pos.Z, req.Face)) : default;
-        if (!s.WorldState.Flying || !CanFly(s) || !Finite(req.Pos) || !Finite(req.Dir) || !float.IsFinite(req.Face)
-            || Distance(new Vec3(), req.Dir) > 2
-            || map == null || !map.IsWalkable(grounded.X, grounded.Y, grounded.Z)
-            || req.Pos.Y < grounded.Y - 1 || req.Pos.Y > grounded.Y + 50
-            || Distance(s.Position, req.Pos) > speed * seconds * 1.5 + 1.5)
-        { await ErrorAsync(s, FlyMove, ErrorCodes.Parameter); await CorrectFlightAsync(s); return; }
+        var grounded = map?.Grounded(new MapPoint(req.Pos.X, req.Pos.Y, req.Pos.Z, req.Face));
+        if (!s.WorldState.Flying || !CanFly(s) || grounded is not { } ground
+            || req.Pos.Y < ground.Y - 1 || req.Pos.Y > ground.Y + 50
+            || MonsterService.Distance(s.Position.X, s.Position.Z, req.Pos.X, req.Pos.Z) > speed * seconds * 1.5 + 1.5)
+        { await CorrectFlightAsync(s); return; }
         s.WorldState.LastFlyMs = Now;
-        await MoveFlightAsync(s, req.Pos, req.Face, req.Dir, req.BStop, MovementTransitionType.MoveTransNormal);
+        await MoveFlightAsync(s, req.Pos, req.Face, req.Dir, req.BStop, MovementTransitionType.MoveTransNormal, self: false);
     }
 
     public async Task FreeFallAsync(GameSession s, FreeFallJumpReq req)
@@ -103,7 +110,9 @@ public sealed partial class WorldCoreService
         { Uid = s.Role.Id, TransType = MovementTransitionType.MoveTransForceTeleport, MovementInfo = new MovementInfo { Pos = s.Position.Clone(), Face = s.Face, ServerTime = Now } });
     }
 
-    private async Task MoveFlightAsync(GameSession s, Vec3 pos, float face, Vec3 direction, bool stop, MovementTransitionType transition)
+    /// <param name="self">Also tell the flyer: a take-off or landing the server makes, not the flyer's own 31084 move,
+    /// which it already shows (an echo of each one fought the client's own movement).</param>
+    private async Task MoveFlightAsync(GameSession s, Vec3 pos, float face, Vec3 direction, bool stop, MovementTransitionType transition, bool self = true)
     {
         var move = new MovementInfo { Pos = pos.Clone(), Face = face, ServerTime = Now, MoveType = MovementType.MoveTypeNone };
         float length = Distance(new Vec3(), direction);
@@ -116,7 +125,7 @@ public sealed partial class WorldCoreService
         s.PreviousPosition = s.Position; s.Position = pos.Clone(); s.Face = face; s.LastWalkUtc = DateTime.UtcNow; s.Walking = false;
         combat.PlayerMoved(s);
         var notify = new MovementChangeNtf { Uid = s.Role!.Id, TransType = transition, MovementInfo = move };
-        await s.SendGameAsync(GameAoiSink.MovementChange, notify);
+        if (self) await s.SendGameAsync(GameAoiSink.MovementChange, notify);
         await world.MoveAsync(s, new WalkReq { Pos = pos.Clone(), Face = face, BStop = true, SpeedRate = 1 }, movement: notify);
     }
 }
