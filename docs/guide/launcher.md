@@ -2,10 +2,12 @@
 
 Players can get one file, `Ro3EmuLauncher.exe` (`src/Ro3Emu.Launcher`, .NET 10 WPF + WebView2, self-contained). It
 installs the RO3 client patched for your server, keeps it updated, updates itself and starts `ro3.exe` with the launch
-proof. The official RO3 launchers cannot be reused for this: they pin the publisher's manifest signing key and update
+proof. The publisher's RO3 launchers cannot be reused for this: they pin the publisher's manifest signing key and update
 hosts in the exe, update themselves, and their Repair restores the original DLLs.
 
-This page explains how to host your own patch repository and publish to it.
+This page explains how to host your own patch repository and publish to it. For players who already have the game,
+the release zip's `RO3EmuDesktop.exe` (`src/Ro3Emu.Desktop`) is simpler: it keeps a server list, patches the game for
+the chosen server, logs in and starts it, with no patch repository (see the [README](../../README.md#play-on-your-own-pc)).
 
 ## How it works
 
@@ -43,7 +45,7 @@ Set `repository` to the public URL of your repository folder and `server` to you
 
 ## Releasing
 
-All commands below use placeholders: `<client dir>` is a clean official RO3 PC install (the folder with `ro3.exe`),
+All commands below use placeholders: `<client dir>` is a clean, unpatched RO3 PC install (the folder with `ro3.exe`),
 `<repo dir>` is your local copy of the repository folder, `<server url>` is your game server (for example
 `http://127.0.0.1:5380` for a local test) and `<channel>` is the channel name.
 

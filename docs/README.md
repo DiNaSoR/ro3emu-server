@@ -11,7 +11,7 @@
 - [Custom content](guide/custom-content.md): your own quests, NPCs, dialogue and text (`content/*.json`)
 - [Reopened content](guide/reopened-content.md): the Season menu and the "Dejected Young Man" side chain, switched off in the client data, opened again
 - [Bug reports](guide/feedback.md): the in-game Feedback button and `/bug`, and how to read the reports
-- [Launcher and patch repository](guide/launcher.md): hosting the client for your players
+- [Launcher and patch repository](guide/launcher.md): hosting the client for your players (`RO3EmuDesktop.exe` in the release zip needs no repository)
 - [Tests](guide/testing.md): content tests on your exported data, rule tests on the invented fixture that CI runs
 
 ## Systems: how each part is implemented
@@ -34,5 +34,5 @@
 - [Activities census](research/activities-evidence.md) · [season page](research/season-page-evidence.md) · [season refine](research/season-refine-evidence.md) · [equipment rating](research/equipment-rating-evidence.md)
 
 Citations such as `re/clientB/lua-src/Logic/...lua:123` point into your own decompiled client (see the main
-[README](../README.md#1-export-the-game-data)); `MG_*.proto` files are in `src/Ro3Emu.Server/Protos/romsg/`.
+[README](../README.md#running-from-source)); `MG_*.proto` files are in `src/Ro3Emu.Server/Protos/romsg/`.
 Behaviour the client cannot prove is marked *(inferred)*.
