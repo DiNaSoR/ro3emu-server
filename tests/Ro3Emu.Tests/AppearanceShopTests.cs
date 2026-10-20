@@ -31,7 +31,8 @@ public sealed class AppearanceShopTests : IAsyncLifetime
     private const int BigPoringLook = 5000038, BigPoring = 60030010;  // class 50202 [3,980]; WardRobeConfig type 6 -> MountsConfig.
     // content/costume-shop.json: Worldscorch Feather [3,2980], award 180001 (headwear, backwear and Ashen Embers vouchers).
     private const int Worldscorch = 5000061, WorldscorchSuit = 40060010, WorldscorchBrilliantGold = 20060010, WorldscorchFeatherstep = 90040001;
-    private const int WorldscorchHeadwearVoucher = 3016101, WorldscorchAshenVoucher = 3016701, WorldscorchAshenEmbers = 70060010;
+    private const int WorldscorchHeadwearVoucher = 3016101, WorldscorchAshenVoucher = 3016701, WorldscorchAshenEmbers = 70060010,
+        WorldscorchHeadwear = 10060010;
     private readonly string directory = Path.Combine(RepoRoot(), ".loadtest-temp", "fashion-shop-" + Guid.NewGuid().ToString("N"));
     private WebApplication app = null!;
     private string http = "";
@@ -154,6 +155,12 @@ public sealed class AppearanceShopTests : IAsyncLifetime
         await bot.SendGameAsync(CharacterService.ItemUse, new ItemUseReq { ItemGuid = ashen, ItemCount = 1 });
         Assert.Equal(0, (await Next(bot, CharacterService.ItemUse, ItemUseResp.Parser)).Result);
         Assert.True(SavedWardrobe.AllLightUpAppearances.ContainsKey(WorldscorchAshenEmbers));
+
+        // So does the headwear voucher's look, which the 2026-10-17 export disables with the rest of the set.
+        long headwear = Alice.Items.First(i => i.Entry == WorldscorchHeadwearVoucher && i.Grid == 0).Guid;
+        await bot.SendGameAsync(CharacterService.ItemUse, new ItemUseReq { ItemGuid = headwear, ItemCount = 1 });
+        Assert.Equal(0, (await Next(bot, CharacterService.ItemUse, ItemUseResp.Parser)).Result);
+        Assert.True(SavedWardrobe.AllLightUpAppearances.ContainsKey(WorldscorchHeadwear));
     }
 
     [ClientDataFact]

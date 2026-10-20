@@ -299,7 +299,7 @@ public sealed partial class WardrobeService
         var current = session.Wardrobe!;
         var looks = new List<int> { appearanceId };
         var vouchered = bonus.Grants.Select(g => VoucherLook(g.Entry)).Where(id => id > 0).ToHashSet();
-        // A piece the client disables (WardRobeConfig._iDisable, e.g. Worldscorch Feather's Brilliant Gold) is left out,
+        // A piece the client disables (WardRobeConfig._iDisable, e.g. Worldscorch Feather's Featherstep) is left out,
         // so a suit with an unreleased piece still sells; the suit look itself must be enabled (Validate below).
         looks.AddRange(parts.Concat(SuitPieces(appearanceId))
             .Where(id => id != appearanceId && !vouchered.Contains(id) && !(Row(id) is { } piece && GameData.Int(piece, "_iDisable") > 0))
