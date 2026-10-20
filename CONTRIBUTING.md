@@ -32,7 +32,7 @@ Compiler and analyzer warnings fail the build (`Directory.Build.props`), except 
 dotnet format whitespace --folder
 ```
 
-Use the SDK feature band that `global.json` pins (10.0.3xx): other bands lay out some statements differently and
+Use the SDK feature band that `global.json` pins (10.0.4xx): other bands lay out some statements differently and
 would reformat unrelated files.
 
 Package versions live in `Directory.Packages.props`: a `PackageReference` names the package without a version.
