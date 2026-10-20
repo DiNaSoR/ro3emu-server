@@ -465,7 +465,12 @@ public sealed partial class CombatService
     /// </summary>
     private async Task GrantSkillBuffAsync(GameSession caster, GameSession recipient, int id, int durationMs)
     {
-        long shield = data.Row("BuffConfig", id) is { } row ? ShieldAmount(row, character.Stats(caster), character.Stats(recipient)) : 0;
+        long shield = 0;
+        if (data.Row("BuffConfig", id) is { } row)
+        {
+            var casterStats = character.Stats(caster);
+            shield = ShieldAmount(row, casterStats, ReferenceEquals(caster, recipient) ? casterStats : character.Stats(recipient));
+        }
         if (durationMs < 0 && LastingSkillBuffs.Contains(id))
         {
             await buffs.AddLastingAsync(recipient, id, caster.Role!.Id);

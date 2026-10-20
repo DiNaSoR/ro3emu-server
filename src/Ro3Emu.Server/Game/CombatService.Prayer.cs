@@ -15,12 +15,19 @@ public sealed partial class CombatService
 {
     private const int PrayerOfGratitudeGroup = 14306;
 
+    private HashSet<int>? _prayerBuffIds;
+
+    /// <summary>BuffConfig rows of the Prayer of Gratitude group, so the 500 ms check runs no row lookups per buff.</summary>
+    private HashSet<int> PrayerBuffIds => _prayerBuffIds ??= data.Table("BuffConfig")
+        .Where(e => GameData.Int(e.Value, "_iBuffID") == PrayerOfGratitudeGroup && int.TryParse(e.Key, out _))
+        .Select(e => int.Parse(e.Key)).ToHashSet();
+
     private async Task PrayerShieldAsync(GameSession s)
     {
         if (s.Role == null || s.Progress == null) return;
-        var held = s.Buffs.FirstOrDefault(b => !b.IsPassive && data.Row("BuffConfig", b.ConfigId) is { } r
-            && GameData.Int(r, "_iBuffID") == PrayerOfGratitudeGroup);
         int level = skills.Level(s.Progress, PrayerOfGratitudeGroup);
+        var ids = PrayerBuffIds;
+        var held = s.Buffs.FirstOrDefault(b => !b.IsPassive && ids.Contains(b.ConfigId));
         if (level <= 0)
         {
             if (held != null) await buffs.RemoveAsync(s, held);

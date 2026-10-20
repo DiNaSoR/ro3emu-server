@@ -213,6 +213,34 @@ public sealed class CardRulesTests : IAsyncLifetime
     }
 
     [ClientDataFact]
+    public async Task ReuseStatsSharesOneSheetOnlyInsideItsScope()
+    {
+        await using var alice = await InWorld("Alice");
+        var session = Session("Alice");
+        var character = Service<CharacterService>();
+        var (outsideA, outsideB, insideA, insideB, nestedOk, after) = await OnLoop(() =>
+        {
+            var a = character.Stats(session);
+            var b = character.Stats(session);
+            StatSheet inA, inB;
+            bool nested;
+            using (character.ReuseStats())
+            {
+                inA = character.Stats(session);
+                inB = character.Stats(session);
+                using (character.ReuseStats()) nested = ReferenceEquals(inA, character.Stats(session));
+                nested &= ReferenceEquals(inA, character.Stats(session)); // the inner scope does not end the outer one
+            }
+            return (a, b, inA, inB, nested, character.Stats(session));
+        });
+        Assert.NotSame(outsideA, outsideB);
+        Assert.Same(insideA, insideB);
+        Assert.True(nestedOk);
+        Assert.NotSame(insideA, after);
+        Assert.Equal(outsideA.Data, insideA.Data);
+    }
+
+    [ClientDataFact]
     public async Task SocketedCardAppliesFlashAttributesAndItsAttributeConversion()
     {
         const int card = 1450101; // _kSkillAttribute 11000062 [8, 109, 1, 1304, 1, 650]; Flash 11001201

@@ -377,7 +377,8 @@ public sealed class TotemEffects : IGameTicker
         {
             var logic = passive.Row.GetProperty("_kLogicData");
             int threshold = (int)(GameData.Number(logic[0]) ?? 0);
-            if (character.Stats(s)[2000] * 100 <= character.Stats(s)[101] * threshold)
+            var stats = character.Stats(s);
+            if (stats[2000] * 100 <= stats[101] * threshold)
                 extra += (long)Math.Floor(heal * (GameData.Number(logic[2]) ?? 0) / 10000d);
         }
         return (long)Math.Floor((heal + extra) * HealingMultiplier(s));
@@ -433,7 +434,8 @@ public sealed class TotemEffects : IGameTicker
         foreach (var passive in Passives(s).Where(p => p.Id == 2502301).DistinctBy(p => (p.Item.Guid, p.Id)))
         {
             var desc = passive.Row.GetProperty("_kDescData");
-            long max = character.Stats(s)[101], hp = character.Stats(s)[2000];
+            var stats = character.Stats(s);
+            long max = stats[101], hp = stats[2000];
             if (max > 0 && hp * 100 < max * (GameData.Number(desc[0]) ?? 0)
                 && Proc(s, passive.Item.Guid, passive.Id, 10000, (int)((GameData.Number(desc[3]) ?? 0) * 1000)))
                 await buffs.AddSourcedAsync(s, 2502501, (int)((GameData.Number(desc[2]) ?? 0) * 1000), passive.Item.Guid);
