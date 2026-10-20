@@ -249,7 +249,13 @@ public sealed class VoiceRelayTests : IAsyncLifetime
         var notMember = await carolVoice.WaitTypeAsync(VoiceDown.JoinResult, Wait);
         Assert.Equal(VoiceJoinCode.NotMember, notMember.Payload[0]);
 
+        // A guild voice channel she does not sit in (GuildVoiceAudioTests covers the guild rooms).
         await carolVoice.JoinAsync("2_5_1");
+        var notSeated = await carolVoice.WaitTypeAsync(VoiceDown.JoinResult, Wait);
+        Assert.Equal(VoiceJoinCode.NotMember, notSeated.Payload[0]);
+
+        // Tavern rooms (talk type 3) are not served.
+        await carolVoice.JoinAsync("3_5_1");
         var unsupported = await carolVoice.WaitTypeAsync(VoiceDown.JoinResult, Wait);
         Assert.Equal(VoiceJoinCode.UnsupportedRoom, unsupported.Payload[0]);
     }
