@@ -375,9 +375,13 @@ public sealed class PersonalService
         return (Total(EffectIntimacy), Total(EffectPopularity), Total(EffectCharity));
     }
 
-    /// <summary>A friend gift: an item FriendlyItemConfig lists (1004000-1004005 and 1004100 in the client's data).</summary>
-    public bool IsFriendGift(long item) =>
-        data.Table("FriendlyItemConfig").Values.Any(row => GameData.Int(row, "_iItemId") == item);
+    /// <summary>A friend gift: an item FriendlyItemConfig lists (1004000-1004005 and 1004100 in the client's data). Without
+    /// that table (no client data) the earlier fixed range 1004000-1004006 still applies.</summary>
+    public bool IsFriendGift(long item)
+    {
+        var rows = data.Table("FriendlyItemConfig");
+        return rows.Count == 0 ? item is >= 1004000 and <= 1004006 : rows.Values.Any(row => GameData.Int(row, "_iItemId") == item);
+    }
 
     /// <summary>Credits a committed gift: the receiver's popularity, the sender's affection.</summary>
     public async Task CreditGiftAsync(long sender, long receiver, int popularity, int affection)
