@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const site = resolve(root, 'docs/site');
 const html = readFileSync(resolve(site, 'index.html'), 'utf8');
-const canonical = 'https://aethai.github.io/ro3emu-server/';
+const canonical = 'https://akreao.github.io/ro3emu-server/';
 assert.match(html, /<html lang="en">/);
 assert.equal([...html.matchAll(/<h1\b/g)].length, 1, 'Use one descriptive H1');
 assert.ok(html.includes(`<link rel="canonical" href="${canonical}">`));
@@ -26,7 +26,7 @@ for (const [, url] of html.matchAll(/\b(?:href|src)="([^"]+)"/g)) {
   checked++;
 }
 const structured = JSON.parse(html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)?.[1] ?? 'null');
-assert.equal(structured?.codeRepository, 'https://github.com/aethai/ro3emu-server');
+assert.equal(structured?.codeRepository, 'https://github.com/akreao/ro3emu-server');
 assert.equal(structured?.url, canonical);
 assert.ok(!('aggregateRating' in structured), 'Do not invent a rating');
 const png = readFileSync(resolve(site, 'social-preview.png'));
