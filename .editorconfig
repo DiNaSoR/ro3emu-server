@@ -57,9 +57,10 @@ dotnet_naming_rule.private_fields_are_underscore_camel_case.severity = warning
 # Analyzer baseline: rules of AnalysisLevel 10.0-recommended and of the style above that older code still breaks, each
 # with its number of violations. They show as suggestions; every other rule fails the build. CI checks the numbers
 # (dotnet run --project tools/AnalyzerBaseline -c Release): more violations fail, and fewer fail until the number is
-# lowered, so new code cannot add any. Delete a rule's two lines once it reaches zero. IDE1006 stays: the fields of
-# DbPlan types and of the values they hold keep their names, because EconomyChildIntent and EventPlanFingerprint write
-# those names into stored receipts (ReceiptFieldNamesTests pins them).
+# lowered, so new code cannot add any. Delete a rule's two lines once it reaches zero. The counts are the ones of the
+# SDK band global.json pins: after an SDK update, run the tool and write the numbers it prints. IDE1006 stays: the
+# fields of DbPlan types and of the values they hold keep their names, because EconomyChildIntent and
+# EventPlanFingerprint write those names into stored receipts (ReceiptFieldNamesTests pins them).
 # 23: types that own disposable fields should be disposable
 dotnet_diagnostic.CA1001.severity = suggestion
 # 1: declare types in namespaces
