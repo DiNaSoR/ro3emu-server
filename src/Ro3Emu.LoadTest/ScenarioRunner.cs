@@ -200,19 +200,20 @@ public sealed partial class ScenarioRunner(RunnerOptions options)
                 report.AbortReason = $"Scheduling lag p99 {report.SchedulingLagP99Ms:F1} ms > 100 ms";
             report.Targets = TargetEvaluation.Evaluate(report);
             report.Verdict = report.AbortReason == null && report.Targets.All(x => x.Status == "PASS") ? "PASS" : "NOT QUALIFIED";
-            await File.WriteAllTextAsync(options.OutputPrefix + ".json", report.ToJson());
-            await File.WriteAllTextAsync(options.OutputPrefix + ".md", report.ToMarkdown());
+            // The report is written even when the run was cancelled: that is when its abort reason matters most.
+            await File.WriteAllTextAsync(options.OutputPrefix + ".json", report.ToJson(), CancellationToken.None);
+            await File.WriteAllTextAsync(options.OutputPrefix + ".md", report.ToMarkdown(), CancellationToken.None);
             // Persistence evidence beside the report: the loop's synchronous DB waits by label (C/D 16 work list),
             // lazy parts, snapshots and backups. Cumulative since server start (not reset with the epoch).
             if (options.ServerLocal)
             {
                 if (persistenceEvidence != null)
-                    await File.WriteAllTextAsync(options.OutputPrefix + ".persistence.json", persistenceEvidence);
+                    await File.WriteAllTextAsync(options.OutputPrefix + ".persistence.json", persistenceEvidence, CancellationToken.None);
                 // Ownership evidence (C/D 15): Realm admissions by origin with queued and held time - every other
                 // reservation waits while one is held. Cumulative since server start.
                 if (report.ServerAfter?["ownership"] is { } ownership)
                     await File.WriteAllTextAsync(options.OutputPrefix + ".ownership.json",
-                        ownership.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+                        ownership.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }), CancellationToken.None);
             }
         }
         return report;

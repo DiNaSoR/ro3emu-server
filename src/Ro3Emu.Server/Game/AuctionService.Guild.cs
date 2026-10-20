@@ -200,8 +200,7 @@ public sealed partial class AuctionService
         }
         catch (Exception e)
         {
-            log.LogError(e, committed ? "Guild auction source {Source} committed; notification failed"
-                : "Guild auction source {Source} failed", source);
+            log.LogError(e, "Guild auction source {Source} failed (committed before the failure: {Committed})", source, committed);
             return committed ? 0 : ErrorCodes.Unknown;
         }
     }

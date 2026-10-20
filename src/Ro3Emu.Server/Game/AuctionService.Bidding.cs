@@ -200,8 +200,7 @@ public sealed partial class AuctionService
         }
         catch (Exception e)
         {
-            log.LogError(e, committed ? "Auction bid committed but notification failed for {Auction}"
-                : "Auction bid failed for {Auction}", id);
+            log.LogError(e, "Auction bid for {Auction} failed (committed before the failure: {Committed})", id, committed);
             return BidResponse(s, store.Get(id), op, extra, committed ? 0 : ErrorCodes.Unknown);
         }
     }

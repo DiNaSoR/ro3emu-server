@@ -88,7 +88,8 @@ public sealed class RankService(GameData data, AccountStore accounts, GuildServi
             case "getUserRankSurrounding":
                 {
                     if (!TryParseRankId(Arg(args, -1, "RankId"), out int boardId, out bool sub)) return MicroServiceRouter.Fail("bad rank id");
-                    long.TryParse(Convert.ToString(Arg(args, -1, "UserId"), System.Globalization.CultureInfo.InvariantCulture), out long id);
+                    if (!long.TryParse(Convert.ToString(Arg(args, -1, "UserId"), System.Globalization.CultureInfo.InvariantCulture), out long id))
+                        return MicroServiceRouter.Fail("bad user id");
                     // (inferred) a bounded window; the client asks a few rows each side.
                     int before = (int)Math.Clamp(Number(Arg(args, -1, "Before")), 0, 100);
                     int after = (int)Math.Clamp(Number(Arg(args, -1, "After")), 0, 100);

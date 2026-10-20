@@ -99,7 +99,7 @@ public sealed class GuildVoiceAudioTests : IAsyncLifetime
     {
         var ticket = await BotVoiceTicket.RequestAsync(bot, Wait);
         Assert.Equal(voicePort, ticket.Port);
-        var client = new VoiceTestClient(voicePort) { Tag = ticket.RoleId.ToString() };
+        var client = new VoiceTestClient(voicePort) { Tag = ticket.RoleId.ToString(System.Globalization.CultureInfo.InvariantCulture) };
         await client.ConnectAsync();
         await client.AuthAsync(ticket.RoleId, ticket.Token, ticket.Secret);
         await client.WaitTypeAsync(VoiceDown.AuthOk, Wait);
