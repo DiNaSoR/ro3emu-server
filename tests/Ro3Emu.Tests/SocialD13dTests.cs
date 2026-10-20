@@ -244,6 +244,27 @@ public sealed class SocialD13dTests : IAsyncLifetime
         Assert.Equal(1, Scalar($"SELECT COUNT(*) FROM economy_entry WHERE asset_id=1004000 AND delta=-1 AND reason_code={(int)EconomyReason.FriendGiftCost}"));
     }
 
+    [ClientDataFact]
+    public async Task OnlyFriendlyItemConfigItemsCanBeGiftedAndEachAddsItsOwnIntimacy()
+    {
+        var (alice, a) = await InWorld("ListAlice");
+        var (bob, b) = await InWorld("ListBob");
+        await using var aliceLease = alice;
+        await using var bobLease = bob;
+        await alice.MicroAsync("FriendService", "apply", new() { ["Uid"] = a.ToString(), ["Target"] = b.ToString() });
+        await bob.MicroAsync("FriendService", "accept", new() { ["Uid"] = b.ToString(), ["Applicant"] = a.ToString() });
+
+        // 1004006 sits in the old fixed range but isn't in FriendlyItemConfig.
+        await alice.SendGameAsync(FriendExtraService.GiveGift, new GiveFriendGiftReq { RoleId = b, ItemId = 1004006, Count = 1 });
+        Assert.Equal(ErrorCodes.Parameter, (await Next(alice, FriendExtraService.GiveGift, GiveFriendGiftResp.Parser)).Result);
+
+        // 1004100 is listed and carries _iUseEffect [107, 5].
+        await GmItemAsync("listalice", 1004100, 2);
+        await alice.SendGameAsync(FriendExtraService.GiveGift, new GiveFriendGiftReq { RoleId = b, ItemId = 1004100, Count = 2 });
+        Assert.Equal(0, (await Next(alice, FriendExtraService.GiveGift, GiveFriendGiftResp.Parser)).Result);
+        Assert.Equal(10, Service<FriendStore>().Intimacy(a, b));
+    }
+
     [Fact]
     public async Task ShortGiftLeavesNoRelationRecordOrEconomicReceipt()
     {
