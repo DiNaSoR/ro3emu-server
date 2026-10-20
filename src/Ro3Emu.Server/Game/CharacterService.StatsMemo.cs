@@ -12,7 +12,7 @@ public sealed partial class CharacterService
 
     /// <summary>
     /// Shares each session's stat sheet across the <see cref="Stats"/> calls of one step that does not change stats
-    /// (for example rolling a debuff's tags, or one pass of a periodic refresh). The memo flows only into code called
+    /// (for example rolling a debuff's tags, which reads both fighters' sheets once per tag). The memo flows only into code called
     /// from that step, so other work running at the same time still builds fresh sheets. Callers must not change a
     /// shared sheet. Dispose to end it; a nested call reuses the outer memo.
     /// </summary>
