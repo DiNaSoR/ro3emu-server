@@ -33,7 +33,8 @@ public sealed class FeedbackService
     private readonly RecentLogBuffer logs;
     private readonly TimeProvider clock;
     private readonly ILogger<FeedbackService> log;
-    private readonly Dictionary<string, DateTimeOffset> _last = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>Per account: times of its stored reports within the last hour, oldest first.</summary>
+    private readonly Dictionary<string, Queue<DateTimeOffset>> _recent = new(StringComparer.OrdinalIgnoreCase);
 
     public FeedbackService(IOptions<ServerOptions> options, GameData data, RecentLogBuffer logs, TimeProvider clock,
         ILogger<FeedbackService> log)
@@ -75,15 +76,22 @@ public sealed class FeedbackService
         }
         var now = clock.GetUtcNow();
         string key = session.Account ?? "";
-        bool tooSoon;
-        lock (_last)
+        string? refused = null;
+        lock (_recent)
         {
-            tooSoon = _last.TryGetValue(key, out var last) && now - last < TimeSpan.FromSeconds(settings.CooldownSeconds);
-            if (!tooSoon) _last[key] = now;
+            if (!_recent.TryGetValue(key, out var times)) _recent[key] = times = new();
+            while (times.Count > 0 && now - times.Peek() >= TimeSpan.FromHours(1)) times.Dequeue();
+            if (times.Count > 0 && now - times.Last() < TimeSpan.FromSeconds(settings.CooldownSeconds))
+                refused = "Please wait a few seconds before sending another report.";
+            else if (settings.MaxPerHour > 0 && times.Count >= settings.MaxPerHour)
+                refused = "You have sent a lot of reports this hour. Please try again later.";
+            else
+                times.Enqueue(now);
+            if (times.Count == 0) _recent.Remove(key);
         }
-        if (tooSoon)
+        if (refused != null)
         {
-            await GmCommands.ReplyAsync(session, "Please wait a few seconds before sending another report.");
+            await GmCommands.ReplyAsync(session, refused);
             return null;
         }
         bool truncated = text.Length > settings.MaxLength;

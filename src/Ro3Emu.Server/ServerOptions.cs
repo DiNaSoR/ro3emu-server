@@ -319,6 +319,10 @@ public sealed class FeedbackOptions
 
     /// <summary>Minimum seconds between two reports of one account.</summary>
     public int CooldownSeconds { get; set; } = 5;
+
+    /// <summary>Most reports one account may store in any hour; 0 means no cap. Keeps a flooding client from filling
+    /// reports/feedback.jsonl (each report carries up to <see cref="ContextLines"/> log lines).</summary>
+    public int MaxPerHour { get; set; } = 30;
 }
 
 /// <summary>

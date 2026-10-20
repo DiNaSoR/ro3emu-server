@@ -152,6 +152,21 @@ public sealed class FeedbackTests : IAsyncLifetime
         Assert.Equal(new[] { "the shop is empty" }, (await Reports()).Select(r => r.Text));
     }
 
+    [Fact]
+    public async Task ReportsPastTheHourlyCapAreRefused()
+    {
+        _app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<ServerOptions>>().Value.Feedback.MaxPerHour = 2;
+        await using var alice = await InWorld("Alice");
+        await alice.JoinChatAsync("4_1");
+        await alice.SendChatAsync("4_1", 2, "/bug one", channelIndex: 4);
+        await Marquee(alice, "Report #1");
+        await alice.SendChatAsync("4_1", 2, "/bug two", channelIndex: 4);
+        await Marquee(alice, "Report #2");
+        await alice.SendChatAsync("4_1", 2, "/bug three", channelIndex: 4);
+        await Marquee(alice, "a lot of reports this hour");
+        Assert.Equal(new[] { "one", "two" }, (await Reports()).Select(r => r.Text));
+    }
+
     [Theory]
     [InlineData("/bug door stuck", true, "door stuck")]
     [InlineData("  /Bug   two  words ", true, "two  words")]
