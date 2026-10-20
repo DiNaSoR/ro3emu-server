@@ -151,9 +151,11 @@ public abstract class GuildHuntingHost : IAsyncLifetime
         return (DBGveHuntingActivityData.Parser.ParseFrom((byte[])reader[0]), runtime.RootElement.GetProperty("Mailed").GetBoolean(), damage);
     }
 
+    /// <summary>Polls <paramref name="done"/> for up to 20 s of wall time (generous for full-suite load; it only costs time on a real failure).</summary>
     protected static async Task Until(Func<bool> done)
     {
-        for (int i = 0; i < 250 && !done(); i++) await Task.Delay(20);
+        var deadline = DateTime.UtcNow.AddSeconds(20);
+        while (DateTime.UtcNow < deadline && !done()) await Task.Delay(20);
         Assert.True(done());
     }
 
@@ -404,7 +406,7 @@ public sealed class GuildHuntingPersistenceTests : GuildHuntingHost
         await Next(alice, GuildHuntingService.LiveRank, GveHuntingLiveRankNotify.Parser,
             r => r.Guilds.Single().Score == 700);
         clock.Set(20, 32, 10); // past the periodic save
-        await Task.Delay(300);
+        await Until(() => Saved(hunters).Damage == 700); // committed before the restart, not a fixed delay
         await alice.DisposeAsync();
         await StopAsync();
 

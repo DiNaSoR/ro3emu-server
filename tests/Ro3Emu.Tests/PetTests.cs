@@ -18,6 +18,8 @@ public sealed class PetTests : IAsyncLifetime
 {
     private readonly string _dataDir = Path.Combine(Path.GetTempPath(), "ro3emu-pet-" + Guid.NewGuid().ToString("N"));
     private static readonly TimeSpan Wait = TimeSpan.FromSeconds(8);
+    /// <summary>How long a test polls for a server event before failing; generous for full-suite load, it only costs time on a real failure.</summary>
+    private static readonly TimeSpan EventWait = TimeSpan.FromSeconds(20);
     private WebApplication _app = null!;
     private string _http = "";
     private readonly TestClock _clock = new();
@@ -383,7 +385,7 @@ public sealed class PetTests : IAsyncLifetime
         }
         async Task<T> After<T>(int from, uint id, MessageParser<T> parser, Func<T, bool> match) where T : IMessage<T>
         {
-            var deadline = DateTime.UtcNow.AddSeconds(8);
+            var deadline = DateTime.UtcNow + EventWait;
             while (DateTime.UtcNow < deadline)
             {
                 foreach (var e in bot.Inbox.Snapshot().Skip(from))
@@ -485,7 +487,7 @@ public sealed class PetTests : IAsyncLifetime
         });
         async Task<T> After<T>(int from, uint id, MessageParser<T> parser, Func<T, bool> match) where T : IMessage<T>
         {
-            var deadline = DateTime.UtcNow.AddSeconds(8);
+            var deadline = DateTime.UtcNow + EventWait;
             while (DateTime.UtcNow < deadline)
             {
                 foreach (var e in bot.Inbox.Snapshot().Skip(from))
@@ -497,10 +499,24 @@ public sealed class PetTests : IAsyncLifetime
         async Task Cast(int skill, int guardian)
         {
             int from = bot.Inbox.Snapshot().Count;
-            await bot.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = skill, TargetId = target.Uid, TargetPos = target.Pos.Clone() });
-            Assert.Equal(0, (await Next(bot, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
+            var castBy = DateTime.UtcNow + EventWait;
+            int result;
+            while (true)
+            {
+                // The previous cast's action may still hold the master (SkillBusy): retry until it ends.
+                await bot.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = skill, TargetId = target.Uid, TargetPos = target.Pos.Clone() });
+                result = (await Next(bot, CombatService.UseSkill, CastSkillRsp.Parser)).Result;
+                if (result != ErrorCodes.SkillBusy || DateTime.UtcNow >= castBy) break;
+                await Task.Delay(50);
+            }
+            Assert.Equal(0, result);
             await After(from, CombatService.ExtraUseInSkill, UseInSkillInfo.Parser, u => u.SkillID == guardian);
-            await Task.Delay(200); // the guardian's buffs land after its 31121
+            // The guardian's own buffs (_kBuff1) land after its 31121: wait for them rather than a fixed delay.
+            var own = GameData.Pairs(_app.Services.GetRequiredService<GameData>().Row("SkillConfig", guardian)!.Value, "_kBuff1")
+                .Select(b => (int)b.Id).ToArray();
+            var deadline = DateTime.UtcNow + EventWait;
+            while (DateTime.UtcNow < deadline && !own.All(id => Buff(id) != null)) await Task.Delay(20);
+            Assert.All(own, id => Assert.NotNull(Buff(id)));
         }
         var normal = _app.Services.GetRequiredService<GameData>().Row("SkillConfig", 1000001)!.Value;
         async Task<int> NormalHit()
@@ -567,7 +583,7 @@ public sealed class PetTests : IAsyncLifetime
         // Wildcat Knight: the enemy it hits adds a 【Vanguard Shield】 stack.
         await Deploy(33004, 1633004);
         await Cast(2307201, 2307101);
-        await Task.Delay(200);
+        for (var until = DateTime.UtcNow + EventWait; DateTime.UtcNow < until && Buff(2307101)?.PileCount != 2;) await Task.Delay(20);
         Assert.Equal(2, Buff(2307101)?.PileCount);
 
         // Fruit Tree Turtle: its vines restore 1000 Life every second.

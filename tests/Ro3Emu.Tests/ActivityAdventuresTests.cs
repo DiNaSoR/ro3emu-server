@@ -16,7 +16,9 @@ namespace Ro3Emu.Tests;
 public sealed class ActivityAdventuresTests : IAsyncLifetime
 {
     private readonly string dataDir = Path.Combine(Path.GetTempPath(), "ro3emu-adventure-" + Guid.NewGuid().ToString("N"));
-    private static readonly TimeSpan Wait = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan Wait = TimeSpan.FromSeconds(10);
+    /// <summary>Mail is written by the kill's detached reward work; under full-suite load that can take well past <see cref="Wait"/>.</summary>
+    private static readonly TimeSpan MailWait = TimeSpan.FromSeconds(20);
     private WebApplication app = null!;
     private string http = "";
     private readonly Dictionary<string, BotClient> clients = new();
@@ -1178,7 +1180,7 @@ public sealed class ActivityAdventuresTests : IAsyncLifetime
             ? JsonSerializer.Deserialize<MailService.Mailbox>(blob)!.Letters.ToArray() : [];
         bool Mailed(GameSession s, int template, int entry) =>
             Letters(s).Any(l => l.TemplateId == template && l.Attachments.Any(a => a.Entry == entry && a.Count == 1));
-        var deadline = DateTime.UtcNow + Wait;
+        var deadline = DateTime.UtcNow + MailWait;
         while (DateTime.UtcNow < deadline && !(Mailed(finder, 11603, 1300088) && Mailed(helper, 11604, 1300089)))
             await Task.Delay(50);
         Assert.True(Mailed(finder, 11603, 1300088), "finder's Dig - Precious Chest mail");
