@@ -213,14 +213,19 @@ row with the same id. `//` comments and trailing commas are allowed. A file with
 
 ### What the quest format makes
 
-Each step is a Side quest (blue tag) that copies a client quest: 10101130 for a talk step, 10101050 for the others.
+Each step copies a client quest (10101130 for a talk step, 10101050 for the others) and takes the quest's `type`:
+`_iTaskType`, the quest log tag `_iShowTag` and the NPC bubble `_kNPCProgressMark` (Side by default).
 
-1. **Talk**: `_kProgressTarget [[104001, npc, map, dialog]]`. A first step with no pre-task gets `_iCondition`
-   2000008 (base level 1), which auto-accepts it for every character. The dialogue's last row carries action
-   `["17", dialog]`, which tells the server the talk is done.
-2. **Kill**: `_kPreTask [previous step]`, target `[104014, monster…, count]` (104002 with `solo`). `_kTrack`
-   `["142", map, id, "-1"]` points the tracker at a scene-editor region next to a spawn of the monster.
-3. **Rewards**: `_kEXP [1, n]` pays n Base EXP, `_iAward` an AwardConfig package (`items` makes AwardConfig and
+1. **Talk**: `_kProgressTarget [[104001, npc, map, dialog]]`, `_kTrack ["143", map, npc, "9", dialog]`. The
+   dialogue's last row carries action `["17", dialog]`, which tells the server the talk is done.
+2. **Kill**: target `[104014, monster…, count]` (104002 with `solo`). With a `map`, `_kTrack`
+   `["142", map, region, "-1"]` points the tracker at a scene-editor region next to a spawn of the monster.
+3. **Level**: target `[101002, level]`, no tracker.
+4. **Area**: target `[104003, map, area]`, `_kTrack ["142", map, area, "-1"]`.
+5. **Done**: target `[104004, quest]`, no tracker.
+6. **Order**: step n gets `_kPreTask [step n - 1]`; the first step gets `_kPreTask [after]`, or with no `after`
+   `_iCondition` 2000008 (base level 1), which auto-accepts it for every character.
+7. **Rewards**: `_kEXP [1, n]` pays n Base EXP, `_iAward` an AwardConfig package (`items` makes AwardConfig and
    MultiverseGroupConfig rows with the step's id: `_kAward [[item, count, bound 0/1]]`, `_kPreview [[item, count]]`).
 
 Useful target types (the first number of a `_kProgressTarget` entry; all supported by `TaskService`), for steps
