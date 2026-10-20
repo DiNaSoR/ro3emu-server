@@ -138,7 +138,7 @@ public sealed class VoiceConnection : IDisposable
     /// <summary>True once <see cref="Kick"/> ran: the connection is on its way out and its frames are ignored.</summary>
     public bool Kicked => _closeAfterDrain;
 
-    /// <summary>Queues a Kicked frame, then closes the connection once the writer has flushed it.</summary>
+    /// <summary>Queues a Kicked frame, then ends the connection once the writer has flushed it.</summary>
     public void Kick(byte code)
     {
         // Flag first: the writer may dequeue the Kicked frame the moment it is queued and must already see it.
@@ -201,10 +201,29 @@ public sealed class VoiceConnection : IDisposable
                     var cipher = _cipher;
                     await _stream.WriteAsync(VoiceFrame.Write(type, cipher == null ? payload : cipher.Seal(type, payload)), _cts.Token);
                 }
-                if (drained && _closeAfterDrain) { Close(); return; }
+                if (drained && _closeAfterDrain) { EndAfterKick(); return; }
             }
         }
         catch (Exception e) when (e is OperationCanceledException or IOException or SocketException or ObjectDisposedException) { }
+    }
+
+    /// <summary>How long a kicked client has to close its side after the Kicked frame before the socket closes.</summary>
+    public static readonly TimeSpan KickedCloseDelay = TimeSpan.FromSeconds(2);
+
+    // FIN right behind the Kicked frame; the serve task reads on (and drops) until the client closes its side, and
+    // the socket closes after KickedCloseDelay at the latest. Closing at once sends RST while the client's own
+    // frames are still unread here, and a Windows client then loses the Kicked frame before it reads it.
+    private void EndAfterKick()
+    {
+        try { _socket.Shutdown(SocketShutdown.Send); }
+        catch (Exception e) when (e is SocketException or ObjectDisposedException) { Close(); return; }
+        _ = CloseLaterAsync();
+
+        async Task CloseLaterAsync()
+        {
+            await Task.Delay(KickedCloseDelay);
+            Close();
+        }
     }
 
     public void Close()
