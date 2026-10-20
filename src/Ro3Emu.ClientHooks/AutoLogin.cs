@@ -37,7 +37,12 @@ namespace Ro3Emu.ClientHooks
         private static float _loginSceneSince = -1f;
 
         // Kept alive here: Lua holds the pushed delegates only weakly through xLua's object pool.
-        private static readonly LuaPatches.SelfMethod OpenAccountPanelWrapper = OpenAccountPanel, UpdateCurrentServerWrapper = UpdateCurrentServer;
+        /// <summary>_onUpdateCurrentServer(self, key, server): _setSelectServer calls it with ('', area), and the property
+        /// binding on m_kCurrentServer with its key and value. It stores the area, so both must reach the original.</summary>
+        public delegate void UpdateServerMethod(Obf_R.Obf_ff self, object key, object server);
+
+        private static readonly LuaPatches.SelfMethod OpenAccountPanelWrapper = OpenAccountPanel;
+        private static readonly UpdateServerMethod UpdateCurrentServerWrapper = UpdateCurrentServer;
 
         /// <summary>From LuaPatches.Tick, once per LuaEnv (before the login UI opens: the modules are required here).</summary>
         internal static void Install(LA_LuaManager manager, Obf_R.Obf_ff global)
@@ -52,7 +57,7 @@ namespace Ro3Emu.ClientHooks
                 _openAccountPanel = _baseClass?.Obf_RuA<Obf_R.Obf_Ef>("OpenAccountPanel");
                 _updateCurrentServer = _serverClass?.Obf_RuA<Obf_R.Obf_Ef>("_onUpdateCurrentServer");
                 if (_openAccountPanel != null) _baseClass.Obf_luA<string, LuaPatches.SelfMethod>("OpenAccountPanel", OpenAccountPanelWrapper);
-                if (_updateCurrentServer != null) _serverClass.Obf_luA<string, LuaPatches.SelfMethod>("_onUpdateCurrentServer", UpdateCurrentServerWrapper);
+                if (_updateCurrentServer != null) _serverClass.Obf_luA<string, UpdateServerMethod>("_onUpdateCurrentServer", UpdateCurrentServerWrapper);
                 _enterPending = _updateCurrentServer != null;
                 Debug.Log("[Ro3Emu.AutoLogin] launcher login for " + (_account ?? "?") + ": login screen "
                     + (_openAccountPanel != null ? "skipped" : "not found") + ", server screen " + (_enterPending ? "skipped" : "not found"));
@@ -128,9 +133,9 @@ namespace Ro3Emu.ClientHooks
             Debug.Log("[Ro3Emu.AutoLogin] logged in as " + _account);
         }
 
-        private static void UpdateCurrentServer(Obf_R.Obf_ff self)
+        private static void UpdateCurrentServer(Obf_R.Obf_ff self, object key, object server)
         {
-            _updateCurrentServer?.Obf_HuA(self);
+            _updateCurrentServer?.Obf_HuA(self, key, server);
             try
             {
                 // Only after our own login (not while the account panel waits for the player), and once.
