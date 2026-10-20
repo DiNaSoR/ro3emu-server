@@ -16,7 +16,8 @@ namespace Ro3Emu.Server.Game;
 /// Leaving the guild or rank changes come in through <see cref="GuildService.MembershipChanged"/>, and edited rank
 /// rights through <see cref="GuildService.RightsChanged"/>. A once-a-second sweep also drops offline or replaced
 /// sessions and members no longer in that guild (there is no logout event to hook). The audio
-/// itself is the voice relay's (relay room "2_&lt;guildId&gt;_&lt;index&gt;"; not wired to these channels yet).
+/// itself is the voice relay's: room "2_&lt;guildId&gt;_&lt;index&gt;" admits who <see cref="IsSeated"/> and holds the mic
+/// off for whoever may not speak (<see cref="MaySpeak"/>).
 /// Invites (83707/83708/83716/83720) are not handled yet; 83718/83719 are never sent by this client.
 /// </summary>
 public sealed class GuildVoiceService(GameData data, GuildStore store, GuildService guilds, SessionRegistry sessions,
@@ -113,6 +114,25 @@ public sealed class GuildVoiceService(GameData data, GuildStore store, GuildServ
                     finally { lock (_sync) _rechecking.Remove(role); }
                 });
             }
+    }
+
+    /// <summary>For the relay: <paramref name="role"/> sits in channel <paramref name="index"/> of <paramref name="guildId"/>.</summary>
+    public bool IsSeated(long role, long guildId, int index)
+    {
+        lock (_sync) return _where.TryGetValue(role, out var at) && at.Guild == guildId && at.Index == index;
+    }
+
+    /// <summary>For the relay: false only for a seated member of a channel in Order mode who has not been given the
+    /// mic (the leader and holders of the GuildVoice right always may).</summary>
+    public bool MaySpeak(long role)
+    {
+        lock (_sync)
+        {
+            if (!_where.TryGetValue(role, out var at) || !_byGuild.TryGetValue(at.Guild, out var channels)) return true;
+            var channel = channels[at.Index];
+            if (channel.Mode == GuildSpeakAuthorityType.Free || !channel.Members.TryGetValue(role, out var seat)) return true;
+            return store.Get(at.Guild) is not { } guild || CanSpeak(guild, channel, role, seat);
+        }
     }
 
     // ---- requests ----

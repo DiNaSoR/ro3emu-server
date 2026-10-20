@@ -82,7 +82,7 @@ namespace Ro3Emu.ClientHooks
         {
             Guard("JoinChannel", () =>
             {
-                if (!IsTeamChannel(channel)) { Note("not a team channel, ignored: " + channel); return; }
+                if (!IsServedChannel(channel)) { Note("not a party or guild channel, ignored: " + channel); return; }
                 if (_wanted != null && _wanted != channel) LeaveCurrent();
                 _wanted = channel;
                 if (_link != null && _link.Authed) { _link.Send(VoiceProtocol.ChannelFrame(VoiceProtocol.Join, channel)); return; }
@@ -401,10 +401,19 @@ namespace Ro3Emu.ClientHooks
             manager.Obf_OD(tips, "PopCommonTips", text);
         }
 
-        private static bool IsTeamChannel(string channel)
+        /// <summary>What the relay serves: a party (its team id) or a guild voice channel "2_&lt;guildId&gt;_&lt;index&gt;"
+        /// (LC_VoiceHelper.GetGuildVoiceChannelId); the relay checks the rest (Ro3Emu.Server.Voice.VoiceRoomKey).</summary>
+        private static bool IsServedChannel(string channel)
         {
-            if (string.IsNullOrEmpty(channel)) return false;
-            foreach (char c in channel)
+            if (IsDigits(channel)) return true;
+            var parts = channel?.Split('_');
+            return parts != null && parts.Length == 3 && parts[0] == "2" && IsDigits(parts[1]) && IsDigits(parts[2]);
+        }
+
+        private static bool IsDigits(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return false;
+            foreach (char c in text)
                 if (c < '0' || c > '9') return false;
             return true;
         }
