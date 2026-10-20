@@ -490,8 +490,8 @@ public sealed partial class SceneService(IOptions<ServerOptions> options, World 
     public async Task<bool> AcceptWalkAsync(GameSession s, WalkReq walk)
     {
         var o = options.Value;
-        var speedMode = WalkCheckMode(o.WalkSpeedCheck);
-        var pathMode = WalkCheckMode(o.WalkPathCheck);
+        var speedMode = WalkCheckMode(nameof(o.WalkSpeedCheck), o.WalkSpeedCheck, ref _badWalkSpeedModeWarned);
+        var pathMode = WalkCheckMode(nameof(o.WalkPathCheck), o.WalkPathCheck, ref _badWalkPathModeWarned);
         if ((speedMode == "off" && pathMode == "off") || worldData.Map(s.SceneEntry)?.Nav is not { } nav) return true;
         var now = DateTime.UtcNow;
         var from = s.Position;
@@ -523,15 +523,15 @@ public sealed partial class SceneService(IOptions<ServerOptions> options, World 
         return false;
     }
 
-    private int _badWalkModeWarned;
+    private int _badWalkSpeedModeWarned, _badWalkPathModeWarned;
 
-    /// <summary>"off", "log" or "enforce", any case; anything else is read as "log" and warned about once.</summary>
-    private string WalkCheckMode(string? value)
+    /// <summary>"off", "log" or "enforce", any case; anything else is read as "log" and warned about once per key.</summary>
+    private string WalkCheckMode(string key, string? value, ref int warned)
     {
         var mode = value?.Trim().ToLowerInvariant();
         if (mode is "off" or "log" or "enforce") return mode;
-        if (Interlocked.Exchange(ref _badWalkModeWarned, 1) == 0)
-            log.LogWarning("Walk check mode {Mode} is not off, log or enforce: logging only", value);
+        if (Interlocked.Exchange(ref warned, 1) == 0)
+            log.LogWarning("Ro3Emu:{Key} is {Mode}, not off, log or enforce: logging only", key, value);
         return "log";
     }
 }

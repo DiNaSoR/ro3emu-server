@@ -21,6 +21,10 @@ Each check has one of three modes:
 
 Modes are read in any case; anything else counts as `log` and is warned about once.
 
+Release v2026.10.20 had a single `WalkCheck` key for both checks. It is no longer read: a server that still sets it
+logs a warning at startup, and both checks follow their own keys (`log` unless set). Replace `WalkCheck=enforce` with
+`WalkSpeedCheck=enforce` and `WalkPathCheck=enforce`.
+
 ```json
 "Ro3Emu": {
   "WalkSpeedCheck": "enforce",
