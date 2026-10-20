@@ -95,6 +95,8 @@ public sealed partial class WorldCoreService : IGameTicker
         scene.Leaving.Add(LeavingAsync);
         monsters.TargetChanged.Add(TargetChangedAsync);
         combat.ReviveOffer = OfferReviveAsync;
+        combat.BeforeCast.Add(MountFlightCastAsync); // a flying mount's take-off and landing (WorldCoreService.MountFlight)
+        FlightChanged.Add(combat.FlightChangedAsync);
         combat.ReviveCheck = dungeons.ExternalReviveError;
         combat.ReviveItemSkill = ReviveItemSkillAsync;
         character.WingJump = WingJumpAsync;
@@ -239,6 +241,7 @@ public sealed partial class WorldCoreService : IGameTicker
             foreach (var id in state.Hatred) await s.SendGameAsync(MonsterLocked, new PlayerBeMonsterLockedNotify { RemoveEnemy = id });
         }
         state.Hatred.Clear(); state.Monitored.Clear(); state.MiniMap = false; state.Flying = false;
+        s.StatusBits &= ~FlyBit; // the next map's entity starts on the ground; its Loaded hooks resync the mount
         state.Watching = false; state.ReviveSource = 0; state.ReviveExpiresMs = 0;
         state.NameBoardSnapshot = ""; state.QueueScene = 0; state.TemporaryLeaveUntilMs = 0;
         state.FightStatus = null;

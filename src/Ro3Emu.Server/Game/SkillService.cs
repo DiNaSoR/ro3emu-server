@@ -486,7 +486,27 @@ public sealed class SkillService
             (state.SkillWheel ??= new SkillWheel()).WhellSkills[(int)SkillWheelSlotType.SkillWheelPet] = slot;
             (state.OriginSkillWheel ??= new SkillWheel()).WhellSkills[(int)SkillWheelSlotType.SkillWheelPet] = slot.Clone();
         }
+        // A flying mount's take-off (on the ground) or landing (in the air): LC_System_Skill reads the slot map from
+        // whellSkills and JoyStickSkillNormalMixin._updateFlyMountSkillShow shows the mount button for SkillWheelMount1.
+        session.MountSkillShown = MountSkill(session);
+        if (session.MountSkillShown > 0)
+        {
+            var slot = new SkillWheelSlot { SkillConfigId = session.MountSkillShown, Enable = true };
+            (state.SkillWheel ??= new SkillWheel()).WhellSkills[(int)SkillWheelSlotType.SkillWheelMount1] = slot;
+            (state.OriginSkillWheel ??= new SkillWheel()).WhellSkills[(int)SkillWheelSlotType.SkillWheelMount1] = slot.Clone();
+        }
         return state;
+    }
+
+    private int MountSkill(GameSession s) =>
+        MountService.FlySkills(s, data) is { } fly && data.Row("SkillConfig", s.WorldState.Flying ? fly.Down : fly.Up) != null
+            ? (s.WorldState.Flying ? fly.Down : fly.Up) : 0;
+
+    /// <summary>Resend 5025 when the mount slot's skill changed (riding a flying mount, take-off, landing).</summary>
+    public async Task RefreshMountSkillAsync(GameSession s)
+    {
+        if (s.SkillPlans == null || s.Progress == null || MountSkill(s) == s.MountSkillShown) return;
+        await SyncAsync(s);
     }
 
     public DBSkillData Build(GameSession session)

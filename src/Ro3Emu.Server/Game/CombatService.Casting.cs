@@ -302,6 +302,8 @@ public sealed partial class CombatService
         int group = (int)GameData.Int(row, "_iSkillID");
         if (skills.NormalGroups(s.Progress!.Career).Contains(group)
             && data.Row("SkillConfig", normal) is { } current && GameData.Int(current, "_iSkillID") != group) return false;
+        // The flying mount's take-off on the ground, its landing in the air (MountService.FlySkills, SkillWheelMount1).
+        if (MountService.FlySkills(s, data) is { } fly && GameData.Int(row, "_iID") == (s.WorldState.Flying ? fly.Down : fly.Up)) return true;
         if (GameData.Int(row, "_iSystemType") == ActiveGuardSkill) return skills.PetMainSkill?.Invoke(s)?.SkillId == GameData.Int(row, "_iID");
         if (ChainOffers(s, row)) return true; // Thousand Shadows, Shadow Loop, Shadow Echo's return (CombatService.Chains)
         return skills.Level(s.Progress, (int)GameData.Int(row, "_iSkillID")) >= GameData.Int(row, "_iLevel");

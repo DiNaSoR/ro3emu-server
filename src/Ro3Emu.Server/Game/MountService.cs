@@ -130,6 +130,24 @@ public sealed class MountService : IGameTicker
     public static long Rider(GameSession s) => s.MountState.QuestMount != 0 ? s.MountState.QuestMount
         : s.Mounts?.MountIds.OrderBy(p => p.Key).FirstOrDefault(p => p.Value.IsRiding).Value?.MountId ?? 0;
 
+    /// <summary>
+    /// The flying mount ridden in the System slot (MountsConfig _iType 1: the Starshatter Dragon 60060010 and 60040033):
+    /// its _kFlySwitchSkills [take-off, landing]. LC_MountComponent.Ride marks the rider m_bRideFlyMount and aims these
+    /// two skills, and the HUD shows the skill wheel's SkillWheelMount1 slot (JoyStickSkillNormalMixin).
+    /// </summary>
+    public static (int Up, int Down)? FlySkills(GameSession s, GameData data)
+    {
+        if (s.MountState.QuestMount != 0 || s.Mounts == null || !s.Mounts.MountIds.TryGetValue(1, out var system)
+            || !system.IsRiding || data.Row("MountsConfig", system.MountId) is not { } row
+            || !row.TryGetProperty("_kFlySwitchSkills", out var list) || list.ValueKind != JsonValueKind.Array) return null;
+        var ids = list.EnumerateArray().Select(v => (int)(GameData.Number(v) ?? 0)).ToArray();
+        return ids is [> 0 and var up, > 0 and var down, ..] ? (up, down) : null;
+    }
+
+    /// <summary>The System-slot mount being ridden (not a quest ride), else 0.</summary>
+    public static long RidingSystem(GameSession s) => s.MountState.QuestMount == 0
+        && s.Mounts?.MountIds.TryGetValue(1, out var system) == true && system.IsRiding ? system.MountId : 0;
+
     /// <summary>LC_MountHelper.GetCurRidingBattleMountId: the Battle slot (2) mount while it is ridden, else 0. The
     /// skill conditions [2003/2004, id] and the mounted JobAttackConfig rows read this.</summary>
     public static long RidingBattle(GameSession s) =>

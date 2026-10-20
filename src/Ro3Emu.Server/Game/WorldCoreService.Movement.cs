@@ -51,6 +51,7 @@ public sealed partial class WorldCoreService
         s.WorldState.Flying = true;
         s.WorldState.LastFlyMs = Now;
         await MoveFlightAsync(s,position,s.Face,new Vec3(),true,MovementTransitionType.MoveTransFlyUp);
+        await FlightStateAsync(s);
     }
 
     private float FlightSpeed(GameSession s) => data.Table("PublicParamConfig").TryGetValue("MountFlyMaxSpeed", out var value)
@@ -92,6 +93,7 @@ public sealed partial class WorldCoreService
         await MoveFlightAsync(s,new Vec3{X=at.X,Y=at.Y,Z=at.Z},face,new Vec3(),true,MovementTransitionType.MoveTransLanding);
         // FixLandNtf instructs the client to end the special landing state; immediate landing has zero remaining time.
         await ToSelfAndViewersAsync(s,FixLand,new FixLandNtf{Uuid=s.Role!.Id,FixLandTime=0});
+        await FlightStateAsync(s);
     }
 
     private async Task CorrectFlightAsync(GameSession s)
