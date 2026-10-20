@@ -219,7 +219,7 @@ public sealed partial class GuildLeagueService
             new(EconomyOwnerKind.Role, g.Key.Role.ToString(CultureInfo.InvariantCulture)), g.Key.Asset,
             g.Aggregate(0L, (n, x) => checked(n + x.Grant.Count)))).ToArray();
         return new EventEconomyMutation(catalog, Guid.NewGuid().ToString("N"), "realm", 0,
-            "event/guild-league-award", sourceKey, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+            "event/guild-league-award", sourceKey, clock.GetUtcNow().ToUnixTimeMilliseconds(),
             [], goods, deltas, JsonSerializer.SerializeToUtf8Bytes(new
             {
                 Source = sourceKey,
