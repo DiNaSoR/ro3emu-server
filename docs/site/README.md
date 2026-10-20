@@ -1,6 +1,6 @@
 # Project website
 
-The public project page lives at `https://aethai.github.io/ro3emu-server/`.
+The public project page lives at `https://akreao.github.io/ro3emu-server/`.
 Only this directory is deployed by `.github/workflows/pages.yml`; server files,
 exported client data and local build output are not part of the Pages artifact.
 
