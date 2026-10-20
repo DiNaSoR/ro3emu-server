@@ -1171,6 +1171,29 @@ public sealed class PetTests : IAsyncLifetime
     }
 
     [ClientDataFact]
+    public async Task LineupSlotsOpenAtTheirSetLimitConditionLevels()
+    {
+        await using var bot = await InWorld();
+        await Unlock();
+        await CombinePet(bot);
+        // Utility Slot 2 is setup slot 3: PetSetLimitConfig._iCondition1 opens it at 40, not PetFightFieldUnlockLv's 45.
+        var req = new PetStateUpdateReq { PetId = 10001, Target = (PetStateSource_Type)1, TargetSlotIndex = 3 };
+        await Gm("!lvl 39");
+        await bot.SendGameAsync(PetService.StateUpdate, req);
+        Assert.Equal(ErrorCodes.PetSetupSlot, (await Next(bot, PetService.StateUpdate, PetStateUpdateResp.Parser)).Result);
+        await Gm("!lvl 40");
+        await bot.SendGameAsync(PetService.StateUpdate, req);
+        Assert.Equal(0, (await Next(bot, PetService.StateUpdate, PetStateUpdateResp.Parser)).Result);
+        // Assist slot 2 follows _iCondition2 (42), not PetAssistFieldUnlockLv's 55.
+        var assist = new PetStateUpdateReq { PetId = 10001, Source = (PetStateSource_Type)1, SourceSlotIndex = 3, Target = (PetStateSource_Type)2, TargetSlotIndex = 2 };
+        await bot.SendGameAsync(PetService.StateUpdate, assist);
+        Assert.Equal(ErrorCodes.PetSupportSlot, (await Next(bot, PetService.StateUpdate, PetStateUpdateResp.Parser)).Result);
+        await Gm("!lvl 42");
+        await bot.SendGameAsync(PetService.StateUpdate, assist);
+        Assert.Equal(0, (await Next(bot, PetService.StateUpdate, PetStateUpdateResp.Parser)).Result);
+    }
+
+    [ClientDataFact]
     public async Task SupportPlansCollectionAndFragmentBreakdownPersistWithoutAnActor()
     {
         await using var bot = await InWorld();
