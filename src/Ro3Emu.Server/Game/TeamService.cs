@@ -54,8 +54,11 @@ public sealed partial class TeamService : IGameTicker
         public readonly Dictionary<long, (RallyTeamType Type, DateTimeOffset Expires)> Rallies = new();
         public readonly List<long> Members = new(); // slot order = teamIndex
         public readonly Dictionary<long, long> Joined = new();
-        public readonly Dictionary<long, string> LastCard = new();
-        public readonly Dictionary<long, string> LastBattle = new();
+        // The last card and battle info sent for each member; protobuf value equality detects changes.
+        public readonly Dictionary<long, TeamMemberDetailInfo> LastCard = new();
+        public readonly Dictionary<long, TeamMemberBattleInfo> LastBattle = new();
+        // Offline members' role row, read once instead of on every 2 s refresh; dropped when they come back online.
+        public readonly Dictionary<long, Role?> Offline = new();
     }
 
     private readonly SessionRegistry sessions;
@@ -293,6 +296,7 @@ public sealed partial class TeamService : IGameTicker
         team.Joined.Remove(role);
         team.LastCard.Remove(role);
         team.LastBattle.Remove(role);
+        team.Offline.Remove(role);
         _byMember.Remove(role);
         log.LogInformation("{Name} leaves party {Team} ({Left} left)", name, team.Id, team.Members.Count);
         if (team.Members.Count == 0)
@@ -337,22 +341,21 @@ public sealed partial class TeamService : IGameTicker
         {
             var detail = Detail(team, m);
             var battle = detail.BattleInfo;
-            detail.BattleInfo = null;
-            string card = detail.ToString(), fight = battle.ToString();
-            if (team.LastCard.GetValueOrDefault(m) != card)
+            var card = detail.Clone();
+            card.BattleInfo = null;
+            if (!card.Equals(team.LastCard.GetValueOrDefault(m)))
             {
                 team.LastCard[m] = card;
-                detail.BattleInfo = battle;
                 var update = new TeamMemberChangeResp { TeamId = team.Id };
                 update.MemberList[m] = detail;
                 // The owner also consumes its card for the dungeon Light of Bonds panel (verified LC_DAL_Team).
                 await ToOthersAsync(team, 0, TeamMemberUpdate, update);
             }
-            else if (team.LastBattle.GetValueOrDefault(m) != fight)
+            else if (!battle.Equals(team.LastBattle.GetValueOrDefault(m)))
             {
                 await ToOthersAsync(team, m, TeamMemberBattleUpdate, new TeamMemberBattleInfoChangeRes { Guid = m, BattleInfo = battle });
             }
-            team.LastBattle[m] = fight;
+            team.LastBattle[m] = battle;
         }
     }
 
@@ -385,7 +388,8 @@ public sealed partial class TeamService : IGameTicker
     private TeamMemberDetailInfo Detail(Team team, long role)
     {
         var s = Session(role);
-        var r = s?.Role ?? roles.Get(role);
+        if (s != null) team.Offline.Remove(role);
+        var r = s?.Role ?? OfflineRole(team, role);
         var p = s?.Progress;
         var detail = new TeamMemberDetailInfo
         {
@@ -412,6 +416,13 @@ public sealed partial class TeamService : IGameTicker
         detail.BattleInfo = battle;
         if (s != null && MultiDungeonInfo != null) detail.MultiDungeonBytes = MultiDungeonInfo(s, team.Members).ToByteString();
         return detail;
+    }
+
+    /// <summary>An offline member's role row, read from the store once per absence (it can't change while offline).</summary>
+    private Role? OfflineRole(Team team, long role)
+    {
+        if (!team.Offline.TryGetValue(role, out var r)) team.Offline[role] = r = roles.Get(role);
+        return r;
     }
 
     private static int Capacity(Team team) => team.Type == TeamType.Forty ? 40 : 5;
