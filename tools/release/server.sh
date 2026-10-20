@@ -71,6 +71,8 @@ settings=(
   "Ro3Emu__OpenContent__Enabled=true"
   "Ro3Emu__Pass__Play=true"
   "Ro3Emu__Pass__FreePremium=true"
+  "Ro3Emu__TopUp__Free=true"
+  "Ro3Emu__CashShop__Free=true"
 )
 for i in "${!gms[@]}"; do settings+=("Ro3Emu__GmAccounts__$i=${gms[$i]}"); done
 [ -z "$voice" ] || settings+=("Ro3Emu__Voice__Port=$voice")

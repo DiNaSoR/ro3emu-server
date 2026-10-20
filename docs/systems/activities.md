@@ -13,7 +13,7 @@ This implementation covers the 47 `NewActivityConfig` rows whose `_kMultiverseAr
 | 112 | Journey act/node/event graph and authored boss dungeons 8100002/4/5/6/7 |
 | 113 | Seven distinct eligible login/connected civil days, configured rewards and durable claims |
 | 114 | Seven-Day Goal (FirstHeartService): 5049 day locks, task progress and score bar from base level 10, 83500 task and 83501 score claims, role blob `first_heart` |
-| 999 | Product/gift-pack activity schedule; paid order and payment reports receive a refusal |
+| 999 | Product/gift-pack activity schedule; Top Up orders and payment reports follow `Ro3Emu:TopUp:Free` ([cash shop](cash-shop.md)) |
 | 117 | Season Eve authored clues and seven-note chapters, shared cycle progress, milestone claims, wishes and durable end-of-cycle reward mail |
 | 118 | Prontera invasion rounds, actual invaders, donation, guild/city state and settlement |
 | 119 | Training ground, real measured damage, configured race/element/size, best DPS and milestone claims, 5069/84061-84067/30106 |
@@ -29,7 +29,7 @@ PvP uses the existing emulator damage formula for player defenders (inferred), i
 
 Row112 retains its authored level999 condition (LC_ConditionList21000010); its wire progression tests override only fixture eligibility and still execute the real act/encounter validation.
 
-Cash-shop RPCs 2001, 2002, 2003 and 2005 are refused. Client-authored order/payment data never grants a product. Consuming an already-owned entitlement or lottery ticket is distinct from creating a paid order.
+Top Up RPCs 2001-2003 are answered only with `Ro3Emu:TopUp:Free` on (RO3Emu.exe and `server.sh` turn it on): 2001 then grants the tier or product at once, and without it all three are refused with `FeatureUnavailable` (`ShopService.TopUp.cs`). The currency exchange 2005 is always served. A client payment report (2002) never grants anything by itself; see [cash shop](cash-shop.md). Consuming an already-owned entitlement or lottery ticket is distinct from creating a paid order.
 
 ## Clock and core policy choices
 
