@@ -103,7 +103,8 @@ client's NPC shop window, the one the Kafra Staff's Novice Shop uses, titled wit
 Each item is `[item, price]` in Zeny, or an object with a `currency` (an item id: 1 Zeny, 2 Minted Coin, 3 Sacred
 Relic Crystal) and a `count` sold per purchase. There is no stock or purchase limit. The shop is ShopConfig row
 `<NPC id>` (its `_iShopId` and `_iClassID` are the NPC id too) and the goods are ShopCommodityConfig rows
-950000000 + (NPC id % 1,000,000) × 100 + 1, 2, …; buying goes through the server's normal shop checks. The window
+950000000 + (NPC id % 1,000,000) × 100 + 1, 2, …; buying goes through the server's normal shop checks, and the player must be on the NPC's map within 12 m of it
+(talk reach plus slack), or the buy is refused with 804 "too far". The window
 needs the client hooks from the same release: older hooks add the rows after the client has indexed its shops, so the
 window stays empty.
 

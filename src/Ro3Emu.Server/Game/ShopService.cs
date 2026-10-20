@@ -275,6 +275,7 @@ public sealed partial class ShopService : IGameTicker
         var shop = data.Table("ShopConfig").Values.FirstOrDefault(s => GameData.Int(s, "_iClassID") == classId);
         if (shop.ValueKind != JsonValueKind.Object) return new(ErrorCodes.ShopMissing, "no shop");
         if (GameData.Int(shop, "_iFunctionId") is var function and > 0 && !functions.IsOpen(session, function)) return new(ErrorCodes.ShopClosed, $"function {function} closed");
+        if (FarFromShopNpc(session, shop) is { } far) return far;
         foreach (var gate in new[] { "_iIsBuy", "_iIsLock" })
             if (GameData.Int(commodity, gate) is var cond and > 0 && !functions.ConditionMet(session, cond)) return new(ErrorCodes.PurchaseRequirements, $"{gate} {cond}");
         // _kMultiverseArray: [0] in every season, else only in the listed playbooks (the current one: SeasonService).
@@ -283,6 +284,32 @@ public sealed partial class ShopService : IGameTicker
             && !books.Contains(0) && !books.Contains(session.SeasonState?.PlayBookId ?? seasons.PlayBook))
             return new(ErrorCodes.NotForSale, "other season");
         return null;
+    }
+
+    /// <summary>How far from its NPC a shop still sells: SceneService's talk reach (NPCConfig _iInteractDistance up to 4 m
+    /// plus 8 m for client position lag).</summary>
+    private const float ShopNpcReach = 12f;
+
+    /// <summary>
+    /// An NPC shop (ShopConfig _iShopType 3) whose _iNpcId the server itself places (custom content "npcs") opens only from
+    /// that NPC's greeting, so a buy must come from the NPC's map within talk reach. The client's own NPC shops are not
+    /// gated: their _iNpcId (100002 for 301/302, 0 for 303) is in no scene-editor NPC list, the dialogs that open 301 belong
+    /// to NPCs 100002 and 25000003 that no map places, and the item-source link (ResourceObtainInfoConfig 1011) walks to
+    /// map 10111 and opens 301 there. Where a real client legitimately stands when buying is not knowable from the data.
+    /// </summary>
+    private Fail? FarFromShopNpc(GameSession session, JsonElement shop)
+    {
+        if (GameData.Int(shop, "_iShopType") != 3 || GameData.Int(shop, "_iNpcId") is not (var npc and > 0)) return null;
+        bool placed = false;
+        foreach (var n in data.Custom.Npcs)
+        {
+            if (n.NpcId != npc) continue;
+            placed = true;
+            if (n.Map == session.SceneEntry
+                && MonsterService.Distance(n.X, n.Z, session.Position.X, session.Position.Z) <= ShopNpcReach) return null;
+        }
+        return placed ? new(ErrorCodes.NpcTooFar, $"not near NPC {npc} (scene {session.SceneEntry} at "
+            + $"{session.Position.X:0.#},{session.Position.Z:0.#})") : null;
     }
 
     /// <summary>

@@ -170,6 +170,17 @@ public sealed class CustomContentQuestTests : IAsyncLifetime
         await Barrier(bot);
 
         long zeny = await Read(s => s.Progress!.Currency.GetValueOrDefault(1));
+        // Away from Elias (the new role starts elsewhere) the shop does not sell (issue #147).
+        await bot.SendGameAsync(ShopService.BuyCommodity, new BuyCommodityReq { CommodityId = Cocoa, Count = 2, Price = 50 });
+        Assert.Equal(ErrorCodes.NpcTooFar, (await Next(bot, ShopService.BuyCommodity, BuyCommodityResp.Parser)).Result);
+        Assert.Equal(zeny, await Read(s => s.Progress!.Currency.GetValueOrDefault(1)));
+
+        // Beside him it does.
+        var npc = Service<WorldData>().Map(10100)!.Npcs.Single(n => n.NpcId == Elias);
+        await Gm($"!warp 10100 {npc.X + 1} {npc.Z}");
+        var arrival = await Next(bot, MsgId.SwitchSceneLine, SwitchSceneLineResp.Parser);
+        await bot.SendGameAsync(MsgId.SceneLoaded, new SceneLoadedReq { SceneId = arrival.SceneEntry });
+        await Next(bot, MsgId.EntitySelf, EntitySelf.Parser);
         await bot.SendGameAsync(ShopService.BuyCommodity, new BuyCommodityReq { CommodityId = Cocoa, Count = 2, Price = 50 });
         Assert.Equal(0, (await Next(bot, ShopService.BuyCommodity, BuyCommodityResp.Parser)).Result);
         Assert.Equal(zeny - 100, await Read(s => s.Progress!.Currency.GetValueOrDefault(1)));
