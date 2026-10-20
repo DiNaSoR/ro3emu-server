@@ -3,31 +3,32 @@
 With this option, every piece of content the client can show is playable. Seasons, the original server's
 switch-offs and functions it never opened gate nothing; only the client's own limits remain.
 
-The option is off by default, so the test suite keeps pinning the original's rules. A hosted server that wants all
-content open turns it on:
+The option is off by default, so the test suite keeps pinning the original's rules. The usual ways to run a server
+already turn it on:
 
-- `appsettings.json`: `"Ro3Emu": { "OpenContent": { "Enabled": true } }`
-- systemd unit or drop-in: `Environment=Ro3Emu__OpenContent__Enabled=true`
-- local development: `appsettings.Development.json` (already on)
+- `RO3Emu.exe host` (`src/Ro3Emu.Setup/Flows.cs`), `server.sh` and the release `tools/release/server.sh`
+- local development: `appsettings.Development.json`
 - tests: `o.OpenContent.Enabled = true` (`tests/Ro3Emu.Tests/OpenContentTests.cs`)
+
+A server started some other way turns it on itself, with `"Ro3Emu": { "OpenContent": { "Enabled": true } }` in
+`appsettings.json` or `Environment=Ro3Emu__OpenContent__Enabled=true` in a systemd unit or drop-in.
 
 ## What it changes
 
 | Area | Original rule | With OpenContent | Where |
 |---|---|---|---|
 | Playbook | 5021 playbook from the options/DB, `!season` switches it | stays 101, the only playbook with its own content; `!season` and `!seasonnext` refuse | `GmCommands` |
-| Functions the original never opened (base level 999/9999) | closed | `Functions` are open: 7201 Realm War map, 70122 Totem Shop, 41 Feedback (panel from `ClientHooks.FeedbackButton`, backend `FeedbackService`, [feedback.md](feedback.md)). Shells without a working panel stay closed (no dead menu buttons); a function joins the list together with its backend (Adventure Group, Valhalla) | `FunctionService.IsOpen` |
+| Functions the original never opened (base level 999/9999) | closed | `Functions` are open: 7201 Realm War map, 70122 Totem Shop, 41 Feedback (panel from `ClientHooks.FeedbackButton`, backend `FeedbackService`, [feedback.md](feedback.md)), 1000000 Adventure Group (`AdventureGroupService`), 96 Valhalla Trials (`ValhallaService`), 14 Title (`TitleService`). Shells without a working panel stay closed (no dead menu buttons); a function joins the list together with its backend | `FunctionService.IsOpen` |
 | Server-day conditions (3031 open days, 3030 playbook seconds) | met on day N | met from the first day (Guild League, auctions, Ilmata, guild challenge difficulties, card flash outputs, system stall items) | `FunctionService.ConditionMet`, `GuildChallengeService.Unlocked`, `CardService.Flash`, `StallsService.System` |
 | Activity open conditions | `_kOpenCondition` | `Activities` are forced: 200 Pass I (its own condition is base level 99, see [activities-battlepass-monthcard.md](../systems/activities-battlepass-monthcard.md)). Novice Challenge 112 is left out, its event texts are filler; `SeasonStageActivities` forces the season page's stage activities (all `[1002,99]`) | `NewActivityService.Gate` |
 | Season Exploration chapters | `ExplorePhaseConfig` days 8/10/12 to 14 | open from the opening, never close | `NewActivityService.WorldPhaseOpen` + `ClientHooks.ServerDayGates` |
 | TimeLimit windows bounded by the server opening or a season stage | e.g. days 9-30, stage 0 | open from the opening, never close (card pools, Pass I/II, Battle for Prontera, Ode to Echoes, tower races, Season Preview...); `KeepTimeLimits` 1021 Midterm Settlement, 1023 Top 10 Guilds, 1036 Feedback keep their bounds | `ActivityClock.Bound` |
 | Absolute-date activities that ended | closed for good | repeat with their own length (Otherworldly Invasion 102: 10-day cycles, donation in the first 4 days); `PerpetualAbsolute` 1060 (Territory War activity) is open for good | `ActivityClock.ResolveActivity`, `ActivityClock.Bound` |
 | Test card pools 1011-1014 | open by their windows | closed (`ClosedActivities`) | `NewActivityService.Applies` |
-| Territory Wars | the exported 2026-05-19..27 block, once | the block repeats every `TerritoryWarCycleDays` (14); each repeat is its own territory season: `TerritoryWarsClock.Epoch` = `SeasonStart:PlayBook:cycle`, so honor/valor archive and award/settlement keys are per cycle (cycle 0 keeps the original key) | `TerritoryWarsClock`, `TerritoryWarsService`, `.Results` |
+| Territory Wars | the exported 2026-05-19..27 block, once | the block repeats every `TerritoryWarCycleDays` (14); each repeat is its own territory season: `TerritoryWarsClock.Epoch` = `SeasonStart:PlayBook:cycle`, so honor/valor archive and award/settlement keys are per cycle (cycle 0 keeps the original key); the escort ledger archives and resets per cycle the same way | `TerritoryWarsClock`, `TerritoryWarsService`, `.Results`, `TerritoryEscortService` |
 
 ## Not covered yet
 
-- Territory escort (`TerritoryEscortService`) still archives per season (`SeasonStart:PlayBook`), not per war cycle.
 - Reward scaling by realm age (`RewardService.RollAuctionAwardBound`, guild caravan pools) still follows the real
   open day: it is pacing, not access.
 - The client computes some gates itself from `ServerOpenTime` (`ServerInfo.iOpenDayCount`). The server still sends

@@ -81,7 +81,7 @@ public sealed class ServerOptions
 
     /// <summary>
     /// Owner policy (2026-10-11): every piece of content the client can show is playable. Off by default so the tests
-    /// keep pinning the original's rules; appsettings.json turns it on for the real server.
+    /// keep pinning the original's rules; RO3Emu.exe host, server.sh and appsettings.Development.json turn it on.
     /// </summary>
     public OpenContentOptions OpenContent { get; set; } = new();
 
