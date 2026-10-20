@@ -141,9 +141,16 @@ public sealed class VoiceConnection : IDisposable
     /// <summary>Queues a Kicked frame, then ends the connection once the writer has flushed it.</summary>
     public void Kick(byte code)
     {
-        // Flag first: the writer may dequeue the Kicked frame the moment it is queued and must already see it.
-        _closeAfterDrain = true;
-        Enqueue(VoiceDown.Kicked, [code]);
+        // Flag and frame under one lock, the one the writer decides under: it either sees neither (and comes back
+        // for the Kicked frame) or both. A flag set alone, while the writer was sending the last queued frame,
+        // let it end the stream without the Kicked frame.
+        lock (_sync)
+        {
+            _closeAfterDrain = true;
+            if (_closed) return;
+            _control.Enqueue((VoiceDown.Kicked, [code]));
+        }
+        _signal.Release();
     }
 
     /// <summary>Builds one Audio-down payload (speaker i64 | seq u16 | opus) for the caller to fan out to every
@@ -189,11 +196,12 @@ public sealed class VoiceConnection : IDisposable
             {
                 await _signal.WaitAsync(_cts.Token);
                 (byte Type, byte[] Payload)? next;
-                bool drained;
+                bool end;
                 lock (_sync)
                 {
                     next = _control.Count > 0 ? _control.Dequeue() : _audio.Count > 0 ? _audio.Dequeue() : null;
-                    drained = _control.Count == 0 && _audio.Count == 0;
+                    // Decided here, under the lock Kick takes: true only once the Kicked frame is out of the queue.
+                    end = _closeAfterDrain && _control.Count == 0 && _audio.Count == 0;
                 }
                 if (next is var (type, payload))
                 {
@@ -201,7 +209,7 @@ public sealed class VoiceConnection : IDisposable
                     var cipher = _cipher;
                     await _stream.WriteAsync(VoiceFrame.Write(type, cipher == null ? payload : cipher.Seal(type, payload)), _cts.Token);
                 }
-                if (drained && _closeAfterDrain) { EndAfterKick(); return; }
+                if (end) { EndAfterKick(); return; }
             }
         }
         catch (Exception e) when (e is OperationCanceledException or IOException or SocketException or ObjectDisposedException) { }
