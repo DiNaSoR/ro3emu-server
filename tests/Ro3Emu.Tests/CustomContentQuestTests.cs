@@ -186,4 +186,46 @@ public sealed class CustomContentQuestTests : IAsyncLifetime
         Assert.Equal(zeny - 100, await Read(s => s.Progress!.Currency.GetValueOrDefault(1)));
         Assert.Equal(2, await Read(s => s.Items.Where(i => i.Entry == 1200801).Sum(i => (long)i.Stack)));
     }
+
+    [ClientDataFact]
+    public async Task ClientNpcShopsSellOnlyBesideAnNpcThatOpensThem()
+    {
+        // The client data's openers: Kafra 100002's dialogue and its _iNpcId (301, 302), 25000003's dialogue (301).
+        var shops = Service<ShopService>();
+        Assert.Equal([100002, 25000003], shops.ShopNpcsForTest(301).Order());
+        Assert.Equal([100002], shops.ShopNpcsForTest(302));
+        Assert.Empty(shops.ShopNpcsForTest(303));
+
+        const int Offer = 113; // ShopCommodityConfig 113: shop 301, 100 Zeny
+        var bot = new BotClient(_http, File.ReadAllText(Path.Combine(_dataDir, "gate_rsa_public.pem")));
+        await using var _ = bot;
+        await bot.LoginAsync("customalice", "pw");
+        await bot.EnterGateAsync();
+        long id = (await bot.CreateRoleAsync("CustomAlice")).RoleBaseInfo.Id;
+        await bot.EnterWorldAsync(id);
+        await Barrier(bot);
+        await Gm("!lvl 10");
+        await Gm("!item 1 1000");
+        await Barrier(bot);
+        async Task<int> Buy()
+        {
+            await bot.SendGameAsync(ShopService.BuyCommodity, new BuyCommodityReq { CommodityId = Offer, Count = 1, Price = 100 });
+            return (await Next(bot, ShopService.BuyCommodity, BuyCommodityResp.Parser)).Result;
+        }
+
+        // No map places 100002 or 25000003, so the shop sells nowhere.
+        Assert.Equal(ErrorCodes.NpcTooFar, await Buy());
+
+        // Beside an opener it sells: NPC 100196 stands 7 m from the born point.
+        shops.AddShopNpcForTest(301, ShopNpcSpawn.SpawnNpc);
+        Assert.Equal(0, await Buy());
+
+        // In Prontera, away from it, it doesn't.
+        var elias = Service<WorldData>().Map(10100)!.Npcs.Single(n => n.NpcId == Elias);
+        await Gm($"!warp 10100 {elias.X + 1} {elias.Z}");
+        var arrival = await Next(bot, MsgId.SwitchSceneLine, SwitchSceneLineResp.Parser);
+        await bot.SendGameAsync(MsgId.SceneLoaded, new SceneLoadedReq { SceneId = arrival.SceneEntry });
+        await Next(bot, MsgId.EntitySelf, EntitySelf.Parser);
+        Assert.Equal(ErrorCodes.NpcTooFar, await Buy());
+    }
 }

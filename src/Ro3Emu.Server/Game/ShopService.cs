@@ -36,11 +36,12 @@ public sealed partial class ShopService : IGameTicker
     private readonly FriendStore friends;
     private readonly AccountStore accounts;
     private readonly Deadlines deadlines;
+    private readonly Maps.WorldData world;
     private readonly ILogger<ShopService> log;
 
     public ShopService(GameData data, CharacterService character, FunctionService functions, RoleStore roles, SeasonService seasons,
         WardrobeService wardrobe, AwardService awards, TimeProvider clock, SessionRegistry sessions, GameLoop loop,
-        MailService mail, FriendStore friends, AccountStore accounts, Deadlines deadlines,
+        MailService mail, FriendStore friends, AccountStore accounts, Deadlines deadlines, Maps.WorldData world,
         ILogger<ShopService> log, Microsoft.Extensions.Options.IOptions<ServerOptions>? options = null)
     {
         freeTopUp = options?.Value.TopUp.Free ?? false;
@@ -59,6 +60,7 @@ public sealed partial class ShopService : IGameTicker
         this.friends = friends;
         this.accounts = accounts;
         this.deadlines = deadlines;
+        this.world = world;
         this.log = log;
     }
 
@@ -284,32 +286,6 @@ public sealed partial class ShopService : IGameTicker
             && !books.Contains(0) && !books.Contains(session.SeasonState?.PlayBookId ?? seasons.PlayBook))
             return new(ErrorCodes.NotForSale, "other season");
         return null;
-    }
-
-    /// <summary>How far from its NPC a shop still sells: SceneService's talk reach (NPCConfig _iInteractDistance up to 4 m
-    /// plus 8 m for client position lag).</summary>
-    private const float ShopNpcReach = 12f;
-
-    /// <summary>
-    /// An NPC shop (ShopConfig _iShopType 3) whose _iNpcId the server itself places (custom content "npcs") opens only from
-    /// that NPC's greeting, so a buy must come from the NPC's map within talk reach. The client's own NPC shops are not
-    /// gated: their _iNpcId (100002 for 301/302, 0 for 303) is in no scene-editor NPC list, the dialogs that open 301 belong
-    /// to NPCs 100002 and 25000003 that no map places, and the item-source link (ResourceObtainInfoConfig 1011) walks to
-    /// map 10111 and opens 301 there. Where a real client legitimately stands when buying is not knowable from the data.
-    /// </summary>
-    private Fail? FarFromShopNpc(GameSession session, JsonElement shop)
-    {
-        if (GameData.Int(shop, "_iShopType") != 3 || GameData.Int(shop, "_iNpcId") is not (var npc and > 0)) return null;
-        bool placed = false;
-        foreach (var n in data.Custom.Npcs)
-        {
-            if (n.NpcId != npc) continue;
-            placed = true;
-            if (n.Map == session.SceneEntry
-                && MonsterService.Distance(n.X, n.Z, session.Position.X, session.Position.Z) <= ShopNpcReach) return null;
-        }
-        return placed ? new(ErrorCodes.NpcTooFar, $"not near NPC {npc} (scene {session.SceneEntry} at "
-            + $"{session.Position.X:0.#},{session.Position.Z:0.#})") : null;
     }
 
     /// <summary>

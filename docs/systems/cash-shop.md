@@ -26,6 +26,11 @@ sub-tabs. The cash shop is Fashion and Mall.
   turn at 05:00) and the `_iIsBuy` / `_iIsLock` conditions.
 - It syncs the counters in 5024.
 - A Fashion commodity unlocks its wardrobe look in the same commit.
+- An NPC shop (`ShopConfig` `_iShopType` 3, the `UI_Sys_ShopNpcPanel` window) sells only within 12 m of an NPC on the
+  player's map that opens it: the shop's `_iNpcId` or an NPC whose `DialogueConfig` reply opens the window on it
+  (`ShopService.NpcReach.cs`, issue #147). Otherwise the buy gets 804 "too far". In this client no map places the Kafra
+  shop NPCs (100002, 25000003) and nothing opens 302 or 303, so shops 301-303 sell nowhere; custom-content shops sell
+  beside their NPC. The other shop types are menu windows the client opens anywhere.
 
 No `ShopConfig` row has a refresh (`_kRefreshType/_kRefreshTime/_kRefreshExpend` are empty everywhere).
 

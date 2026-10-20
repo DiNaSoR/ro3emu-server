@@ -35,6 +35,7 @@ public sealed class EconomyShopTests : IAsyncLifetime
             o.PlayBook = 101;
         });
         await app.StartAsync();
+        app.Services.GetRequiredService<ShopService>().SellNpcShopsAtSpawn();
         http = $"http://127.0.0.1:{web}";
     }
 

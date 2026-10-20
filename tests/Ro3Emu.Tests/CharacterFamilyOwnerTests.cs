@@ -36,7 +36,8 @@ public sealed class CharacterFamilyOwnerTests : IAsyncLifetime
             o.DataDir = directory; o.GameDataDir = Path.Combine(RepoRoot(), "data");
             o.HttpPort = web; o.MicroGatePort = micro; o.GameGatePort = game;
         });
-        await app.StartAsync(); http = $"http://127.0.0.1:{web}";
+        await app.StartAsync();
+        app.Services.GetRequiredService<ShopService>().SellNpcShopsAtSpawn(); http = $"http://127.0.0.1:{web}";
     }
 
     public async Task DisposeAsync()
