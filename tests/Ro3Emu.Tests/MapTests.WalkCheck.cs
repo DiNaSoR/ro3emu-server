@@ -8,13 +8,12 @@ using Ro3Emu.Server.Maps;
 
 namespace Ro3Emu.Tests;
 
-/// <summary>ServerOptions.WalkCheck and its per-check overrides WalkSpeedCheck and WalkPathCheck (issue #158).</summary>
+/// <summary>ServerOptions.WalkSpeedCheck and WalkPathCheck (issue #158).</summary>
 public sealed partial class MapTests
 {
-    private void WalkModes(string all, string? speed = null, string? path = null)
+    private void WalkModes(string speed, string path)
     {
         var o = _app.Services.GetRequiredService<IOptions<ServerOptions>>().Value;
-        o.WalkCheck = all;
         o.WalkSpeedCheck = speed;
         o.WalkPathCheck = path;
     }
@@ -67,7 +66,7 @@ public sealed partial class MapTests
     [ClientDataFact]
     public async Task EnforcedWalkCheckSnapsATooFastWalkBack()
     {
-        WalkModes("enforce");
+        WalkModes("enforce", "enforce");
         await using var alice = await InWorld("Alice");
         var (step, _) = await StepThenDash(alice);
         var back = await Next(alice, GameAoiSink.MovementChange, MovementChangeNtf.Parser, m => m.Uid == (long)alice.Self!.Uuid);
@@ -79,7 +78,7 @@ public sealed partial class MapTests
     [ClientDataFact]
     public async Task ASpeedCheckSetToLogLetsATooFastWalkThroughWhileThePathCheckEnforces()
     {
-        WalkModes("enforce", speed: "log");
+        WalkModes(speed: "log", path: "enforce");
         await using var alice = await InWorld("Alice");
         var (_, far) = await StepThenDash(alice);
         await WaitServerPosition("alice", far);
@@ -93,9 +92,9 @@ public sealed partial class MapTests
     }
 
     [ClientDataFact]
-    public async Task ASpeedCheckOverrideIsReadInAnyCase()
+    public async Task AWalkCheckModeIsReadInAnyCase()
     {
-        WalkModes("log", speed: "ENFORCE");
+        WalkModes(speed: "ENFORCE", path: "log");
         await using var alice = await InWorld("Alice");
         var (step, _) = await StepThenDash(alice);
         await Next(alice, GameAoiSink.MovementChange, MovementChangeNtf.Parser, m => m.Uid == (long)alice.Self!.Uuid);

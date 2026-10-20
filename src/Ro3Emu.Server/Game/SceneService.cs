@@ -483,15 +483,15 @@ public sealed partial class SceneService(IOptions<ServerOptions> options, World 
     }
 
     /// <summary>
-    /// Checks a client walk against the nav grid and the speed attribute. ServerOptions.WalkCheck sets the mode of both
-    /// checks, and WalkSpeedCheck / WalkPathCheck set one apart: "off", "log" (default: report only) or "enforce" (log
-    /// and snap the client back to the last good position). A walk failing an enforced check is refused.
+    /// Checks a client walk against the nav grid and the speed attribute. ServerOptions.WalkSpeedCheck and
+    /// WalkPathCheck set each check's mode: "off", "log" (default: report only) or "enforce" (log and snap the client
+    /// back to the last good position). A walk failing an enforced check is refused.
     /// </summary>
     public async Task<bool> AcceptWalkAsync(GameSession s, WalkReq walk)
     {
         var o = options.Value;
-        var speedMode = WalkCheckMode(string.IsNullOrWhiteSpace(o.WalkSpeedCheck) ? o.WalkCheck : o.WalkSpeedCheck);
-        var pathMode = WalkCheckMode(string.IsNullOrWhiteSpace(o.WalkPathCheck) ? o.WalkCheck : o.WalkPathCheck);
+        var speedMode = WalkCheckMode(o.WalkSpeedCheck);
+        var pathMode = WalkCheckMode(o.WalkPathCheck);
         if ((speedMode == "off" && pathMode == "off") || worldData.Map(s.SceneEntry)?.Nav is not { } nav) return true;
         var now = DateTime.UtcNow;
         var from = s.Position;

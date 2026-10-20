@@ -86,8 +86,8 @@ Open TCP `5380`, `20000` and `33100`.
   on your own PC. A hosted server gives them only to the accounts you name with `--gm` ([GM access](docs/guide/gm-access.md)).
 - **Bug reports from players:** the Feedback button in the game menu or `/bug <text>` in chat ([feedback](docs/guide/feedback.md)).
 - **Rates:** `Ro3Emu:Rates` multiplies the EXP, item and Zeny that monsters give ([rates](docs/guide/rates.md)).
-- **Walk check:** speed and wall checks on every walk only log by default; `Ro3Emu:WalkCheck=enforce` snaps cheaters
-  back, and `WalkSpeedCheck` / `WalkPathCheck` set each check apart ([walk check](docs/guide/walk-check.md)).
+- **Walk check:** speed and wall checks on every walk only log by default; `Ro3Emu:WalkSpeedCheck=enforce` and
+  `Ro3Emu:WalkPathCheck=enforce` snap cheaters back ([walk check](docs/guide/walk-check.md)).
 - **Bonus Time:** `Ro3Emu:FreezeBonusTime` keeps field Bonus Time from running down (off by default;
   [frozen Bonus Time](docs/guide/bonus-time.md)).
 - **Free Top Up:** the in-game Top Up and currency exchange work without any payment (`Ro3Emu:TopUp:Free`, on in

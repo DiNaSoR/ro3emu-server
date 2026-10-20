@@ -5,7 +5,7 @@
 - [GM access](guide/gm-access.md): who may use GM commands (`Ro3Emu:GmAccounts`) and what the client's GM panel can do
 - [Open content](guide/open-content.md): every feature the client can show is playable (`Ro3Emu:OpenContent`)
 - [Rates](guide/rates.md): Base/Job EXP, item drop and currency drop multipliers for monster kills (`Ro3Emu:Rates`)
-- [Walk check](guide/walk-check.md): log or refuse walks that are too fast or cross walls (`Ro3Emu:WalkCheck`, `WalkSpeedCheck`, `WalkPathCheck`)
+- [Walk check](guide/walk-check.md): log or refuse walks that are too fast or cross walls (`Ro3Emu:WalkSpeedCheck`, `Ro3Emu:WalkPathCheck`)
 - [Frozen Bonus Time](guide/bonus-time.md): field Bonus Time never runs down (off by default; `Ro3Emu:FreezeBonusTime`)
 - [Trade Exchange for solo play](guide/exchange.md): a built-in seller that stocks the exchange and buys cheap listings back (`Ro3Emu:Exchange`)
 - [Starter kit](guide/starter-kit.md): what a new character starts with (nothing by default; `Ro3Emu:StarterKit`)
