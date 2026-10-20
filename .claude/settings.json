@@ -21,7 +21,12 @@
       "Bash(dotnet build:*)",
       "Bash(dotnet test:*)",
       "Bash(dotnet restore:*)",
-      "Bash(dotnet format:*)"
+      "Bash(dotnet format:*)",
+      "mcp__github__create_pull_request",
+      "mcp__github__update_pull_request",
+      "mcp__github__issue_write",
+      "mcp__github__add_issue_comment",
+      "mcp__claude-code-remote__subscribe_pr_activity"
     ],
     "deny": [
       "Bash(git push --force:*)",
