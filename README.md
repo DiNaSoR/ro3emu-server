@@ -233,9 +233,8 @@ dotnet test tests/Ro3Emu.Patcher.Tests -c Release                       # update
 
 Tests of content need the exported `data/` and are skipped without it; tests of rules (persistence, retries,
 ownership, logins) run on a small invented data set in `tests/Ro3Emu.Tests/Fixtures/GameData`, so CI runs them too
-([docs/guide/testing.md](docs/guide/testing.md)). CI runs all three suites on Linux on every push. The suite runs as
-if the machine were in UTC+08, so results don't depend on where it runs (`RO3EMU_TEST_HOST_TZ=<zone id>` picks another
-zone, `host` keeps the real one).
+([docs/guide/testing.md](docs/guide/testing.md)). CI runs all three suites on Linux and Windows for every pull request and push to `main`. The suite runs as if the machine were in UTC+08, so results don't depend on where it runs
+(`RO3EMU_TEST_HOST_TZ=<zone id>` picks another zone, `host` keeps the real one).
 
 The whole server suite takes about 12 minutes on 4 cores. While you work, build once, pass `--no-build` and filter to
 the classes you touched (`--filter "FullyQualifiedName~Ro3Emu.Tests.TavernTests"`); the

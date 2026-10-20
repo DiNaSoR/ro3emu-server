@@ -14,8 +14,8 @@ using Ro3Emu.Bot;
 //   guildapply <guildId>  apply to a guild;  guildhelp <guildId>  respond to a guild being founded;  guildleave
 //   quit
 // usage: Ro3Emu.BotCli voice-echo <server http base> <account> <password> [roleName] [--delay-ms 1000] [--data-dir <dir>] [--guild <guildId> [--channel 0] [--ask-mic]]
-//   --guild: instead of a party, apply to that guild, wait to be accepted and sit in its voice channel (channel state
-//   only, no audio yet); --ask-mic asks for the mic each time the channel turns to Order mode.
+//   --guild: instead of a party, apply to that guild, wait to be accepted, sit in its voice channel and echo there
+//   (when the server's voice relay is on); --ask-mic asks for the mic each time the channel turns to Order mode.
 //   waits for a party invite, accepts it and echoes the party's voice back (see BotVoiceEcho)
 if (args.Length > 0 && args[0] == "voice-echo")
 {
@@ -197,7 +197,25 @@ static async Task<int> VoiceEchoAsync(string[] args)
         if (guildId > 0)
         {
             await BotGuildVoice.JoinGuildAsync(bot, http, account, guildId, Log, stop.Token);
-            int joinCode = await BotGuildVoice.SitAsync(bot, roleId, channel, askMic, Log, stop.Token);
+            using var sitting = CancellationTokenSource.CreateLinkedTokenSource(stop.Token);
+            var sit = BotGuildVoice.SitAsync(bot, roleId, channel, askMic, Log, sitting.Token);
+            var room = $"2_{guildId}_{channel}";
+            // The echo starts once the panel seat is taken (the relay admits only who sits in the channel) and ends
+            // with it: a kick from the channel drops the voice connection too.
+            var echo = Task.Run(async () =>
+            {
+                await Task.Delay(TimeSpan.FromSeconds(1), sitting.Token);
+                return await BotVoiceEcho.RunAsync(bot, roleId, room, TimeSpan.FromMilliseconds(delayMs), Log, sitting.Token);
+            });
+            var first = await Task.WhenAny(sit, echo);
+            if (first == echo && echo.IsCompletedSuccessfully && echo.Result.Kind != BotVoiceEchoEndKind.Cancelled)
+                Log("voice echo ended; still sitting in the channel");
+            int joinCode = await sit;
+            sitting.Cancel();
+            // The seat decides the exit code; an echo that broke (network, a refused ticket) is only reported.
+            try { await echo; }
+            catch (OperationCanceledException) { }
+            catch (Exception e) { Log($"voice echo failed: {e.GetType().Name}: {e.Message}"); }
             Log(joinCode == 0 ? "stopped" : "exiting");
             return joinCode == 0 ? 0 : 1;
         }
