@@ -5,7 +5,6 @@ import "MG_MultiDungeon.proto";
 import "MG_Guild.proto";
 import "MG_GuildLeague.proto";
 import "MG_Chicken.proto";
-import "FieldOption.proto";
 import "MG_Siege.proto";
 import "MG_DB.proto";
 import "MG_TerritoryWars.proto";
@@ -14,7 +13,6 @@ import "MG_HeroicSpirit.proto";
 import "MG_GuildDraculaWedding_Init.proto";
 import "MG_RainbowKoi_Init.proto";
 import "MG_AdventureGroup.proto";
-import "MG_Training.proto";
 
 enum TeamType {
   TeamTypeNone = 0;

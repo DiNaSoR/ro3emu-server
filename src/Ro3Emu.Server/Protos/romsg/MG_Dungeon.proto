@@ -4,7 +4,6 @@ import "MG_Common.proto";
 import "MG_PublicServer.proto";
 import "MG_Team.proto";
 import "MG_Chicken.proto";
-import "FieldOption.proto";
 import "MG_Training.proto";
 
 enum DungeonFirstResultType {

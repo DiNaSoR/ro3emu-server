@@ -2,7 +2,6 @@ syntax = "proto3";
 package romsg;
 import "MG_Common.proto";
 import "MG_Pack.proto";
-import "FieldOption.proto";
 
 enum EquipPosType {
   EquipPosType_None = 0;

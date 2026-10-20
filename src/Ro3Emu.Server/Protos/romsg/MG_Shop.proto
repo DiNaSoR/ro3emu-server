@@ -1,7 +1,5 @@
 syntax = "proto3";
 package romsg;
-import "MG_PublicServer.proto";
-import "FieldOption.proto";
 
 enum CollectOperateType {
   CollectOperateType_None = 0;

@@ -3,7 +3,6 @@ package romsg;
 import "MG_Common.proto";
 import "MG_DB.proto";
 import "MG_PublicServer.proto";
-import "FieldOption.proto";
 
 message DBMultiDungeonHallOfFame {
   int32 multiDungeonBossId = 1;

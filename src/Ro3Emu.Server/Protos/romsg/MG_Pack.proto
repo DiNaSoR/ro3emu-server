@@ -1,7 +1,5 @@
 syntax = "proto3";
 package romsg;
-import "MG_Common.proto";
-import "FieldOption.proto";
 import "MG_Chat.proto";
 
 enum ItemQualityType {

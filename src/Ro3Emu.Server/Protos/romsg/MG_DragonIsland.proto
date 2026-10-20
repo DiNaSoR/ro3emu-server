@@ -1,6 +1,5 @@
 syntax = "proto3";
 package romsg;
-import "MG_Define.proto";
 import "MG_Common.proto";
 
 message DragonIslandClaimRankRewardReq {

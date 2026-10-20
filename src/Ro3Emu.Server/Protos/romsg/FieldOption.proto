@@ -1,4 +1,3 @@
 syntax = "proto3";
 package romsg;
-import "google/protobuf/descriptor.proto";
 

@@ -1,7 +1,6 @@
 syntax = "proto3";
 package romsg;
 import "MG_Common.proto";
-import "FieldOption.proto";
 
 message ResourceOperate {
   repeated romsg.ItemBaseInfo item = 1;

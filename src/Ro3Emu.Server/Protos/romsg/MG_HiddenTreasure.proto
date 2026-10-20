@@ -1,6 +1,5 @@
 syntax = "proto3";
 package romsg;
-import "FieldOption.proto";
 
 enum EHiddenTreasureNpcState {
   EHiddenTreasureNpcState_None = 0;

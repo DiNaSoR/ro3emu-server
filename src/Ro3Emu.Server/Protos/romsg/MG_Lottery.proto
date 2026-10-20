@@ -1,6 +1,5 @@
 syntax = "proto3";
 package romsg;
-import "FieldOption.proto";
 import "MG_DB.proto";
 
 enum ELotteryPoolType {

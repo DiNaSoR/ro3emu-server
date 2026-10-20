@@ -2,7 +2,6 @@ syntax = "proto3";
 package romsg;
 import "MG_Common.proto";
 import "MG_Guild.proto";
-import "FieldOption.proto";
 
 enum GuildLeagueStatus {
   GuildLeagueStatus_None = 0;
