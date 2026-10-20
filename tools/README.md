@@ -1,7 +1,7 @@
 # Tools
 
 Everything here works on files from your own client (`RO3_CLIENT_DIR`, the `ROO_PC` folder) and writes into the
-ignored `data/` and `re/` folders. The main [README](../README.md#1-export-the-game-data) has the export recipe.
+ignored `data/` and `re/` folders. The main [README](../README.md#running-from-source) has the export recipe.
 
 | Tool | What it does |
 |---|---|
@@ -16,3 +16,8 @@ ignored `data/` and `re/` folders. The main [README](../README.md#1-export-the-g
 | `EconomyProbe` | read-only economy snapshots and ledger checks against a server database (used by load scenario S3) |
 | `patch-client.ps1` | rebuilds the client hooks and patches the client in `RO3_CLIENT_DIR` against a local server |
 | `run-server.ps1` | runs the server and restarts it when it exits, logging to `data/logs/` |
+| `update-client-dlls.sh` | installs the client DLLs from the rolling `client-dlls` release (or a folder you give it) into RO3Emu and the game |
+| `update-launcher.sh` | installs RO3Emu.exe from the rolling `launcher` release (backing up the old exe), then runs `update-client-dlls.sh` |
+| `test-summary.ps1` | one line per test project from `.trx` results: executed, failed, skipped for want of client data |
+| `release/` | `pack.ps1` builds the release archives, `smoke.ps1` tests the zip, `client-dlls.ps1` builds the client DLLs without a client |
+| `check-site.mjs` · `render-social-preview.ps1` | checks the project website in `docs/site` and renders its social preview |

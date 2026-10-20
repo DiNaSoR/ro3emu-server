@@ -7,7 +7,7 @@ If Windows says "Windows protected your PC" (RO3Emu is not signed), click
 
 The first time it:
   1. finds your Ragnarok 3 game folder (the one with ro3.exe), or lets you pick it,
-     or downloads the game from the official Genesis servers (about 24 GB; every
+     or downloads the game from the Genesis update servers (about 24 GB; every
      file is checked against the publisher's signature);
   2. exports the game data it needs from your game folder (about a minute);
   3. starts the server on this PC;
@@ -30,9 +30,9 @@ Other things it can do (open a command prompt in this folder):
                                    log in for you: the game skips its login and
                                    server screens (asks for the password)
   RO3Emu.exe host                  let friends on your network join your server
-  RO3Emu.exe install               download the game from the official servers
-  RO3Emu.exe update                update the game from the official servers
-  RO3Emu.exe restore               undo the patch (the game talks to the official servers again)
+  RO3Emu.exe install               download the game from the Genesis update servers
+  RO3Emu.exe update                update the game from the Genesis update servers
+  RO3Emu.exe restore               undo the patch (the game talks to the Genesis servers again)
   RO3Emu.exe diag                  write RO3Emu-diagnostics.zip for a bug report
   RO3Emu.exe help                  everything else
 

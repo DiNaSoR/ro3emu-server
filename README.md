@@ -8,8 +8,8 @@ server first; changes to the original rules come after.
 
 <p align="center">
   <a href="https://github.com/aethai/ro3emu-server/releases/latest"><img src="https://img.shields.io/github/v/release/aethai/ro3emu-server?label=release" alt="Latest release"></a>
-  <a href="https://github.com/aethai/ro3emu-server/actions/workflows/tests.yml"><img src="https://github.com/aethai/ro3emu-server/actions/workflows/tests.yml/badge.svg" alt="Tests on Linux"></a>
-  <a href="https://github.com/aethai/ro3emu-server/actions/workflows/ci.yml"><img src="https://github.com/aethai/ro3emu-server/actions/workflows/ci.yml/badge.svg" alt="Client-independent .NET checks"></a>
+  <a href="https://github.com/akreao/ro3emu-server/actions/workflows/tests.yml"><img src="https://github.com/akreao/ro3emu-server/actions/workflows/tests.yml/badge.svg" alt="Tests on Linux"></a>
+  <a href="https://github.com/akreao/ro3emu-server/actions/workflows/ci.yml"><img src="https://github.com/akreao/ro3emu-server/actions/workflows/ci.yml/badge.svg" alt="Client-independent .NET checks"></a>
   <img src="https://img.shields.io/badge/C%23-.NET%2010-512BD4?logo=dotnet&logoColor=white" alt=".NET 10">
   <img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="GPL-3.0">
 </p>
@@ -28,8 +28,10 @@ server first; changes to the original rules come after.
 
 ## Play on your own PC
 
-1. Download **`RO3Emu-win-x64.zip`** from the [latest release](https://github.com/aethai/ro3emu-server/releases/latest)
-   and extract it anywhere.
+1. Download **`RO3Emu-win-x64.zip`** and extract it anywhere. This fork's newest build (from main, with
+   `RO3EmuDesktop.exe` and the login skip) is the rolling
+   [`launcher` release](https://github.com/akreao/ro3emu-server/releases/tag/launcher); upstream's tagged builds are
+   on its [latest release](https://github.com/aethai/ro3emu-server/releases/latest).
 2. Double-click **`RO3Emu.exe`**. Nothing to install: no .NET, Java or Node.js. If Windows says "Windows protected
    your PC" (RO3Emu is not signed), click *More info*, then *Run anyway*.
 3. The first time, it finds your Ragnarok 3: Genesis game folder (or asks for the one with `ro3.exe`), prepares the
@@ -47,8 +49,8 @@ server, not the official one: the official Ragnarok Online 3 server has not laun
 |---|---|
 | `RO3Emu.exe` | play on your own server (same as `RO3Emu.exe start`) |
 | `RO3Emu.exe join <address>` | play on someone else's server (`host`, `host:port` or `http://host:port`) |
-| `... --account <name>` | (`start`, `host`, `join`) log in for the player: the game skips its login and server screens |
-| `RO3EmuDesktop.exe` | the window launcher, works on its own: server list, login, *Update DLLs* (newest CI build) and *Play* (gets a newer CI build of the DLLs when there is one, then the same patch, login and start as `join`) |
+| `... --account <name>` | (`start`, `host`, `join`) log in for the player: the game skips its login and server screens and opens on character select (the password is asked, or taken from `--password` or `RO3EMU_PASSWORD`) |
+| `RO3EmuDesktop.exe` | (in the same zip) the window launcher, works on its own without RO3Emu.exe: server list, login, *Update DLLs* (newest CI build) and *Play* (gets a newer CI build of the DLLs when there is one, then the same patch, login and start as `join`) |
 | `RO3Emu.exe host` | your server, open to friends (`--gm <account>` for GM commands) |
 | `RO3Emu.exe install [folder]` / `update [folder]` | the game from the Genesis update servers, every file checked |
 | `RO3Emu.exe restore` | undo the patch: the game talks to the Genesis servers again |
@@ -91,7 +93,8 @@ Open TCP `5380`, `20000` and `33100`.
   RO3Emu.exe and `server.sh`; [cash shop](docs/systems/cash-shop.md)).
 - **Solo play:** a built-in Trade Exchange seller and buy-back fill the market when few people play; on for local play,
   off on a hosted server unless you turn them on ([exchange](docs/guide/exchange.md)).
-- **Custom content:** your own quests, NPCs, dialogue and text from `content/*.json` ([custom content](docs/guide/custom-content.md)).
+- **Custom content:** your own quests, NPCs, NPC shops, dialogue and text from `content/*.json`
+  ([custom content](docs/guide/custom-content.md)).
 - **Backups:** the database is backed up to `data/backups/` at start and every 6 hours (newest 20 kept).
 - **One session per account:** a second login takes over from the first. The client runs one instance per PC;
   `Ro3Emu.BotCli` can stand in for extra players when you test alone.
@@ -138,6 +141,7 @@ show is playable from day one, without season or server-day gates ([details](doc
 - trade center, stalls, auctions (guild, world, event), mail
 - NPC, point and guild shops, battle pass, cash shop and Top Up, Fashion gifts to friends
 - friends and gifts, parties and raids, chat channels and horns
+- Connect Quests and activity Intimacy between party friends
 - party voice chat through the server (off by default, see below)
 - Tavern rooms with text and voice chat, mic rules, gifts and the Daily Tavern
 - adventure groups
@@ -170,6 +174,8 @@ show is playable from day one, without season or server-day gates ([details](doc
 - **Smaller missing pieces:** some stages of the story dungeons
   that are still simplified.
 - **Guild voice:** only party and Tavern voice are implemented.
+- **Guild Technology and Timed Strategies**, the Starshatter Dragon Summon Ritual, party teleport invites and big-map
+  marks, and leaderboard rewards: the client sends these requests and the server does not answer them yet.
 
 **Voice.** Party voice goes through a relay in the server instead of the publisher's Tencent GME, and the patched
 client records and plays it through Windows' own winmm. It is off by default: `Voice:Port` turns it on. The voice
@@ -210,9 +216,10 @@ chunks into standard Lua 5.4 bytecode for any decompiler.
 | `src/Ro3Emu.ClientHooks` · `src/Ro3Emu.Loc` | code injected into the client: Lua patches, party voice and the English text layer |
 | `src/Ro3Emu.Bot` · `src/Ro3Emu.BotCli` | a scripted client speaking the real protocol (tests, load, extra players) |
 | `src/Ro3Emu.LoadTest` | load runner: scenarios S1-S5 with protocol bots |
-| `src/Ro3Emu.Launcher` · `src/Ro3Emu.Patcher` | a player launcher and its content-addressed update engine |
+| `src/Ro3Emu.Desktop` | RO3EmuDesktop.exe: the window launcher (Avalonia) for joining servers; runs RO3Emu.exe's join flow in-process |
+| `src/Ro3Emu.Launcher` · `src/Ro3Emu.Patcher` | a launcher for a hosted patch repository and its content-addressed update engine |
 | `tests/` | end-to-end tests: the server in-process, bots over real sockets |
-| `tools/` | Lua, config, nav and message-table export, release scripts |
+| `tools/` | Lua, config, nav and message-table export, release scripts, `update-client-dlls.sh` and `update-launcher.sh` ([tools/README.md](tools/README.md)) |
 | `docs/` | guides, system notes, client research |
 
 ### Tests
@@ -225,8 +232,13 @@ dotnet test tests/Ro3Emu.Patcher.Tests -c Release                       # update
 
 Tests of content need the exported `data/` and are skipped without it; tests of rules (persistence, retries,
 ownership, logins) run on a small invented data set in `tests/Ro3Emu.Tests/Fixtures/GameData`, so CI runs them too
-([docs/guide/testing.md](docs/guide/testing.md)). CI runs all three suites on Linux on every push. The suite runs as if the machine were in UTC+08, so results don't depend on where it runs
-(`RO3EMU_TEST_HOST_TZ=<zone id>` picks another zone, `host` keeps the real one).
+([docs/guide/testing.md](docs/guide/testing.md)). CI runs all three suites on Linux on every push. The suite runs as
+if the machine were in UTC+08, so results don't depend on where it runs (`RO3EMU_TEST_HOST_TZ=<zone id>` picks another
+zone, `host` keeps the real one).
+
+The whole server suite takes about 12 minutes on 4 cores. While you work, build once, pass `--no-build` and filter to
+the classes you touched (`--filter "FullyQualifiedName~Ro3Emu.Tests.TavernTests"`); the
+[testing guide](docs/guide/testing.md#running-tests-while-you-work) lists the usual filters.
 
 ### Load tests
 
@@ -291,8 +303,8 @@ what to include in a report or a change. Thanks to everyone who has sent fixes s
 
 ## Documentation
 
-- [`docs/guide/`](docs/guide): running a server (GM access, open content, rates, starter kit, Trade Exchange, custom
-  content, feedback, launcher)
+- [`docs/guide/`](docs/guide): running a server (GM access, open content, rates, frozen Bonus Time, starter kit, Trade
+  Exchange, custom content, reopened content, feedback, patch-repository launcher) and the [tests](docs/guide/testing.md)
 - [`docs/systems/`](docs/systems): how each system works and which rules are inferred
 - [`docs/research/`](docs/research): the client evidence behind the protocol and rules
 
