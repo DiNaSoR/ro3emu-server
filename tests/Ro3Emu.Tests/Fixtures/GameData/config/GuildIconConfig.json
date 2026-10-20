@@ -1,4 +1,6 @@
 {
   "100101": { "_iID": 100101, "_iType": 1, "_iCreateShow": 1, "_iDefaultUnlock": 1 },
-  "200101": { "_iID": 200101, "_iType": 2, "_iCreateShow": 1, "_iDefaultUnlock": 1 }
+  "200101": { "_iID": 200101, "_iType": 2, "_iCreateShow": 1, "_iDefaultUnlock": 1 },
+  "100102": { "_iID": 100102, "_iType": 1, "_iCreateShow": 1, "_iDefaultUnlock": 0 },
+  "200102": { "_iID": 200102, "_iType": 2, "_iCreateShow": 1, "_iDefaultUnlock": 0 }
 }
