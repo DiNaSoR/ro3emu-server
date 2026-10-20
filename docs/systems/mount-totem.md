@@ -34,6 +34,17 @@ separate ownership, selected slot and visible riding. In particular:
   `m_kMountComp.m_bRideSystemMount` is set and drops it once its chant and action time have passed, so a
   later dismount left the first hit invisible. The riding mount's `_kFlySwitchSkills`, quest rides and
   battle mounts (slot 2) stay mounted *(inferred)*.
+- Flying mounts (`MountsConfig._iType` 1: the Starshatter Dragon 60060010 from the Dragon Whistle 1501004, and
+  60040033) fly by their `_kFlySwitchSkills` [take-off, landing] (`WorldCoreService.MountFlight`). No client Lua sends
+  31083; `LC_Movement_AStarAgentNew` sends 31084 once the unit is `m_bFlying`, which `LC_UnitBase` takes from the
+  status word's `eObjectStateFly` (43) bit. While the mount is ridden the 5025 wheel's `SkillWheelMount1` holds the
+  take-off (landing in the air), which `JoyStickSkillNormalMixin` shows as the mount button; the ground buff is
+  `_kBindBuff` (3112101) and the air buff is the row sharing the landing skill's id (3112201, `FlyBuffTag`). An
+  accepted take-off sets the bit and raises the server position by the skill's rise (EffectData 3112121: 20 m); an
+  accepted landing clears it and grounds the position; getting off in the air lands at once *(inferred)*. The skill
+  condition `[2009, 1]` is `CheckSceneFlyable` (`MapConfig._iFly`). The Worldscorch Feather suit's `_iSkillID`
+  3112101 only shows this skill's video in the wardrobe; `content/wardrobe-unlocks.json` lists the dragon's
+  disabled look so the wardrobe Mount tab lights it.
 - All attribute contributions use `MountsConfig`/`CartRemouldTable._kAttr`, including percentage
   movement attribute 1131. Self and viewers receive the same `curRider` and refreshed properties.
 - Item action 201 validates the configured target and consumes the requested GUID together with

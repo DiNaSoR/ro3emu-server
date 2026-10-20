@@ -354,6 +354,8 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
 
     /// <summary>The pet Main Skill the last 5025 showed (PetService.RefreshMainSkillAsync); 0 for none.</summary>
     public int PetMainSkillShown { get; set; }
+    /// <summary>The SkillWheelMount1 skill last sent in 5025 (SkillService.RefreshMountSkillAsync).</summary>
+    public int MountSkillShown { get; set; }
 
     /// <summary>Card collection (AUTO_SYNC 5057), loaded at login by CardService.</summary>
     public Romsg.DBLibraryInfo? Library { get; set; }

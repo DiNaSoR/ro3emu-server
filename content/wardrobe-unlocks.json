@@ -1,10 +1,11 @@
 {
-  "//": "Wardrobe looks the client data disables (_iDisable 1) but the Fashion shop sells as part of a set, or hands out as a set's gift voucher: Silverwing Covenant's 20050010 (vouchers 3045201/3045202), Worldscorch Feather's Brilliant Gold 20060010 and Ashen Embers 70060010 (voucher 3016701, the Worldscorch gift). The client leaves disabled looks out of the wardrobe and the server refuses them, so the vouchers failed. These rows copy each look with _iDisable 0. Delete this file to disable them again.",
+  "//": "Wardrobe looks the client data disables (_iDisable 1) but the Fashion shop sells as part of a set, or hands out as a set's gift voucher: Silverwing Covenant's 20050010 (vouchers 3045201/3045202), Worldscorch Feather's Brilliant Gold 20060010 and Ashen Embers 70060010 (voucher 3016701, the Worldscorch gift). The client leaves disabled looks out of the wardrobe and the server refuses them, so the vouchers failed. The Starshatter Dragon 60060010 (Dragon Whistle 1501004) is the mount behind the Worldscorch Feather's Take Flight skill; its look must be listed for the wardrobe Mount tab to light and ride it. These rows copy each look with _iDisable 0. Delete this file to disable them again.",
   "rows": {
     "WardRobeConfig": {
       "20050010": { "_base": 20050010, "_iDisable": 0 },
       "20060010": { "_base": 20060010, "_iDisable": 0 },
-      "70060010": { "_base": 70060010, "_iDisable": 0 }
+      "70060010": { "_base": 70060010, "_iDisable": 0 },
+      "60060010": { "_base": 60060010, "_iDisable": 0 }
     }
   }
 }

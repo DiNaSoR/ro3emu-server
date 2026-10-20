@@ -116,6 +116,21 @@ public sealed class AppearanceShopTests : IAsyncLifetime
         Assert.All(result.Locations, x => Assert.Equal("0", x.Residual));
     }
 
+    // The Worldscorch Feather's Take Flight (3112101) is the Starshatter Dragon's take-off. The dragon's look is
+    // _iDisable 1 in the client data; content/wardrobe-unlocks.json lists it, so the whistle lights the Mount tab entry.
+    [ClientDataFact]
+    public async Task DragonWhistleLightsTheStarshatterDragonsWardrobeLook()
+    {
+        await using var bot = await Enter();
+        await Gm("!item 1501004 1");
+        long whistle = Alice.Items.Single(i => i.Entry == 1501004).Guid;
+        await bot.SendGameAsync(CharacterService.ItemUse, new ItemUseReq { ItemGuid = whistle, ItemCount = 1 });
+        Assert.Equal(0, (await Next(bot, CharacterService.ItemUse, ItemUseResp.Parser)).Result);
+        await Next(bot, WardrobeService.WardrobeSync, DBWardRobeInfoIncrement.Parser, i => i.AllLightUpAppearances.ContainsKey(60060010));
+        Assert.True(Alice.Mounts!.Mounts.ContainsKey(60060010));
+        Assert.True(SavedWardrobe.AllLightUpAppearances.ContainsKey(60060010));
+    }
+
     [ClientDataFact]
     public async Task CustomCostumeRowSellsASuitWhosePiecesTheClientPartlyDisables()
     {

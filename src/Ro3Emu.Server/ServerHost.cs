@@ -225,6 +225,11 @@ public static class ServerHost
         app.Services.GetRequiredService<CareerSpecialService>().Changed.Add(app.Services.GetRequiredService<CombatService>().SyncCompanionsAsync);
         // A cast dismounts a system-mount rider before the client starts it (MountService.DismountForCastAsync).
         app.Services.GetRequiredService<CombatService>().BeforeCast.Add(app.Services.GetRequiredService<MountService>().DismountForCastAsync);
+        // Getting off a flying mount in the air lands (WorldCoreService.MountFlight; resolved when called, so the
+        // service keeps its place in the scene hook order), and riding one shows its skill (SkillWheelMount1).
+        app.Services.GetRequiredService<MountService>().Changed.Add(s => app.Services.GetRequiredService<WorldCoreService>().MountsChangedAsync(s));
+        app.Services.GetRequiredService<MountService>().Changed.Add(app.Services.GetRequiredService<SkillService>().RefreshMountSkillAsync);
+        app.Services.GetRequiredService<SceneService>().Loaded.Add(app.Services.GetRequiredService<SkillService>().RefreshMountSkillAsync);
         app.Services.GetRequiredService<CombatService>().TeamMembers = app.Services.GetRequiredService<TeamService>().MembersOf;
         app.Use(async (context, next) =>
         {

@@ -556,6 +556,79 @@ public sealed class MountTests : IAsyncLifetime
     private static string RepoRoot()
     { for (var d = new DirectoryInfo(AppContext.BaseDirectory); d != null; d = d.Parent) if (File.Exists(Path.Combine(d.FullName, "Ro3Emu.slnx"))) return d.FullName; throw new DirectoryNotFoundException(); }
 
+    // The Starshatter Dragon (Dragon Whistle 1501004) flies by its _kFlySwitchSkills: Take Flight 3112101 on the ground,
+    // landing 3112201 in the air. The client sends no 31083; it flies once the status word carries eObjectStateFly (43).
+    [ClientDataFact]
+    public async Task StarshatterDragonTakesOffAndLandsByItsMountSkills()
+    {
+        const int Dragon = 60060010, TakeFlight = 3112101, Land = 3112201;
+        const long FlyBit = 1L << 42;
+        await using var a = await InWorld("Alice");
+        var loop = app.Services.GetRequiredService<GameLoop>();
+        await UnlockMount(a, "alice", 1501004);
+        var s = Session("alice");
+        long self = s.Role!.Id;
+        Task Cast(int skill) => a.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = skill, TargetId = self });
+
+        await Cast(TakeFlight); // not riding yet: not a skill Alice has
+        Assert.NotEqual(0, (await Next(a, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
+        Assert.Equal(0, s.MountSkillShown);
+
+        await a.SendGameAsync(32743, new PlayerMountsSetCfgReq { MountId = Dragon });
+        await Next(a, 32743, PlayerMountsSetCfgResp.Parser);
+        await a.SendGameAsync(32745, new PlayerRiderMountReq { Tp = (eRiderType)1 });
+        Assert.Equal(0, (await Next(a, 32745, PlayerRiderMountResp.Parser)).Result);
+        Assert.Equal(TakeFlight, s.MountSkillShown);
+        Assert.Contains(s.Buffs, b => b.ConfigId == TakeFlight); // the ground buff, MountsConfig _kBindBuff
+
+        await Cast(TakeFlight);
+        Assert.Equal(0, (await Next(a, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
+        var up = await Next(a, CombatService.AoiAttrChange, AOIAttrChange.Parser, m => m.EntityUuid == (ulong)self && m.StateInfo != null
+            && (m.StateInfo.Data.Values[0] & (ulong)FlyBit) != 0);
+        Assert.True(s.WorldState.Flying);
+        Assert.Equal(Dragon, MountService.Rider(s)); // the take-off keeps Alice on the dragon
+        Assert.Contains(s.Buffs, b => b.ConfigId == Land);
+        Assert.DoesNotContain(s.Buffs, b => b.ConfigId == TakeFlight);
+        Assert.Equal(Land, s.MountSkillShown);
+
+        // In the air 31084 moves her (the server raised her by the take-off's 20 m, as the client's effect does).
+        var ahead = s.Position.Clone(); ahead.X += 1;
+        await a.SendGameAsync(WorldCoreService.FlyMove, new FlyMoveReq { Pos = ahead, Dir = new Vec3 { X = 1 }, Face = 90 });
+        await Task.Delay(300);
+        Assert.Equal(ahead.X, s.Position.X);
+
+        await loop.InvokeAsync(() =>
+        {
+            if (s.SkillCast is { } cast) { cast.Cancelled = true; s.SkillCast = null; }
+            s.SkillCds.Clear(); s.SkillModeCds.Clear(); return Task.CompletedTask;
+        });
+        await Cast(Land);
+        Assert.Equal(0, (await Next(a, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
+        await Next(a, CombatService.AoiAttrChange, AOIAttrChange.Parser, m => m.EntityUuid == (ulong)self && m.StateInfo != null
+            && (m.StateInfo.Data.Values[0] & (ulong)FlyBit) == 0);
+        Assert.False(s.WorldState.Flying);
+        Assert.Contains(s.Buffs, b => b.ConfigId == TakeFlight);
+        Assert.DoesNotContain(s.Buffs, b => b.ConfigId == Land);
+        Assert.Equal(TakeFlight, s.MountSkillShown);
+
+        // Getting off in the air lands at once.
+        await loop.InvokeAsync(() =>
+        {
+            if (s.SkillCast is { } cast) { cast.Cancelled = true; s.SkillCast = null; }
+            s.SkillCds.Clear(); s.SkillModeCds.Clear(); return Task.CompletedTask;
+        });
+        await Cast(TakeFlight);
+        Assert.Equal(0, (await Next(a, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
+        Assert.True(s.WorldState.Flying);
+        await a.SendGameAsync(32745, new PlayerRiderMountReq { Tp = (eRiderType)0 });
+        Assert.Equal(0, (await Next(a, 32745, PlayerRiderMountResp.Parser)).Result);
+        await Next(a, WorldCoreService.FixLand, FixLandNtf.Parser);
+        Assert.False(s.WorldState.Flying);
+        Assert.Equal(0, s.StatusBits & FlyBit);
+        Assert.DoesNotContain(s.Buffs, b => b.ConfigId is TakeFlight or Land);
+        Assert.Equal(0, s.MountSkillShown);
+    }
+
     private sealed class ManualClock(DateTimeOffset initial) : TimeProvider
     {
         private long ticks = initial.UtcTicks;

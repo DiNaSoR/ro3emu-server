@@ -64,6 +64,8 @@ public sealed partial class CombatService
         [2004, var mount, ..] => MountService.RidingBattle(s) != (long)mount,
         [2006, var pendant, ..] => HasPendantType(s, (int)pendant),
         [2007, var pendant, ..] => !HasPendantType(s, (int)pendant),
+        // CheckSceneFlyable (LC_ConditionDefine): the map allows flight (MapConfig _iFly), e.g. Take Flight's 86000558.
+        [2009, var flag, ..] => (data.Row("MapConfig", s.SceneEntry) is { } map && GameData.Int(map, "_iFly") == 1) == (flag != 0),
         _ => true,
     };
 
@@ -81,6 +83,13 @@ public sealed partial class CombatService
 
     /// <summary>After a lease, a ride, a learned level, a job change or a scene load: grant or end the companion buffs, and
     /// resend the normal attack when the ridden battle mount changed.</summary>
+    /// <summary>WorldCoreService.FlightChanged: a flying mount's ground/air buff and its wheel slot follow the flight.</summary>
+    public async Task FlightChangedAsync(GameSession s)
+    {
+        await SyncCompanionsAsync(s);
+        await skills.RefreshMountSkillAsync(s);
+    }
+
     public async Task SyncCompanionsAsync(GameSession s)
     {
         if (s.Role == null || s.Progress == null) return;
@@ -93,6 +102,14 @@ public sealed partial class CombatService
         long ride = MountService.RidingBattle(s);
         if (ride != 0 && data.Row("CartRemouldTable", ride) is { } mount)
             foreach (var bound in Numbers(mount, "_kBindBuff")) if (bound > 0) want.Add((int)bound);
+        // A flying System mount: on the ground its MountsConfig _kBindBuff (Starshatter Dragon 3112101), in the air the
+        // buff that shares the landing skill's id (3112201, FlyBuffTag 3100000, which WorldCoreService.CanFly needs).
+        // The two rows name each other's group in _kLogicData (31121 <-> 31122), so one replaces the other (inferred).
+        if (MountService.RidingSystem(s) is var system and > 0 && data.Row("MountsConfig", system) is { } ridden)
+        {
+            if (s.WorldState.Flying && MountService.FlySkills(s, data) is { } fly) want.Add(fly.Down);
+            else foreach (var bound in Numbers(ridden, "_kBindBuff")) if (bound > 0) want.Add((int)bound);
+        }
         if (RidesWolf(s) && skills.Level(s.Progress, WolfsFangGroup) is var fang and > 0
             && data.Row("BuffConfig", skills.RealId(WolfsFangGroup, fang)) is { } fangRow && Numbers(fangRow, "_kLogicData") is [var fangBuff, ..])
             want.Add((int)fangBuff);
