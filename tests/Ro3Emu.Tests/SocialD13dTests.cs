@@ -236,8 +236,9 @@ public sealed class SocialD13dTests : IAsyncLifetime
         }
 
         var friends = Service<FriendStore>();
-        Assert.Equal(1, friends.Intimacy(a, b));
-        Assert.Equal(1, friends.Intimacy(b, a));
+        // 1004000 carries _iUseEffect [107, 10]: one gift is 10 Intimacy.
+        Assert.Equal(10, friends.Intimacy(a, b));
+        Assert.Equal(10, friends.Intimacy(b, a));
         Assert.Single(friends.LoadMetadata(a).SendGiftRecords);
         Assert.Single(friends.LoadMetadata(b).ReceiveGiftRecords);
         Assert.Equal(1, Scalar($"SELECT COUNT(*) FROM economy_entry WHERE asset_id=1004000 AND delta=-1 AND reason_code={(int)EconomyReason.FriendGiftCost}"));
