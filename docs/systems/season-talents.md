@@ -25,19 +25,30 @@ child. So the server, **(inferred)**:
 
 - opens a job node while its branch point would open (a large node's parent is the type-5 node, a small node's
   parent is the large node);
-- refuses a node without a level-1 row for the role's job (`FeatureUnavailable`). Rows are per job: a third-rank
-  job sees two or three large nodes per branch point, each with two small nodes;
-- on a purchase, sets the node and its large node to level 1, sets the branch point to level 1 (opening the
-  ordinary node after it) and clears a different large node already chosen at that branch point in this plan,
-  with its small nodes. Each small node of the chosen branch can be taken;
-- charges a job node's `_kCosts` (empty for every exported row).
+- takes the selected small node, or a large node that has no small node for the role's job
+  (`SeasonTalentService.Profession.cs`), and refuses anything else (`TalentInvalid`): a node without a level-1 row
+  for the role's job, or a large node whose small nodes the role can choose;
+- sets the branch point, the large node and the small node to level 1 and clears every other node of that branch
+  point's choice in this plan. Choosing the same node again changes nothing. One small node per choice;
+- charges nothing: every exported job row's `_kCosts` is empty.
 
 ## Total talent level
 
 Tree and node thresholds count the total the talent panel shows (`UI_Sys_Skill_SeasonTalentPanelCtrl._refreshGrade`):
 every node of every tree except the branch points (type 5). That is the selected plan's ordinary and job node levels
-plus the shared oath level. Job nodes must count: the first two trees' ordinary nodes stop at 120 levels, and the third
-tree needs 126. **(inferred)** that the server's gate uses the same number the panel shows.
+plus the shared oath level. The tree gates (`SeasonTalentTreeConfig._iNeedLevel`) need the job nodes: each one equals
+all ordinary levels of the trees before it plus 2 per branch point, one large and one small node per choice:
+
+| Tree | Gate | Ordinary levels before it | Branch points before it |
+| --- | --- | --- | --- |
+| 10103 | 126 | 120 | 3 |
+| 10104 | 228 | 220 | 4 |
+| 10105 | 330 | 320 | 5 |
+| 10106-10110 | 510, 690, 870, 1050, 1230 | each tree adds 180 | 5 |
+| 10111 | 1590 | 1580 | 5 |
+
+Without the job nodes no tree after the second could open. **(inferred)** that the server's gate uses the same number
+the panel shows.
 
 `_kProfessionID` on large node rows names the schools the select list shows as suited. It is not a restriction.
 
