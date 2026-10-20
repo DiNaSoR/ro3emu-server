@@ -31,7 +31,7 @@ jobs:
         run: |
           $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } else { '0.0.0' }
           ./tools/release/pack.ps1 -UsePrebuiltClientDlls -Version $version
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: ro3emu-release
           path: |
