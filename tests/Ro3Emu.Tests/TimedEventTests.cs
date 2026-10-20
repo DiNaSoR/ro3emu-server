@@ -259,8 +259,11 @@ public sealed class TimedEventTests : IAsyncLifetime
         clock.Set(new DateTimeOffset(2025, 7, 1, 12, 0, 0, TimeSpan.Zero).ToUnixTimeSeconds());
         await using var bot = await InWorld("Alice");
         long role = (long)bot.Self!.Uuid;
-        var fake = new ActivityDataUploadReq { ActivityId = Novice, PlayerId = role + 1,
-            UploadParam = new ActivityDataUploadParam { NoviceActivity = new NoviceActivity() } };
+        var fake = new ActivityDataUploadReq
+        {
+            ActivityId = Novice, PlayerId = role + 1,
+            UploadParam = new ActivityDataUploadParam { NoviceActivity = new NoviceActivity() }
+        };
         fake.UploadParam.NoviceActivity.TaskIds[100001] = 7;
         await bot.SendGameAsync(TimedEventService.Upload, fake);
         var refused = await Next(bot, TimedEventService.Upload, ActivityDataUploadResp.Parser);
@@ -276,8 +279,11 @@ public sealed class TimedEventTests : IAsyncLifetime
     public async Task PronteraDonateRejectsClosedLevelAndReplayAndPersistsContribution()
     {
         await using var bot = await InWorld("Alice");
-        var request = new CommonActivityReq { ActivityId = PronteraDefenseService.ActivityId, RequestId = 1,
-            PronteraDefenseDonate = new PronteraDefenseDonateReq { ItemCount = 1 } };
+        var request = new CommonActivityReq
+        {
+            ActivityId = PronteraDefenseService.ActivityId, RequestId = 1,
+            PronteraDefenseDonate = new PronteraDefenseDonateReq { ItemCount = 1 }
+        };
         await bot.SendGameAsync(NewActivityService.Common, request);
         Assert.Equal(ErrorCodes.FunctionLocked,
             (await Next(bot, NewActivityService.Common, CommonActivityRes.Parser)).Result);
@@ -859,8 +865,11 @@ public sealed class TimedEventTests : IAsyncLifetime
     private static async Task<int> RiftEnterAsync(BotClient bot, TimedBattleService.RiftStone stone)
     {
         // The client names the stone by its unit uid (LC_SceneManagerNew.SendEnterDungeonWithOnePieceData).
-        await bot.SendGameAsync(DungeonService.Enter, new EnterDungeonReq { SceneEntry = stone.Scene,
-            InitData = new DungeonInitData { HiddenTreasureInitData = new HiddenTreasureInitData { NpcId = stone.Uid } } });
+        await bot.SendGameAsync(DungeonService.Enter, new EnterDungeonReq
+        {
+            SceneEntry = stone.Scene,
+            InitData = new DungeonInitData { HiddenTreasureInitData = new HiddenTreasureInitData { NpcId = stone.Uid } }
+        });
         return (await Next(bot, DungeonService.Enter, EnterDungeonRsp.Parser)).Result;
     }
 

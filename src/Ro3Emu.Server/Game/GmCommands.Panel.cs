@@ -42,11 +42,11 @@ public sealed partial class GmCommands
         {
             case OpStrengthen:
             case OpRefine:
-            {
-                if (!PartGrids.TryGetValue(I(Arg(args, 0)), out var grids)) throw new ArgumentException("part 1-6");
-                int level = Has(args, 1) ? I(args[1]) : 1;
-                return await services.GetRequiredService<EquipmentService>().GmSetLevelAsync(s, grids, level, op == OpRefine);
-            }
+                {
+                    if (!PartGrids.TryGetValue(I(Arg(args, 0)), out var grids)) throw new ArgumentException("part 1-6");
+                    int level = Has(args, 1) ? I(args[1]) : 1;
+                    return await services.GetRequiredService<EquipmentService>().GmSetLevelAsync(s, grids, level, op == OpRefine);
+                }
             case OpResetAttrPnt:
                 await character.ResetStatsAsync(s);
                 return "Stat points reset.";
@@ -55,17 +55,17 @@ public sealed partial class GmCommands
             case OpDropPool:
                 return await DropPoolAsync(s, L(Arg(args, 0)));
             case OpAddNpc:
-            {
-                int npc = I(Arg(args, 0));
-                var at = new MapPoint(s.Position.X, s.Position.Y, s.Position.Z, s.Face);
-                var unit = await services.GetRequiredService<MonsterService>().SpawnSingleAsync(s.RuntimeMap, npc, at);
-                return unit == null ? $"NPC {npc} is not a monster the server can spawn here." : $"Spawned {npc} (uid {unit.Uid}).";
-            }
+                {
+                    int npc = I(Arg(args, 0));
+                    var at = new MapPoint(s.Position.X, s.Position.Y, s.Position.Z, s.Face);
+                    var unit = await services.GetRequiredService<MonsterService>().SpawnSingleAsync(s.RuntimeMap, npc, at);
+                    return unit == null ? $"NPC {npc} is not a monster the server can spawn here." : $"Spawned {npc} (uid {unit.Uid}).";
+                }
             case OpKillEntity:
-            {
-                var t = Target(s, Arg(args, 0));
-                return await ChangeHpAsync(s, t, 0, t.Monster?.Hp ?? character.Stats(t.Player!)[AttrHp]);
-            }
+                {
+                    var t = Target(s, Arg(args, 0));
+                    return await ChangeHpAsync(s, t, 0, t.Monster?.Hp ?? character.Stats(t.Player!)[AttrHp]);
+                }
             case OpDumpEntityAttr:
                 return Describe(Target(s, Arg(args, 0)), null);
             case OpShowAttr:
@@ -97,11 +97,11 @@ public sealed partial class GmCommands
             case OpSendMailSystemByCfgId:
                 return await TemplateMailAsync(I(Arg(args, 0)), Has(args, 1) ? I(args[1]) : 0);
             case OpFullHpMp:
-            {
-                var stats = character.Stats(s);
-                await character.SetHpSpAsync(s, stats[AttrMaxHp], stats[AttrMaxSp]);
-                return "HP and SP full.";
-            }
+                {
+                    var stats = character.Stats(s);
+                    await character.SetHpSpAsync(s, stats[AttrMaxHp], stats[AttrMaxSp]);
+                    return "HP and SP full.";
+                }
             case OpShowLocation:
                 return string.Create(CultureInfo.InvariantCulture,
                     $"Map {s.SceneEntry} {data.MapName(s.SceneEntry)} at {s.Position.X:F1} {s.Position.Y:F1} {s.Position.Z:F1}, facing {s.Face:F0}");
@@ -115,38 +115,38 @@ public sealed partial class GmCommands
                 await services.GetRequiredService<DungeonService>().LeaveAsync(s);
                 return "Leaving the dungeon.";
             case OpEnterDungeon:
-            {
-                long scene = L(Arg(args, 0));
-                await services.GetRequiredService<DungeonService>().EnterAsync(s, new EnterDungeonReq { SceneEntry = scene });
-                return $"Dungeon {scene}: entry requested.";
-            }
+                {
+                    long scene = L(Arg(args, 0));
+                    await services.GetRequiredService<DungeonService>().EnterAsync(s, new EnterDungeonReq { SceneEntry = scene });
+                    return $"Dungeon {scene}: entry requested.";
+                }
             case OpOpGuild:
                 return await GuildAsync(s, args);
             case OpSetEntityCamp:
-            {
-                var t = Target(s, Arg(args, 0));
-                int camp = I(Arg(args, 1));
-                if (t.Monster == null) return "Only a monster's camp can be changed.";
-                return await services.GetRequiredService<WorldEffectsService>().SetCampAsync(t.Monster, camp)
-                    ? $"Monster {t.Monster.Uid} camp {camp}." : $"Camp {camp} cannot be set (neutral is 0).";
-            }
-            case OpTask:
-            {
-                int option = I(Arg(args, 0));
-                if (option < 0 || option >= TaskOps.Length) throw new ArgumentException("task state");
-                return await tasks.GmAsync(s, TaskOps[option], L(Arg(args, 1)));
-            }
-            case OpCurAllSkillLevUpMax:
-            {
-                var skills = services.GetRequiredService<SkillService>();
-                if (Arg(args, 0) != "1")
                 {
-                    await skills.ResetAsync(s, new SkillResetReq { Plan = skills.Build(s).CurrentPlanIndex });
-                    return "Skills reset.";
+                    var t = Target(s, Arg(args, 0));
+                    int camp = I(Arg(args, 1));
+                    if (t.Monster == null) return "Only a monster's camp can be changed.";
+                    return await services.GetRequiredService<WorldEffectsService>().SetCampAsync(t.Monster, camp)
+                        ? $"Monster {t.Monster.Uid} camp {camp}." : $"Camp {camp} cannot be set (neutral is 0).";
                 }
-                int levels = await skills.GmLearnAllAsync(s);
-                return levels == 0 ? "No skill could be raised (no skill points left, or all at maximum)." : $"Learned {levels} skill levels.";
-            }
+            case OpTask:
+                {
+                    int option = I(Arg(args, 0));
+                    if (option < 0 || option >= TaskOps.Length) throw new ArgumentException("task state");
+                    return await tasks.GmAsync(s, TaskOps[option], L(Arg(args, 1)));
+                }
+            case OpCurAllSkillLevUpMax:
+                {
+                    var skills = services.GetRequiredService<SkillService>();
+                    if (Arg(args, 0) != "1")
+                    {
+                        await skills.ResetAsync(s, new SkillResetReq { Plan = skills.Build(s).CurrentPlanIndex });
+                        return "Skills reset.";
+                    }
+                    int levels = await skills.GmLearnAllAsync(s);
+                    return levels == 0 ? "No skill could be raised (no skill points left, or all at maximum)." : $"Learned {levels} skill levels.";
+                }
             default:
                 return null;
         }

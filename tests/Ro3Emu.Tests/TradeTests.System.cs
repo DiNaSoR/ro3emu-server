@@ -45,7 +45,7 @@ public sealed partial class TradeTests
         Assert.All(gear.DataList, l => Assert.Equal(1, l.Quantity));
 
         await buyer.SendGameAsync(TradeService.BuyNormal, new TradeBuyNormalItemsReq
-            { ItemId = 1254013, SpuId = stock.SpuId, Price = 600, TotalPrice = 1200, TotalQuantity = 2 });
+        { ItemId = 1254013, SpuId = stock.SpuId, Price = 600, TotalPrice = 1200, TotalQuantity = 2 });
         Assert.Equal(0, (await Next(buyer, TradeService.BuyNormal, TradeBuyNormalItemsResp.Parser)).Result);
         var mail = Assert.Single(await Mail(buyer, (long)buyer.Self!.Uuid), m => m.Template == 1064);
         Assert.Equal(2, Assert.Single(mail.Goods.Items).Stack);
@@ -78,10 +78,10 @@ public sealed partial class TradeTests
         await Gm("soloseller", "!item 1254013 3"); await Gm("soloseller", "!item 2 5000");
         long guid = Assert.Single(Items(seller), i => i.Entry == 1254013).Guid;
         await seller.SendGameAsync(TradeService.PutOn, new TradePutOnItemReq
-            { ItemGuid = guid, ItemPrice = 600, CurrencyType = 1, Quantity = 1 });
+        { ItemGuid = guid, ItemPrice = 600, CurrencyType = 1, Quantity = 1 });
         Assert.Equal(0, (await Next(seller, TradeService.PutOn, TradePutOnItemResp.Parser)).Result);
         await seller.SendGameAsync(TradeService.PutOn, new TradePutOnItemReq
-            { ItemGuid = guid, ItemPrice = 900, CurrencyType = 1, Quantity = 2 });
+        { ItemGuid = guid, ItemPrice = 900, CurrencyType = 1, Quantity = 2 });
         Assert.Equal(0, (await Next(seller, TradeService.PutOn, TradePutOnItemResp.Parser)).Result);
 
         await SystemPass(seller: false, buyBack: true);

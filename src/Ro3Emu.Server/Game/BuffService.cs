@@ -436,9 +436,26 @@ public sealed partial class BuffService : IGameTicker
     // Lua_GameDefine.enum_ForbiddenState: masks are explicit and do not line up with every proto ordinal.
     private static ulong ForbiddenMask(int ordinal) => ordinal switch
     {
-        1 => 1, 2 => 2, 3 => 4, 4 => 8, 5 => 16, 6 => 32, 7 => 64, 8 => 128, 9 => 256,
-        10 => 512, 11 => 1024, 12 => 2048, 13 => 4096, 14 => 8192, 15 => 16384,
-        16 => 65536, 23 => 4194304, 24 => 8388608, 25 => 16777216, 27 => 67108864,
+        1 => 1,
+        2 => 2,
+        3 => 4,
+        4 => 8,
+        5 => 16,
+        6 => 32,
+        7 => 64,
+        8 => 128,
+        9 => 256,
+        10 => 512,
+        11 => 1024,
+        12 => 2048,
+        13 => 4096,
+        14 => 8192,
+        15 => 16384,
+        16 => 65536,
+        23 => 4194304,
+        24 => 8388608,
+        25 => 16777216,
+        27 => 67108864,
         _ => 0, // Lua enum has no named mask for the remaining server ordinals.
     };
 
@@ -463,33 +480,33 @@ public sealed partial class BuffService : IGameTicker
         {
             // Every session, every tick: copy the list only when something in it has expired.
             if (AnyExpired(s.Buffs, now))
-            foreach (var b in s.Buffs.Where(b => b.ExpireMs <= now).ToList()) loop.TrackLegacyDetached("buff expiration", async () =>
-            {
-                if (!s.Buffs.Contains(b)) return;
-                await RemoveAsync(s, b);
-                foreach (var handler in Expired) await handler(s, b);
-            });
+                foreach (var b in s.Buffs.Where(b => b.ExpireMs <= now).ToList()) loop.TrackLegacyDetached("buff expiration", async () =>
+                {
+                    if (!s.Buffs.Contains(b)) return;
+                    await RemoveAsync(s, b);
+                    foreach (var handler in Expired) await handler(s, b);
+                });
             TickEnergy(s, now);
             TickImmuneDeath(s, now);
         }
         bool unitExpired = false;
         foreach (var list in _unitBuffs.Values) if (list.Count == 0 || AnyExpired(list, now)) { unitExpired = true; break; }
         if (unitExpired)
-        foreach (var (uid, list) in _unitBuffs.ToList())
-        {
-            foreach (var buff in list.Where(b => b.ExpireMs <= now).ToList())
+            foreach (var (uid, list) in _unitBuffs.ToList())
             {
-                var unit = world.AllUnits().FirstOrDefault(u => u.Uid == uid);
-                if (unit != null) loop.TrackLegacyDetached("unit buff expiration", async () =>
+                foreach (var buff in list.Where(b => b.ExpireMs <= now).ToList())
                 {
-                    if (!_unitBuffs.TryGetValue(unit.Uid, out var live) || !live.Contains(buff)) return;
-                    await RemoveUnitBuffAsync(unit, buff);
-                    foreach (var handler in UnitExpired) await handler(unit, buff);
-                });
-                else list.Remove(buff);
+                    var unit = world.AllUnits().FirstOrDefault(u => u.Uid == uid);
+                    if (unit != null) loop.TrackLegacyDetached("unit buff expiration", async () =>
+                    {
+                        if (!_unitBuffs.TryGetValue(unit.Uid, out var live) || !live.Contains(buff)) return;
+                        await RemoveUnitBuffAsync(unit, buff);
+                        foreach (var handler in UnitExpired) await handler(unit, buff);
+                    });
+                    else list.Remove(buff);
+                }
+                if (list.Count == 0) _unitBuffs.Remove(uid);
             }
-            if (list.Count == 0) _unitBuffs.Remove(uid);
-        }
     }
 
     private async Task ToPlayerAndViewersAsync(GameSession p, uint msgId, Google.Protobuf.IMessage body)

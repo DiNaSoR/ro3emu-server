@@ -433,8 +433,11 @@ public sealed class AppraiseEnchantTests : IAsyncLifetime
             s.Items.RemoveAll(i => i.Entry == echo);
             for (int slot = 1; slot <= echoes; slot++)
             {
-                var item = new InvItem { Entry = echo, Stack = 1, Pack = 5, Sort = 100 + slot, Guid = 9_000_000 + slot,
-                    Attrs = new() { [1001] = 0, [10001] = 2, [10002] = slot } };
+                var item = new InvItem
+                {
+                    Entry = echo, Stack = 1, Pack = 5, Sort = 100 + slot, Guid = 9_000_000 + slot,
+                    Attrs = new() { [1001] = 0, [10001] = 2, [10002] = slot }
+                };
                 for (int i = 0; i < lit; i++) item.Attrs[1021 + i] = mark;
                 s.Items.Add(item);
                 s.Emblems.Plans[s.Emblems.CurrentPlan].Slots[slot] = item.Guid;

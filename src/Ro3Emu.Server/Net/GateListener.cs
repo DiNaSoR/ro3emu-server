@@ -146,34 +146,34 @@ public abstract class GateListener(IPAddress address, int port, ILogger log, Dia
         _serveCompletion.Value = completion;
         try
         {
-        await using var channel = new PhonestChannel(socket, Log) { Metrics = Metrics?.Connect() };
-        Log.LogInformation("{Name}: {Remote} connected", Name, channel.Remote);
-        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        var watch = WatchHandshakeAsync(channel, deadline);
-        try
-        {
-            await channel.RunAsync(OnFrameAsync, deadline.Token);
-        }
-        catch (Exception e) when (e is SocketException or OperationCanceledException or IOException)
-        {
-        }
-        catch (Exception e)
-        {
-            Log.LogError(e, "{Name}: {Remote} failed", Name, channel.Remote);
-        }
-        finally
-        {
-            try { await OnDisconnectedAsync(channel); }
+            await using var channel = new PhonestChannel(socket, Log) { Metrics = Metrics?.Connect() };
+            Log.LogInformation("{Name}: {Remote} connected", Name, channel.Remote);
+            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            var watch = WatchHandshakeAsync(channel, deadline);
+            try
+            {
+                await channel.RunAsync(OnFrameAsync, deadline.Token);
+            }
+            catch (Exception e) when (e is SocketException or OperationCanceledException or IOException)
+            {
+            }
             catch (Exception e)
             {
-                DrainSucceeded = false;
-                OnCleanupFailed(channel, e);
-                Log.LogError(e, "{Name}: {Remote} disconnect cleanup failed", Name, channel.Remote);
+                Log.LogError(e, "{Name}: {Remote} failed", Name, channel.Remote);
             }
-            Log.LogInformation("{Name}: {Remote} disconnected", Name, channel.Remote);
-            deadline.Cancel();
-            await watch;
-        }
+            finally
+            {
+                try { await OnDisconnectedAsync(channel); }
+                catch (Exception e)
+                {
+                    DrainSucceeded = false;
+                    OnCleanupFailed(channel, e);
+                    Log.LogError(e, "{Name}: {Remote} disconnect cleanup failed", Name, channel.Remote);
+                }
+                Log.LogInformation("{Name}: {Remote} disconnected", Name, channel.Remote);
+                deadline.Cancel();
+                await watch;
+            }
         }
         finally { _serveCompletion.Value = null; completion?.Dispose(); }
     }

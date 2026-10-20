@@ -107,8 +107,11 @@ public sealed partial class GuildService
         {
             paid = cost.Length < 2 || cost[0] <= 0 || cost[1] <= 0 ? await SaveGuildAsync(g)
                 : await character.ExchangeLockedAsync(s, [((int)cost[0], cost[1])], [],
-                    persist: tx => { store.EnlistSave(g, tx, "guild disappeared during impeachment"); EnlistViews(g, tx);
-                        tx.WithEconomy(GuildPayment(s, "guild-impeach", (int)cost[0], cost[1])); }, asyncCommit: true) != null;
+                    persist: tx =>
+                    {
+                        store.EnlistSave(g, tx, "guild disappeared during impeachment"); EnlistViews(g, tx);
+                        tx.WithEconomy(GuildPayment(s, "guild-impeach", (int)cost[0], cost[1]));
+                    }, asyncCommit: true) != null;
             if (!paid) code = cost.Length >= 2 && cost[0] > 0 ? ErrorCodes.ItemsShort : ErrorCodes.GuildMissing;
         }
         catch (InvalidOperationException e) when (e.Message == "guild disappeared during impeachment") { code = ErrorCodes.GuildMissing; }

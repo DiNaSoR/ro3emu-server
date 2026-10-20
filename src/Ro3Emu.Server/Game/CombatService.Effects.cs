@@ -278,168 +278,168 @@ public sealed partial class CombatService
         if (DelayedHitScripts.Contains(Script(row))) damage = false;
         try
         {
-        foreach (var target in targets)
-        {
-            if (!CanApplyMoreEffects()) break; // a previous target's awaited callback may have invalidated the caster
-            if (target.Dead || target.Hp <= 0) continue; // another awaited cast may already own this death source
-            processed.Add(target);
-            if (field != null) field.Touched++;
-            if (damage)
+            foreach (var target in targets)
             {
-                var defender = AsDefender(target);
-                var (amount, result) = Damage(attacker, defender, row, stage?.Branch ?? DamageBranch(s, row, target), stage?.Element ?? 0);
-                if (action.ProcFixedDamage > 0 && result != DamageHitResult.Miss) amount = action.ProcFixedDamage;
-                else if (amount > 0 && action.ProcScale != 1) amount = Math.Max(1, (long)Math.Round(amount * action.ProcScale));
-                if (amount > 0 && bolts > 1) amount = amount / bolts + (bolt < amount % bolts ? 1 : 0);
-                if (amount > 0)
+                if (!CanApplyMoreEffects()) break; // a previous target's awaited callback may have invalidated the caster
+                if (target.Dead || target.Hp <= 0) continue; // another awaited cast may already own this death source
+                processed.Add(target);
+                if (field != null) field.Touched++;
+                if (damage)
                 {
-                    foreach (var modifier in DamageAdjusters) amount = Math.Max(0, modifier(s, target, row, result, amount));
-                    // (inferred) A follow-up is itself the extra hit: it adds no Double Attack or card extra hit.
-                    if (!action.Proc) foreach (var extra in ExtraHitDamage) amount += Math.Max(0, extra(s, target, row, amount));
-                    // A Double Attack proc shows as its own number(s) on this swing, as _kShowDmg splits multi-hit skills.
-                    if (_doubleAttackHits > 0) hit.Split = Math.Max(hit.Split, shownHits + _doubleAttackHits);
-                    _doubleAttackHits = 0;
+                    var defender = AsDefender(target);
+                    var (amount, result) = Damage(attacker, defender, row, stage?.Branch ?? DamageBranch(s, row, target), stage?.Element ?? 0);
+                    if (action.ProcFixedDamage > 0 && result != DamageHitResult.Miss) amount = action.ProcFixedDamage;
+                    else if (amount > 0 && action.ProcScale != 1) amount = Math.Max(1, (long)Math.Round(amount * action.ProcScale));
+                    if (amount > 0 && bolts > 1) amount = amount / bolts + (bolt < amount % bolts ? 1 : 0);
+                    if (amount > 0)
+                    {
+                        foreach (var modifier in DamageAdjusters) amount = Math.Max(0, modifier(s, target, row, result, amount));
+                        // (inferred) A follow-up is itself the extra hit: it adds no Double Attack or card extra hit.
+                        if (!action.Proc) foreach (var extra in ExtraHitDamage) amount += Math.Max(0, extra(s, target, row, amount));
+                        // A Double Attack proc shows as its own number(s) on this swing, as _kShowDmg splits multi-hit skills.
+                        if (_doubleAttackHits > 0) hit.Split = Math.Max(hit.Split, shownHits + _doubleAttackHits);
+                        _doubleAttackHits = 0;
+                    }
+                    long beforeHp = target.Hp;
+                    target.Hp = target.HpAfter(beforeHp, amount);
+                    long effective = beforeHp - target.Hp;
+                    if (target.Hp == 0) killed.Add(target); // reserve before awaited damage callbacks
+                    if (amount > 0)
+                    {
+                        landed.Add((target, amount));
+                        await ConsumeOnHitDebuffsAsync(target);
+                    }
+                    await SettleMonsterHitAsync(s, target, beforeHp, amount);
+                    if (CanApplyMoreEffects())
+                        foreach (var handler in DealtAsync)
+                        {
+                            if (!CanApplyMoreEffects()) break;
+                            await handler(s, target, row, amount);
+                        }
+                    // The hit is already committed; an unchanged (even cancelled) lease
+                    // still owns its damage callback, while a replacement lease does not.
+                    if (effective > 0 && CurrentKillRecipient())
+                        foreach (var handler in MonsterDamageApplied)
+                        {
+                            if (!CurrentKillRecipient()) break;
+                            try { await handler(s, target, effective); }
+                            catch (Exception ex) { log.LogError(ex, "Monster damage callback failed for {Uid}", target.Uid); }
+                        }
+                    hit.Dsts.Add(new DamageInfo { DstID = target.Uid, Damage = amount, HitResult = result, DstElement = target.Template.Element, IsDead = target.Hp == 0 });
                 }
-                long beforeHp = target.Hp;
-                target.Hp = target.HpAfter(beforeHp, amount);
-                long effective = beforeHp - target.Hp;
-                if (target.Hp == 0) killed.Add(target); // reserve before awaited damage callbacks
-                if (amount > 0)
+                if (CanApplyMoreEffects() && (firstBolt || stage is { Buff2: >= 0 } || only != null))
                 {
-                    landed.Add((target, amount));
-                    await ConsumeOnHitDebuffsAsync(target);
+                    var tuples = Tuples(row, "_kBuff2").ToArray();
+                    var rolled = stage is { Buff2: >= 0 } ? tuples.Skip(stage.Buff2).Take(1) : stage?.Fallback >= 0 ? tuples.Take(stage.Fallback) : tuples;
+                    bool slowedBefore = Slowed(target);
+                    foreach (var (tuple, index) in rolled.Select((t, i) => (t, i)).ToArray())
+                        if (CanApplyMoreEffects() && !GaleSkipsBuff(row, index, slowedBefore)
+                            && RollHostileBuff(tuple, s, null, null, target, out int id, out int duration))
+                        {
+                            await buffs.ShowOnUnitAsync(target, id, duration, castingRole.Id);
+                            action.StatusLanded.Add(target.Uid);
+                        }
+                    // "guaranteed to inflict at least 1 of these Status Effects": the last packet's fallback tuple.
+                    if (stage is { Last: true, Fallback: >= 0 } && stage.Fallback < tuples.Length && !action.StatusLanded.Contains(target.Uid)
+                        && CanApplyMoreEffects() && RollHostileBuff(tuples[stage.Fallback], s, null, null, target, out int fid, out int fduration))
+                        await buffs.ShowOnUnitAsync(target, fid, fduration, castingRole.Id);
                 }
-                await SettleMonsterHitAsync(s, target, beforeHp, amount);
-                if (CanApplyMoreEffects())
-                    foreach (var handler in DealtAsync)
-                    {
-                        if (!CanApplyMoreEffects()) break;
-                        await handler(s, target, row, amount);
-                    }
-                // The hit is already committed; an unchanged (even cancelled) lease
-                // still owns its damage callback, while a replacement lease does not.
-                if (effective > 0 && CurrentKillRecipient())
-                    foreach (var handler in MonsterDamageApplied)
-                    {
-                        if (!CurrentKillRecipient()) break;
-                        try { await handler(s, target, effective); }
-                        catch (Exception ex) { log.LogError(ex, "Monster damage callback failed for {Uid}", target.Uid); }
-                    }
-                hit.Dsts.Add(new DamageInfo { DstID = target.Uid, Damage = amount, HitResult = result, DstElement = target.Template.Element, IsDead = target.Hp == 0 });
-            }
-            if (CanApplyMoreEffects() && (firstBolt || stage is { Buff2: >= 0 } || only != null))
-            {
-                var tuples = Tuples(row, "_kBuff2").ToArray();
-                var rolled = stage is { Buff2: >= 0 } ? tuples.Skip(stage.Buff2).Take(1) : stage?.Fallback >= 0 ? tuples.Take(stage.Fallback) : tuples;
-                bool slowedBefore = Slowed(target);
-                foreach (var (tuple, index) in rolled.Select((t, i) => (t, i)).ToArray())
-                    if (CanApplyMoreEffects() && !GaleSkipsBuff(row, index, slowedBefore)
-                        && RollHostileBuff(tuple, s, null, null, target, out int id, out int duration))
-                    {
-                        await buffs.ShowOnUnitAsync(target, id, duration, castingRole.Id);
-                        action.StatusLanded.Add(target.Uid);
-                    }
-                // "guaranteed to inflict at least 1 of these Status Effects": the last packet's fallback tuple.
-                if (stage is { Last: true, Fallback: >= 0 } && stage.Fallback < tuples.Length && !action.StatusLanded.Contains(target.Uid)
-                    && CanApplyMoreEffects() && RollHostileBuff(tuples[stage.Fallback], s, null, null, target, out int fid, out int fduration))
-                    await buffs.ShowOnUnitAsync(target, fid, fduration, castingRole.Id);
-            }
-            if (CanApplyMoreEffects() && firstBolt && KnockUps.Contains(script) && !target.Dead && target.Hp > 0)
-                await buffs.ShowOnUnitAsync(target, KnockUpBuff, KnockUpMs, castingRole.Id);
-            if (CanApplyMoreEffects() && script is ("Provoke" or "Taunt")) monsters.Engage(target, s);
-            if (CanApplyMoreEffects() && firstBolt && !target.Dead && target.Hp > 0)
-            {
-                if (field is { PushMeters: > 0 }) await PushFromFieldAsync(s, action, field, target);
-                else await DisplaceTargetAsync(s, action, target);
-            }
-        }
-        // Buff1 is self for hostile selectors, but actual friend recipients for ally selectors (Detoxify, Blessing).
-        foreach (var recipient in friendly ? allies : new List<GameSession> { s })
-        {
-            if (!CanApplyMoreEffects()) break;
-            if (field == null && firstBolt)
-            {
-                foreach (var tuple in Buff1(s, row, script, recipient))
-                    if (CanApplyMoreEffects() && RollBuff(tuple, out int id, out int duration)) await GrantSkillBuffAsync(s, recipient, id, duration);
-                if (script == "Sacrifice" && recipient != s)
-                    foreach (var tuple in Buff1(s, row, script))
-                        if (CanApplyMoreEffects() && RollBuff(tuple, out int id, out int duration)) await GrantSkillBuffAsync(s, s, id, duration);
-            }
-            // A support cast with no number to show (Blessing, Increase AGI, Angelus, cleanses) still needs its recipient in
-            // 31101: the client plays the hit effect's gfx (fx_buff_angelblessing on Blessing's 1400102) only per dst
-            // (LC_DamageHelper._ActionJumpDamage -> ShowHitDisplay). DamageShare with a Normal result maps to no HUD
-            // word (LC_DamageHelper damage-word type -> None), so the entry shows the effect and no "0" (inferred).
-            if (friendly && !damage && field == null && firstBolt)
-                shownOnly.Add(new DamageInfo { DstID = recipient.Role!.Id, DamageType = DamageType.DamageShare, DstElement = 1 });
-            if (friendly && damage && !PetAuraGuardian(row))
-            {
-                double multiplier = Numbers(row, "_kDamageParam1").FirstOrDefault(), flat = Numbers(row, "_kDamageParam2").FirstOrDefault();
-                // Heal's friendly branch is P1[0]/P2[0]; its enemy branch is [1] (description + select race mask).
-                var before = character.Stats(recipient);
-                long amount = (long)Math.Max(0, Math.Round((HealPower(row, stats) * multiplier / 10000 + flat)
-                    * FormulaFactor(attacker, row, 0, heal: true) * HealFactor(attacker, PlayerDefender(recipient, before))));
-                foreach (var modifier in ExtraHeal) amount = modifier(s, amount);
-                long actual = Math.Min(amount, Math.Max(0, before[101] - before[2000]));
-                await character.SetHpSpAsync(recipient, before[2000] + amount, null);
-                hit.Dsts.Add(new DamageInfo { DstID = recipient.Role!.Id, Damage = actual, DamageType = DamageType.Heal, DstElement = 1 });
-                foreach (var handler in Healed) handler(s, actual);
-                foreach (var handler in HealedAsync) await handler(s, actual);
-            }
-            if (CleanseTargets(row) is { Length: > 0 } cleansed)
-                foreach (var buff in recipient.Buffs.Where(b => data.Row("BuffConfig", b.ConfigId) is { } br && Cleanses(cleansed, br)).ToArray())
-                    await buffs.RemoveAsync(recipient, buff);
-            if (CleansedCategories(row, recipient == s) is { Length: > 0 } categories)
-                foreach (var buff in recipient.Buffs.Where(b => data.Row("BuffConfig", b.ConfigId) is { } br && HasCategory(br, categories)).ToArray())
-                    await buffs.RemoveAsync(recipient, buff);
-        }
-        if (hit.Dsts.Count > 0 || shownOnly.Count > 0)
-        {
-            foreach (var result in hit.Dsts)
-            {
-                if (!CurrentCaster()) break;
-                await RecordDamageStatisticAsync(s, new DamageStatistics
+                if (CanApplyMoreEffects() && firstBolt && KnockUps.Contains(script) && !target.Dead && target.Hp > 0)
+                    await buffs.ShowOnUnitAsync(target, KnockUpBuff, KnockUpMs, castingRole.Id);
+                if (CanApplyMoreEffects() && script is ("Provoke" or "Taunt")) monsters.Engage(target, s);
+                if (CanApplyMoreEffects() && firstBolt && !target.Dead && target.Hp > 0)
                 {
-                    DamageSourceId = hit.SrcID, DamageTargetId = result.DstID, DamageValue = result.Damage,
-                    DamageBeShield = result.SheildDamage, DamageType = result.DamageType, HitResult = result.HitResult, SkillId = hit.SkillId,
-                });
+                    if (field is { PushMeters: > 0 }) await PushFromFieldAsync(s, action, field, target);
+                    else await DisplaceTargetAsync(s, action, target);
+                }
             }
-            if (CurrentCaster() && firstBolt && hit.Dsts.Any(d => d.HitResult != DamageHitResult.Miss))
+            // Buff1 is self for hostile selectors, but actual friend recipients for ally selectors (Detoxify, Blessing).
+            foreach (var recipient in friendly ? allies : new List<GameSession> { s })
             {
-                await buffs.RecoverEnergyOnHitAsync(s, row);
-                if (CurrentCaster()) await ConvertChargesAsync(s, row);
-            }
-            hit.Dsts.AddRange(shownOnly); // display only: no statistics, energy or charges
-            var sourceViewers = CurrentCaster() ? world.Viewers(s).Append(s) : Enumerable.Empty<GameSession>();
-            var recipients = shownOnly.Count > 0 ? allies.Where(a => shownOnly.Any(d => d.DstID == a.Role?.Id)) : Enumerable.Empty<GameSession>();
-            foreach (var viewer in processed.SelectMany(t => t.Viewers).Concat(sourceViewers).Concat(recipients).Distinct()) await viewer.SendGameAsync(SkillHit, hit);
-            if (CurrentCaster() && field?.Trap == true)
-                await ToPlayerAndViewersAsync(s, TrapDamage, new TrapDamageNtf { SkillConfigId = action.Request.SkillId, DamageValue = hit.Dsts.Sum(d => d.Damage), Pos = center.Clone() });
-        }
-        foreach (var target in processed)
-        {
-            if (!damage) continue;
-            if (target.Hp == 0 && !target.DeathDurable) continue; // another cast is still committing that death
-            await world.ToUnitViewersAsync(target, AoiAttrChange, MonsterService.Hp(target));
-            await FightingAsync(target);
-            if (target.Hp > 0 && CurrentCaster()) monsters.Engage(target, s);
-        }
-        if (processed.Count > 0 && CurrentCaster()) await FightingAsync(s);
-        foreach (var target in killed.Where(target => target.Hp == 0 && target.DeathDurable))
-        {
-            log.LogDebug("{Name} killed {Monster} ({Npc})", castingRole.Name, target.Uid, target.Template.NpcId);
-            await monsters.KillAsync(target);
-            foreach (var other in sessions.All().Where(o => o.Attack?.Target == target))
-            {
-                other.Attack = null;
-                await other.SendGameAsync(SkillEnd, new SkillEndNotify
+                if (!CanApplyMoreEffects()) break;
+                if (field == null && firstBolt)
                 {
-                    SrcID = other.Role!.Id, SessionId = action.Id, Type = SkillEndNotify.Types.SkillEndType.Interrupted,
-                    InterruptedInfo = new SkillInterruptedInfo { Type = SkillInterruptedInfo.Types.SkillInterruptType.LockerInvalid },
-                });
+                    foreach (var tuple in Buff1(s, row, script, recipient))
+                        if (CanApplyMoreEffects() && RollBuff(tuple, out int id, out int duration)) await GrantSkillBuffAsync(s, recipient, id, duration);
+                    if (script == "Sacrifice" && recipient != s)
+                        foreach (var tuple in Buff1(s, row, script))
+                            if (CanApplyMoreEffects() && RollBuff(tuple, out int id, out int duration)) await GrantSkillBuffAsync(s, s, id, duration);
+                }
+                // A support cast with no number to show (Blessing, Increase AGI, Angelus, cleanses) still needs its recipient in
+                // 31101: the client plays the hit effect's gfx (fx_buff_angelblessing on Blessing's 1400102) only per dst
+                // (LC_DamageHelper._ActionJumpDamage -> ShowHitDisplay). DamageShare with a Normal result maps to no HUD
+                // word (LC_DamageHelper damage-word type -> None), so the entry shows the effect and no "0" (inferred).
+                if (friendly && !damage && field == null && firstBolt)
+                    shownOnly.Add(new DamageInfo { DstID = recipient.Role!.Id, DamageType = DamageType.DamageShare, DstElement = 1 });
+                if (friendly && damage && !PetAuraGuardian(row))
+                {
+                    double multiplier = Numbers(row, "_kDamageParam1").FirstOrDefault(), flat = Numbers(row, "_kDamageParam2").FirstOrDefault();
+                    // Heal's friendly branch is P1[0]/P2[0]; its enemy branch is [1] (description + select race mask).
+                    var before = character.Stats(recipient);
+                    long amount = (long)Math.Max(0, Math.Round((HealPower(row, stats) * multiplier / 10000 + flat)
+                        * FormulaFactor(attacker, row, 0, heal: true) * HealFactor(attacker, PlayerDefender(recipient, before))));
+                    foreach (var modifier in ExtraHeal) amount = modifier(s, amount);
+                    long actual = Math.Min(amount, Math.Max(0, before[101] - before[2000]));
+                    await character.SetHpSpAsync(recipient, before[2000] + amount, null);
+                    hit.Dsts.Add(new DamageInfo { DstID = recipient.Role!.Id, Damage = actual, DamageType = DamageType.Heal, DstElement = 1 });
+                    foreach (var handler in Healed) handler(s, actual);
+                    foreach (var handler in HealedAsync) await handler(s, actual);
+                }
+                if (CleanseTargets(row) is { Length: > 0 } cleansed)
+                    foreach (var buff in recipient.Buffs.Where(b => data.Row("BuffConfig", b.ConfigId) is { } br && Cleanses(cleansed, br)).ToArray())
+                        await buffs.RemoveAsync(recipient, buff);
+                if (CleansedCategories(row, recipient == s) is { Length: > 0 } categories)
+                    foreach (var buff in recipient.Buffs.Where(b => data.Row("BuffConfig", b.ConfigId) is { } br && HasCategory(br, categories)).ToArray())
+                        await buffs.RemoveAsync(recipient, buff);
             }
-            await PublishDurableKillAsync(s, target, CurrentKillRecipient);
-            await FinalizeLethalPublicationAsync(target);
-        }
+            if (hit.Dsts.Count > 0 || shownOnly.Count > 0)
+            {
+                foreach (var result in hit.Dsts)
+                {
+                    if (!CurrentCaster()) break;
+                    await RecordDamageStatisticAsync(s, new DamageStatistics
+                    {
+                        DamageSourceId = hit.SrcID, DamageTargetId = result.DstID, DamageValue = result.Damage,
+                        DamageBeShield = result.SheildDamage, DamageType = result.DamageType, HitResult = result.HitResult, SkillId = hit.SkillId,
+                    });
+                }
+                if (CurrentCaster() && firstBolt && hit.Dsts.Any(d => d.HitResult != DamageHitResult.Miss))
+                {
+                    await buffs.RecoverEnergyOnHitAsync(s, row);
+                    if (CurrentCaster()) await ConvertChargesAsync(s, row);
+                }
+                hit.Dsts.AddRange(shownOnly); // display only: no statistics, energy or charges
+                var sourceViewers = CurrentCaster() ? world.Viewers(s).Append(s) : Enumerable.Empty<GameSession>();
+                var recipients = shownOnly.Count > 0 ? allies.Where(a => shownOnly.Any(d => d.DstID == a.Role?.Id)) : Enumerable.Empty<GameSession>();
+                foreach (var viewer in processed.SelectMany(t => t.Viewers).Concat(sourceViewers).Concat(recipients).Distinct()) await viewer.SendGameAsync(SkillHit, hit);
+                if (CurrentCaster() && field?.Trap == true)
+                    await ToPlayerAndViewersAsync(s, TrapDamage, new TrapDamageNtf { SkillConfigId = action.Request.SkillId, DamageValue = hit.Dsts.Sum(d => d.Damage), Pos = center.Clone() });
+            }
+            foreach (var target in processed)
+            {
+                if (!damage) continue;
+                if (target.Hp == 0 && !target.DeathDurable) continue; // another cast is still committing that death
+                await world.ToUnitViewersAsync(target, AoiAttrChange, MonsterService.Hp(target));
+                await FightingAsync(target);
+                if (target.Hp > 0 && CurrentCaster()) monsters.Engage(target, s);
+            }
+            if (processed.Count > 0 && CurrentCaster()) await FightingAsync(s);
+            foreach (var target in killed.Where(target => target.Hp == 0 && target.DeathDurable))
+            {
+                log.LogDebug("{Name} killed {Monster} ({Npc})", castingRole.Name, target.Uid, target.Template.NpcId);
+                await monsters.KillAsync(target);
+                foreach (var other in sessions.All().Where(o => o.Attack?.Target == target))
+                {
+                    other.Attack = null;
+                    await other.SendGameAsync(SkillEnd, new SkillEndNotify
+                    {
+                        SrcID = other.Role!.Id, SessionId = action.Id, Type = SkillEndNotify.Types.SkillEndType.Interrupted,
+                        InterruptedInfo = new SkillInterruptedInfo { Type = SkillInterruptedInfo.Types.SkillInterruptType.LockerInvalid },
+                    });
+                }
+                await PublishDurableKillAsync(s, target, CurrentKillRecipient);
+                await FinalizeLethalPublicationAsync(target);
+            }
         }
         finally
         {
@@ -636,8 +636,11 @@ public sealed partial class CombatService
 
     private async Task MoveCasterAsync(GameSession s, JsonElement row, CastSkillReq request, int actionMs)
     {
-        if (Displacement(row) is not { Kind: DisplaceKind.CasterForward or DisplaceKind.CasterBack
-                or DisplaceKind.CasterToTarget or DisplaceKind.CasterToPoint } move) return;
+        if (Displacement(row) is not
+            {
+                Kind: DisplaceKind.CasterForward or DisplaceKind.CasterBack
+                or DisplaceKind.CasterToTarget or DisplaceKind.CasterToPoint
+            } move) return;
         float dx, dz;
         if (move.Kind == DisplaceKind.CasterToTarget)
         {

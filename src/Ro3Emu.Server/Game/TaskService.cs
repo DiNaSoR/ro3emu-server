@@ -249,7 +249,7 @@ public sealed partial class TaskService
             t => t is [TClientInteract, var id, var required] && id == req.TaskId && required == req.GoalCount ? long.MaxValue : 0,
             d => ContextMapMatches(session, d));
         await session.SendGameAsync(TriggerTaskEvent, new TriggerTaskEventResp
-            { Result = matches ? 0 : ErrorCodes.TaskRequirements, TaskId = req.TaskId, GoalCount = req.GoalCount });
+        { Result = matches ? 0 : ErrorCodes.TaskRequirements, TaskId = req.TaskId, GoalCount = req.GoalCount });
     }
 
     /// <summary>
@@ -441,34 +441,34 @@ public sealed partial class TaskService
                 session.Tasks.CompleteTaskNum[FirstTask] = 0;
                 break;
             case "drop":
-            {
-                // The quest and every quest after it in its chain: a later quest left delivered (or running) would
-                // offer the next ones again at once, without their pre-task.
-                var chain = new List<long>();
-                var queue = new Queue<long>([id]);
-                while (queue.TryDequeue(out long next))
                 {
-                    if (chain.Contains(next)) continue;
-                    chain.Add(next);
-                    foreach (long child in _children!.GetValueOrDefault(next) ?? []) queue.Enqueue(child);
+                    // The quest and every quest after it in its chain: a later quest left delivered (or running) would
+                    // offer the next ones again at once, without their pre-task.
+                    var chain = new List<long>();
+                    var queue = new Queue<long>([id]);
+                    while (queue.TryDequeue(out long next))
+                    {
+                        if (chain.Contains(next)) continue;
+                        chain.Add(next);
+                        foreach (long child in _children!.GetValueOrDefault(next) ?? []) queue.Enqueue(child);
+                    }
+                    bool shown = false;
+                    foreach (long task in chain)
+                    {
+                        if (!Active(session, task) && !session.Tasks.Infos.ContainsKey(task) && !session.Tasks.CompleteTaskNum.ContainsKey(task)) continue;
+                        bool active = Active(session, task);
+                        Forget(session, task, session.Tasks.CompleteTaskNum.GetValueOrDefault(task));
+                        session.Tasks.Infos.Remove(task);
+                        session.Tasks.CompleteTaskNum.Remove(task);
+                        // The quest log and tracker drop a quest only on 31203 (LC_DAL_Task TaskGiveUpResp ->
+                        // TaskGiveUpEvent -> LC_System_Task.CancelOrRsetTask), as for the player's own give-up; the
+                        // dataset's del alone leaves it on screen.
+                        if (active) await session.SendGameAsync(TaskGiveUp, new TaskGiveUpResp { Result = 0, Id = task });
+                        shown |= active;
+                    }
+                    if (shown) await FlushAsync(session); // synced before settling, which may offer the first one again
+                    break;
                 }
-                bool shown = false;
-                foreach (long task in chain)
-                {
-                    if (!Active(session, task) && !session.Tasks.Infos.ContainsKey(task) && !session.Tasks.CompleteTaskNum.ContainsKey(task)) continue;
-                    bool active = Active(session, task);
-                    Forget(session, task, session.Tasks.CompleteTaskNum.GetValueOrDefault(task));
-                    session.Tasks.Infos.Remove(task);
-                    session.Tasks.CompleteTaskNum.Remove(task);
-                    // The quest log and tracker drop a quest only on 31203 (LC_DAL_Task TaskGiveUpResp ->
-                    // TaskGiveUpEvent -> LC_System_Task.CancelOrRsetTask), as for the player's own give-up; the
-                    // dataset's del alone leaves it on screen.
-                    if (active) await session.SendGameAsync(TaskGiveUp, new TaskGiveUpResp { Result = 0, Id = task });
-                    shown |= active;
-                }
-                if (shown) await FlushAsync(session); // synced before settling, which may offer the first one again
-                break;
-            }
             case "accept" when defs.ContainsKey(id):
                 Accept(session, id);
                 break;
@@ -683,8 +683,11 @@ public sealed partial class TaskService
             int? playBook = session.Synced.GetValueOrDefault(SeasonService.SeasonSync) is DBSeasonInfo { Current: { } current }
                 ? (int)current.PlayBookId : null;
             var plan = NovicePassTask(def) ? awards.ResolveDirect(session, def.Award) : awards.Resolve(session, def.Award, playBook);
-            var runtime = new TaskRuntimeState { CompletedGuides = session.TaskRuntime.CompletedGuides.ToHashSet(), InCutScene = session.InCutScene || cutScene,
-                Forgotten = session.TaskRuntime.Forgotten is { } forgotten ? new(forgotten) : null };
+            var runtime = new TaskRuntimeState
+            {
+                CompletedGuides = session.TaskRuntime.CompletedGuides.ToHashSet(), InCutScene = session.InCutScene || cutScene,
+                Forgotten = session.TaskRuntime.Forgotten is { } forgotten ? new(forgotten) : null
+            };
             int delivery = next.CompleteTaskNum[id] + (session.TaskRuntime.Forgotten?.GetValueOrDefault(id) ?? 0);
             string AwardSource(int n) => $"task/{session.Role!.Id}/{id}/{n}/{session.Daily?.DailyEpoch ?? 0}/{session.Daily?.WeeklyEpoch ?? 0}";
             int skipped = await ForgottenDeliveriesAsync(session, id, delivery, AwardSource);

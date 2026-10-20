@@ -298,8 +298,11 @@ public sealed class GatheringService : IGameTicker
         await session.SendGameAsync(StateChange, new InteractChangeNtf
         {
             Uid = session.Role!.Id,
-            DataInfo = new InteractInfo { EType = InteractInfo.Types.EState.Collection, StateId = 5,
-                ActiveObjId = node.Uid, InteractConfigId = node.InteractionId, CollectionInfo = state },
+            DataInfo = new InteractInfo
+            {
+                EType = InteractInfo.Types.EState.Collection, StateId = 5,
+                ActiveObjId = node.Uid, InteractConfigId = node.InteractionId, CollectionInfo = state
+            },
         });
         if (gameId == 0)
             Schedule(_runtimes[node.RuntimeMap], TimeSpan.FromMilliseconds(duration), () => CompleteAsync(session, node.Uid), session);
@@ -519,12 +522,15 @@ public sealed class GatheringService : IGameTicker
         owner.Deadlines.Add(deadline);
         // An Apply fault quarantines the role and therefore blocks the legacy Realm ticker.
         // Source reconciliation needs only a read and this resource's runtime; it must still run.
-        try { loop.ScheduleRuntime(delay, async () =>
+        try
+        {
+            loop.ScheduleRuntime(delay, async () =>
         {
             if (owner.Retired || !owner.Deadlines.Remove(deadline)) return;
             owner.Pending++;
             await RunDeadlineAsync(owner, deadline.Item2);
-        }); }
+        });
+        }
         catch { owner.Deadlines.Remove(deadline); throw; }
     }
 
@@ -617,11 +623,17 @@ public sealed class GatheringService : IGameTicker
     /// </summary>
     private static Task SendYieldDropAsync(GameSession session, GatheringUnit node, IReadOnlyList<AwardGrant> grants)
     {
-        var notify = new GetRewardNotify { Position = node.Pos, TargetEntry = node.NpcId, TargetUid = session.Role!.Id,
-            RewardType = { YieldDrop } };
+        var notify = new GetRewardNotify
+        {
+            Position = node.Pos, TargetEntry = node.NpcId, TargetUid = session.Role!.Id,
+            RewardType = { YieldDrop }
+        };
         foreach (var grant in grants.Where(g => g.Entry is not (100 or 101) && g.Count > 0))
-            notify.Rewards.Add(new ItemBaseInfo { ItemEntry = grant.Entry, Stack = grant.Count,
-                ItemInfos = { [10001] = new ItemAttrValue { LongVal = 0 } } });
+            notify.Rewards.Add(new ItemBaseInfo
+            {
+                ItemEntry = grant.Entry, Stack = grant.Count,
+                ItemInfos = { [10001] = new ItemAttrValue { LongVal = 0 } }
+            });
         return notify.Rewards.Count == 0 ? Task.CompletedTask : session.SendGameAsync(CharacterService.GetRewardNotify, notify);
     }
 

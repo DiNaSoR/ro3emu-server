@@ -30,7 +30,7 @@ public sealed class TeamRefreshTests
         Assert.Equal(0, (await Next(alice, TeamService.TeamInvite, InviteIntoTeamResp.Parser)).Result);
         await Next(bob, TeamService.TeamNotifyInvitee, NotifyInvitee.Parser);
         await bob.SendGameAsync(TeamService.TeamInviteeResp, new InviteeResp
-            { TeamId = created.TeamId, IsAgree = true, InviteGuid = (long)alice.Self!.Uuid });
+        { TeamId = created.TeamId, IsAgree = true, InviteGuid = (long)alice.Self!.Uuid });
         Assert.Equal(0, (await Next(bob, TeamService.TeamInviteeResp, InviteeRespResp.Parser)).Result);
 
         await bob.DisposeAsync();

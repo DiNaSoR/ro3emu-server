@@ -84,7 +84,7 @@ public sealed partial class SceneService(IOptions<ServerOptions> options, World 
             if (!ReferenceEquals(s.Role, role) || !ReferenceEquals(s.Attachment, lease) || lease?.Cancelled == true
                 || s.SceneGeneration != generation || s.SceneEntry != sourceScene || s.InstanceId != sourceInstance)
                 return false;
-            return await EnterSceneCoreAsync(s,scene,at,reason,instanceId,transfer,lineNumber,source,createLine);
+            return await EnterSceneCoreAsync(s, scene, at, reason, instanceId, transfer, lineNumber, source, createLine);
         }
         finally { s.SceneTransitionGate.Release(); }
     }
@@ -429,8 +429,11 @@ public sealed partial class SceneService(IOptions<ServerOptions> options, World 
     {
         var map = data.Row("MapConfig", req.SceneId) != null ? worldData.Map(req.SceneId) : null;
         var point = s.Dead || s.SceneLoading ? null : map?.Points.GetValueOrDefault(req.PointId);
-        await s.SendGameAsync(CustomJumpMap, new ClientCustomJumpMapResp { Result = point != null ? 0 : map == null ? ErrorCodes.SceneMissing
-            : s.Dead || s.SceneLoading ? ErrorCodes.FeatureUnavailable : ErrorCodes.Parameter });
+        await s.SendGameAsync(CustomJumpMap, new ClientCustomJumpMapResp
+        {
+            Result = point != null ? 0 : map == null ? ErrorCodes.SceneMissing
+            : s.Dead || s.SceneLoading ? ErrorCodes.FeatureUnavailable : ErrorCodes.Parameter
+        });
         if (point is { } p) await EnterSceneAsync(s, req.SceneId, p);
     }
 
