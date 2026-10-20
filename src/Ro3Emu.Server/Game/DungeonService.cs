@@ -405,6 +405,7 @@ public sealed partial class DungeonService
         };
         if (QuestList(a) is { } quests) snapshot.Vars.Add(quests);
         if (GoalParams(a) is { } goal) snapshot.Vars.Add(goal);
+        if (GuideWays(a) is { } guide) snapshot.Vars.Add(guide);
         if (a.GuildChallenge is { } challenge)
         {
             snapshot.Vars.Add(challenge.Vars());
@@ -464,6 +465,20 @@ public sealed partial class DungeonService
             return v;
         }
         v.Vi64.Add([Math.Clamp(a.Killed.Count - a.WaveBase, 0, size), size]);
+        return v;
+    }
+
+    /// <summary>
+    /// LC_DunGeon_VarDefine 10021 PGuideWayList: the scene-editor guide points (m_kGuidePoints) the client draws as
+    /// guide arrow lines (LC_SceneCom_GuideGfx, a component of every scene); the ones missing from a new list are
+    /// removed. The current scripted step's list until it completes, in a scene where any step has one (an empty list
+    /// clears it).
+    /// </summary>
+    private static DungeonVar? GuideWays(Attempt a)
+    {
+        if (!a.Plan.Waves.Any(w => w.Step is { Guide.Count: > 0 })) return null;
+        var v = new DungeonVar { VarId = GuideWayVar };
+        if (Step(a) is { } step && (a.Spawning || !a.StepDone) && !a.Settled) v.Vi64.Add(step.Guide); // Spawning: a new step
         return v;
     }
 

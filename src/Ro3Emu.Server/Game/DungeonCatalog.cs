@@ -318,7 +318,7 @@ public sealed class DungeonCatalog(GameData data, WorldData worldData, MonsterSe
     /// A scripted scene's steps (ReconstructedDungeons.Scripted): one wave per step, without monsters unless it is a
     /// fight step. Every reference
     /// must resolve in the client data and the scene's map, or the scene is refused like any unresolved encounter:
-    /// the quests the tracker shows, the actors' NPCConfig rows, points and buffs, the stories, regions and points,
+    /// the quests the tracker shows, the actors' NPCConfig rows, points and buffs, the stories, regions and points, the guide points,
     /// the interactions and dungeon messages the step's actors can actually send, a fight step's monsters and points, and
     /// every line with its speaker among the step's actors or monsters.
     /// </summary>
@@ -338,6 +338,7 @@ public sealed class DungeonCatalog(GameData data, WorldData worldData, MonsterSe
                     || actor.Buffs.Any(b => data.Row("BuffConfig", b) is not { } buff || GameData.Int(buff, "_iBuffID") <= 0)) return [];
             if (step.Story != 0 && data.Row("PlotInterpretation", step.Story) == null) return [];
             if (step.TeleportAfter != 0 && !map.Points.ContainsKey(step.TeleportAfter)) return [];
+            if (step.Guide.Any(g => !map.GuidePoints.Contains(g))) return [];
             if (step.Slide is { } slide && !(slide.Side >= 0 && slide.Down > 0 && slide.Side < 100 && slide.Down < 100)) return [];
             if (step.Fallback is { } fallback && (fallback.Ms <= 0 || step.Fight
                 || fallback.Teleport != 0 && !map.Points.ContainsKey(fallback.Teleport)

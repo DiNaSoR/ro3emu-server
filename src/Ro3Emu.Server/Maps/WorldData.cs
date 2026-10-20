@@ -78,6 +78,8 @@ public sealed class MapWorld
     public IReadOnlyList<SpawnGroup> SpawnGroups { get; init; } = [];
     public IReadOnlyList<GatheringSpawnPoint> GatheringPoints { get; init; } = [];
     public IReadOnlyDictionary<long, MapRegion> Regions { get; init; } = new Dictionary<long, MapRegion>();
+    /// <summary>Scene-editor guide points (m_kGuidePoints): paths the client draws as a guide arrow line (PGuideWayList).</summary>
+    public IReadOnlySet<long> GuidePoints { get; init; } = new HashSet<long>();
 
     /// <summary>Dungeon m_kGroups joined to m_kMonsterSpawnPoints; templates/timing belong to PetFloorConfig.</summary>
     public IReadOnlyDictionary<int, IReadOnlyList<SpawnPoint>> DungeonGroups { get; init; } = new Dictionary<int, IReadOnlyList<SpawnPoint>>();
@@ -258,8 +260,14 @@ public sealed partial class WorldData(IOptions<ServerOptions> options, GameData 
         log.LogInformation("Map {Scene} {Name}: {Npcs} NPC/portal/Kafra, {Groups} spawn groups, born {Born}, nav {W}x{H}",
             sceneEntry, data.MapName(sceneEntry), npcs.Count, spawnGroups.Count, born, map.Nav?.Width, map.Nav?.Height);
         return new MapWorld { SceneEntry = sceneEntry, Born = born, Revive = revive, Npcs = npcs, Points = points, Nav = map.Nav, SpawnGroups = spawnGroups,
-            GatheringPoints = LoadGatheringPoints(se, sceneEntry), DungeonGroups = LoadDungeonGroups(se), Regions = LoadRegions(se) };
+            GatheringPoints = LoadGatheringPoints(se, sceneEntry), DungeonGroups = LoadDungeonGroups(se), Regions = LoadRegions(se),
+            GuidePoints = LoadGuidePoints(se) };
     }
+
+    private static HashSet<long> LoadGuidePoints(JsonElement se) =>
+        se.TryGetProperty("m_kGuidePoints", out var gs) && gs.ValueKind == JsonValueKind.Object
+            ? gs.EnumerateObject().Select(g => long.TryParse(g.Name, out long id) ? id : 0).Where(id => id > 0).ToHashSet()
+            : [];
 
     private static Dictionary<long, MapRegion> LoadRegions(JsonElement se)
     {

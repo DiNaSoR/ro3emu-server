@@ -245,7 +245,12 @@ Reconstructed scripted scenes (`Reconstructed/scripted-scenes.json`, same switch
   (`InstanceService.AddPropAsync`), removed at settlement and before the room's final cleanup.
 - Guessed (see each scene's "guessed" list): the corridor region that ends 1000201's first stage, Bobo's place there,
   the jump as a teleport, the slide's speeds, no exploding ant eggs, which bell hides
-  Katie (from both stories), a wrong guess changing nothing, the instrument retrieved within 4 m of mark point 37.
+  Katie (from both stories), a wrong guess changing nothing, the instrument being the Strange Device (400046) at mark
+  point 37, picked up with its collect interaction 40004601.
+- A step's guide line: `"guide": [ids]` names scene-editor guide points (m_kGuidePoints) that the client draws as guide
+  arrow lines while the step runs: dungeon var 10021 PGuideWayList (LC_SceneCom_GuideGfx), sent in a 30404 var-change
+  event when the step starts and, empty, when it completes, and kept in 30401 while it runs. Louie's game draws guide
+  point 38 from the bells to the instrument.
 - `DungeonTests.Scripted` resolves each scene against the client data, plays each one through its client events (wrong
   and premature events included) to a clear, and checks that the story step is delivered and the next one offered.
   The story walk plays these scenes with the same events (a fight step by its kills) and has no known-open blocker left.
