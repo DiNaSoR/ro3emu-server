@@ -26,7 +26,7 @@ namespace Ro3Emu.ClientHooks
         internal const string TokenVariable = "RO3EMU_LOGIN_TOKEN", AccountVariable = "RO3EMU_LOGIN_ACCOUNT";
 
         /// <summary>Seconds in the login scene without OpenAccountPanel before Tick logs in itself (late install).</summary>
-        private const float LateLoginSeconds = 3f;
+        private const float LateLoginSeconds = 10f;
 
         private static string _token, _account;
         private static bool _read, _loginPending, _enterPending;
@@ -144,11 +144,19 @@ namespace Ro3Emu.ClientHooks
             return instance != null && instance.Length > 0 && instance[0] is Obf_R.Obf_ff table ? table : cls;
         }
 
+        /// <summary>
+        /// False until a scene is loaded: IsLoginScene indexes LC_SceneManagerIns:GetCurSceneInfo(), which is nil right
+        /// after start, so the Lua call raises "attempt to index a nil value" then. That must not cancel the login.
+        /// </summary>
         private static bool InLoginScene()
         {
-            var manager = LoginManager();
-            var result = manager?.Obf_RuA<Obf_R.Obf_Ef>("IsLoginScene")?.Obf_HuA(manager);
-            return result != null && result.Length > 0 && result[0] is bool b && b;
+            try
+            {
+                var manager = LoginManager();
+                var result = manager?.Obf_RuA<Obf_R.Obf_Ef>("IsLoginScene")?.Obf_HuA(manager);
+                return result != null && result.Length > 0 && result[0] is bool b && b;
+            }
+            catch (Exception) { return false; }
         }
     }
 }
