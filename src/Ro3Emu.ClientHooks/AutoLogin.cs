@@ -25,8 +25,10 @@ namespace Ro3Emu.ClientHooks
     {
         internal const string TokenVariable = "RO3EMU_LOGIN_TOKEN", AccountVariable = "RO3EMU_LOGIN_ACCOUNT";
 
-        /// <summary>Seconds in the login scene without OpenAccountPanel before Tick logs in itself (late install).</summary>
-        private const float LateLoginSeconds = 10f;
+        /// <summary>Seconds the account panel has been open without our wrapper before Tick logs in itself (late install).</summary>
+        private const float LateLoginSeconds = 1f;
+
+        private const string AccountPanelModule = "ui_sys_login_accountpasswordwidgetctrl";
 
         private static string _token, _account;
         private static bool _read, _loginPending, _enterPending;
@@ -77,9 +79,11 @@ namespace Ro3Emu.ClientHooks
                     return;
                 }
                 // Late install: the login widget opened (and showed the account panel) before the wrapper was in.
-                if (_global == null || !InLoginScene()) { _loginSceneSince = -1f; return; }
+                if (_global == null || !AccountPanelOpened()) { _loginSceneSince = -1f; return; }
                 if (_loginSceneSince < 0f) { _loginSceneSince = Time.realtimeSinceStartup; return; }
                 if (Time.realtimeSinceStartup - _loginSceneSince < LateLoginSeconds) return;
+                // AccountLoginBySdk fetches the server list; its LoginSelectServer event makes the login widget
+                // (_onSelectServer) hide the account panel and show the server screen, as after a typed login.
                 Debug.Log("[Ro3Emu.AutoLogin] login screen was open before the hooks; logging in from here");
                 Login();
             }
@@ -145,17 +149,15 @@ namespace Ro3Emu.ClientHooks
         }
 
         /// <summary>
-        /// False until a scene is loaded: IsLoginScene indexes LC_SceneManagerIns:GetCurSceneInfo(), which is nil right
-        /// after start, so the Lua call raises "attempt to index a nil value" then. That must not cancel the login.
+        /// The account/password widget exists: OpenAccountPanel creates it (UI_Sys_Login_AccountPasswordWidget), which
+        /// requires its module, so package.loaded holds it once the panel was shown without our wrapper. Usually the
+        /// login screen opens a moment before LuaPatches installs (it needs the world modules), so this is the common
+        /// path. (LC_LoginManager:IsLoginScene is no use here: it is true on the select-role scene only, and raises
+        /// before the first scene loads.)
         /// </summary>
-        private static bool InLoginScene()
+        private static bool AccountPanelOpened()
         {
-            try
-            {
-                var manager = LoginManager();
-                var result = manager?.Obf_RuA<Obf_R.Obf_Ef>("IsLoginScene")?.Obf_HuA(manager);
-                return result != null && result.Length > 0 && result[0] is bool b && b;
-            }
+            try { return _global?.Obf_LuA<Obf_R.Obf_ff>("package.loaded." + AccountPanelModule) != null; }
             catch (Exception) { return false; }
         }
     }
