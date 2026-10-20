@@ -606,9 +606,9 @@ public sealed class AchievementTests : IAsyncLifetime
         await bob.MicroAsync("FriendService", "accept", new() { ["Uid"] = b.ToString(), ["Applicant"] = a.ToString() });
         await ReachedIncrement(alice, Friend1); // 106017 [1, 1]: one friend of affection level >= 1
         Assert.Equal([1], (await Info("Alice", 102100301))!.Scores);
-        // FriendlinessConfig: level 2 from 200 intimacy; a gift adds one per unit (inferred by FriendExtraService).
-        await Gm("alice", "!item 1004000 200");
-        await alice.SendGameAsync(FriendExtraService.GiveGift, new GiveFriendGiftReq { RoleId = b, ItemId = 1004000, Count = 200 });
+        // FriendlinessConfig: level 2 from 200 intimacy; 1004000 adds 10 per unit (_iUseEffect [107, 10]).
+        await Gm("alice", "!item 1004000 20");
+        await alice.SendGameAsync(FriendExtraService.GiveGift, new GiveFriendGiftReq { RoleId = b, ItemId = 1004000, Count = 20 });
         Assert.Equal(0, (await Next(alice, FriendExtraService.GiveGift, GiveFriendGiftResp.Parser)).Result);
         await Until("Alice", s => s.Achievements!.Infos.GetValueOrDefault(Affection2)?.Status == AchievementStatusType.Complete,
             "affection level 2");
