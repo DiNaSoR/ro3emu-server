@@ -582,11 +582,17 @@ public sealed class SeasonTalentTests
         Assert.Equal(1, plan[Point].CurrentLevel);
         Assert.True(fixture.Session.SeasonTalent.UnlockedNode[AfterPoint]);
         Assert.Equal(remnants, fixture.Character.CountOf(fixture.Session, Remnant));
-        Assert.Equal(ErrorCodes.SkillMaxLevel, await Upgrade(alice, PierceA));
-        Assert.Equal(0, await Upgrade(alice, PierceB));
+        Assert.Equal(0, await Upgrade(alice, PierceA)); // choosing again changes nothing
+        Assert.Equal(1, fixture.Session.SeasonTalent!.Plan[0].TalentNodes[PierceA].CurrentLevel);
         await Eventually(() => fixture.Session.Buffs.Any(b => b.IsTalentOwned && b.SourceId == PierceA && b.ConfigId == 1112101)
-            && fixture.Session.Buffs.Any(b => b.IsTalentOwned && b.SourceId == PierceB && b.ConfigId == 1112201)
-            && fixture.Session.ExtraSkillModifiers.Any(m => m.Group == 11120), "branch buffs and modifiers");
+            && fixture.Session.ExtraSkillModifiers.Any(m => m.Group == 11120), "branch buff and modifiers");
+
+        // One small node per choice: Pierce B replaces Pierce A within the same large node.
+        Assert.Equal(0, await Upgrade(alice, PierceB));
+        plan = fixture.Session.SeasonTalent!.Plan[0].TalentNodes;
+        Assert.Equal((1, 0, 1), (plan[Pierce].CurrentLevel, plan[PierceA].CurrentLevel, plan[PierceB].CurrentLevel));
+        await Eventually(() => fixture.Session.Buffs.Any(b => b.IsTalentOwned && b.SourceId == PierceB && b.ConfigId == 1112201)
+            && !fixture.Session.Buffs.Any(b => b.IsTalentOwned && b.SourceId == PierceA), "replaced small node buff");
         // Pierce itself: [21,0,0,11120,29,1,100] and [21,0,0,11120,30,1,20].
         Assert.Contains(fixture.Session.ExtraSkillModifiers, m => m is { Group: 11120, Type: 29, Operation: 1, Value: 100 });
         Assert.Contains(fixture.Session.ExtraSkillModifiers, m => m is { Group: 11120, Type: 30, Operation: 1, Value: 20 });
@@ -628,14 +634,14 @@ public sealed class SeasonTalentTests
         var alice = await JobTreeRole(fixture, 5200);
         await Max(alice, 10102001);
         await Max(alice, 10102002);
-        Assert.Equal(ErrorCodes.FeatureUnavailable, await Upgrade(alice, 10102104)); // a Blacksmith (2x00) node only
+        Assert.Equal(ErrorCodes.TalentInvalid, await Upgrade(alice, 10102104)); // a Blacksmith (2x00) node only
         Assert.Equal(0, await Upgrade(alice, PierceA));
         await Eventually(() => fixture.Session.Buffs.Any(b => b.IsTalentOwned && b.ConfigId == 1522201)
             && fixture.Session.Buffs.Any(b => b.IsTalentOwned && b.ConfigId == 1522301), "assassin branch buffs");
         await Max(alice, AfterPoint);
         await Max(alice, 10102005);
         long before = fixture.Character.Stats(fixture.Session)[103];
-        Assert.Equal(0, await Upgrade(alice, 10102117)); // [1,103,15]: Physical ATK +15
+        Assert.Equal(0, await Upgrade(alice, 10102118)); // the client sends the small node; its large node 10102117 is [1,103,15]: Physical ATK +15
         Assert.Equal(15, fixture.Character.Stats(fixture.Session)[103] - before);
         Assert.Equal(1, fixture.Session.SeasonTalent!.Plan[0].TalentNodes[10102006].CurrentLevel);
     }
@@ -656,8 +662,9 @@ public sealed class SeasonTalentTests
     }
 
     [ClientDataFact]
-    public async Task JobNodesStopCountingWhenTheBranchIsReplaced()
+    public async Task AReplacedChoiceStillCountsTwoLevels()
     {
+        // A choice is the large node and one small node, so switching branches neither adds nor loses levels.
         await using var fixture = new ServerFixture();
         await fixture.StartAsync(jobTreeOpen: true, afterPointNeedLevel: 23);
         var alice = await JobTreeRole(fixture, 1200);
@@ -665,9 +672,11 @@ public sealed class SeasonTalentTests
         await Max(alice, 10102002);
         Assert.Equal(0, await Upgrade(alice, PierceA));
         Assert.Equal(ErrorCodes.TalentLocked, await Upgrade(alice, AfterPoint)); // 22 of 23
-        Assert.Equal(0, await Upgrade(alice, PierceB));
-        Assert.True(fixture.Session.SeasonTalent!.UnlockedNode[AfterPoint]); // 23
-        Assert.Equal(0, await Upgrade(alice, BashA)); // Bash and Bash A replace three Pierce levels: 22
+        Assert.Equal(0, await Upgrade(alice, PierceB)); // replaces Pierce A: still 22
+        Assert.False(fixture.Session.SeasonTalent!.UnlockedNode[AfterPoint]);
+        Assert.Equal(0, await Upgrade(alice, BashA)); // Bash and Bash A replace Pierce and Pierce B: still 22
+        var plan = fixture.Session.SeasonTalent!.Plan[0].TalentNodes;
+        Assert.Equal((0, 0, 1, 1), (plan[Pierce].CurrentLevel, plan[PierceB].CurrentLevel, plan[Bash].CurrentLevel, plan[BashA].CurrentLevel));
         Assert.False(fixture.Session.SeasonTalent!.UnlockedNode[AfterPoint]);
     }
 
