@@ -1,0 +1,69 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Ro3Emu.Desktop.MainWindow"
+        Title="RO3Emu Launcher"
+        Width="860" Height="600" MinWidth="720" MinHeight="480"
+        Background="#14171C">
+  <Grid ColumnDefinitions="300,*" RowDefinitions="*,170" Margin="20">
+
+    <!-- Servers -->
+    <Border Grid.Column="0" Grid.Row="0" Background="#1B1F26" CornerRadius="8" Padding="14" Margin="0,0,16,16">
+      <DockPanel>
+        <TextBlock DockPanel.Dock="Top" Text="RO3Emu" FontSize="24" FontWeight="Bold" Margin="0,0,0,2" />
+        <TextBlock DockPanel.Dock="Top" Classes="label" Text="Choose a server" Margin="0,0,0,10" />
+        <StackPanel DockPanel.Dock="Bottom" Spacing="6" Margin="0,10,0,0">
+          <TextBox x:Name="NewName" Watermark="Name (for example Friends)" />
+          <TextBox x:Name="NewAddress" Watermark="Address (for example 203.0.113.10)" />
+          <Grid ColumnDefinitions="*,8,*">
+            <Button x:Name="AddButton" Grid.Column="0" Content="Add server" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
+            <Button x:Name="RemoveButton" Grid.Column="2" Content="Remove" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
+          </Grid>
+        </StackPanel>
+        <ListBox x:Name="ServerList" Background="Transparent" />
+      </DockPanel>
+    </Border>
+
+    <!-- Login and play -->
+    <Border Grid.Column="1" Grid.Row="0" Background="#1B1F26" CornerRadius="8" Padding="18" Margin="0,0,0,16">
+      <DockPanel>
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,16">
+          <Ellipse x:Name="StatusDot" Width="10" Height="10" Fill="#6B7280" VerticalAlignment="Center" />
+          <TextBlock x:Name="StatusText" Text="Checking the server..." VerticalAlignment="Center" />
+        </StackPanel>
+
+        <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,12,2*" Margin="0,16,0,0">
+          <Button x:Name="UpdateButton" Grid.Column="0" Content="Update DLLs" Height="44"
+                  HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                  ToolTip.Tip="Download the newest Ro3Emu.ClientHooks.dll and Ro3Emu.Loc.dll from the repository's CI build" />
+          <Button x:Name="PlayButton" Grid.Column="2" Classes="primary" Content="Play" FontSize="18" FontWeight="SemiBold" Height="44"
+                  HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" />
+        </Grid>
+
+        <StackPanel Spacing="12">
+          <StackPanel>
+            <TextBlock Classes="label" Text="Account" />
+            <TextBox x:Name="AccountBox" Watermark="Your account name (new names are created on first login)" />
+          </StackPanel>
+          <StackPanel>
+            <TextBlock Classes="label" Text="Password" />
+            <TextBox x:Name="PasswordBox" PasswordChar="●" />
+          </StackPanel>
+          <CheckBox x:Name="RememberBox" Content="Remember my password on this PC" />
+          <StackPanel>
+            <TextBlock Classes="label" Text="Game folder (the one with ro3.exe; empty = find it)" />
+            <Grid ColumnDefinitions="*,8,Auto">
+              <TextBox x:Name="ClientBox" Grid.Column="0" Watermark="for example D:\ROO_PC" />
+              <Button x:Name="BrowseButton" Grid.Column="2" Content="Browse..." VerticalAlignment="Stretch" />
+            </Grid>
+          </StackPanel>
+        </StackPanel>
+      </DockPanel>
+    </Border>
+
+    <!-- Log -->
+    <Border Grid.Column="0" Grid.ColumnSpan="2" Grid.Row="1" Background="#0F1216" CornerRadius="8" Padding="10">
+      <TextBox x:Name="LogBox" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" Background="Transparent" BorderThickness="0"
+               FontFamily="Consolas,Menlo,monospace" FontSize="12" Foreground="#C9D1D9" />
+    </Border>
+  </Grid>
+</Window>

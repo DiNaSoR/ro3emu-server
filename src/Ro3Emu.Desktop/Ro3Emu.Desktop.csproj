@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- RO3EmuDesktop.exe: a window launcher that stands alone. It keeps a list of servers, fetches the newest client
+       DLLs, patches the game for the chosen server, logs in for the player (the game then skips its login and server
+       screens) and starts it. It runs RO3Emu.exe's own join flow in-process (Ro3Emu.Setup is a library here), so both
+       patch exactly the same way. Avalonia, so it also runs under Wine. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>RO3EmuDesktop</AssemblyName>
+    <RootNamespace>Ro3Emu.Desktop</RootNamespace>
+    <Product>RO3Emu Launcher</Product>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- A single-file publish (tools/release/pack.ps1) is compressed: about half the size. -->
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.22" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Ro3Emu.Setup\Ro3Emu.Setup.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ro3Emu.Setup.Tests" />
+  </ItemGroup>
+
+  <!-- Ro3Emu.Setup is an exe project, so its runtimeconfig is copied along; the single-file publish does not need it
+       (and in the release folder it would sit next to RO3Emu.exe, which has its own embedded). -->
+  <Target Name="DropReferencedExeRuntimeConfig" AfterTargets="Publish">
+    <Delete Files="$(PublishDir)RO3Emu.runtimeconfig.json" Condition="'$(PublishSingleFile)' == 'true'" />
+  </Target>
+
+</Project>

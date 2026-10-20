@@ -1,13 +1,22 @@
 name: release
 
 # A tag v* builds the two release archives (tools/release/pack.ps1) and attaches them to a draft release.
+# A change on main to anything that goes into RO3Emu.exe or the client DLLs rebuilds them and replaces the files of the
+# rolling "launcher" release (this fork's own RO3Emu.exe; tools/update-launcher.sh installs it).
 # CI has no game client: pack.ps1 (tools/release/client-dlls.ps1) downloads just the client's managed DLLs from the
 # publisher and builds the client hooks/loc DLLs against them. Run tools/release/smoke.ps1 locally (it needs the
 # clients) before publishing the draft.
 on:
   push:
     tags: ['v*']
+    branches: [main]
+    paths: ['src/Ro3Emu.Setup/**', 'src/Ro3Emu.Patcher/**', 'src/Ro3Emu.ClientTools/**', 'src/Ro3Emu.DataExport/**', 'src/Ro3Emu.Desktop/**',
+      'src/Ro3Emu.ClientHooks/**', 'src/Ro3Emu.Loc/**', 'tools/release/**', '.github/workflows/release.yml']
   workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -25,7 +34,7 @@ jobs:
       - name: Pack
         shell: pwsh
         run: |
-          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } else { '0.0.0' }
+          $version = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } else { "0.0.$env:GITHUB_RUN_NUMBER" }
           ./tools/release/pack.ps1 -Version $version
       - uses: actions/upload-artifact@v5
         with:
@@ -39,3 +48,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "${{ github.ref_name }}" dist/RO3Emu-win-x64.zip dist/RO3Emu-server-linux-x64.tar.gz --draft --title "RO3Emu ${{ github.ref_name }}" --notes "Download RO3Emu-win-x64.zip, extract it and double-click RO3Emu.exe. Server hosts on Linux: RO3Emu-server-linux-x64.tar.gz."
+      - name: Publish to the launcher release
+        if: github.ref == 'refs/heads/main'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          echo "$GITHUB_SHA" > dist/commit.txt
+          notes="RO3Emu.exe (in RO3Emu-win-x64.zip) built by CI from main at $GITHUB_SHA, version 0.0.$GITHUB_RUN_NUMBER. Replaced on every change to the launcher, patcher or client DLL sources; tools/update-launcher.sh installs it."
+          if ! gh release view launcher >/dev/null 2>&1; then
+            gh release create launcher --target "$GITHUB_SHA" --prerelease --latest=false --title "RO3Emu.exe (latest main build)" --notes "$notes"
+          fi
+          gh release upload launcher dist/RO3Emu-win-x64.zip dist/RO3Emu-server-linux-x64.tar.gz dist/commit.txt --clobber
+          gh release edit launcher --notes "$notes"

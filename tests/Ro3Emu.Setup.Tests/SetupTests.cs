@@ -69,6 +69,57 @@ public class SetupTests
     }
 
     [Fact]
+    public async Task SdkLoginPostsTheGamesFormAndReturnsTheToken()
+    {
+        var (url, answers, requests, listener) = Serve("""{"code":0,"data":{"token":"tok-123"}}""", """{"code":401}""");
+        Assert.Equal("tok-123", await Flows.SdkLoginAsync(url, "alice", "p&ss"));
+        var wrong = await Assert.ThrowsAsync<SetupException>(() => Flows.SdkLoginAsync(url, "alice", "nope"));
+        Assert.Contains("Wrong password", wrong.Message);
+        await answers;
+        Assert.Equal(["/sdk/login identity=alice&credential=p%26ss", "/sdk/login identity=alice&credential=nope"], requests);
+        listener.Dispose();
+        var o = Options.Parse(["join", "10.0.0.2", "--account", "alice", "--password", "pw"]);
+        Assert.Equal(("alice", "pw"), (o.Account, o.Password));
+    }
+
+    /// <summary>
+    /// A local HTTP server that answers each request with the next body and records "path body". Dispose the listener
+    /// once the client has read every answer: closing it earlier resets the last connection on Windows.
+    /// </summary>
+    internal static (string Url, Task Done, List<string> Requests, IDisposable Listener) Serve(params string[] bodies)
+    {
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        int port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop();
+        var http = new System.Net.HttpListener();
+        http.Prefixes.Add($"http://127.0.0.1:{port}/");
+        http.Start();
+        var requests = new List<string>();
+        var done = Task.Run(async () =>
+        {
+            try
+            {
+                foreach (var body in bodies)
+                {
+                    var context = await http.GetContextAsync();
+                    using (var reader = new StreamReader(context.Request.InputStream))
+                        requests.Add(context.Request.Url!.AbsolutePath + " " + await reader.ReadToEndAsync());
+                    var answer = System.Text.Encoding.UTF8.GetBytes(body);
+                    context.Response.ContentType = "application/json";
+                    context.Response.ContentLength64 = answer.Length;
+                    context.Response.KeepAlive = false;
+                    await context.Response.OutputStream.WriteAsync(answer);
+                    context.Response.Close();
+                }
+            }
+            catch (System.Net.HttpListenerException) { } // closed by the test
+            catch (ObjectDisposedException) { }
+        });
+        return ($"http://127.0.0.1:{port}", done, requests, http);
+    }
+
+    [Fact]
     public async Task DeleteCharacterWithNoServerSaysSo()
     {
         var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);

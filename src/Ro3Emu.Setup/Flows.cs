@@ -156,6 +156,7 @@ internal static class Flows
     public static async Task<int> PlayLocalAsync(Options options, bool host)
     {
         Ui.Title(host ? "RO3Emu - host a Ragnarok 3 server" : "RO3Emu - Ragnarok 3 on your own server");
+        var account = ResolveAccount(options);
         var client = await ResolveClientAsync(options, offerInstall: true);
         Ui.Step("Checking the game");
         CheckClient(client, needExport: true);
@@ -235,7 +236,8 @@ internal static class Flows
                 Ui.Info("to this PC and start with --public <your public IP>.");
             }
             if (server != null) Program.OnClose = () => server.Stop(TimeSpan.FromSeconds(4));
-            return await PlayAndWaitAsync(client, server, options.NoLaunch);
+            var login = account == null ? null : new GameLogin($"http://127.0.0.1:{ports.Http}", account.Value.Name, account.Value.Password);
+            return await PlayAndWaitAsync(client, server, options.NoLaunch, login);
         }
         finally
         {
@@ -252,10 +254,10 @@ internal static class Flows
     }
 
     /// <summary>Starts the game (unless asked not to) and keeps the server up until the player is done.</summary>
-    private static async Task<int> PlayAndWaitAsync(string client, ServerProcess? server, bool noLaunch)
+    private static async Task<int> PlayAndWaitAsync(string client, ServerProcess? server, bool noLaunch, GameLogin? login)
     {
         Process? game = null;
-        if (!noLaunch) game = LaunchGame(client);
+        if (!noLaunch) game = await LaunchGameAsync(client, login);
         Ui.Step("Server running");
         Ui.Info("Keep this window open while you play.");
         if (Ui.Interactive) Ui.Info(noLaunch ? "Press Q to stop the server." : "Press Q to stop the server, or R to start the game again.");
@@ -292,7 +294,7 @@ internal static class Flows
                     if (key is ConsoleKey.Q or ConsoleKey.Escape) break;
                     if (key == ConsoleKey.R && !GameRunning())
                     {
-                        game = LaunchGame(client);
+                        game = await LaunchGameAsync(client, login);
                         gameAnnounced = false;
                     }
                 }
@@ -305,17 +307,79 @@ internal static class Flows
 
     private static bool GameRunning() => Process.GetProcessesByName("ro3").Any();
 
-    private static Process LaunchGame(string client)
+    /// <summary>The account RO3Emu logs in with for the player (<c>--account</c>), or null: the game asks as usual.</summary>
+    internal sealed record GameLogin(string ServerUrl, string Account, string Password);
+
+    /// <summary>--account with its password (--password, RO3EMU_PASSWORD, or asked now, before the long steps).</summary>
+    private static (string Name, string Password)? ResolveAccount(Options options)
     {
+        if (string.IsNullOrWhiteSpace(options.Account)) return null;
+        var password = options.Password ?? Environment.GetEnvironmentVariable(PasswordVariable);
+        if (string.IsNullOrEmpty(password))
+        {
+            if (!Ui.Interactive)
+                throw new SetupException("--account needs a password.", $"Add --password <password>, or set the {PasswordVariable} environment variable.");
+            password = Ui.AskSecret($"Password for {options.Account.Trim()}:");
+            if (password.Length == 0) throw new SetupException("No password given.", "Run RO3Emu.exe again and type the password, or leave out --account to log in in the game.");
+        }
+        return (options.Account.Trim(), password);
+    }
+
+    internal const string PasswordVariable = "RO3EMU_PASSWORD";
+
+    /// <summary>What the game's hooks read to log in by themselves (Ro3Emu.ClientHooks AutoLogin); set on ro3.exe only.</summary>
+    internal const string TokenVariable = "RO3EMU_LOGIN_TOKEN", AccountVariable = "RO3EMU_LOGIN_ACCOUNT";
+
+    /// <summary>
+    /// The game's own first step (POST /sdk/login, identity + credential; the first login creates the account), done here
+    /// so the game can skip its login screen: returns the token the game would have got.
+    /// </summary>
+    internal static async Task<string> SdkLoginAsync(string serverUrl, string account, string password)
+    {
+        int code;
+        string? token = null;
+        try
+        {
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+            using var response = await http.PostAsync(serverUrl + "/sdk/login", new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["identity"] = account, ["credential"] = password,
+            }));
+            if ((int)response.StatusCode == 429)
+                throw new SetupException("The server refused the login for now: too many attempts.", "Wait a minute, then run RO3Emu.exe again.");
+            using var json = System.Text.Json.JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            code = json.RootElement.GetProperty("code").GetInt32();
+            if (code == 0) token = json.RootElement.GetProperty("data").GetProperty("token").GetString();
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException or KeyNotFoundException or InvalidOperationException)
+        {
+            throw new SetupException($"The server at {serverUrl} does not answer the login ({e.Message}).",
+                "Check that the server is running, or leave out --account to log in in the game.");
+        }
+        if (code == 401) throw new SetupException($"Wrong password for {account}.", "Use the password you log in to the game with, or leave out --account to log in in the game.");
+        if (code != 0 || string.IsNullOrEmpty(token)) throw new SetupException($"The server refused the login (code {code}).", "Leave out --account to log in in the game, and check the server's log.");
+        return token;
+    }
+
+    private static async Task<Process> LaunchGameAsync(string client, GameLogin? login)
+    {
+        Dictionary<string, string>? environment = null;
+        if (login != null)
+        {
+            Ui.Step($"Logging in as {login.Account}");
+            var token = await SdkLoginAsync(login.ServerUrl, login.Account, login.Password);
+            environment = new() { [TokenVariable] = token, [AccountVariable] = login.Account };
+            Ui.Ok("logged in; the game opens on character select");
+        }
         Ui.Step("Starting the game");
-        var game = Quiet(() => Launcher.Start(client, []));
+        var game = Quiet(() => Launcher.Start(client, [], environment));
         if (game.HasExited)
         {
             int code = game.ExitCode;
             throw new SetupException($"The game closed right after starting (exit code {code}{(code == 70 ? ", launch check refused" : "")}).",
                 "Run RO3Emu.exe again. If it keeps happening, run RO3Emu.exe update to repair the game.");
         }
-        Ui.Ok("the game is starting. Log in with any account name and password: the account is created on first login.");
+        Ui.Ok(login != null ? "the game is starting." : "the game is starting. Log in with any account name and password: the account is created on first login.");
         return game;
     }
 
@@ -368,6 +432,7 @@ internal static class Flows
         var address = options.Positional.FirstOrDefault() ?? Ui.Ask("Server address (ask the server owner, for example 203.0.113.10):");
         var serverUrl = ServerUrl(address)
             ?? throw new SetupException($"'{address}' is not a server address.", "Use the address the server owner gave you, for example RO3Emu.exe join 203.0.113.10");
+        var account = ResolveAccount(options);
         var client = await ResolveClientAsync(options, offerInstall: true);
         Ui.Step("Checking the game");
         CheckClient(client, needExport: false);
@@ -388,7 +453,8 @@ internal static class Flows
         Ui.Ok("the server answers");
         EnsureLocMap(client);
         PatchClient(client, serverUrl, pem);
-        if (!options.NoLaunch) LaunchGame(client);
+        if (!options.NoLaunch)
+            await LaunchGameAsync(client, account == null ? null : new GameLogin(serverUrl, account.Value.Name, account.Value.Password));
         Ui.Info($"Next time, run RO3Emu.exe join {address} again. This window can be closed.");
         if (Ui.OwnsConsole() && Ui.Interactive) await Task.Delay(8000);
         return 0;

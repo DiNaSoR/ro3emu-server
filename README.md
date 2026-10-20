@@ -47,6 +47,8 @@ server, not the official one: the official Ragnarok Online 3 server has not laun
 |---|---|
 | `RO3Emu.exe` | play on your own server (same as `RO3Emu.exe start`) |
 | `RO3Emu.exe join <address>` | play on someone else's server (`host`, `host:port` or `http://host:port`) |
+| `... --account <name>` | (`start`, `host`, `join`) log in for the player: the game skips its login and server screens |
+| `RO3EmuDesktop.exe` | the window launcher, works on its own: server list, login, *Update DLLs* (newest CI build) and *Play* (gets a newer CI build of the DLLs when there is one, then the same patch, login and start as `join`) |
 | `RO3Emu.exe host` | your server, open to friends (`--gm <account>` for GM commands) |
 | `RO3Emu.exe install [folder]` / `update [folder]` | the game from the Genesis update servers, every file checked |
 | `RO3Emu.exe restore` | undo the patch: the game talks to the Genesis servers again |
@@ -250,6 +252,12 @@ the same way on every pull request that touches `src/Ro3Emu.ClientHooks` or `src
 to test) and on main, where it publishes them to the rolling
 [`client-dlls` release](https://github.com/akreao/ro3emu-server/releases/tag/client-dlls).
 `tools/update-client-dlls.sh` installs that build (or a folder you give it) into RO3Emu and the game.
+
+This fork's own `RO3Emu.exe` is built by the `release` workflow on every change to main that goes into it (the
+launcher, patcher and client DLL sources) and published to the rolling
+[`launcher` release](https://github.com/akreao/ro3emu-server/releases/tag/launcher) as `RO3Emu-win-x64.zip`.
+`tools/update-launcher.sh` installs it into RO3Emu (backing up the old exe) and then runs `update-client-dlls.sh`
+with the DLLs from the same zip.
 
 ### Architecture
 
