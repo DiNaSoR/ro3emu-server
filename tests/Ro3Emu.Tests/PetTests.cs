@@ -572,8 +572,11 @@ public sealed class PetTests : IAsyncLifetime
         await Deploy(31201, 1631201);
         await Cast(2332201, 2332101);
         await SetHp(1);
+        int beforeFirst = bot.Inbox.Snapshot().Count;
         await Taken();
         Assert.True(Hp() > 1);
+        // Its heal packet can reach the bot after Taken returns: count it before checking the second hit adds none.
+        await After(beforeFirst, CombatService.SkillHit, SkillHitInfo.Parser, h => h.Dsts.Any(d => d.DamageType == DamageType.Heal));
         int afterFirst = bot.Inbox.Snapshot().Count;
         await Taken();
         await Task.Delay(200);

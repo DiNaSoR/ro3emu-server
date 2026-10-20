@@ -62,6 +62,8 @@ public sealed partial class ShopService : IGameTicker
         this.deadlines = deadlines;
         this.world = world;
         this.log = log;
+        // The game day the server starts in: a rollover before the first tick still resyncs the online roles.
+        gameDay = DailyActivityService.GameDay(clock.GetLocalNow().DateTime);
     }
 
     private TimeSpan lastTick;
@@ -77,9 +79,7 @@ public sealed partial class ShopService : IGameTicker
         lastTick = time.Now;
         var day = DailyActivityService.GameDay(clock.GetLocalNow().DateTime);
         if (day == gameDay) return;
-        bool first = gameDay == default;
         gameDay = day;
-        if (first) return;
         foreach (var session in sessions.All())
             if (session.Role != null && session.Shop is { Bought.Count: > 0 })
                 loop.PostOwned(session, () => session.Shop != null && session.Role != null ? SyncAsync(session) : Task.CompletedTask);

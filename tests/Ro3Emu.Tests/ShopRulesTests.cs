@@ -127,7 +127,7 @@ public sealed class ShopRulesTests : IAsyncLifetime
         clock.Now = clock.Now.AddMinutes(2); // 05:01: a new game day
         var resync = await bot.Inbox.WaitAsync(e => e.IsGame(ShopService.ShopSync)
             && DBShopInfoIncrement.Parser.ParseFrom(e.Body).CommodityBuyTimes.TryGetValue(Daily, out var c) && c.Del,
-            TimeSpan.FromSeconds(20)); // the 1 s rollover tick, then the owned sync: slow under full-suite load
+            TimeSpan.FromSeconds(8));
         Assert.NotNull(resync);
         var bought = await Buy(bot, Daily, 10);
         Assert.Equal(0, bought.Result);
