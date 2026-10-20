@@ -36,11 +36,12 @@ public sealed partial class ShopService : IGameTicker
     private readonly FriendStore friends;
     private readonly AccountStore accounts;
     private readonly Deadlines deadlines;
+    private readonly Maps.WorldData world;
     private readonly ILogger<ShopService> log;
 
     public ShopService(GameData data, CharacterService character, FunctionService functions, RoleStore roles, SeasonService seasons,
         WardrobeService wardrobe, AwardService awards, TimeProvider clock, SessionRegistry sessions, GameLoop loop,
-        MailService mail, FriendStore friends, AccountStore accounts, Deadlines deadlines,
+        MailService mail, FriendStore friends, AccountStore accounts, Deadlines deadlines, Maps.WorldData world,
         ILogger<ShopService> log, Microsoft.Extensions.Options.IOptions<ServerOptions>? options = null)
     {
         freeTopUp = options?.Value.TopUp.Free ?? false;
@@ -59,6 +60,7 @@ public sealed partial class ShopService : IGameTicker
         this.friends = friends;
         this.accounts = accounts;
         this.deadlines = deadlines;
+        this.world = world;
         this.log = log;
     }
 
@@ -275,6 +277,7 @@ public sealed partial class ShopService : IGameTicker
         var shop = data.Table("ShopConfig").Values.FirstOrDefault(s => GameData.Int(s, "_iClassID") == classId);
         if (shop.ValueKind != JsonValueKind.Object) return new(ErrorCodes.ShopMissing, "no shop");
         if (GameData.Int(shop, "_iFunctionId") is var function and > 0 && !functions.IsOpen(session, function)) return new(ErrorCodes.ShopClosed, $"function {function} closed");
+        if (FarFromShopNpc(session, shop) is { } far) return far;
         foreach (var gate in new[] { "_iIsBuy", "_iIsLock" })
             if (GameData.Int(commodity, gate) is var cond and > 0 && !functions.ConditionMet(session, cond)) return new(ErrorCodes.PurchaseRequirements, $"{gate} {cond}");
         // _kMultiverseArray: [0] in every season, else only in the listed playbooks (the current one: SeasonService).

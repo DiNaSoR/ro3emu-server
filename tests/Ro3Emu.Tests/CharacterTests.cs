@@ -33,6 +33,7 @@ public sealed class CharacterTests : IAsyncLifetime
             o.GameGatePort = gamePort;
         });
         await _app.StartAsync();
+        _app.Services.GetRequiredService<ShopService>().SellNpcShopsAtSpawn();
         _http = $"http://127.0.0.1:{httpPort}";
     }
 
