@@ -274,7 +274,7 @@ public sealed class DbWriter : IDisposable
                     // Resolve from what is committed, on a fresh read-only connection of this worker, before
                     // releasing the accepted job's completion.
                     using var recovery = new SqliteConnection(new SqliteConnectionStringBuilder(_connectionString)
-                        { Mode = SqliteOpenMode.ReadOnly, Pooling = false }.ToString());
+                    { Mode = SqliteOpenMode.ReadOnly, Pooling = false }.ToString());
                     recovery.Open();
                     DbWriteGuard.AttachRead(recovery, _metrics, "writer/resolve-operation");
                     if (OperationReceipts.TryRead(recovery, null, operationId, out var receipt))

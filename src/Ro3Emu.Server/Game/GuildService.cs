@@ -298,8 +298,11 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
     {
         // (inferred) 32214 only changes roster. A full reset is the sole observed route that clears GuildBaseInfo.shortUid.
         // Keep real building rows so DecodeBuilding's unguarded pairs(building) can consume the exit packet.
-        var clear = new GuildFullInfoNtf { Guid = 0, ShortUid = 0, Status = GuildStatus.None,
-            IconInfo = new GuildHeadIcon(), OfficalRight = new GuildOfficalRight(), Resource = new GuildResource() };
+        var clear = new GuildFullInfoNtf
+        {
+            Guid = 0, ShortUid = 0, Status = GuildStatus.None,
+            IconInfo = new GuildHeadIcon(), OfficalRight = new GuildOfficalRight(), Resource = new GuildResource()
+        };
         clear.HistoryNames.AddRange(former.HistoryNames.Count > 0 ? former.HistoryNames : [former.Name]);
         clear.Building.AddRange(former.Buildings.Select(k => BuildingInfo(former, k.Key)));
         await s.SendGameAsync(Full, clear);
@@ -323,8 +326,11 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
         double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out _);
 
     public Task CheckSensitiveAsync(GameSession s, CheckSensitiveWordReq req) => s.SendGameAsync(CheckSensitive,
-        new CheckSensitiveWordResp { Key = req.Key, Content = req.Content,
-            Result = (uint)(Sensitive(req.Content) ? ErrorCodes.TextSensitive : 0) });
+        new CheckSensitiveWordResp
+        {
+            Key = req.Key, Content = req.Content,
+            Result = (uint)(Sensitive(req.Content) ? ErrorCodes.TextSensitive : 0)
+        });
 
     private long[] Setting(string name, params long[] fallback)
     {
@@ -378,9 +384,12 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
                 {
                     // Even when a later config assigns a creation cost, payment and uniqueness commit together.
                     if (await character.ExchangeLockedAsync(s, [((int)cost[0], cost[1])], [],
-                            persist: tx => { store.EnlistSave(guild, tx); EnlistViews(guild, tx);
-                                tx.WithEconomy(GuildPayment(s, "guild-create", (int)cost[0], cost[1])); }, asyncCommit: true) == null)
-                            code = ErrorCodes.ItemsShort;
+                            persist: tx =>
+                            {
+                                store.EnlistSave(guild, tx); EnlistViews(guild, tx);
+                                tx.WithEconomy(GuildPayment(s, "guild-create", (int)cost[0], cost[1]));
+                            }, asyncCommit: true) == null)
+                        code = ErrorCodes.ItemsShort;
                 }
                 else if (!await SaveGuildAsync(guild)) code = store.NameExists(req.Name) ? ErrorCodes.GuildNameTaken : ErrorCodes.AlreadyInGuild;
             }
@@ -408,8 +417,11 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
     private GuildStore.Member NewMember(Role role, int official)
     {
         var progress = roles.LoadProgress(role.Id);
-        return new GuildStore.Member { RoleId = role.Id, Name = role.Name, Level = progress.Level,
-            Career = progress.Career, EnterTime = NowMs(), OfflineTime = NowSec(), Official = official };
+        return new GuildStore.Member
+        {
+            RoleId = role.Id, Name = role.Name, Level = progress.Level,
+            Career = progress.Career, EnterTime = NowMs(), OfflineTime = NowSec(), Official = official
+        };
     }
 
     private Task RecommendCoreAsync(GameSession s, GuildRecommendListReq req)
@@ -419,8 +431,11 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
             .Where(g => !req.IsCanJoin || g.Members.Count < MaxMembers(g)).Where(g => g.Id > req.LastGuildShortId).ToList();
         // The bridge omits empty repeated messages; the success DAL ipairs(guilds) cannot parse an empty list.
         // (inferred) A no-match refusal is safer than reporting a false success with an absent list.
-        var resp = new GuildRecommendListResp { Result = list.Count == 0 ? ErrorCodes.GuildMissing : 0,
-            SearchName = req.SearchName, TotalGuildCount = list.Count };
+        var resp = new GuildRecommendListResp
+        {
+            Result = list.Count == 0 ? ErrorCodes.GuildMissing : 0,
+            SearchName = req.SearchName, TotalGuildCount = list.Count
+        };
         resp.Guilds.AddRange(list.Take(Math.Clamp(req.Count, 1, 100)).Select(g => Snapshot(g, s.Role?.Id ?? 0)));
         return s.SendGameAsync(Recommend, resp);
     }
@@ -430,8 +445,11 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
         var guilds = store.List().Where(g => g.Status == (int)GuildStatus.PreCreate && g.HelperDeadlineMs > NowMs()
             && (req.SearchName.Length == 0 || g.Name.Contains(req.SearchName, StringComparison.OrdinalIgnoreCase))).ToArray();
         // Empty repeated fields decode as nil in this bridge; the DAL calls ipairs without a guard.
-        var rsp = new GuildCreateHelperListResp { Result = guilds.Length == 0 ? ErrorCodes.GuildMissing : 0,
-            SearchName = req.SearchName };
+        var rsp = new GuildCreateHelperListResp
+        {
+            Result = guilds.Length == 0 ? ErrorCodes.GuildMissing : 0,
+            SearchName = req.SearchName
+        };
         rsp.Data.AddRange(guilds.Select(g => new GuildCreateHelperListResp.Types.GuildHelperInfo
         { Guild = Snapshot(g, s.Role?.Id ?? 0), FinishTime = g.HelperDeadlineMs }));
         return s.SendGameAsync(HelperList, rsp);
@@ -444,8 +462,11 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
         if (g != null)
         {
             resp.SnapshotData = Snapshot(g, s.Role?.Id ?? 0);
-            resp.BuildData.AddRange(g.Buildings.Select(k => new DBGuildBuilding { BuildingID = k.Key, Level = k.Value,
-                EndLevelUpTime = g.BuildingEndTimes.GetValueOrDefault(k.Key) }));
+            resp.BuildData.AddRange(g.Buildings.Select(k => new DBGuildBuilding
+            {
+                BuildingID = k.Key, Level = k.Value,
+                EndLevelUpTime = g.BuildingEndTimes.GetValueOrDefault(k.Key)
+            }));
             resp.PlayerHistoryData.AddRange(g.Members.Values.Select(m => new PlayerHistoryInfo
             { PlayerId = m.RoleId, Official = m.Official, HistoryContribute = (int)Math.Min(int.MaxValue, m.HistoryContribute) }));
         }
@@ -544,8 +565,11 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
                 }
                 else
                 {
-                    var a = new GuildStore.Application { RoleId = s.Role!.Id, Name = s.Role.Name,
-                        Level = s.Progress!.Level, Career = s.Progress.Career, ApplyTime = NowSec() };
+                    var a = new GuildStore.Application
+                    {
+                        RoleId = s.Role!.Id, Name = s.Role.Name,
+                        Level = s.Progress!.Level, Career = s.Progress.Career, ApplyTime = NowSec()
+                    };
                     g.Applications[a.RoleId] = a;
                     if (!g.AutoAccept) await SaveGuildAsync(g);
                     await PushApplications(g, a, GuildEnterApplyChangeNtf.Types.ChangeType.Add);
@@ -659,8 +683,11 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
                 await PushMember(g, target, GuildMemberInfoChangeNtf.Types.ChangeType.Update);
             }
         }
-        await s.SendGameAsync(ChangeOfficial, new GuildChangeOfficialResp { Result = code, TarPlayerID = req.TarPlayerID,
-            TarOfficial = req.TarOfficial, ResetElit = req.ResetElit });
+        await s.SendGameAsync(ChangeOfficial, new GuildChangeOfficialResp
+        {
+            Result = code, TarPlayerID = req.TarPlayerID,
+            TarOfficial = req.TarOfficial, ResetElit = req.ResetElit
+        });
     }
 
     private async Task LeaveCoreAsync(GameSession s)
@@ -776,7 +803,8 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
         {
             switch (tp)
             {
-                case 1: if (Sensitive(req.Announce)) code = ErrorCodes.TextSensitive;
+                case 1:
+                    if (Sensitive(req.Announce)) code = ErrorCodes.TextSensitive;
                     else if (AllNumeric(req.Announce)) code = ErrorCodes.GuildTextNumbers;
                     else if (req.Announce.Length > Setting("GuildNoticeContentNumNew", 0, 80)[1]) code = ErrorCodes.GuildTextLength;
                     else if (!req.IsCheck) g.Announce = req.Announce; break;
@@ -813,8 +841,11 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
                                     if (cost.Length >= 2 && cost[0] > 0 && cost[1] > 0)
                                     {
                                         if (await character.ExchangeLockedAsync(s, [((int)cost[0], cost[1])], [],
-                                            persist: tx => { store.EnlistSave(g, tx, "guild disappeared during rename"); EnlistViews(g, tx);
-                                                tx.WithEconomy(GuildPayment(s, "guild-rename", (int)cost[0], cost[1])); }, asyncCommit: true) == null)
+                                            persist: tx =>
+                                            {
+                                                store.EnlistSave(g, tx, "guild disappeared during rename"); EnlistViews(g, tx);
+                                                tx.WithEconomy(GuildPayment(s, "guild-rename", (int)cost[0], cost[1]));
+                                            }, asyncCommit: true) == null)
                                             code = ErrorCodes.ItemsShort;
                                         else storedWithPayment = true;
                                     }
@@ -839,20 +870,26 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
                         }
                     }
                     break;
-                case 3: code = CheckIcon(req.Icon, g);
-                    if (code == 0 && !req.IsCheck) { g.Background = req.Icon.BackgroundType; g.Icon = req.Icon.IconType; } break;
-                case 4: code = CheckRights(req.Right);
+                case 3:
+                    code = CheckIcon(req.Icon, g);
+                    if (code == 0 && !req.IsCheck) { g.Background = req.Icon.BackgroundType; g.Icon = req.Icon.IconType; }
+                    break;
+                case 4:
+                    code = CheckRights(req.Right);
                     if (code == 0 && !req.IsCheck)
                         foreach (var setting in req.Right.Data)
                             g.Rights[(int)setting.RightType] = setting.AbledOfficial.Select(x => (int)x).ToList();
                     break;
-                case 5: if (Sensitive(req.Notice)) code = ErrorCodes.TextSensitive;
+                case 5:
+                    if (Sensitive(req.Notice)) code = ErrorCodes.TextSensitive;
                     else if (AllNumeric(req.Notice)) code = ErrorCodes.GuildTextNumbers;
                     else if (req.Notice.Length > Setting("GuildNoticeContentNumNew", 0, 80)[1]) code = ErrorCodes.GuildTextLength;
-                    else if (!req.IsCheck) { g.Notice = req.Notice; g.LastChangeNoticeTime = NowSec(); } break;
+                    else if (!req.IsCheck) { g.Notice = req.Notice; g.LastChangeNoticeTime = NowSec(); }
+                    break;
                 case 6: if (!req.IsCheck) g.AutoAccept = req.AutoAcceptApply; break;
                 case 7: if (!req.IsCheck) g.AutoCreateHelper = req.AutoCreateHelper; break;
-                case 8: if (req.JoinLevelLimit < 0 || req.JoinLevelLimit > 200) code = ErrorCodes.Parameter;
+                case 8:
+                    if (req.JoinLevelLimit < 0 || req.JoinLevelLimit > 200) code = ErrorCodes.Parameter;
                     else if (!req.IsCheck) g.JoinLevelLimit = req.JoinLevelLimit; break;
                 case 9: if (!req.IsCheck) { var personal = (s.Guild ?? new DBRoleGuildInfo()).Clone(); personal.CantBeInvited = req.CantBeInvited; await SavePersonalAsync(s, personal); } break;
                 case 10:
@@ -882,20 +919,32 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
                 await RefreshMembers(g);
                 if (tp is 1 or 2 or 5 or 10)
                 {
-                    var change = new GuildBaseInfoChangeNtf { Tp = GuildBaseInfoChangeNtf.Types.ChangeType.ChangeBase,
-                        Base = new GuildBaseInfoChangeNtf.Types.BaseChangeInfo { Name = g.Name, Level = g.Level,
-                        Announce = g.Announce, Notice = g.Notice, Status = (GuildStatus)g.Status,
-                        MaxMemberCount = MaxMembers(g), LastChangeNameTime = g.LastChangeNameTime,
-                        LastChangeNoticeTime = (int)g.LastChangeNoticeTime } };
+                    var change = new GuildBaseInfoChangeNtf
+                    {
+                        Tp = GuildBaseInfoChangeNtf.Types.ChangeType.ChangeBase,
+                        Base = new GuildBaseInfoChangeNtf.Types.BaseChangeInfo
+                        {
+                            Name = g.Name, Level = g.Level,
+                            Announce = g.Announce, Notice = g.Notice, Status = (GuildStatus)g.Status,
+                            MaxMemberCount = MaxMembers(g), LastChangeNameTime = g.LastChangeNameTime,
+                            LastChangeNoticeTime = (int)g.LastChangeNoticeTime
+                        }
+                    };
                     change.Base.HistoryNames.AddRange(g.HistoryNames.Count > 0 ? g.HistoryNames : [g.Name]);
                     foreach (var m in g.Members.Values) if (Online(m.RoleId) is { } peer) await peer.SendGameAsync(BaseChange, change);
                 }
                 if (tp == 10)
                 {
-                    await PushBase(g, new GuildBaseInfoChangeNtf { Tp = GuildBaseInfoChangeNtf.Types.ChangeType.ChangeAutoAcceptApply,
-                        AutoAcceptApply = g.AutoAccept });
-                    await PushBase(g, new GuildBaseInfoChangeNtf { Tp = GuildBaseInfoChangeNtf.Types.ChangeType.ChangeJoinLevelLimit,
-                        JoinLevelLimit = g.JoinLevelLimit });
+                    await PushBase(g, new GuildBaseInfoChangeNtf
+                    {
+                        Tp = GuildBaseInfoChangeNtf.Types.ChangeType.ChangeAutoAcceptApply,
+                        AutoAcceptApply = g.AutoAccept
+                    });
+                    await PushBase(g, new GuildBaseInfoChangeNtf
+                    {
+                        Tp = GuildBaseInfoChangeNtf.Types.ChangeType.ChangeJoinLevelLimit,
+                        JoinLevelLimit = g.JoinLevelLimit
+                    });
                     if (publishRecruit)
                     {
                         await chat.PublishRecruitmentAsync(s, g.Announce, g.Id,
@@ -904,12 +953,15 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
                 }
             }
         }
-        await s.SendGameAsync(Edit, new GuildEditResp { Result = code, Tp = tp,
+        await s.SendGameAsync(Edit, new GuildEditResp
+        {
+            Result = code, Tp = tp,
             Name = g?.Name ?? "", Announce = g?.Announce ?? "", Notice = g?.Notice ?? "",
             Icon = g == null ? new GuildHeadIcon() : Icon(g), Right = g == null ? new GuildOfficalRight() : Rights(g),
             AutoAcceptApply = g?.AutoAccept ?? false, AutoCreateHelper = g?.AutoCreateHelper ?? false,
             JoinLevelLimit = g?.JoinLevelLimit ?? 0, CantBeInvited = s.Guild?.CantBeInvited ?? false,
-            IsOpeRecruit = req.IsOpeRecruit });
+            IsOpeRecruit = req.IsOpeRecruit
+        });
     }
 
     /// <summary>The Guild League's handlers for 30410/30411/30412 (GuildLeagueService), run inside this family's guild scope.</summary>
@@ -975,12 +1027,21 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
                         Ro3Emu.Server.Economy.EconomyCompartment.GuildTreasury, -amount,
                         Ro3Emu.Server.Economy.EconomyLegKind.Sink, Ro3Emu.Server.Economy.EconomyReason.GuildResourceSpend)], []);
                 await SaveGuildAsync(g, economy: economy);
-                await s.SendGameAsync(BuildUpgrade, new GuildBuildLevelUpResp { Result = 0, BuildingID = type,
-                    EndLevelUpTime = g.BuildingEndTimes[type] });
-                await PushBase(g, new GuildBaseInfoChangeNtf { Tp = GuildBaseInfoChangeNtf.Types.ChangeType.ChangeResource,
-                    Resource = Resource(g) });
-                await PushBase(g, new GuildBaseInfoChangeNtf { Tp = GuildBaseInfoChangeNtf.Types.ChangeType.ChangeBuilding,
-                    Build = BuildingInfo(g, type) });
+                await s.SendGameAsync(BuildUpgrade, new GuildBuildLevelUpResp
+                {
+                    Result = 0, BuildingID = type,
+                    EndLevelUpTime = g.BuildingEndTimes[type]
+                });
+                await PushBase(g, new GuildBaseInfoChangeNtf
+                {
+                    Tp = GuildBaseInfoChangeNtf.Types.ChangeType.ChangeResource,
+                    Resource = Resource(g)
+                });
+                await PushBase(g, new GuildBaseInfoChangeNtf
+                {
+                    Tp = GuildBaseInfoChangeNtf.Types.ChangeType.ChangeBuilding,
+                    Build = BuildingInfo(g, type)
+                });
                 return;
             }
         }
@@ -989,8 +1050,11 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
 
     /// <summary>32231 resource change after another guild system commits an atomic treasury transaction.</summary>
     public Task RefreshResourceAsync(long guildId) => store.Get(guildId) is { } guild
-        ? PushBase(guild, new GuildBaseInfoChangeNtf { Tp = GuildBaseInfoChangeNtf.Types.ChangeType.ChangeResource,
-            Resource = Resource(guild) }) : Task.CompletedTask;
+        ? PushBase(guild, new GuildBaseInfoChangeNtf
+        {
+            Tp = GuildBaseInfoChangeNtf.Types.ChangeType.ChangeResource,
+            Resource = Resource(guild)
+        }) : Task.CompletedTask;
 
     private async Task PushBase(GuildStore.State g, GuildBaseInfoChangeNtf change)
     {
@@ -1025,8 +1089,11 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
                 g.Buildings[type]++;
                 if (type == 1) g.Level = (int)g.Buildings[type]; // (inferred) guild level follows Hall level.
                 await SaveGuildAsync(g);
-                await PushBase(g, new GuildBaseInfoChangeNtf { Tp = GuildBaseInfoChangeNtf.Types.ChangeType.ChangeBuilding,
-                    Build = BuildingInfo(g, type) });
+                await PushBase(g, new GuildBaseInfoChangeNtf
+                {
+                    Tp = GuildBaseInfoChangeNtf.Types.ChangeType.ChangeBuilding,
+                    Build = BuildingInfo(g, type)
+                });
                 if (type == 1) await RefreshMembers(g);
             }
         }
