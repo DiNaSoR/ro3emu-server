@@ -1,5 +1,6 @@
 # Builds the two release archives:
-#   dist/RO3Emu-win-x64.zip               RO3Emu.exe + the self-contained server + the client hooks/loc DLLs + README
+#   dist/RO3Emu-win-x64.zip               RO3Emu.exe + RO3EmuDesktop.exe (the window launcher) + the self-contained server
+#                                         + the client hooks/loc DLLs + README
 #   dist/RO3Emu-server-linux-x64.tar.gz   the self-contained server + RO3Emu (export/install) + server.sh + README
 # Nothing from the game goes in: the archives are checked against an allowlist and the DLLs' embedded resources are
 # checked too, and the build fails if a client DLL, Lua, config JSON or exported data would ship.
@@ -63,6 +64,7 @@ function Publish([string]$project, [string]$rid, [string]$out) {
 }
 $win = Join-Path $work 'win\RO3Emu'
 Publish 'src\Ro3Emu.Setup' 'win-x64' $win
+Publish 'src\Ro3Emu.Desktop' 'win-x64' $win
 Publish 'src\Ro3Emu.Server' 'win-x64' (Join-Path $win 'server')
 New-Item -ItemType Directory (Join-Path $win 'client') | Out-Null
 Copy-Item (Join-Path $clientDlls '*.dll') (Join-Path $win 'client')
@@ -76,7 +78,7 @@ Copy-Item (Join-Path $PSScriptRoot 'README-linux.txt') (Join-Path $linux 'README
 
 # 3. Nothing from the game: exactly these files, and the DLLs carry only our own resources.
 $allowed = @{
-    win = @('RO3Emu.exe', 'README.txt', 'server/Ro3Emu.Server.exe', 'server/appsettings.json', 'server/appsettings.Development.json',
+    win = @('RO3Emu.exe', 'RO3EmuDesktop.exe', 'README.txt', 'server/Ro3Emu.Server.exe', 'server/appsettings.json', 'server/appsettings.Development.json',
         'client/Ro3Emu.ClientHooks.dll', 'client/Ro3Emu.Loc.dll')
     linux = @('RO3Emu', 'README.txt', 'server.sh', 'server/Ro3Emu.Server', 'server/appsettings.json', 'server/appsettings.Development.json')
 }

@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- RO3EmuDesktop.exe: the window launcher next to RO3Emu.exe. It keeps a list of servers, logs in for the player
+       (the game then skips its login and server screens), fetches the newest client DLLs and runs RO3Emu.exe join,
+       which patches the game for the chosen server and starts it. Avalonia, so it also runs under Wine. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>RO3EmuDesktop</AssemblyName>
+    <RootNamespace>Ro3Emu.Desktop</RootNamespace>
+    <Product>RO3Emu Launcher</Product>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- A single-file publish (tools/release/pack.ps1) is compressed: about half the size. -->
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.22" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ro3Emu.Setup.Tests" />
+  </ItemGroup>
+
+</Project>

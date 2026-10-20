@@ -47,6 +47,8 @@ server, not the official one: the official Ragnarok Online 3 server has not laun
 |---|---|
 | `RO3Emu.exe` | play on your own server (same as `RO3Emu.exe start`) |
 | `RO3Emu.exe join <address>` | play on someone else's server (`host`, `host:port` or `http://host:port`) |
+| `... --account <name>` | (`start`, `host`, `join`) log in for the player: the game skips its login and server screens |
+| `RO3EmuDesktop.exe` | the window launcher: server list, login, *Update DLLs* (newest CI build) and *Play* (runs `join`) |
 | `RO3Emu.exe host` | your server, open to friends (`--gm <account>` for GM commands) |
 | `RO3Emu.exe install [folder]` / `update [folder]` | the game from the Genesis update servers, every file checked |
 | `RO3Emu.exe restore` | undo the patch: the game talks to the Genesis servers again |

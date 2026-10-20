@@ -82,7 +82,7 @@ public class SetupTests
     }
 
     /// <summary>A local HTTP server that answers each request with the next JSON body and records "path body".</summary>
-    private static (string Url, Task Done, List<string> Requests) Serve(params string[] bodies)
+    internal static (string Url, Task Done, List<string> Requests) Serve(params string[] bodies)
     {
         var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
         listener.Start();

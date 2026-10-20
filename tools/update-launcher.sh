@@ -32,6 +32,12 @@ mkdir -p "$backup"
 [[ -d "$LAUNCHER/server" ]] && cp -rp "$LAUNCHER/server" "$backup/"
 cp "$new/RO3Emu.exe" "$LAUNCHER/RO3Emu.exe"
 echo "updated RO3Emu.exe  $(sha256sum "$new/RO3Emu.exe" | cut -c1-12)"
+# The window launcher (wine RO3EmuDesktop.exe): server list, login, Update DLLs, Play.
+if [[ -f "$new/RO3EmuDesktop.exe" ]]; then
+    [[ -f "$LAUNCHER/RO3EmuDesktop.exe" ]] && cp -p "$LAUNCHER/RO3EmuDesktop.exe" "$backup/"
+    cp "$new/RO3EmuDesktop.exe" "$LAUNCHER/RO3EmuDesktop.exe"
+    echo "updated RO3EmuDesktop.exe  $(sha256sum "$new/RO3EmuDesktop.exe" | cut -c1-12)"
+fi
 # The bundled server (used by `RO3Emu.exe` / `host`; `join` does not need it). appsettings you changed are kept.
 mkdir -p "$LAUNCHER/server"
 for f in "$new/server/"*; do

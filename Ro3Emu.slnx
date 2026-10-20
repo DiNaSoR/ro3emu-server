@@ -7,6 +7,7 @@
   <Project Path="src/Ro3Emu.Loc/Ro3Emu.Loc.csproj" />
     <Project Path="src/Ro3Emu.ClientTools/Ro3Emu.ClientTools.csproj" />
     <Project Path="src/Ro3Emu.DataExport/Ro3Emu.DataExport.csproj" />
+    <Project Path="src/Ro3Emu.Desktop/Ro3Emu.Desktop.csproj" />
     <Project Path="src/Ro3Emu.Launcher/Ro3Emu.Launcher.csproj" />
     <Project Path="src/Ro3Emu.Patcher/Ro3Emu.Patcher.csproj" />
     <Project Path="src/Ro3Emu.Server/Ro3Emu.Server.csproj" />

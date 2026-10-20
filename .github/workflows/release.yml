@@ -10,7 +10,7 @@ on:
   push:
     tags: ['v*']
     branches: [main]
-    paths: ['src/Ro3Emu.Setup/**', 'src/Ro3Emu.Patcher/**', 'src/Ro3Emu.ClientTools/**', 'src/Ro3Emu.DataExport/**',
+    paths: ['src/Ro3Emu.Setup/**', 'src/Ro3Emu.Patcher/**', 'src/Ro3Emu.ClientTools/**', 'src/Ro3Emu.DataExport/**', 'src/Ro3Emu.Desktop/**',
       'src/Ro3Emu.ClientHooks/**', 'src/Ro3Emu.Loc/**', 'tools/release/**', '.github/workflows/release.yml']
   workflow_dispatch:
 
