@@ -107,6 +107,24 @@ public sealed partial class TaskService
         }), "quest siege");
     }
 
+    /// <summary>106610 / 106609: a settled Territory War battle; <paramref name="personal"/> holds the loaded participants'
+    /// personal scores, <paramref name="guilds"/> each fighting guild's score, credited to its online members.</summary>
+    public void OnTerritoryBattleSettled(IReadOnlyDictionary<long, long> personal, IReadOnlyDictionary<long, long> guilds)
+    {
+        foreach (var s in sessions.All().Where(s => s.Role != null).ToArray())
+        {
+            long own = personal.GetValueOrDefault(s.Role!.Id);
+            long guild = s.Guild is { GuildId: > 0 } g ? guilds.GetValueOrDefault(g.GuildId) : 0;
+            if (own <= 0 && guild <= 0) continue;
+            loop.PostOwned(s, () => ProgressAsync(s, null, t => t switch
+            {
+                [TTerritoryPersonal, _] => own,
+                [TTerritoryGuild, _] => guild,
+                _ => 0,
+            }), "quest territory war");
+        }
+    }
+
     /// <summary>317002: levels gained by one committed Soul Echo upgrade.</summary>
     public void OnEchoUpgraded(GameSession s, int levels)
     {

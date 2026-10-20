@@ -387,6 +387,7 @@ public static class ServerHost
         app.Services.GetRequiredService<GuildChallengeService>().Participated.Add(questTasks.OnGveJoined); // 103014
         league.MatchCommitted.Add(questTasks.OnGuildLeagueMatch); // 106603, 106019
         territory.SiegeSettled.Add(questTasks.OnSiegeSettled); // 106611, 106605, 106606
+        territory.BattleSettled.Add(questTasks.OnTerritoryBattleSettled); // 106610, 106609
         app.Services.GetRequiredService<EmblemService>().Upgraded.Add(questTasks.OnEchoUpgraded); // 317002
         app.Services.GetRequiredService<TowerService>().Settled.Add(questTasks.OnTowerSettled); // 101007, 101010
         app.Services.GetRequiredService<PersonalService>().Upvoted.Add(questTasks.OnProfileLiked); // 106902

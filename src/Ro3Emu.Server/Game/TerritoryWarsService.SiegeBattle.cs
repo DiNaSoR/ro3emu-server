@@ -17,6 +17,11 @@ public sealed partial class TerritoryWarsService
     /// won (quest target 106611). Listeners post their work.</summary>
     public List<Action<long, long, bool>> SiegeSettled { get; } = new();
 
+    /// <summary>After a committed stronghold/capital battle settlement: the personal score of each newly settled loaded
+    /// participant (by role) and each fighting guild's battle score (by guild). Quest targets 106610 / 106609 (Realm
+    /// Campaign Battle Merit and Guild Territory War points). Listeners post their work.</summary>
+    public List<Action<IReadOnlyDictionary<long, long>, IReadOnlyDictionary<long, long>>> BattleSettled { get; } = new();
+
     public sealed class SiegeRunState
     {
         public int City { get; set; }

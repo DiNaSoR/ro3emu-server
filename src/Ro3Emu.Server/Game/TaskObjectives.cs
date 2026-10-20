@@ -142,6 +142,14 @@ public sealed partial class TaskService
     // - 106801 [n] "Log in ${1} times" (110007, Lost Treasure): one per login while the quest runs; the login that
     //   accepts it counts as the first (inferred).
     private const int TGvgJoin = 106605, TGvgWin = 106606, TLogin = 106801;
+    // - 106610 [n] "Earn a total of ${1} Personal Points in the Territory War" (Realm Campaign 107, tasks 120001-120005
+    //   "Reach @{1} Battle Merit") / 106609 [n] "Earn a total of ${1} Guild Points in the Territory War" (120006-120010
+    //   "Reach @{1} points in Guild Territory War"), ProgressConfig 11190100104 / 11190100103: the personal score of each
+    //   settled stronghold or capital battle the role was loaded into (TerritoryWarsService.Participant.Score, the same
+    //   points that feed RoleState.Honor) / its guild's battle score (BattleState.Scores), credited to the guild's members
+    //   online at settlement. Counted since acceptance, like the other event counters; the client has no formatter for
+    //   either id (default R = p2). Siege War has its own target (106611) and is not counted (inferred).
+    private const int TTerritoryPersonal = 106610, TTerritoryGuild = 106609;
     // - 107101 [phase, percent] "Reach @{1}% completion for the First Movement" (Genesis Movement 111, tasks 2101001-2101004,
     //   "[Symphony of Genesis] Movement @{1}"): the ExplorePhaseConfig phase's note-filling progress (NewActivityService
     //   WorldFillCoreAsync, DBWorldExplorationPhase.totalRate in basis points) in whole percent; R = p3. The client has no
@@ -172,7 +180,7 @@ public sealed partial class TaskService
             or TTalentLevels or TPetsDeployed or TTowerFloor or TGuildHunt or TDraculaWedding or TPetSupport
             or TPetRoom or TTreasureDig or TCoffinOrSurvivor or TDragonCoffin or TGveJoin or TFriends or TEchoLevelSum
             or TEchoUpgrade or TTowerJoin or TTowerWin or TTowerFloorReached or TLike or TLiveness or TCampfire or TTavernTime
-            or TGvgJoin or TGvgWin or TLogin, var n] => n,
+            or TGvgJoin or TGvgWin or TLogin or TTerritoryPersonal or TTerritoryGuild, var n] => n,
         [TTenBossWin, var n, _, ..] => n,
         // Connect Quests (TaskService.ConnectQuests.cs); 106014 counts seconds against its minutes (inferred).
         [TPartyMvp or TPartyBoss, var n, _] => n,
