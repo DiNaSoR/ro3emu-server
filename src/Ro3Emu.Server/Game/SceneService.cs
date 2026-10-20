@@ -416,13 +416,17 @@ public sealed partial class SceneService(IOptions<ServerOptions> options, World 
     }
 
     /// <summary>
-    /// 30012 to another map is free travel: a GM may go anywhere, a player only to a map it has been to (the world map
-    /// the client draws from 1016 VisitedMaps), alive and outside an instance or dungeon. The failed-load recovery
-    /// request names the current map and is always allowed.
+    /// 30012 to another map is free travel: a player only to a map it has been to (the world map the client draws from
+    /// 1016 VisitedMaps) and alive, a GM to any map. Nobody travels out of an instance or dungeon, a GM included: the
+    /// client sends 30012 by itself when its quest tracker auto-paths to a quest target on another map
+    /// (LC_Actor_ControlMove.CrossMapAutoFindPath, CheckOperationAndConfirm CrossScene), e.g. at the end of a story in
+    /// the Culvert's Louie's game, whose main quest 10106270 tracks the field entrance. Answering it pulled the player
+    /// out of the run before its last step, and the quest's accept action entered it again, round and round. The exit
+    /// button (30402) leaves a run. The failed-load recovery request names the current map and is always allowed.
     /// </summary>
     private bool TravelRefused(GameSession s, long target) =>
-        target != s.SceneEntry && !GmCommands.Allowed(options.Value, s.Account, loopbackTool: false)
-        && (s.Dead || s.InstanceId != 0 || !s.WorldState.Saved.VisitedMaps.Contains(target));
+        target != s.SceneEntry && (s.InstanceId != 0 || !GmCommands.Allowed(options.Value, s.Account, loopbackTool: false)
+            && (s.Dead || !s.WorldState.Saved.VisitedMaps.Contains(target)));
 
     /// <summary>30131: a dialog option jumping to a numbered point of a map (e.g. the palace guard).</summary>
     public async Task CustomJumpAsync(GameSession s, ClientCustomJumpMapReq req)
@@ -434,10 +438,15 @@ public sealed partial class SceneService(IOptions<ServerOptions> options, World 
         if (point is { } p) await EnterSceneAsync(s, req.SceneId, p);
     }
 
-    /// <summary>30016: destination resolved and authorized by the active task, without a 30131 acknowledgement.</summary>
+    /// <summary>
+    /// 30016: destination resolved and authorized by the active task, without a 30131 acknowledgement. Never to another
+    /// map from inside an instance or dungeon (see <see cref="TravelRefused"/>): a quest tracking a field point would
+    /// otherwise pull the player out of a run.
+    /// </summary>
     public async Task<bool> TaskTrackTeleportAsync(GameSession s, long sceneEntry, long pointId)
     {
         if (s.SceneLoading || s.Dead || data.Row("MapConfig", sceneEntry) == null) return false;
+        if (s.InstanceId != 0 && sceneEntry != s.SceneEntry) return false;
         var point = worldData.Map(sceneEntry)?.Points.GetValueOrDefault(pointId);
         if (point == null) return false;
         if (sceneEntry != s.SceneEntry) return await EnterSceneAsync(s, sceneEntry, point);
