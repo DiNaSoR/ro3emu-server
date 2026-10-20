@@ -25,8 +25,10 @@ namespace Ro3Emu.ClientHooks
     {
         internal const string TokenVariable = "RO3EMU_LOGIN_TOKEN", AccountVariable = "RO3EMU_LOGIN_ACCOUNT";
 
-        /// <summary>Seconds in the login scene without OpenAccountPanel before Tick logs in itself (late install).</summary>
-        private const float LateLoginSeconds = 3f;
+        /// <summary>Seconds the account panel has been open without our wrapper before Tick logs in itself (late install).</summary>
+        private const float LateLoginSeconds = 1f;
+
+        private const string AccountPanelModule = "ui_sys_login_accountpasswordwidgetctrl";
 
         private static string _token, _account;
         private static bool _read, _loginPending, _enterPending;
@@ -35,7 +37,12 @@ namespace Ro3Emu.ClientHooks
         private static float _loginSceneSince = -1f;
 
         // Kept alive here: Lua holds the pushed delegates only weakly through xLua's object pool.
-        private static readonly LuaPatches.SelfMethod OpenAccountPanelWrapper = OpenAccountPanel, UpdateCurrentServerWrapper = UpdateCurrentServer;
+        /// <summary>_onUpdateCurrentServer(self, key, server): _setSelectServer calls it with ('', area), and the property
+        /// binding on m_kCurrentServer with its key and value. It stores the area, so both must reach the original.</summary>
+        public delegate void UpdateServerMethod(Obf_R.Obf_ff self, object key, object server);
+
+        private static readonly LuaPatches.SelfMethod OpenAccountPanelWrapper = OpenAccountPanel;
+        private static readonly UpdateServerMethod UpdateCurrentServerWrapper = UpdateCurrentServer;
 
         /// <summary>From LuaPatches.Tick, once per LuaEnv (before the login UI opens: the modules are required here).</summary>
         internal static void Install(LA_LuaManager manager, Obf_R.Obf_ff global)
@@ -50,7 +57,7 @@ namespace Ro3Emu.ClientHooks
                 _openAccountPanel = _baseClass?.Obf_RuA<Obf_R.Obf_Ef>("OpenAccountPanel");
                 _updateCurrentServer = _serverClass?.Obf_RuA<Obf_R.Obf_Ef>("_onUpdateCurrentServer");
                 if (_openAccountPanel != null) _baseClass.Obf_luA<string, LuaPatches.SelfMethod>("OpenAccountPanel", OpenAccountPanelWrapper);
-                if (_updateCurrentServer != null) _serverClass.Obf_luA<string, LuaPatches.SelfMethod>("_onUpdateCurrentServer", UpdateCurrentServerWrapper);
+                if (_updateCurrentServer != null) _serverClass.Obf_luA<string, UpdateServerMethod>("_onUpdateCurrentServer", UpdateCurrentServerWrapper);
                 _enterPending = _updateCurrentServer != null;
                 Debug.Log("[Ro3Emu.AutoLogin] launcher login for " + (_account ?? "?") + ": login screen "
                     + (_openAccountPanel != null ? "skipped" : "not found") + ", server screen " + (_enterPending ? "skipped" : "not found"));
@@ -77,9 +84,11 @@ namespace Ro3Emu.ClientHooks
                     return;
                 }
                 // Late install: the login widget opened (and showed the account panel) before the wrapper was in.
-                if (_global == null || !InLoginScene()) { _loginSceneSince = -1f; return; }
+                if (_global == null || !AccountPanelOpened()) { _loginSceneSince = -1f; return; }
                 if (_loginSceneSince < 0f) { _loginSceneSince = Time.realtimeSinceStartup; return; }
                 if (Time.realtimeSinceStartup - _loginSceneSince < LateLoginSeconds) return;
+                // AccountLoginBySdk fetches the server list; its LoginSelectServer event makes the login widget
+                // (_onSelectServer) hide the account panel and show the server screen, as after a typed login.
                 Debug.Log("[Ro3Emu.AutoLogin] login screen was open before the hooks; logging in from here");
                 Login();
             }
@@ -113,20 +122,48 @@ namespace Ro3Emu.ClientHooks
             _openAccountPanel?.Obf_HuA(self);
         }
 
-        /// <summary>What _loginCallBack does after a successful SDK login, with the launcher's token.</summary>
+        /// <summary>
+        /// What the SDK does after a successful login: GameLogic.LoginCallBack(result). It first loads the model name
+        /// tables (Lua_UT_StringDefine.SetRDStringMapping: the m_kAniName_Gen, m_kGfxName_Gen... globals LC_ModelLoader
+        /// needs, or character select shows models without heads), then sends the LoginCallBack event, whose handler
+        /// (the login widget's _loginCallBack) calls LC_LoginManager:AccountLoginBySdk(token, uid). Calling
+        /// AccountLoginBySdk directly skipped the first step.
+        /// </summary>
         private static void Login()
         {
             _loginPending = false;
-            var manager = LoginManager() ?? throw new InvalidOperationException("LC_LoginManager not found");
-            var call = manager.Obf_RuA<Obf_R.Obf_Ef>("AccountLoginBySdk") ?? throw new InvalidOperationException("AccountLoginBySdk not found");
-            call.Obf_HuA(manager, _token, _account);
+            var callback = _global?.Obf_LuA<Obf_R.Obf_Ef>("GameLogic.LoginCallBack");
+            var pack = _global?.Obf_LuA<Obf_R.Obf_Ef>("table.pack");
+            var rawset = _global?.Obf_LuA<Obf_R.Obf_Ef>("rawset");
+            if (callback != null && pack != null && rawset != null)
+            {
+                var result = (Obf_R.Obf_ff)pack.Obf_HuA()[0];
+                rawset.Obf_HuA(result, "n", null);
+                rawset.Obf_HuA(result, "isSuccess", true);
+                rawset.Obf_HuA(result, "uid", _account);
+                rawset.Obf_HuA(result, "token", _token);
+                rawset.Obf_HuA(result, "loginType", 0L);
+                rawset.Obf_HuA(result, "name", _account);
+                rawset.Obf_HuA(result, "code", 0L);
+                rawset.Obf_HuA(result, "banTime", 0L);
+                callback.Obf_HuA(result);
+            }
+            else
+            {
+                // Older builds: the same two steps by hand.
+                var mapping = _global?.Obf_LuA<Obf_R.Obf_Ef>("package.loaded.lua_ut_stringdefine.SetRDStringMapping");
+                mapping?.Obf_HuA();
+                var manager = LoginManager() ?? throw new InvalidOperationException("LC_LoginManager not found");
+                var call = manager.Obf_RuA<Obf_R.Obf_Ef>("AccountLoginBySdk") ?? throw new InvalidOperationException("AccountLoginBySdk not found");
+                call.Obf_HuA(manager, _token, _account);
+            }
             _token = null;
-            Debug.Log("[Ro3Emu.AutoLogin] logged in as " + _account);
+            Debug.Log("[Ro3Emu.AutoLogin] logged in as " + _account + (callback != null ? "" : " (direct)"));
         }
 
-        private static void UpdateCurrentServer(Obf_R.Obf_ff self)
+        private static void UpdateCurrentServer(Obf_R.Obf_ff self, object key, object server)
         {
-            _updateCurrentServer?.Obf_HuA(self);
+            _updateCurrentServer?.Obf_HuA(self, key, server);
             try
             {
                 // Only after our own login (not while the account panel waits for the player), and once.
@@ -144,11 +181,17 @@ namespace Ro3Emu.ClientHooks
             return instance != null && instance.Length > 0 && instance[0] is Obf_R.Obf_ff table ? table : cls;
         }
 
-        private static bool InLoginScene()
+        /// <summary>
+        /// The account/password widget exists: OpenAccountPanel creates it (UI_Sys_Login_AccountPasswordWidget), which
+        /// requires its module, so package.loaded holds it once the panel was shown without our wrapper. Usually the
+        /// login screen opens a moment before LuaPatches installs (it needs the world modules), so this is the common
+        /// path. (LC_LoginManager:IsLoginScene is no use here: it is true on the select-role scene only, and raises
+        /// before the first scene loads.)
+        /// </summary>
+        private static bool AccountPanelOpened()
         {
-            var manager = LoginManager();
-            var result = manager?.Obf_RuA<Obf_R.Obf_Ef>("IsLoginScene")?.Obf_HuA(manager);
-            return result != null && result.Length > 0 && result[0] is bool b && b;
+            try { return _global?.Obf_LuA<Obf_R.Obf_ff>("package.loaded." + AccountPanelModule) != null; }
+            catch (Exception) { return false; }
         }
     }
 }
