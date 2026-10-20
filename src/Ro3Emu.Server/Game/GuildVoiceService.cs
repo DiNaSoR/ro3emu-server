@@ -13,8 +13,9 @@ namespace Ro3Emu.Server.Game;
 /// change is pushed in full to everybody in the channel; 83710/83712/83713 are empty handlers in this client build
 /// and 83714/83715 only log, so they are not sent. In memory only: channels start empty after a restart.
 ///
-/// Leaving the guild or rank changes come in through <see cref="GuildService.MembershipChanged"/>; a once-a-second
-/// sweep also drops whoever went offline or is no longer in that guild (there is no logout event to hook). The audio
+/// Leaving the guild or rank changes come in through <see cref="GuildService.MembershipChanged"/>, and edited rank
+/// rights through <see cref="GuildService.RightsChanged"/>. A once-a-second sweep also drops offline or replaced
+/// sessions and members no longer in that guild (there is no logout event to hook). The audio
 /// itself is the voice relay's (relay room "2_&lt;guildId&gt;_&lt;index&gt;"; not wired to these channels yet).
 /// Invites (83707/83708/83716/83720) are not handled yet; 83718/83719 are never sent by this client.
 /// </summary>
@@ -35,8 +36,9 @@ public sealed class GuildVoiceService(GameData data, GuildStore store, GuildServ
     private const long DefaultBlockMs = 86_400_000;
     private static readonly TimeSpan SweepInterval = TimeSpan.FromSeconds(1);
 
-    private sealed class Seat(long joinMs)
+    private sealed class Seat(GameSession session, long joinMs)
     {
+        public GameSession Session { get; } = session;
         public long JoinMs { get; } = joinMs;
         public bool Granted { get; set; }
     }
@@ -78,6 +80,17 @@ public sealed class GuildVoiceService(GameData data, GuildStore store, GuildServ
         if (session.Role is { } role) loop.Post(() => RecheckAsync(role.Id));
     }
 
+    /// <summary>Rank rights were committed: refresh each occupied channel once, even when no rank changed.</summary>
+    public void OnRightsChanged(long guildId) => loop.Post(async () =>
+    {
+        if (store.Get(guildId) is not { } guild) return;
+        Channel[] occupied;
+        lock (_sync)
+            occupied = _byGuild.TryGetValue(guildId, out var channels)
+                ? channels.Where(c => c.Members.Count > 0).ToArray() : [];
+        foreach (var channel in occupied) await PushAsync(guild, channel);
+    });
+
     public void Tick(GameTime time)
     {
         if (time.Now - _lastSweep < SweepInterval) return;
@@ -89,9 +102,9 @@ public sealed class GuildVoiceService(GameData data, GuildStore store, GuildServ
             seated = _where.Keys.ToList();
         }
         if (seated.Count == 0) return;
-        var online = sessions.All().Where(s => s.Role != null).Select(s => s.Role!.Id).ToHashSet();
+        var online = sessions.All().Where(s => s.Role != null).ToDictionary(s => s.Role!.Id);
         foreach (long role in seated)
-            if (!online.Contains(role) || store.ForRole(role)?.Id != Where(role)?.Guild)
+            if (!OwnsSeat(role, online.GetValueOrDefault(role)) || store.ForRole(role)?.Id != Where(role)?.Guild)
             {
                 lock (_sync) if (!_rechecking.Add(role)) continue;
                 loop.Post(async () =>
@@ -121,8 +134,17 @@ public sealed class GuildVoiceService(GameData data, GuildStore store, GuildServ
         int code;
         GuildVoiceChannelInfo? info = null;
         Channel? joined = null;
+        Channel? left = null;
+        GuildStore.State? formerGuild = null;
         lock (_sync)
         {
+            // A fresh login may join before the next sweep. Remove its predecessor's seat and mic request
+            // in the same transition as the new join, before any notification can suspend this command.
+            if (_where.TryGetValue(self, out var previous) && !OwnsSeat(self, s))
+            {
+                formerGuild = store.Get(previous.Guild);
+                left = Unseat(self);
+            }
             code = guild == null ? ErrorCodes.GuildVoiceNotInGuild
                 : !ValidIndex(req.ChannelIndex) ? ErrorCodes.GuildVoiceBadChannel
                 : _where.TryGetValue(self, out var at) ? (at.Guild == guild.Id && at.Index == req.ChannelIndex
@@ -132,12 +154,13 @@ public sealed class GuildVoiceService(GameData data, GuildStore store, GuildServ
             if (code == 0)
             {
                 joined = Channels(guild!.Id)[req.ChannelIndex];
-                joined.Members[self] = new Seat(NowMs());
+                joined.Members[self] = new Seat(s, NowMs());
                 _where[self] = (guild.Id, req.ChannelIndex);
                 info = Info(guild, joined);
             }
         }
         await s.SendGameAsync(JoinMsg, new GuildVoiceChannelJoinRsp { ErrorCode = code, ChannelInfo = info });
+        if (left != null && left != joined && formerGuild != null) await PushAsync(formerGuild, left);
         if (joined != null) await PushAsync(guild!, joined, except: self);
     }
 
@@ -147,7 +170,8 @@ public sealed class GuildVoiceService(GameData data, GuildStore store, GuildServ
         var guild = Guild(s);
         Channel? left = null;
         lock (_sync)
-            if (guild != null && _where.TryGetValue(self, out var at) && at.Guild == guild.Id && at.Index == req.ChannelIndex)
+            if (guild != null && OwnsSeat(self, s) && _where.TryGetValue(self, out var at)
+                && at.Guild == guild.Id && at.Index == req.ChannelIndex)
                 left = Unseat(self);
         await s.SendGameAsync(LeaveMsg, new GuildVoiceChannelLeaveRsp
         {
@@ -277,13 +301,13 @@ public sealed class GuildVoiceService(GameData data, GuildStore store, GuildServ
 
     // ---- membership ----
 
-    /// <summary>Drops <paramref name="role"/> from its channel when it is offline or no longer in that guild; on a
+    /// <summary>Drops <paramref name="role"/> from its channel when its session is gone/replaced or it left the guild; on a
     /// rank change (it stays) the channel is pushed again, since who may speak in Order mode can have changed.</summary>
     private async Task RecheckAsync(long role)
     {
         var at = Where(role);
         if (at == null || store.Get(at.Value.Guild) is not { } guild) { await DropAsync(role); return; }
-        bool stays = Online(role) != null && store.ForRole(role)?.Id == guild.Id;
+        bool stays = OwnsSeat(role, Online(role)) && store.ForRole(role)?.Id == guild.Id;
         Channel channel;
         lock (_sync)
         {
@@ -331,7 +355,7 @@ public sealed class GuildVoiceService(GameData data, GuildStore store, GuildServ
         if (Guild(s) is not { } guild) return (ErrorCodes.GuildVoiceNotInGuild, null, null);
         if (!ValidIndex(index)) return (ErrorCodes.GuildVoiceBadChannel, guild, null);
         lock (_sync)
-            return Where(s.Role!.Id) is { } at && at.Guild == guild.Id && at.Index == index
+            return Where(s.Role!.Id) is { } at && at.Guild == guild.Id && at.Index == index && OwnsSeat(s.Role.Id, s)
                 ? (0, guild, Channels(guild.Id)[index])
                 : (ErrorCodes.GuildVoiceNotInChannel, guild, null);
     }
@@ -362,6 +386,14 @@ public sealed class GuildVoiceService(GameData data, GuildStore store, GuildServ
     private (long Guild, int Index)? Where(long role)
     {
         lock (_sync) return _where.TryGetValue(role, out var at) ? at : null;
+    }
+
+    private bool OwnsSeat(long role, GameSession? session)
+    {
+        lock (_sync)
+            return session != null && _where.TryGetValue(role, out var at)
+                && _byGuild[at.Guild][at.Index].Members.TryGetValue(role, out var seat)
+                && ReferenceEquals(seat.Session, session);
     }
 
     private bool IsBlocked(Channel channel, long role)
@@ -411,14 +443,14 @@ public sealed class GuildVoiceService(GameData data, GuildStore store, GuildServ
     private async Task PushAsync(GuildStore.State guild, Channel channel, long except = 0)
     {
         GuildVoiceChannelUpdateNotify notify;
-        List<long> members;
+        List<(long Role, GameSession Session)> members;
         lock (_sync)
         {
             notify = new GuildVoiceChannelUpdateNotify { ChannelIndex = channel.Index, ChannelInfo = Info(guild, channel) };
-            members = channel.Members.Keys.Where(r => r != except).ToList();
+            members = channel.Members.Where(m => m.Key != except).Select(m => (m.Key, m.Value.Session)).ToList();
         }
-        foreach (long role in members)
-            if (Online(role) is { } session) await session.SendGameAsync(UpdateNotify, notify);
+        foreach (var (role, session) in members)
+            if (ReferenceEquals(Online(role), session)) await session.SendGameAsync(UpdateNotify, notify);
     }
 
     private GuildStore.State? Guild(GameSession s) => s.Role == null ? null : store.ForRole(s.Role.Id);

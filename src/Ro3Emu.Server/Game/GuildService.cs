@@ -30,6 +30,8 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
     /// <summary>An online member's committed guild view changed guild or position (create, join, leave, appoint;
     /// achievements 104007/107003). Runs inside the commit's apply: listeners post their work.</summary>
     public List<Action<GameSession>> MembershipChanged { get; } = new();
+    /// <summary>Rank rights were saved for this guild. Listeners post work without changing membership.</summary>
+    public List<Action<long>> RightsChanged { get; } = new();
     public const uint Apply = 32223, ApplyOpe = 32224, ApplyChange = 32225, Edit = 32230, BaseChange = 32231;
     public const uint ChangeOfficial = 32232, Kick = 32233, Leave = 32234, Invite = 32237, InviteNtf = 32238, InviteAck = 32239;
     public const uint Detail = 32290, BuildUpgrade = 32242, MarketBooth = 83900, MarketItems = 83903, MarketList = 83901, MarketUnlist = 83902;
@@ -875,7 +877,9 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
             }
             if (code == 0 && g != null && !req.IsCheck)
             {
-                if (tp != 9 && !storedWithPayment) await SaveGuildAsync(g);
+                bool saved = tp == 9 || storedWithPayment || await SaveGuildAsync(g);
+                if (tp == 4 && saved)
+                    foreach (var handler in RightsChanged) handler(g.Id);
                 await RefreshMembers(g);
                 if (tp is 1 or 2 or 5 or 10)
                 {
