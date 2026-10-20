@@ -27,12 +27,16 @@ client: tests of rules use an invented data set, and tests of real content are s
 dotnet test tests/Ro3Emu.Tests/Ro3Emu.Tests.csproj -c Release --filter "Category!=Slow"
 ```
 
-Compiler and analyzer warnings fail the build (`Directory.Build.props`), and CI checks the C# layout set in
+Compiler and analyzer warnings fail the build (`Directory.Build.props`), except in `Ro3Emu.ClientHooks`,
+`Ro3Emu.Loc` and `Ro3Emu.ClientTools`, which only build against a local client. CI checks the C# layout set in
 `.editorconfig`. Before you push, run:
 
 ```powershell
 dotnet format whitespace --folder
 ```
+
+Use the SDK feature band that `global.json` pins (10.0.3xx): other bands lay out some statements differently and
+would reformat unrelated files.
 
 Package versions live in `Directory.Packages.props`: a `PackageReference` names the package without a version.
 

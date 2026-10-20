@@ -151,7 +151,7 @@ public sealed class VoiceTestClient : IAsyncDisposable
         try
         {
             var (type, _) = await WaitAsync(predicate, timeout);
-            throw new Exception($"expected no matching voice frame, but type 0x{type:x2} arrived");
+            throw new InvalidOperationException($"expected no matching voice frame, but type 0x{type:x2} arrived");
         }
         catch (TimeoutException) { }
     }

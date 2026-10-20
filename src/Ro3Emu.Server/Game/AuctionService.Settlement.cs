@@ -261,7 +261,7 @@ public sealed partial class AuctionService
             }
             catch (Exception e)
             {
-                log.LogError(e, committed ? "Auction bonus claim notification failed" : "Auction bonus claim failed");
+                log.LogError(e, "Auction bonus claim failed (committed before the failure: {Committed})", committed);
                 result = committed ? 0 : ErrorCodes.Unknown;
             }
         }
