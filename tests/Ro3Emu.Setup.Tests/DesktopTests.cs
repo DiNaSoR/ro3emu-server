@@ -55,7 +55,7 @@ public class DesktopTests
             var client = Path.Combine(dir.FullName, "client");
             Directory.CreateDirectory(client);
             File.WriteAllText(Path.Combine(client, "Ro3Emu.ClientHooks.dll"), "MZ old hooks");
-            var (url, done, requests) = SetupTests.Serve("0123456789abcdef0123\n", "MZ new hooks", "MZ new loc");
+            var (url, done, requests, listener) = SetupTests.Serve("0123456789abcdef0123\n", "MZ new hooks", "MZ new loc");
             var lines = new List<string>();
             var commit = await Engine.UpdateClientDllsAsync(lines.Add, CancellationToken.None, url + "/", client);
             await done;
@@ -63,12 +63,14 @@ public class DesktopTests
             Assert.Equal(["/commit.txt ", "/Ro3Emu.ClientHooks.dll ", "/Ro3Emu.Loc.dll "], requests);
             Assert.Equal("MZ new hooks", File.ReadAllText(Path.Combine(client, "Ro3Emu.ClientHooks.dll")));
             Assert.Equal("MZ new loc", File.ReadAllText(Path.Combine(client, "Ro3Emu.Loc.dll")));
+            listener.Dispose();
             var backup = Assert.Single(Directory.GetDirectories(Path.Combine(client, "backups")));
             Assert.Equal("MZ old hooks", File.ReadAllText(Path.Combine(backup, "Ro3Emu.ClientHooks.dll")));
 
-            (url, done, _) = SetupTests.Serve("abc", "<html>not found</html>");
+            (url, done, _, listener) = SetupTests.Serve("abc", "<html>not found</html>");
             await Assert.ThrowsAsync<InvalidDataException>(() => Engine.UpdateClientDllsAsync(_ => { }, CancellationToken.None, url + "/", client));
             await done;
+            listener.Dispose();
             Assert.Equal("MZ new hooks", File.ReadAllText(Path.Combine(client, "Ro3Emu.ClientHooks.dll")));
         }
         finally { dir.Delete(recursive: true); }
