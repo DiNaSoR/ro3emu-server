@@ -37,7 +37,7 @@ dotnet_diagnostic.CA1050.severity = suggestion
 dotnet_diagnostic.CA1051.severity = suggestion
 # 3: CancellationToken parameters must come last
 dotnet_diagnostic.CA1068.severity = suggestion
-# 432: specify IFormatProvider
+# 431: specify IFormatProvider
 dotnet_diagnostic.CA1305.severity = suggestion
 # 57: specify StringComparison for correctness
 dotnet_diagnostic.CA1310.severity = suggestion
