@@ -25,7 +25,8 @@ public static class Launcher
     }
 
     /// <summary>Starts the game and hands it the proof; returns once it has read it (or after it exited early).</summary>
-    public static Process Start(string clientDir, string[] gameArgs)
+    /// <param name="environment">Extra variables for the game process only (for example the launcher login the hooks read).</param>
+    public static Process Start(string clientDir, string[] gameArgs, IReadOnlyDictionary<string, string>? environment = null)
     {
         var exe = Path.Combine(clientDir, "ro3.exe");
         if (!File.Exists(exe)) throw new FileNotFoundException("ro3.exe not found", exe);
@@ -38,6 +39,7 @@ public static class Launcher
         };
         foreach (var a in gameArgs) start.ArgumentList.Add(a);
         start.Environment["RO3_LAUNCH_PIPE_HANDLE"] = pipe.GetClientHandleAsString();
+        if (environment != null) foreach (var (name, value) in environment) start.Environment[name] = value;
 
         var game = Process.Start(start) ?? throw new InvalidOperationException("ro3.exe did not start");
         pipe.DisposeLocalCopyOfClientHandle();

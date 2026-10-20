@@ -37,6 +37,7 @@ namespace Ro3Emu.ClientHooks
     /// <item>The server's custom content (quests, NPCs, dialogue, texts) is added to the client's config tables
     /// (CustomContent).</item>
     /// <item>The "Don't just stand there" idle prompt (tutorial guide 199) no longer shows (IdlePrompt).</item>
+    /// <item>When RO3Emu.exe logged in for the player, the login and server screens are skipped (AutoLogin).</item>
     /// </list>
     /// </summary>
     public static class LuaPatches
@@ -122,6 +123,7 @@ namespace Ro3Emu.ClientHooks
                 BoundCrystals.Install(global.Obf_RuA<Obf_R.Obf_ff>("LC_ItemHelper") ?? Module(manager, global, "lc_itemhelper"));
                 PayManager.Install(Module(manager, global, "lua_sdk_paymgr"));
                 IdlePrompt.Install(Module(manager, global, "lc_guidemanager")); // the class: GlobalRequire keeps its instance elsewhere
+                AutoLogin.Install(manager, global);
                 Debug.Log("[Ro3Emu.LuaPatches] lc_itemshowfunc: " + added + " card show-func method(s) added; stall name limit "
                     + (param != null ? StallNameMaxLength.ToString() : "not set (publicparamconfig missing)"));
             }

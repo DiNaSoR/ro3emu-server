@@ -33,6 +33,9 @@ internal static class Program
 
         options:
           --client <folder>  the game folder (the one with ro3.exe); remembered for next time
+          --account <name>   log in for the player: the game skips its login and server screens and opens
+                             on character select (start, host, join). The password is asked, or taken from
+                             --password <password> or the RO3EMU_PASSWORD environment variable
           --reexport         export the game data again
           --no-launch        do not start the game (server only)
           --yes              no questions: take the defaults
@@ -148,6 +151,8 @@ internal sealed class Options
     public string? PublicHost { get; private set; }
     public List<string> GmAccounts { get; } = [];
     public string? Only { get; private set; }
+    public string? Account { get; private set; }
+    public string? Password { get; private set; }
     public bool ListInputs { get; private set; }
     public bool ServerFiles { get; private set; }
     public ServerProcess.Ports Ports { get; private set; } = new();
@@ -179,6 +184,8 @@ internal sealed class Options
                 case "--public": o.PublicHost = Value("--public"); break;
                 case "--gm": o.GmAccounts.Add(Value("--gm")); break;
                 case "--only": o.Only = Value("--only"); break;
+                case "--account": o.Account = Value("--account"); break;
+                case "--password": o.Password = Value("--password"); break;
                 case "--list-inputs": o.ListInputs = true; break;
                 case "--server-files": o.ServerFiles = true; break;
                 case "--http-port": o.Ports = o.Ports with { Http = Port("--http-port") }; break;

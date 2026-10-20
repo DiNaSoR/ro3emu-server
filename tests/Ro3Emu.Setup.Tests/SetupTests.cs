@@ -69,6 +69,50 @@ public class SetupTests
     }
 
     [Fact]
+    public async Task SdkLoginPostsTheGamesFormAndReturnsTheToken()
+    {
+        var (url, answers, requests) = Serve("""{"code":0,"data":{"token":"tok-123"}}""", """{"code":401}""");
+        Assert.Equal("tok-123", await Flows.SdkLoginAsync(url, "alice", "p&ss"));
+        var wrong = await Assert.ThrowsAsync<SetupException>(() => Flows.SdkLoginAsync(url, "alice", "nope"));
+        Assert.Contains("Wrong password", wrong.Message);
+        await answers;
+        Assert.Equal(["/sdk/login identity=alice&credential=p%26ss", "/sdk/login identity=alice&credential=nope"], requests);
+        var o = Options.Parse(["join", "10.0.0.2", "--account", "alice", "--password", "pw"]);
+        Assert.Equal(("alice", "pw"), (o.Account, o.Password));
+    }
+
+    /// <summary>A local HTTP server that answers each request with the next JSON body and records "path body".</summary>
+    private static (string Url, Task Done, List<string> Requests) Serve(params string[] bodies)
+    {
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        int port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop();
+        var http = new System.Net.HttpListener();
+        http.Prefixes.Add($"http://127.0.0.1:{port}/");
+        http.Start();
+        var requests = new List<string>();
+        var done = Task.Run(async () =>
+        {
+            try
+            {
+                foreach (var body in bodies)
+                {
+                    var context = await http.GetContextAsync();
+                    using (var reader = new StreamReader(context.Request.InputStream))
+                        requests.Add(context.Request.Url!.AbsolutePath + " " + await reader.ReadToEndAsync());
+                    var answer = System.Text.Encoding.UTF8.GetBytes(body);
+                    context.Response.ContentType = "application/json";
+                    await context.Response.OutputStream.WriteAsync(answer);
+                    context.Response.Close();
+                }
+            }
+            finally { http.Close(); }
+        });
+        return ($"http://127.0.0.1:{port}", done, requests);
+    }
+
+    [Fact]
     public async Task DeleteCharacterWithNoServerSaysSo()
     {
         var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
