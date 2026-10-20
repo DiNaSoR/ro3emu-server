@@ -534,6 +534,12 @@ public sealed partial class TaskService
     private async Task ProgressCoreAsync(GameSession session, int? type, Func<long[], long> amount, Func<TaskDef, bool>? eligible = null)
     {
         if (session.Tasks == null || session.Progress == null) return;
+        if (AddProgress(session, type, amount, eligible)) await SettleAsync(session);
+    }
+
+    /// <summary>The counting half of <see cref="ProgressCoreAsync"/>: true when a target moved. The caller settles.</summary>
+    private bool AddProgress(GameSession session, int? type, Func<long[], long> amount, Func<TaskDef, bool>? eligible = null)
+    {
         bool changed = false;
         foreach (var info in session.Tasks.Infos.Values.Where(i => i.Status == Running).ToList())
         {
@@ -553,7 +559,7 @@ public sealed partial class TaskService
                 changed = true;
             }
         }
-        if (changed) await SettleAsync(session);
+        return changed;
     }
 
     /// <summary>Re-reads the passive targets (level, job, points, other tasks) and settles.</summary>
