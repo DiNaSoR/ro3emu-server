@@ -69,7 +69,8 @@ your characters), `logs\` and `RO3Emu.settings.json`.
 
 **On Windows.** The host runs `RO3Emu.exe host`; it prints the address to share (Windows asks once whether the server
 may use the network: allow it). Friends run `RO3Emu.exe join <that address>`. For friends outside your home network,
-forward TCP ports `5380`, `20000` and `33100` on your router to the host and share your public IP.
+forward TCP ports `5380`, `20000` and `33100` on your router to the host and share your public IP. Party voice chat
+is off unless the host adds `--voice-port 33101` (any free port); then forward that port too.
 
 **On Linux.** Download **`RO3Emu-server-linux-x64.tar.gz`**, extract it and run `server.sh`; nothing to install:
 
@@ -79,7 +80,7 @@ forward TCP ports `5380`, `20000` and `33100` on your router to the host and sha
 ./server.sh --service ...                                                       # install it as a systemd service
 ```
 
-Open TCP `5380`, `20000` and `33100`.
+Open TCP `5380`, `20000` and `33100`, and the voice port if you turn voice on with `--voice-port 33101`.
 
 **Good to know**
 - **GM commands** (`!help` in chat, and most buttons of the client's GM panel) are on for every account when you play
@@ -179,8 +180,8 @@ show is playable from day one, without season or server-day gates ([details](doc
 
 **Voice.** Party voice goes through a relay in the server instead of the publisher's Tencent GME, and the patched
 client records and plays it through Windows' own winmm. It is off by default: `Voice:Port` turns it on. The voice
-stream is not encrypted yet (only its one-time ticket travels through the encrypted game gate), so the relay listens
-on loopback only unless `Voice:AllowPlaintextOffLoopback` is set.
+stream is encrypted (AES-CTR with an HMAC-SHA256 tag per frame) with a fresh key per session that travels inside the
+one-time ticket over the encrypted game gate, so the relay serves off loopback too.
 
 ## For developers
 

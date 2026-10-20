@@ -9,7 +9,7 @@ namespace Ro3Emu.Server.Game;
 
 public sealed partial class GuildService
 {
-    private long MarketNowMs() => marketClock.GetUtcNow().ToUnixTimeMilliseconds();
+    private long MarketNowMs() => clock.GetUtcNow().ToUnixTimeMilliseconds();
     internal Func<Task>? AfterMarketNoticeSendForTest { get; set; }
 
     private EscrowEconomyIntent MarketEconomy(GameSession? session, string command, object evidence) =>

@@ -70,7 +70,7 @@ public sealed partial class GuildService
         // The client titles the letter with the guild name; the server uses its own copy of that name.
         // (inferred) every member gets it, the sender too, for MailConfig 1019's 30 days.
         var expires = DateTimeOffset.FromUnixTimeMilliseconds(now).AddDays(30);
-        foreach (long role in g.Members.Keys.Order().ToArray())
+        foreach (long role in g!.Members.Keys.Order().ToArray())
         {
             try { await mail.SendRawAsync(role, g.Name, content, sender: s.Role!.Name, expiresAt: expires, category: 3); }
             catch (Exception e) when (e is not OperationCanceledException)

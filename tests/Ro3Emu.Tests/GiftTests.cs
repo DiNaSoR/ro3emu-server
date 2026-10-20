@@ -127,7 +127,7 @@ public sealed class GiftTests : IAsyncLifetime
         Assert.True(Session("GiftBob").Wardrobe!.AllLightUpAppearances.ContainsKey(TeaPartySuit));
         Assert.Equal(1, Count("GiftBob", TeaPartyBonus));
         Assert.False(Session("GiftAlice").Wardrobe!.AllLightUpAppearances.ContainsKey(TeaPartySuit));
-        Assert.Equal(1, (await Next(bob, ShopService.PresentList, CommodityPresentListNtf.Parser, m => m.Orders.Any(o => o.State == 1))).Orders.Count);
+        Assert.Single((await Next(bob, ShopService.PresentList, CommodityPresentListNtf.Parser, m => m.Orders.Any(o => o.State == 1))).Orders);
         await Next(alice, ShopService.SentGiftsList, SentGiftsListNtf.Parser, m => m.SentGifts.Any(o => o.State == 1));
         Assert.Equal(6903, await Pick(bob, sent.OrderId));
         Assert.Equal(2316, (await Gift(alice, b, TeaParty)).Result); // Bob owns it now

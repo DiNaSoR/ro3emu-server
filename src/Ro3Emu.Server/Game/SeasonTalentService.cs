@@ -22,7 +22,7 @@ namespace Ro3Emu.Server.Game;
 /// small nodes. Job nodes open while their branch point would open; they cost what their row says (nothing in the
 /// export), need a row for the role's job, and do not count toward the total levels of tree and node thresholds.
 /// </summary>
-public sealed class SeasonTalentService
+public sealed partial class SeasonTalentService
 {
     public const uint TalentSync = 5050, Upgrade = 83550, SetPlan = 83552, RenamePlan = 83553;
     private const long TalentFunction = 1003, ParentFunction = 10, TalentTask = 10103160, ParentTask = 10101170;
@@ -334,6 +334,12 @@ public sealed class SeasonTalentService
     /// <summary>83550: lock validation, payment, plan/oath mutation and durable save as one role operation.</summary>
     public async Task UpgradeAsync(GameSession s, SeasonTalentUpgradeReq req)
     {
+        if (data.Row("SeasonTalentConfig", req.TalentId) is { } requested
+            && GameData.Int(requested, "_iType") is ProfessionBranchType or ProfessionOptionType)
+        {
+            await SelectProfessionAsync(s, req);
+            return;
+        }
         int result;
         bool changed = false;
         using (await CharacterService.Lock(s))

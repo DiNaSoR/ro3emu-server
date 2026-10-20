@@ -541,7 +541,7 @@ public sealed partial class TaskService
     private bool AddProgress(GameSession session, int? type, Func<long[], long> amount, Func<TaskDef, bool>? eligible = null)
     {
         bool changed = false;
-        foreach (var info in session.Tasks.Infos.Values.Where(i => i.Status == Running).ToList())
+        foreach (var info in session.Tasks!.Infos.Values.Where(i => i.Status == Running).ToList())
         {
             if (!Defs().TryGetValue(info.TaskId, out var def) || eligible?.Invoke(def) == false) continue;
             for (int i = 0; i < def.Targets.Length && i < info.CompleteNum.Count; i++)

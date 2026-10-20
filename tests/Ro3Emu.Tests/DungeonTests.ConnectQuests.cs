@@ -52,7 +52,7 @@ public sealed partial class DungeonTests
                 Assert.True(DateTime.UtcNow < deadline, $"{bot.Account} did not deliver {PartyGoldenThiefBug}");
                 await Task.Delay(25);
             }
-            await QuestProbe.AtAsync(app, bot.Account, PartyGoldenThiefBug, 0); // re-armed
+            await QuestProbe.AtAsync(app, bot.Account!, PartyGoldenThiefBug, 0); // re-armed
         }
         var until = DateTime.UtcNow + Wait;
         while (await friends.IntimacyAsync(a, b) != 10)

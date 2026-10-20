@@ -485,7 +485,7 @@ public sealed class TimedEventTests : IAsyncLifetime
             var scored = await Next(alice, DungeonService.BaseInfo, DungeonBaseInfoNotify.Parser,
                 s => s.Vars.Any(v => v.VarId == 304 && v.Vi64.Count == 4 && v.Vi64[1] == 20));
             Assert.Equal([1L, 20, 2, 0], scored.Vars.Single(v => v.VarId == 304).Vi64);
-            Assert.Empty(alice.Inbox.Snapshot().Where(e => e.IsGame(TimedBattleService.DragonSettle)));
+            Assert.DoesNotContain(alice.Inbox.Snapshot(), e => e.IsGame(TimedBattleService.DragonSettle));
             clock.Set(scored.StageModuleData.StageEndTime / 1000 + 1);
             await OnLoop(() => { Service<TimedBattleService>().Tick(default); return Task.CompletedTask; });
             var result = await Next(alice, TimedBattleService.DragonSettle, DragonIslandSettleNtf.Parser);
