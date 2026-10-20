@@ -376,7 +376,8 @@ public sealed class PersonalService
     }
 
     /// <summary>A friend gift: an item FriendlyItemConfig lists (1004000-1004005 and 1004100 in the client's data). Without
-    /// that table (no client data) the earlier fixed range 1004000-1004006 still applies.</summary>
+    /// that table (no client data) the earlier fixed range 1004000-1004006 still applies, so the gift path stays testable;
+    /// with no ItemConfig either, such a gift adds no intimacy, popularity or affection (GiftValues finds no row).</summary>
     public bool IsFriendGift(long item)
     {
         var rows = data.Table("FriendlyItemConfig");
