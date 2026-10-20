@@ -3,7 +3,6 @@ package romsg;
 import "MG_Define.proto";
 import "MG_Chat.proto";
 import "google/protobuf/any.proto";
-import "FieldOption.proto";
 
 enum MsgSource {
   MsgSource_none = 0;

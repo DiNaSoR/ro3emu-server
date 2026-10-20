@@ -1,6 +1,5 @@
 syntax = "proto3";
 package romsg;
-import "MG_Common.proto";
 
 message GetAchievementRewardReq {
   repeated int64 ID = 1;

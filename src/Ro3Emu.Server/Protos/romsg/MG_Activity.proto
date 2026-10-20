@@ -1,7 +1,6 @@
 syntax = "proto3";
 package romsg;
 import "MG_Common.proto";
-import "FieldOption.proto";
 import "MG_TerritoryWars.proto";
 import "MG_Siege.proto";
 import "MG_GuildLeague.proto";

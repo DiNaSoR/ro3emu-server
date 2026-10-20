@@ -31,12 +31,21 @@ else
 }
 Directory.CreateDirectory(args[1]);
 int messages = 0, enums = 0, services = 0;
+var definedIn = DefinedTypes(set);
+var inSet = set.File.Select(f => f.Name).ToHashSet();
 foreach (var file in set.File)
 {
     var sb = new StringBuilder();
     sb.AppendLine($"syntax = \"{(string.IsNullOrEmpty(file.Syntax) ? "proto2" : file.Syntax)}\";");
     if (file.HasPackage) sb.AppendLine($"package {file.Package};");
-    foreach (var dep in file.Dependency) sb.AppendLine($"import \"{dep}\";");
+    // Only the imports whose types this file names: the client's descriptors list more, and protoc warns about each
+    // unused one. Custom options are not written, so the files that only declare them are never needed. A type from
+    // outside the set (google.protobuf.Any) keeps the imports that are outside it too.
+    var referenced = ReferencedTypes(file).ToList();
+    var used = referenced.Select(t => definedIn.GetValueOrDefault(t)).ToHashSet();
+    bool external = referenced.Any(t => !definedIn.ContainsKey(t));
+    foreach (var dep in file.Dependency.Where(d => used.Contains(d) || (external && !inSet.Contains(d))))
+        sb.AppendLine($"import \"{dep}\";");
     if (file.Options?.HasCsharpNamespace == true) sb.AppendLine($"option csharp_namespace = \"{file.Options.CsharpNamespace}\";");
     sb.AppendLine();
     bool proto3 = file.Syntax == "proto3";
@@ -59,6 +68,42 @@ Console.WriteLine($"{set.File.Count} files, {messages} top-level messages, {enum
 return 0;
 
 static string Trim(string typeName) => typeName.StartsWith('.') ? typeName[1..] : typeName;
+
+// Full type name (package.Outer.Inner) -> the file that defines it.
+static Dictionary<string, string> DefinedTypes(FileDescriptorSet set)
+{
+    var types = new Dictionary<string, string>();
+    foreach (var file in set.File)
+    {
+        var prefix = file.HasPackage ? file.Package + "." : "";
+        foreach (var e in file.EnumType) types[prefix + e.Name] = file.Name;
+        foreach (var m in file.MessageType) AddMessage(m, prefix, file.Name);
+    }
+    return types;
+
+    void AddMessage(DescriptorProto m, string prefix, string fileName)
+    {
+        types[prefix + m.Name] = fileName;
+        foreach (var e in m.EnumType) types[$"{prefix}{m.Name}.{e.Name}"] = fileName;
+        foreach (var n in m.NestedType) AddMessage(n, $"{prefix}{m.Name}.", fileName);
+    }
+}
+
+// Full names of the message and enum types that the written fields and rpcs of a file name.
+static IEnumerable<string> ReferencedTypes(FileDescriptorProto file)
+{
+    foreach (var t in file.MessageType.SelectMany(FieldTypes)) yield return t;
+    foreach (var r in file.Service.SelectMany(s => s.Method))
+    {
+        yield return Trim(r.InputType);
+        yield return Trim(r.OutputType);
+    }
+
+    static IEnumerable<string> FieldTypes(DescriptorProto m) => m.Field
+        .Where(f => f.Type is Type.Message or Type.Enum or Type.Group)
+        .Select(f => Trim(f.TypeName))
+        .Concat(m.NestedType.SelectMany(FieldTypes));
+}
 
 static void WriteEnum(StringBuilder sb, EnumDescriptorProto e, int depth)
 {

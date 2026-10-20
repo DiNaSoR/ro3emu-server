@@ -3,9 +3,7 @@ package romsg;
 import "MG_Common.proto";
 import "MG_Skill.proto";
 import "MG_Scene.proto";
-import "MG_Dungeon.proto";
 import "MG_Interact.proto";
-import "FieldOption.proto";
 import "MG_TerritoryWars.proto";
 
 enum EntityState {

@@ -1,7 +1,6 @@
 syntax = "proto3";
 package romsg;
 import "MG_Define.proto";
-import "FieldOption.proto";
 
 enum LanguageParamType {
   LanguageParamType_Str = 0;

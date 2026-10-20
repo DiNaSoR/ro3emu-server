@@ -1,9 +1,7 @@
 syntax = "proto3";
 package romsg;
-import "google/protobuf/descriptor.proto";
 import "MG_DB.proto";
 import "MG_Common.proto";
-import "FieldOption.proto";
 
 message GenreSeekerReq {
 }

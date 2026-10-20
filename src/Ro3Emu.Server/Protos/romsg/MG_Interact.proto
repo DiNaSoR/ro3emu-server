@@ -2,7 +2,6 @@ syntax = "proto3";
 package romsg;
 import "MG_Skill.proto";
 import "MG_Common.proto";
-import "FieldOption.proto";
 
 enum ETerritoryBossStage {
   EClose = 0;

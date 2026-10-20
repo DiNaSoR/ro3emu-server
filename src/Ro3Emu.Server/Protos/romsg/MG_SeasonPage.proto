@@ -1,6 +1,5 @@
 syntax = "proto3";
 package romsg;
-import "FieldOption.proto";
 
 message FunctionList {
   repeated int32 functions = 1;

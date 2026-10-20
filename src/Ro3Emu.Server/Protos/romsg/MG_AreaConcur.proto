@@ -1,6 +1,5 @@
 syntax = "proto3";
 package romsg;
-import "FieldOption.proto";
 
 message AreaConcurGainMapAwardReq {
   int64 mapId = 1;
