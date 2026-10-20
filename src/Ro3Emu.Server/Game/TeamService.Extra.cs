@@ -41,7 +41,7 @@ public sealed partial class TeamService
     private async Task ChangeInfoCoreAsync(GameSession s, ChangeTeamInfoReq req)
     {
         int code = !TryLeader(s, out var team) ? ErrorCodes.NoPermission
-            : !ValidTarget(req.TargetId, team!.Type) || req.MinBattlePoint < 0 || req.TeamDesc.Length > 512 || req.TeamName.Length > 128 ? ErrorCodes.Parameter : 0;
+            : !ValidTarget(req.TargetId, team!.Type) || req.MinBattlePoint < 0 || req.TeamDesc.Length > MaxDescription || req.TeamName.Length > MaxName ? ErrorCodes.Parameter : 0;
         if (code == 0)
         {
             team!.Target = req.TargetId == 0 ? NoTarget : req.TargetId;
@@ -257,7 +257,7 @@ public sealed partial class TeamService
     private async Task<(long Id, int Count, int Capacity, int[] Jobs)?> RecruitCoreAsync(GameSession s, TeamRecruitReq req)
     {
         int code = !TryLeader(s, out var team) ? ErrorCodes.NoPermission
-            : string.IsNullOrWhiteSpace(req.Content) || req.Content.Length > 512 ? ErrorCodes.Parameter
+            : string.IsNullOrWhiteSpace(req.Content) || req.Content.Length > MaxDescription ? ErrorCodes.Parameter
             : _recruitUntil.GetValueOrDefault(team!.Id) > DateTimeOffset.UtcNow ? ErrorCodes.Cooldown : 0;
         await s.SendGameAsync(TeamRecruit, new TeamRecruitResp { Result = code });
         if (code != 0) return null;
