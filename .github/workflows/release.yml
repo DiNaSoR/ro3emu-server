@@ -1,8 +1,8 @@
 name: release
 
 # A tag v* builds the two release archives (tools/release/pack.ps1) and attaches them to a draft release.
-# CI has no game client, so the client hooks/loc DLLs come from prebuilt/client: built by the maintainer against the
-# 7 Oct 2026 client with `pwsh tools/release/pack.ps1 -UpdatePrebuiltClientDlls` and committed; pack.ps1 refuses them
+# CI has no game client, so the client hooks/loc DLLs come from prebuilt/client: built against the 20 Oct 2026 client
+# with `pwsh tools/release/pack.ps1 -UpdatePrebuiltClientDlls` and committed; pack.ps1 refuses them
 # when they were built from other hooks/loc sources than the tagged ones. Run tools/release/smoke.ps1 locally (it needs
 # the clients) before publishing the draft.
 on:
