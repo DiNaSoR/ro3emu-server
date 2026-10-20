@@ -21,7 +21,8 @@ To play on servers that someone else runs, double-click RO3EmuDesktop.exe instea
 (it works on its own, RO3Emu.exe is not needed for it):
 pick a server (or add one with its address), type your account and password and
 click Play. It patches the game for that server, logs you in and the game opens on
-character select. "Update DLLs" fetches the newest RO3Emu game DLLs first.
+character select. Play first checks for a newer build of the RO3Emu game DLLs
+and downloads it when there is one; "Update DLLs" fetches them on demand.
 
 Other things it can do (open a command prompt in this folder):
   RO3Emu.exe join 203.0.113.10     play on a friend's server

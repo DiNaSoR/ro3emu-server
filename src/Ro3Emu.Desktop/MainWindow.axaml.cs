@@ -122,12 +122,27 @@ public partial class MainWindow : Window
         Save();
         try
         {
+            await CheckDllsAsync();
             Log($"Starting {server}...");
             var failure = await Engine.PlayAsync(server.Address, account, password, ClientBox.Text, Log);
             Log(failure == null ? "Done. Have fun!" : "Stopped: " + failure);
         }
         catch (Exception e) { Log("Could not start: " + e.Message); }
         finally { End(); }
+    }
+
+    /// <summary>Before Play: get the newest CI build of the client DLLs if there is one; carry on with the current ones if GitHub can't be reached.</summary>
+    private async Task CheckDllsAsync()
+    {
+        try
+        {
+            var (commit, updated) = await Engine.UpdateIfNewerAsync(Log, CancellationToken.None);
+            Log(updated ? $"Client DLLs updated to the build of {commit}." : $"Client DLLs are up to date ({commit}).");
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or IOException or UnauthorizedAccessException or InvalidDataException)
+        {
+            Log("Could not check for newer client DLLs (" + e.Message + "); playing with the current ones.");
+        }
     }
 
     private async Task BrowseAsync()

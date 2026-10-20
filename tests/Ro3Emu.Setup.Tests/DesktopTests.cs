@@ -92,4 +92,32 @@ public class DesktopTests
         }
         finally { dir.Delete(recursive: true); }
     }
+
+    [Fact]
+    public async Task PlayDownloadsTheDllsOnlyWhenTheReleaseHasANewerBuild()
+    {
+        var dir = Directory.CreateTempSubdirectory("ro3emu-desktop-");
+        try
+        {
+            var client = Path.Combine(dir.FullName, "client");
+            var (url, done, requests, listener) = SetupTests.Serve("aaaa1111\n", "MZ hooks 1", "MZ loc 1");
+            Assert.Equal(("aaaa1111", true), await Engine.UpdateIfNewerAsync(_ => { }, CancellationToken.None, url + "/", client));
+            await done;
+            listener.Dispose();
+            Assert.Equal("aaaa1111", File.ReadAllText(Path.Combine(client, Engine.CommitFile)).Trim());
+
+            (url, done, requests, listener) = SetupTests.Serve("aaaa1111\n");
+            Assert.Equal(("aaaa1111", false), await Engine.UpdateIfNewerAsync(_ => { }, CancellationToken.None, url + "/", client));
+            await done;
+            listener.Dispose();
+            Assert.Equal(["/commit.txt "], requests);
+
+            (url, done, requests, listener) = SetupTests.Serve("bbbb2222\n", "MZ hooks 2", "MZ loc 2");
+            Assert.Equal(("bbbb2222", true), await Engine.UpdateIfNewerAsync(_ => { }, CancellationToken.None, url + "/", client));
+            await done;
+            listener.Dispose();
+            Assert.Equal("MZ hooks 2", File.ReadAllText(Path.Combine(client, "Ro3Emu.ClientHooks.dll")));
+        }
+        finally { dir.Delete(recursive: true); }
+    }
 }

@@ -47,9 +47,46 @@ public static class Engine
     {
         releaseBase ??= DllRelease;
         clientDir ??= Path.Combine(AppDir, "client");
-        using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(2) };
-        http.DefaultRequestHeaders.UserAgent.ParseAdd("RO3EmuDesktop/1.0");
+        using var http = Http();
         string commit = (await http.GetStringAsync(releaseBase + "commit.txt", ct)).Trim();
+        return await DownloadAsync(http, commit, log, ct, releaseBase, clientDir);
+    }
+
+    /// <summary>The file in client\ that records which commit its DLLs were downloaded from.</summary>
+    public const string CommitFile = "commit.txt";
+
+    /// <summary>
+    /// Run before every Play: asks the CI release which commit it holds and downloads the DLLs only when that differs
+    /// from client\commit.txt or a DLL is missing. Returns the commit and whether anything was downloaded.
+    /// </summary>
+    public static async Task<(string Commit, bool Updated)> UpdateIfNewerAsync(Action<string> log, CancellationToken ct, string? releaseBase = null, string? clientDir = null)
+    {
+        releaseBase ??= DllRelease;
+        clientDir ??= Path.Combine(AppDir, "client");
+        using var http = Http();
+        string latest;
+        using (var check = CancellationTokenSource.CreateLinkedTokenSource(ct))
+        {
+            check.CancelAfter(TimeSpan.FromSeconds(15)); // a slow GitHub must not hold up Play for long
+            latest = (await http.GetStringAsync(releaseBase + "commit.txt", check.Token)).Trim();
+        }
+        var recorded = Path.Combine(clientDir, CommitFile);
+        string? have = File.Exists(recorded) ? File.ReadAllText(recorded).Trim() : null;
+        if (have == latest && ClientDlls.All(d => File.Exists(Path.Combine(clientDir, d)))) return (Short(latest), false);
+        return (await DownloadAsync(http, latest, log, ct, releaseBase, clientDir), true);
+    }
+
+    private static HttpClient Http()
+    {
+        var http = new HttpClient { Timeout = TimeSpan.FromMinutes(2) };
+        http.DefaultRequestHeaders.UserAgent.ParseAdd("RO3EmuDesktop/1.0");
+        return http;
+    }
+
+    private static string Short(string commit) => commit.Length > 12 ? commit[..12] : commit;
+
+    private static async Task<string> DownloadAsync(HttpClient http, string commit, Action<string> log, CancellationToken ct, string releaseBase, string clientDir)
+    {
         var downloaded = new Dictionary<string, byte[]>();
         foreach (var dll in ClientDlls)
         {
@@ -74,7 +111,8 @@ public static class Engine
             File.Move(temp, target, overwrite: true);
             log($"updated {dll}");
         }
-        return commit.Length > 12 ? commit[..12] : commit;
+        await File.WriteAllTextAsync(Path.Combine(clientDir, CommitFile), commit + Environment.NewLine, ct);
+        return Short(commit);
     }
 
     /// <summary>The join command line (RO3Emu.exe's own options); the password is added in memory only, by PlayAsync.</summary>
