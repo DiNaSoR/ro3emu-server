@@ -11,6 +11,8 @@ namespace Ro3Emu.Server.Game;
 /// (DropGroup 1216, e.g. 1501014 "[201,0,60030020]") is followed on PC by GuideConfig 1811-1821 (task 10101251), which
 /// start at the wardrobe with the mount already unlocked; the guides that walk the player through using the item
 /// (42-47) are closed (_iIsOpen 0). Using it on receipt is inferred from that.
+/// Awards, shop purchases and claimed Fashion gifts all count as receipt (CharacterService.AwardItemsGained): the
+/// Fashion suits' bonus vouchers (e.g. 3016101, 3016701, 3025101) and the vouchers sold on their own are all [3, 0].
 /// The use runs the normal 31323 path after the grant commits, so cooldowns, level checks and the mount/box owners
 /// apply unchanged; a refused use is silent and the item stays usable by hand. Login and level changes retry
 /// anything still held (saves from before this existed). A GM !item is not an award: it stays in the bag until one of

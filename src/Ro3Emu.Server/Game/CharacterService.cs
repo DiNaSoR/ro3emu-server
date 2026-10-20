@@ -93,8 +93,16 @@ public sealed partial class CharacterService(RoleStore roles, ItemStore itemStor
 
     /// <summary>An item entered the bag: entry and the count gained (card collection first sight, achievement counters).</summary>
     public List<Action<GameSession, int, int>> ItemGained { get; } = new();
-    /// <summary>Items a committed award put in the bag (quests, drops, boxes), after ItemGained; GM grants are not awards.</summary>
+    /// <summary>Items a committed award put in the bag (quests, drops, boxes, shop purchases and claimed gifts), after
+    /// ItemGained; GM grants are not awards.</summary>
     public List<Action<GameSession, IReadOnlyList<(int Entry, int Count)>>> AwardItemsGained { get; } = new();
+
+    /// <summary>A committed shop purchase or gift claim put these items in the bag: the same hooks as an award run, so
+    /// ItemAutoUseService uses a _QuickUse [3, 0] voucher (a Fashion suit's bonus piece) on receipt.</summary>
+    internal void PurchasedItemsGained(GameSession session, IReadOnlyList<(int Entry, int Count)> gained)
+    {
+        if (gained.Count > 0) foreach (var handler in AwardItemsGained) handler(session, gained);
+    }
     internal sealed record FirstCardSightPlan(Action<RoleItemPlanBuilder> Persist, Action Apply);
     /// <summary>CardService enlists first sight in owned award/exchange commits and, for a kill, the slain monster's Codex kill (NPC id, 0 none).</summary>
     internal Func<GameSession, IReadOnlyList<int>, int, FirstCardSightPlan?>? StageFirstCardSight { get; set; }

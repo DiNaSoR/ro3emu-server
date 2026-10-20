@@ -354,6 +354,8 @@ public sealed partial class WardrobeService
         // 5012 only: 31189 below is the purchase's one unlock tip; 32747 would pop a second (LC_DAL_Mount.lua:186-218).
         if (ride != null) await ride.PublishAsync();
         await session.SendGameAsync(UnlockNotice, new WardRobeUnLockNtf { AppearanceId = appearanceId });
+        // The bonus vouchers are _QuickUse [3, 0] (AutoUse, no delay): their looks light after the purchase's own tip.
+        character.PurchasedItemsGained(session, goods.Select(g => (g.Entry, g.Count)).ToList());
         log.LogInformation("{Name} buys appearance {Id} (+{Parts} pieces, award {Award})", session.Role!.Name,
             appearanceId, looks.Count - 1, bonus.GroupId);
         return 0;
