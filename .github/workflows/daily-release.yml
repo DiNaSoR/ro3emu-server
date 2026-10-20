@@ -3,10 +3,14 @@ name: daily release
 # Once a day, if main has commits the last daily release doesn't, release.yml builds main and publishes it as a
 # release tagged vYYYY.MM.DD (UTC date; a second release on the same day gets .2, .3, ...). Its notes are the
 # changelog: the pull requests merged since the previous daily release. Run it by hand from the Actions tab to cut one
-# now (it still skips when nothing changed).
+# now (it still skips when nothing changed). A change to this file on main also runs it, so merging it cuts the first
+# release right away and the README's latest-release link works from the start.
 on:
   schedule:
     - cron: '0 6 * * *'
+  push:
+    branches: [main]
+    paths: ['.github/workflows/daily-release.yml']
   workflow_dispatch:
 
 permissions:

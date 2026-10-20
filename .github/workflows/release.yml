@@ -69,11 +69,18 @@ jobs:
           SHA: ${{ inputs.sha }}
           PREVIOUS_TAG: ${{ inputs.previous_tag }}
         run: |
-          # --generate-notes lists the pull requests merged since PREVIOUS_TAG (all of them on the first release)
-          # after the notes given here.
+          # The changelog is the pull requests merged since PREVIOUS_TAG (--generate-notes). The first release has no
+          # previous daily tag, and without one GitHub would start from whatever release it picks (the rolling
+          # launcher/client-dlls tags sit on old commits), so it lists every merged pull request itself.
           notes="Built from main at $SHA. Download RO3Emu-win-x64.zip, extract it and double-click RO3Emu.exe. Server hosts on Linux: RO3Emu-server-linux-x64.tar.gz."
-          args=(--target "$SHA" --title "RO3Emu $TAG" --notes "$notes" --generate-notes --latest)
-          if [ -n "$PREVIOUS_TAG" ]; then args+=(--notes-start-tag "$PREVIOUS_TAG"); fi
+          args=(--target "$SHA" --title "RO3Emu $TAG" --latest)
+          if [ -n "$PREVIOUS_TAG" ]; then
+            args+=(--notes "$notes" --generate-notes --notes-start-tag "$PREVIOUS_TAG")
+          else
+            changes=$(gh pr list --state merged --base main --limit 1000 --json number,title,author,mergedAt \
+              --jq 'sort_by(.mergedAt) | reverse | .[] | "* \(.title) by @\(.author.login) in #\(.number)"')
+            args+=(--notes "$(printf '%s\n\nFirst daily release. Everything merged so far:\n\n%s\n' "$notes" "$changes")")
+          fi
           gh release create "$TAG" dist/RO3Emu-win-x64.zip dist/RO3Emu-server-linux-x64.tar.gz "${args[@]}"
       - name: Publish to the launcher release
         if: github.ref == 'refs/heads/main' && !inputs.tag

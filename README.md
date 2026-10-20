@@ -273,7 +273,8 @@ with the DLLs from the same zip.
 Every day at 06:00 UTC the `daily release` workflow checks whether main has commits the last daily release doesn't.
 If it does, it builds main with the `release` workflow and publishes a release tagged `vYYYY.MM.DD` (`.2`, `.3` for
 more on the same day), marked latest. GitHub generates its notes from the pull requests merged since the previous
-daily release. Run the workflow from the Actions tab to cut one sooner. Pushing a `v*` tag by hand still makes a draft.
+daily release (the first one lists everything merged so far). Run the workflow from the Actions tab to cut one
+sooner. Pushing a `v*` tag by hand still makes a draft.
 
 ### Architecture
 
