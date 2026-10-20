@@ -634,16 +634,17 @@ public sealed class QuestEngineTests : IAsyncLifetime
             await Barrier(bot);
             Assert.Equal(1, await Read(s => Service<CharacterService>().CountOf(s, 1501014)));
             Assert.DoesNotContain(bot.Inbox.Snapshot(), e => e.IsGame(CharacterService.ItemUse));
-            await Gm("!lvl 14");
-            Assert.Equal(60030020, (await Next(bot, MountService.Unlock, PlayerMountUnLockNtf.Parser)).RiderId);
-            Assert.Equal(0, await Read(s => Service<CharacterService>().CountOf(s, 1501014)));
-            // A GM grant is not an award: it stays for the manual path until the next login.
-            await Gm("!item 1501016 1");
-            await Barrier(bot);
-            Assert.Equal(1, await Read(s => Service<CharacterService>().CountOf(s, 1501016)));
         }
         await using (var bot = await InWorld(create: false))
         {
+            // Login retries it (still refused below the level), and the level change uses it.
+            await Barrier(bot);
+            Assert.Equal(1, await Read(s => Service<CharacterService>().CountOf(s, 1501014)));
+            await Gm("!lvl 14");
+            Assert.Equal(60030020, (await Next(bot, MountService.Unlock, PlayerMountUnLockNtf.Parser)).RiderId);
+            Assert.Equal(0, await Read(s => Service<CharacterService>().CountOf(s, 1501014)));
+            // Any way into the bag counts, a GM grant too.
+            await Gm("!item 1501016 1");
             Assert.Equal(60030040, (await Next(bot, MountService.Unlock, PlayerMountUnLockNtf.Parser)).RiderId);
             Assert.Equal(0, await Read(s => Service<CharacterService>().CountOf(s, 1501016)));
         }

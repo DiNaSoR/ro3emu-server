@@ -24,6 +24,8 @@ public sealed class MountTests : IAsyncLifetime
         var (h, m, g) = TestPorts.FreePorts();
         app = ServerHost.Create([], o => { o.DataDir = dir; o.GameDataDir = Path.Combine(RepoRoot(), "data"); o.HttpPort = h; o.MicroGatePort = m; o.GameGatePort = g; }, clock);
         await app.StartAsync(); http = $"http://127.0.0.1:{h}";
+        // These tests drive the manual 31323 use of the _QuickUse [3, 0] mount and look vouchers.
+        app.Services.GetRequiredService<ItemAutoUseService>().Paused = true;
     }
     public async Task DisposeAsync()
     {

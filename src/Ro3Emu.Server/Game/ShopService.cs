@@ -226,7 +226,6 @@ public sealed partial class ShopService : IGameTicker
                     },
                     committed: () => session.Shop = next, asyncCommit: true) == null)
                     error = new(character.ShortageOf(session, cost), "payment short");
-                else character.PurchasedItemsGained(session, [(entry, perUnit * count)]); // e.g. the 26101+ look vouchers
             }
         }
         log.LogInformation("{Name} buys {Count}x commodity {Id} at {Unit} (quote {Quote}): {Result}", session.Role!.Name, count, commodityId, unit, quote, error?.Why ?? "ok");

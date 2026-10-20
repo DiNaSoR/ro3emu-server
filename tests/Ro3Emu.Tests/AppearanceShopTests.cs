@@ -130,10 +130,8 @@ public sealed class AppearanceShopTests : IAsyncLifetime
     public async Task DragonWhistleLightsTheStarshatterDragonsWardrobeLook()
     {
         await using var bot = await Enter();
-        await Gm("!item 1501004 1");
-        long whistle = Alice.Items.Single(i => i.Entry == 1501004).Guid;
-        await bot.SendGameAsync(CharacterService.ItemUse, new ItemUseReq { ItemGuid = whistle, ItemCount = 1 });
-        Assert.Equal(0, (await Next(bot, CharacterService.ItemUse, ItemUseResp.Parser)).Result);
+        await Gm("!item 1501004 1"); // _QuickUse [3, 0]: used on receipt.
+        await AutoUsed(bot, 1501004);
         await Next(bot, WardrobeService.WardrobeSync, DBWardRobeInfoIncrement.Parser, i => i.AllLightUpAppearances.ContainsKey(60060010));
         Assert.True(Alice.Mounts!.Mounts.ContainsKey(60060010));
         Assert.True(SavedWardrobe.AllLightUpAppearances.ContainsKey(60060010));
