@@ -274,8 +274,11 @@ public sealed partial class SeasonTalentService
                 try
                 {
                     var economy = character.ProgressionEconomy(s, "cd13c/season-talent-upgrade", cost!, [],
-                        new { Node = node, Oath = isOath, Level = isOath ? next.BattleOathLevel
-                            : next.Plan[next.CurPlanId].TalentNodes[node].CurrentLevel, Plan = next.CurPlanId });
+                        new
+                        {
+                            Node = node, Oath = isOath, Level = isOath ? next.BattleOathLevel
+                            : next.Plan[next.CurPlanId].TalentNodes[node].CurrentLevel, Plan = next.CurPlanId
+                        });
                     paid = await character.ExchangeLockedAsync(s, cost!, [], popup: false, sync: false,
                         persist: tx => { tx.RoleBlob(s.Role!.Id, "season_talent", next.ToByteArray()); tx.WithEconomy(economy); },
                         committed: () => s.SeasonTalent = next, asyncCommit: true);

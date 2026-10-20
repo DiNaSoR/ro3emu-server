@@ -207,12 +207,18 @@ public sealed class GuildVoiceTests : IAsyncLifetime
 
         // Taking it back, in a batch; the leader's own mic cannot be taken.
         Assert.Equal(ErrorCodes.GuildVoiceLeaderCannotMute, (await Ask(alice, GuildVoiceService.SetSpeakPermissionMsg,
-            new GuildVoiceChannelSetSpeakPermissionReq { ChannelIndex = 0, SpeakMode = GuildSpeakAuthorityType.Order,
-                PermissionItems = { new GuildVoiceChannelSpeakPermissionItem { TargetPlayerId = aliceId, GrantPermission = false } } },
+            new GuildVoiceChannelSetSpeakPermissionReq
+            {
+                ChannelIndex = 0, SpeakMode = GuildSpeakAuthorityType.Order,
+                PermissionItems = { new GuildVoiceChannelSpeakPermissionItem { TargetPlayerId = aliceId, GrantPermission = false } }
+            },
             GuildVoiceChannelSetSpeakPermissionRsp.Parser)).ErrorCode);
         Assert.Equal(0, (await Ask(alice, GuildVoiceService.SetSpeakPermissionMsg,
-            new GuildVoiceChannelSetSpeakPermissionReq { ChannelIndex = 0, SpeakMode = GuildSpeakAuthorityType.Order,
-                PermissionItems = { new GuildVoiceChannelSpeakPermissionItem { TargetPlayerId = bobId, GrantPermission = false } } },
+            new GuildVoiceChannelSetSpeakPermissionReq
+            {
+                ChannelIndex = 0, SpeakMode = GuildSpeakAuthorityType.Order,
+                PermissionItems = { new GuildVoiceChannelSpeakPermissionItem { TargetPlayerId = bobId, GrantPermission = false } }
+            },
             GuildVoiceChannelSetSpeakPermissionRsp.Parser)).ErrorCode);
         // Taken back: Bob may ask again (holding the mic, he would get "already may speak").
         Assert.Equal(0, (await Ask(bob, GuildVoiceService.ApplyMicMsg,
@@ -254,8 +260,11 @@ public sealed class GuildVoiceTests : IAsyncLifetime
             new GuildVoiceChannelSetSpeakPermissionReq { ChannelIndex = 0, SpeakMode = GuildSpeakAuthorityType.Free }, GuildVoiceChannelSetSpeakPermissionRsp.Parser)).ErrorCode);
         await Update(bob, i => i.SpeakMode == GuildSpeakAuthorityType.Free);
         Assert.Equal(0, (await Ask(alice, GuildVoiceService.SetSpeakPermissionMsg,
-            new GuildVoiceChannelSetSpeakPermissionReq { ChannelIndex = 0, SpeakMode = GuildSpeakAuthorityType.Order,
-                PermissionItems = { new GuildVoiceChannelSpeakPermissionItem { TargetPlayerId = bobId, GrantPermission = true } } },
+            new GuildVoiceChannelSetSpeakPermissionReq
+            {
+                ChannelIndex = 0, SpeakMode = GuildSpeakAuthorityType.Order,
+                PermissionItems = { new GuildVoiceChannelSpeakPermissionItem { TargetPlayerId = bobId, GrantPermission = true } }
+            },
             GuildVoiceChannelSetSpeakPermissionRsp.Parser)).ErrorCode);
         await Update(bob, i => i.SpeakMode == GuildSpeakAuthorityType.Order && i.Members.Single(m => m.PlayerId == bobId).HasSpeakPermission);
     }
