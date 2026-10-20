@@ -7,7 +7,7 @@ server first; changes to the original rules come after.
 <p align="center"><img src="docs/assets/banner.svg" alt="RO3Emu server emulator architecture and game world" width="100%"></p>
 
 <p align="center">
-  <a href="https://github.com/aethai/ro3emu-server/releases/latest"><img src="https://img.shields.io/github/v/release/aethai/ro3emu-server?label=release" alt="Latest release"></a>
+  <a href="https://github.com/akreao/ro3emu-server/releases/latest"><img src="https://img.shields.io/github/v/release/akreao/ro3emu-server?label=release" alt="Latest release"></a>
   <a href="https://github.com/akreao/ro3emu-server/actions/workflows/tests.yml"><img src="https://github.com/akreao/ro3emu-server/actions/workflows/tests.yml/badge.svg" alt="Tests on Linux"></a>
   <a href="https://github.com/akreao/ro3emu-server/actions/workflows/ci.yml"><img src="https://github.com/akreao/ro3emu-server/actions/workflows/ci.yml/badge.svg" alt="Client-independent .NET checks"></a>
   <img src="https://img.shields.io/badge/C%23-.NET%2010-512BD4?logo=dotnet&logoColor=white" alt=".NET 10">
@@ -28,10 +28,9 @@ server first; changes to the original rules come after.
 
 ## Play on your own PC
 
-1. Download **`RO3Emu-win-x64.zip`** and extract it anywhere. This fork's newest build (from main, with
-   `RO3EmuDesktop.exe` and the login skip) is the rolling
-   [`launcher` release](https://github.com/akreao/ro3emu-server/releases/tag/launcher); upstream's tagged builds are
-   on its [latest release](https://github.com/aethai/ro3emu-server/releases/latest).
+1. Download **`RO3Emu-win-x64.zip`** from the [latest release](https://github.com/akreao/ro3emu-server/releases/latest)
+   and extract it anywhere. A release is cut every day main changes, and its notes list what changed. The very newest
+   build of main is the rolling [`launcher` release](https://github.com/akreao/ro3emu-server/releases/tag/launcher).
 2. Double-click **`RO3Emu.exe`**. Nothing to install: no .NET, Java or Node.js. If Windows says "Windows protected
    your PC" (RO3Emu is not signed), click *More info*, then *Run anyway*.
 3. The first time, it finds your Ragnarok 3: Genesis game folder (or asks for the one with `ro3.exe`), prepares the
@@ -270,6 +269,11 @@ launcher, patcher and client DLL sources) and published to the rolling
 [`launcher` release](https://github.com/akreao/ro3emu-server/releases/tag/launcher) as `RO3Emu-win-x64.zip`.
 `tools/update-launcher.sh` installs it into RO3Emu (backing up the old exe) and then runs `update-client-dlls.sh`
 with the DLLs from the same zip.
+
+Every day at 06:00 UTC the `daily release` workflow checks whether main has commits the last daily release doesn't.
+If it does, it builds main with the `release` workflow and publishes a release tagged `vYYYY.MM.DD` (`.2`, `.3` for
+more on the same day), marked latest. GitHub generates its notes from the pull requests merged since the previous
+daily release. Run the workflow from the Actions tab to cut one sooner. Pushing a `v*` tag by hand still makes a draft.
 
 ### Architecture
 

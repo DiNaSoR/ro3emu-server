@@ -1,0 +1,59 @@
+name: daily release
+
+# Once a day, if main has commits the last daily release doesn't, release.yml builds main and publishes it as a
+# release tagged vYYYY.MM.DD (UTC date; a second release on the same day gets .2, .3, ...). Its notes are the
+# changelog: the pull requests merged since the previous daily release. Run it by hand from the Actions tab to cut one
+# now (it still skips when nothing changed).
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.plan.outputs.tag }}
+      sha: ${{ steps.plan.outputs.sha }}
+      previous_tag: ${{ steps.plan.outputs.previous_tag }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+      - id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          sha=$(git rev-parse HEAD)
+          # Newest published daily release (the rolling launcher/client-dlls releases and drafts don't count).
+          prev=$(gh release list --limit 100 --exclude-drafts --json tagName,createdAt \
+            --jq '[.[] | select(.tagName | test("^v[0-9]{4}\\.[0-9]{2}\\.[0-9]{2}(\\.[0-9]+)?$"))] | sort_by(.createdAt) | reverse | .[0].tagName // ""')
+          if [ -n "$prev" ] && [ "$(git rev-list -n 1 "refs/tags/$prev")" = "$sha" ]; then
+            echo "main ($sha) is already released as $prev; nothing to do." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          base="v$(date -u +%Y.%m.%d)"
+          tag="$base"; n=1
+          while git rev-parse -q --verify "refs/tags/$tag" >/dev/null; do n=$((n + 1)); tag="$base.$n"; done
+          echo "Releasing $sha as $tag (changelog since ${prev:-the beginning})." >> "$GITHUB_STEP_SUMMARY"
+          { echo "tag=$tag"; echo "sha=$sha"; echo "previous_tag=$prev"; } >> "$GITHUB_OUTPUT"
+
+  release:
+    needs: prepare
+    if: needs.prepare.outputs.tag != ''
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: ${{ needs.prepare.outputs.tag }}
+      sha: ${{ needs.prepare.outputs.sha }}
+      previous_tag: ${{ needs.prepare.outputs.previous_tag }}
+    permissions:
+      contents: write
