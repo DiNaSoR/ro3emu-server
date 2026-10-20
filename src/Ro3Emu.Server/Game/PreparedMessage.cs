@@ -29,4 +29,11 @@ public sealed class PreparedMessage
     public byte[] Envelope { get; }
     /// <summary>The whole wire frame, shared by every recipient (stage G: one copy per viewer was 40% of a walk).</summary>
     public byte[] Frame { get; }
+
+    /// <summary>Sends <paramref name="body"/> to every viewer, serialized once and only if anyone is there.</summary>
+    public static async Task SendToAsync(IEnumerable<GameSession> viewers, uint msgId, IMessage body)
+    {
+        PreparedMessage? prepared = null;
+        foreach (var viewer in viewers) await viewer.SendPreparedAsync(prepared ??= new PreparedMessage(msgId, body));
+    }
 }

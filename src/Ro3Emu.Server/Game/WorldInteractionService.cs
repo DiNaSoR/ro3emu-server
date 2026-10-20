@@ -125,7 +125,7 @@ public sealed class WorldInteractionService
         };
         var message = new InteractChangeNtf { Uid = s.Role!.Id, DataInfo = info, Interrupt = interrupt };
         await s.SendGameAsync(Change, message);
-        foreach (var viewer in world.Viewers(s)) await viewer.SendGameAsync(Change, message);
+        await PreparedMessage.SendToAsync(world.Viewers(s), Change, message);
     }
 
     private async Task ExitAsync(GameSession s, bool interrupt)
@@ -136,7 +136,7 @@ public sealed class WorldInteractionService
         var message = new InteractChangeNtf { Uid = s.Role.Id,
             DataInfo = new InteractInfo { EType = InteractInfo.Types.EState.Idle }, Interrupt = interrupt };
         await s.SendGameAsync(Change, message);
-        foreach (var viewer in world.Viewers(s)) await viewer.SendGameAsync(Change, message);
+        await PreparedMessage.SendToAsync(world.Viewers(s), Change, message);
     }
 
     private Task LeaveAsync(GameSession s) => ExitAsync(s, true);

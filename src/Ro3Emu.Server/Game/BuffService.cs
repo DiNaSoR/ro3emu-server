@@ -495,6 +495,6 @@ public sealed partial class BuffService : IGameTicker
     private async Task ToPlayerAndViewersAsync(GameSession p, uint msgId, Google.Protobuf.IMessage body)
     {
         await p.SendGameAsync(msgId, body);
-        foreach (var viewer in world.Viewers(p).Where(v => v != p)) await viewer.SendGameAsync(msgId, body);
+        await PreparedMessage.SendToAsync(world.Viewers(p).Where(v => v != p), msgId, body);
     }
 }
