@@ -47,10 +47,13 @@ public sealed class ReceiptFieldNamesTests
             foreach (var property in Properties(type)) Reach(property.PropertyType);
             foreach (var collection in type.GetInterfaces().Where(i => i.IsGenericType)) Reach(collection);
         }
-        return reached.Where(t => !typeof(IEnumerable).IsAssignableFrom(t))
-            .SelectMany(t => Fields(t).Select(f => Definition(f.DeclaringType)!.FullName + "/" + f.Name)
-                .Concat(Properties(t).Select(p => t.FullName + "#" + p.Name)))
-            .Distinct().Order(StringComparer.Ordinal).ToList();
+        return
+        [
+            .. reached.Where(t => !typeof(IEnumerable).IsAssignableFrom(t))
+                .SelectMany(t => Fields(t).Select(f => Definition(f.DeclaringType)!.FullName + "/" + f.Name)
+                    .Concat(Properties(t).Select(p => t.FullName + "#" + p.Name)))
+                .Distinct().Order(StringComparer.Ordinal),
+        ];
 
         void Reach(Type type)
         {
