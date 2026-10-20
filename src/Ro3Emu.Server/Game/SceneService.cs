@@ -483,22 +483,27 @@ public sealed partial class SceneService(IOptions<ServerOptions> options, World 
     }
 
     /// <summary>
-    /// Checks a client walk against the nav grid and the speed attribute. ServerOptions.WalkCheck:
-    /// "off", "log" (default: report only) or "enforce" (snap the client back to the last good position).
+    /// Checks a client walk against the nav grid and the speed attribute. ServerOptions.WalkCheck sets the mode of both
+    /// checks, and WalkSpeedCheck / WalkPathCheck set one apart: "off", "log" (default: report only) or "enforce" (log
+    /// and snap the client back to the last good position). A walk failing an enforced check is refused.
     /// </summary>
     public async Task<bool> AcceptWalkAsync(GameSession s, WalkReq walk)
     {
-        var mode = options.Value.WalkCheck;
-        if (mode == "off" || worldData.Map(s.SceneEntry)?.Nav is not { } nav) return true;
+        var o = options.Value;
+        var speedMode = WalkCheckMode(string.IsNullOrWhiteSpace(o.WalkSpeedCheck) ? o.WalkCheck : o.WalkSpeedCheck);
+        var pathMode = WalkCheckMode(string.IsNullOrWhiteSpace(o.WalkPathCheck) ? o.WalkCheck : o.WalkPathCheck);
+        if ((speedMode == "off" && pathMode == "off") || worldData.Map(s.SceneEntry)?.Nav is not { } nav) return true;
         var now = DateTime.UtcNow;
         var from = s.Position;
         float dx = walk.Pos.X - from.X, dz = walk.Pos.Z - from.Z, dist = MathF.Sqrt(dx * dx + dz * dz);
         double seconds = Math.Clamp((now - s.LastWalkUtc).TotalSeconds, 0.05, 5);
         float maxDist = (float)(s.Speed / 100.0 * seconds * 1.5) + 1.5f;
-        string? problem = !nav.IsWalkable(walk.Pos.X, walk.Pos.Y, walk.Pos.Z) ? "unwalkable cell"
-            : dist > maxDist ? $"too fast ({dist:F1} m in {seconds:F2} s, max {maxDist:F1})"
+        string? pathProblem = pathMode == "off" ? null
+            : !nav.IsWalkable(walk.Pos.X, walk.Pos.Y, walk.Pos.Z) ? "unwalkable cell"
             : !nav.CanWalk(from.X, from.Y, from.Z, walk.Pos.X, walk.Pos.Z) ? "path crosses unwalkable cells"
             : null;
+        string? speedProblem = speedMode != "off" && dist > maxDist ? $"too fast ({dist:F1} m in {seconds:F2} s, max {maxDist:F1})" : null;
+        string? problem = speedProblem != null && pathProblem != null ? $"{pathProblem}, {speedProblem}" : pathProblem ?? speedProblem;
         if (problem == null)
         {
             s.LastWalkUtc = now;
@@ -508,12 +513,25 @@ public sealed partial class SceneService(IOptions<ServerOptions> options, World 
         if (++s.WalkCheckWarnings % 100 == 1)
             log.LogWarning("Walk check {Name} scene {Scene} {FromX:F1},{FromZ:F1} -> {X:F1},{Y:F1},{Z:F1}: {Problem} ({Count} so far)",
                 s.Role?.Name, s.SceneEntry, from.X, from.Z, walk.Pos.X, walk.Pos.Y, walk.Pos.Z, problem, s.WalkCheckWarnings);
-        if (mode != "enforce")
+        bool enforce = (speedProblem != null && speedMode == "enforce") || (pathProblem != null && pathMode == "enforce");
+        if (!enforce)
         {
             s.LastWalkUtc = now;
             return true;
         }
         await TeleportInMapAsync(s, new MapPoint(from.X, from.Y, from.Z, s.Face));
         return false;
+    }
+
+    private int _badWalkModeWarned;
+
+    /// <summary>"off", "log" or "enforce", any case; anything else is read as "log" and warned about once.</summary>
+    private string WalkCheckMode(string? value)
+    {
+        var mode = value?.Trim().ToLowerInvariant();
+        if (mode is "off" or "log" or "enforce") return mode;
+        if (Interlocked.Exchange(ref _badWalkModeWarned, 1) == 0)
+            log.LogWarning("Walk check mode {Mode} is not off, log or enforce: logging only", value);
+        return "log";
     }
 }

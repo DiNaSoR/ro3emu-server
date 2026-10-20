@@ -50,8 +50,17 @@ public sealed class ServerOptions
     /// this folder. Relative to the working directory, like DataDir; a missing folder means no custom content.</summary>
     public string CustomContentDir { get; set; } = "content";
 
-    /// <summary>Walk check against the client's nav grid: "off", "log" (report only) or "enforce" (snap back).</summary>
+    /// <summary>Walk check against the client's nav grid: "off", "log" (report only) or "enforce" (log and snap back).
+    /// It covers both movement checks unless WalkSpeedCheck or WalkPathCheck sets one apart
+    /// (docs/guide/walk-check.md).</summary>
     public string WalkCheck { get; set; } = "log";
+
+    /// <summary>Mode of the speed check ("too fast"), overriding WalkCheck; empty follows WalkCheck.</summary>
+    public string? WalkSpeedCheck { get; set; }
+
+    /// <summary>Mode of the nav-grid checks (an unwalkable target cell, or a path through unwalkable cells),
+    /// overriding WalkCheck; empty follows WalkCheck.</summary>
+    public string? WalkPathCheck { get; set; }
 
     public int ClusterId { get; set; } = 1;
 
