@@ -64,7 +64,8 @@ your characters), `logs\` and `RO3Emu.settings.json`.
 
 **On Windows.** The host runs `RO3Emu.exe host`; it prints the address to share (Windows asks once whether the server
 may use the network: allow it). Friends run `RO3Emu.exe join <that address>`. For friends outside your home network,
-forward TCP ports `5380`, `20000` and `33100` on your router to the host and share your public IP.
+forward TCP ports `5380`, `20000` and `33100` on your router to the host and share your public IP. Party voice chat
+is off unless the host adds `--voice-port 33101` (any free port); then forward that port too.
 
 **On Linux.** Download **`RO3Emu-server-linux-x64.tar.gz`**, extract it and run `server.sh`; nothing to install:
 
@@ -74,7 +75,7 @@ forward TCP ports `5380`, `20000` and `33100` on your router to the host and sha
 ./server.sh --service ...                                                       # install it as a systemd service
 ```
 
-Open TCP `5380`, `20000` and `33100`.
+Open TCP `5380`, `20000` and `33100`, and the voice port if you turn voice on with `--voice-port 33101`.
 
 **Good to know**
 - **GM commands** (`!help` in chat) are on for every account when you play on your own PC. A hosted server gives them
