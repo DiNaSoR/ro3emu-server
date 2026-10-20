@@ -11,7 +11,8 @@ Players report problems from inside the game; the server stores each report with
   input holds 60 characters, so longer reports go through the button, or as several `/bug` lines.
 
 Either way the marquee answers `Thank you! Report #N was saved.` Empty reports get a usage hint; a second report
-within 5 seconds is refused (`Ro3Emu:Feedback:CooldownSeconds`).
+within 5 seconds is refused (`Ro3Emu:Feedback:CooldownSeconds`), and so is a 31st report from one account within
+an hour (`Ro3Emu:Feedback:MaxPerHour`, 0 for no cap). Refused reports are not stored.
 
 ## What the client's Feedback button did before
 
