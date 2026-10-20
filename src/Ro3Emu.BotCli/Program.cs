@@ -13,7 +13,9 @@ using Ro3Emu.Bot;
 //   party                 create a party;  invite <roleId>  invite into it;  friend <roleId>  send a friend request
 //   guildapply <guildId>  apply to a guild;  guildhelp <guildId>  respond to a guild being founded;  guildleave
 //   quit
-// usage: Ro3Emu.BotCli voice-echo <server http base> <account> <password> [roleName] [--delay-ms 1000] [--data-dir <dir>]
+// usage: Ro3Emu.BotCli voice-echo <server http base> <account> <password> [roleName] [--delay-ms 1000] [--data-dir <dir>] [--guild <guildId> [--channel 0] [--ask-mic]]
+//   --guild: instead of a party, apply to that guild, wait to be accepted and sit in its voice channel (channel state
+//   only, no audio yet); --ask-mic asks for the mic each time the channel turns to Order mode.
 //   waits for a party invite, accepts it and echoes the party's voice back (see BotVoiceEcho)
 if (args.Length > 0 && args[0] == "voice-echo")
 {
@@ -141,15 +143,21 @@ static async Task<int> VoiceEchoAsync(string[] args)
     var positional = new List<string>();
     int delayMs = 1000;
     string? dataDir = null;
+    long guildId = 0;
+    int channel = 0;
+    bool askMic = false;
     for (int i = 0; i < args.Length; i++)
     {
         if (args[i] == "--delay-ms" && i + 1 < args.Length) delayMs = int.Parse(args[++i], CultureInfo.InvariantCulture);
         else if (args[i] == "--data-dir" && i + 1 < args.Length) dataDir = args[++i];
+        else if (args[i] == "--guild" && i + 1 < args.Length) guildId = long.Parse(args[++i], CultureInfo.InvariantCulture);
+        else if (args[i] == "--channel" && i + 1 < args.Length) channel = int.Parse(args[++i], CultureInfo.InvariantCulture);
+        else if (args[i] == "--ask-mic") askMic = true;
         else positional.Add(args[i]);
     }
-    if (positional.Count < 3 || delayMs < 0)
+    if (positional.Count < 3 || delayMs < 0 || guildId < 0 || channel < 0)
     {
-        Console.WriteLine("usage: Ro3Emu.BotCli voice-echo <server http base> <account> <password> [roleName] [--delay-ms 1000] [--data-dir <dir>]");
+        Console.WriteLine("usage: Ro3Emu.BotCli voice-echo <server http base> <account> <password> [roleName] [--delay-ms 1000] [--data-dir <dir>] [--guild <guildId> [--channel 0] [--ask-mic]]");
         return 2;
     }
     string http = positional[0], account = positional[1], password = positional[2];
@@ -186,6 +194,13 @@ static async Task<int> VoiceEchoAsync(string[] args)
 
     try
     {
+        if (guildId > 0)
+        {
+            await BotGuildVoice.JoinGuildAsync(bot, http, account, guildId, Log, stop.Token);
+            int joinCode = await BotGuildVoice.SitAsync(bot, roleId, channel, askMic, Log, stop.Token);
+            Log(joinCode == 0 ? "stopped" : "exiting");
+            return joinCode == 0 ? 0 : 1;
+        }
         long teamId = await BotVoiceEcho.AcceptPartyInviteAsync(bot, Log, stop.Token);
         var end = await BotVoiceEcho.RunAsync(bot, roleId, teamId, TimeSpan.FromMilliseconds(delayMs), Log, stop.Token);
         switch (end.Kind)
