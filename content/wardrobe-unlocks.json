@@ -1,11 +1,23 @@
 {
-  "//": "Wardrobe looks the client data disables (_iDisable 1) but the Fashion shop sells as part of a set, or hands out as a set's gift voucher: Silverwing Covenant's 20050010 (vouchers 3045201/3045202), Worldscorch Feather's Brilliant Gold 20060010 and Ashen Embers 70060010 (voucher 3016701, the Worldscorch gift). The client leaves disabled looks out of the wardrobe and the server refuses them, so the vouchers failed. The Starshatter Dragon 60060010 (Dragon Whistle 1501004) is the mount behind the Worldscorch Feather's Take Flight skill; its look must be listed for the wardrobe Mount tab to light and ride it. These rows copy each look with _iDisable 0. Delete this file to disable them again.",
+  "//": "Wardrobe looks the client data disables (_iDisable 1) but the Fashion shop sells (content/costume-shop.json), as part of a set, or hands out as a set's gift voucher: Silverwing Covenant's suit 40050020 (row 5000059) with its pieces 10050020, 50050020 and 80050020, and 20050010 (vouchers 3045201/3045202); the mounts 60040031, 60040033, 60040070, 60050010 and 60050021 (rows 5000068-5000073); Worldscorch Feather's suit 40060010 (Fashion row 5000061) with its pieces 50060010 and Brilliant Gold 20060010, and its gift's headwear 10060010 (voucher 3016101) and Ashen Embers 70060010 (voucher 3016701). (The 2026-10-17 export disables every Worldscorch look; Featherstep 90040001 stays disabled.) The client leaves disabled looks out of the wardrobe and the server refuses them, so the vouchers failed. The Starshatter Dragon 60060010 (Dragon Whistle 1501004) is the mount behind the Worldscorch Feather's Take Flight skill; its look must be listed for the wardrobe Mount tab to light and ride it. These rows copy each look with _iDisable 0. Delete this file to disable them again.",
   "rows": {
     "WardRobeConfig": {
       "20050010": { "_base": 20050010, "_iDisable": 0 },
       "20060010": { "_base": 20060010, "_iDisable": 0 },
       "70060010": { "_base": 70060010, "_iDisable": 0 },
-      "60060010": { "_base": 60060010, "_iDisable": 0 }
+      "40060010": { "_base": 40060010, "_iDisable": 0 },
+      "10060010": { "_base": 10060010, "_iDisable": 0 },
+      "50060010": { "_base": 50060010, "_iDisable": 0 },
+      "60060010": { "_base": 60060010, "_iDisable": 0 },
+      "40050020": { "_base": 40050020, "_iDisable": 0 },
+      "10050020": { "_base": 10050020, "_iDisable": 0 },
+      "50050020": { "_base": 50050020, "_iDisable": 0 },
+      "80050020": { "_base": 80050020, "_iDisable": 0 },
+      "60040031": { "_base": 60040031, "_iDisable": 0 },
+      "60040033": { "_base": 60040033, "_iDisable": 0 },
+      "60040070": { "_base": 60040070, "_iDisable": 0 },
+      "60050010": { "_base": 60050010, "_iDisable": 0 },
+      "60050021": { "_base": 60050021, "_iDisable": 0 }
     }
   }
 }

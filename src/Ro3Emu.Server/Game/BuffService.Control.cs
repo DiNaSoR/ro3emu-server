@@ -27,7 +27,11 @@ public sealed partial class BuffService
     /// <summary>Exact groups whose name gives the state but whose category does not (kept from the first mapping).</summary>
     private static int StateForGroup(int buffGroup) => buffGroup switch
     {
-        9016 => 18, 9022 => 19, 9023 => 20, 12003 => 11, 9034 => 25,
+        9016 => 18,
+        9022 => 19,
+        9023 => 20,
+        12003 => 11,
+        9034 => 25,
         _ => 0,
     };
 

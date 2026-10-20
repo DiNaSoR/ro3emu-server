@@ -185,7 +185,7 @@ public sealed class SeasonPageTests : IAsyncLifetime
         Assert.Empty(page.RankRewardReceiveInfo);
         Assert.Equal(0, (await Page(again)).RankScore[17]);
         var list = await again.MicroAsync("MailService", "getUserMailList", new Dictionary<string, object?>
-            { ["Uid"] = oldId.ToString(), ["Start"] = 0, ["Limit"] = 150, ["MailType"] = 1 });
+        { ["Uid"] = oldId.ToString(), ["Start"] = 0, ["Limit"] = 150, ["MailType"] = 1 });
         var letters = (object?[])list["MailList"]!;
         Assert.Single(letters);
         var row = (Dictionary<object, object?>)letters[0]!;
@@ -195,7 +195,7 @@ public sealed class SeasonPageTests : IAsyncLifetime
         await again.DisposeAsync();
         await using var third = await InWorld("CycleAlice", create: false);
         list = await third.MicroAsync("MailService", "getUserMailList", new Dictionary<string, object?>
-            { ["Uid"] = oldId.ToString(), ["Start"] = 0, ["Limit"] = 150, ["MailType"] = 1 });
+        { ["Uid"] = oldId.ToString(), ["Start"] = 0, ["Limit"] = 150, ["MailType"] = 1 });
         Assert.Single((object?[])list["MailList"]!);
         using var db = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={Path.Combine(dataDir, "ro3emu.db")}");
         db.Open();
@@ -236,7 +236,7 @@ public sealed class SeasonPageTests : IAsyncLifetime
         await Service<GameLoop>().InvokeAsync(() => Service<SeasonPageService>().LoginAsync(session));
         Assert.Equal(200, session.SeasonPage!.HistoryFunctionScoreData[1].FunctionScore[17]);
         var list = await bot.MicroAsync("MailService", "getUserMailList", new Dictionary<string, object?>
-            { ["Uid"] = role.ToString(), ["Start"] = 0, ["Limit"] = 150, ["MailType"] = 1 });
+        { ["Uid"] = role.ToString(), ["Start"] = 0, ["Limit"] = 150, ["MailType"] = 1 });
         Assert.Single((object?[])list["MailList"]!);
     }
 

@@ -33,6 +33,6 @@ internal static class Program
     [DllImport("kernel32", CharSet = CharSet.Unicode)]
     private static extern IntPtr GetModuleHandle(string name);
 
-    [DllImport("kernel32", CharSet = CharSet.Ansi)]
-    private static extern IntPtr GetProcAddress(IntPtr module, string name);
+    [DllImport("kernel32", CharSet = CharSet.Ansi, BestFitMapping = false, ThrowOnUnmappableChar = true)]
+    private static extern IntPtr GetProcAddress(IntPtr module, [MarshalAs(UnmanagedType.LPStr)] string name);
 }

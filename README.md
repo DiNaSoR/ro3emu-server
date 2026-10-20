@@ -69,7 +69,8 @@ your characters), `logs\` and `RO3Emu.settings.json`.
 
 **On Windows.** The host runs `RO3Emu.exe host`; it prints the address to share (Windows asks once whether the server
 may use the network: allow it). Friends run `RO3Emu.exe join <that address>`. For friends outside your home network,
-forward TCP ports `5380`, `20000` and `33100` on your router to the host and share your public IP.
+forward TCP ports `5380`, `20000` and `33100` on your router to the host and share your public IP. Party voice chat
+is off unless the host adds `--voice-port 33101` (any free port); then forward that port too.
 
 **On Linux.** Download **`RO3Emu-server-linux-x64.tar.gz`**, extract it and run `server.sh`; nothing to install:
 
@@ -79,13 +80,15 @@ forward TCP ports `5380`, `20000` and `33100` on your router to the host and sha
 ./server.sh --service ...                                                       # install it as a systemd service
 ```
 
-Open TCP `5380`, `20000` and `33100`.
+Open TCP `5380`, `20000` and `33100`, and the voice port if you turn voice on with `--voice-port 33101`.
 
 **Good to know**
 - **GM commands** (`!help` in chat, and most buttons of the client's GM panel) are on for every account when you play
   on your own PC. A hosted server gives them only to the accounts you name with `--gm` ([GM access](docs/guide/gm-access.md)).
 - **Bug reports from players:** the Feedback button in the game menu or `/bug <text>` in chat ([feedback](docs/guide/feedback.md)).
 - **Rates:** `Ro3Emu:Rates` multiplies the EXP, item and Zeny that monsters give ([rates](docs/guide/rates.md)).
+- **Walk check:** speed and wall checks on every walk only log by default; `Ro3Emu:WalkSpeedCheck=enforce` and
+  `Ro3Emu:WalkPathCheck=enforce` snap cheaters back ([walk check](docs/guide/walk-check.md)).
 - **Bonus Time:** `Ro3Emu:FreezeBonusTime` keeps field Bonus Time from running down (off by default;
   [frozen Bonus Time](docs/guide/bonus-time.md)).
 - **Free Top Up:** the in-game Top Up and currency exchange work without any payment (`Ro3Emu:TopUp:Free`, on in
@@ -179,8 +182,8 @@ show is playable from day one, without season or server-day gates ([details](doc
 
 **Voice.** Party voice goes through a relay in the server instead of the publisher's Tencent GME, and the patched
 client records and plays it through Windows' own winmm. It is off by default: `Voice:Port` turns it on. The voice
-stream is not encrypted yet (only its one-time ticket travels through the encrypted game gate), so the relay listens
-on loopback only unless `Voice:AllowPlaintextOffLoopback` is set.
+stream is encrypted (AES-CTR with an HMAC-SHA256 tag per frame) with a fresh key per session that travels inside the
+one-time ticket over the encrypted game gate, so the relay serves off loopback too.
 
 ## For developers
 
@@ -232,9 +235,8 @@ dotnet test tests/Ro3Emu.Patcher.Tests -c Release                       # update
 
 Tests of content need the exported `data/` and are skipped without it; tests of rules (persistence, retries,
 ownership, logins) run on a small invented data set in `tests/Ro3Emu.Tests/Fixtures/GameData`, so CI runs them too
-([docs/guide/testing.md](docs/guide/testing.md)). CI runs all three suites on Linux on every push. The suite runs as
-if the machine were in UTC+08, so results don't depend on where it runs (`RO3EMU_TEST_HOST_TZ=<zone id>` picks another
-zone, `host` keeps the real one).
+([docs/guide/testing.md](docs/guide/testing.md)). CI runs all three suites on Linux and Windows for every pull request and push to `main`. The suite runs as if the machine were in UTC+08, so results don't depend on where it runs
+(`RO3EMU_TEST_HOST_TZ=<zone id>` picks another zone, `host` keeps the real one).
 
 The whole server suite takes about 12 minutes on 4 cores. While you work, build once, pass `--no-build` and filter to
 the classes you touched (`--filter "FullyQualifiedName~Ro3Emu.Tests.TavernTests"`); the

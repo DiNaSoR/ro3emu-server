@@ -106,8 +106,11 @@ public sealed class CoreMessages(RoleSessionService roleSessions, ChatService ch
             // Equipment ranking in tooltips (UI_Com_ItemTips_Equip_HeadWidgetCtrl._requestRankData, board 1401): both ids
             // echoed (an empty reply caches item 0), 0 when the instance is not on the board.
             var rank = QueryEquipRankReq.Parser.ParseFrom(body.Span);
-            await session.SendGameAsync(EquipGetRank, new QueryEquipRankRes { Rankid = rank.Rankid, Itemuid = rank.Itemuid,
-                Rank = await ranks.EquipRankAsync(rank.Rankid, rank.Itemuid) });
+            await session.SendGameAsync(EquipGetRank, new QueryEquipRankRes
+            {
+                Rankid = rank.Rankid, Itemuid = rank.Itemuid,
+                Rank = await ranks.EquipRankAsync(rank.Rankid, rank.Itemuid)
+            });
         });
         routes.Map(AuctionService.Sync, "handler", async (session, msgId, body) =>
         {

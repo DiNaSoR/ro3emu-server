@@ -127,9 +127,13 @@ public sealed partial class DungeonService
                 && pts.ValueKind == JsonValueKind.Array && pts.GetArrayLength() > 0 && GameData.Number(pts[0]) is { } hp ? (float)hp : 0.2f;
             template = template with
             {
-                NormalSkill = (int)GameData.Int(swing, "_iID"), SkillMs = ms, HitPointSeconds = hitPoint,
+                NormalSkill = (int)GameData.Int(swing, "_iID"),
+                SkillMs = ms,
+                HitPointSeconds = hitPoint,
                 SwingIntervalMs = (int)Math.Max(ms, Math.Max(1500, GameData.Int(swing, "_iCD"))),
-                AttackRange = Math.Max(1f, GameData.Int(swing, "_iDistanceMax") / 100f), Aggressive = false, RoamDistance = 0,
+                AttackRange = Math.Max(1f, GameData.Int(swing, "_iDistanceMax") / 100f),
+                Aggressive = false,
+                RoamDistance = 0,
             };
         }
         else template = template with { NormalSkill = 0, Aggressive = false, RoamDistance = 0, SpeedCm = 0 };

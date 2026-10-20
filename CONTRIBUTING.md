@@ -18,11 +18,22 @@ dotnet test tests/Ro3Emu.Patcher.Tests/Ro3Emu.Patcher.Tests.csproj -c Release
 
 The full solution includes `Ro3Emu.ClientHooks` and `Ro3Emu.Loc`, which compile against DLLs from your own RO3 PC
 client. Their built DLLs are not committed: the `client DLLs` workflow builds them for each pull request (a
-`client-dlls` artifact) and publishes main's build to the `client-dlls` release. Server integration tests also need [exported game data](README.md#running-from-source). If you have it, run:
+`client-dlls` artifact) and publishes main's build to the `client-dlls` release. The server tests run without the
+client: tests of rules use an invented data set, and tests of real content are skipped unless you have
+[exported game data](README.md#running-from-source) ([testing guide](docs/guide/testing.md)):
 
 ```powershell
 dotnet test tests/Ro3Emu.Tests/Ro3Emu.Tests.csproj -c Release --filter "Category!=Slow"
 ```
+
+Compiler and analyzer warnings fail the build (`Directory.Build.props`), and CI checks the C# layout set in
+`.editorconfig`. Before you push, run:
+
+```powershell
+dotnet format whitespace --folder
+```
+
+Package versions live in `Directory.Packages.props`: a `PackageReference` names the package without a version.
 
 Report which checks you ran and which you could not run. Do not treat the client-independent CI check as proof of a
 playable client or complete game behavior.

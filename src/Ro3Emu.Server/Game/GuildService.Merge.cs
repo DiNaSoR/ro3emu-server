@@ -92,8 +92,11 @@ public sealed partial class GuildService
     /// the same buildings in the same order.</summary>
     private static GuildMergeInfo MergeColumn(GuildStore.State g, long[] buildings, long memberCount, long activity)
     {
-        var info = new GuildMergeInfo { Guid = g.Id, Name = g.Name, Level = g.Level, MemberCount = (int)memberCount,
-            Activity = (int)Math.Min(int.MaxValue, activity), IconInfo = Icon(g) };
+        var info = new GuildMergeInfo
+        {
+            Guid = g.Id, Name = g.Name, Level = g.Level, MemberCount = (int)memberCount,
+            Activity = (int)Math.Min(int.MaxValue, activity), IconInfo = Icon(g)
+        };
         info.Buildind.AddRange(buildings.Select(b => new GuildBuilding { BuildingID = b, Level = g.Buildings.GetValueOrDefault(b) }));
         return info;
     }

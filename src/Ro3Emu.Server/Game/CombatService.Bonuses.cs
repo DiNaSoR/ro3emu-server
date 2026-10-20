@@ -140,7 +140,11 @@ public sealed partial class CombatService
     /// <summary>The monster side of the formula: race, size, element and boss from its template.</summary>
     private Fighter AsMonster(Fighter f, MonsterTemplate t, StatSheet? stats) => f with
     {
-        Stats = stats, Race = t.Race, Size = t.Size, IsMonster = true, Boss = IsBoss(t.NpcId),
+        Stats = stats,
+        Race = t.Race,
+        Size = t.Size,
+        IsMonster = true,
+        Boss = IsBoss(t.NpcId),
     };
 
     private readonly Dictionary<int, bool> _bosses = new();

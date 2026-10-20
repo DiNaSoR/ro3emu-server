@@ -31,6 +31,7 @@ permissions:
 jobs:
   pack:
     runs-on: windows-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
         with:
@@ -38,6 +39,8 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
+      - name: Server tests
+        run: dotnet test tests/Ro3Emu.Tests -c Release --filter "Category!=Slow"
       - name: Setup tests
         run: dotnet test tests/Ro3Emu.Setup.Tests -c Release --filter "Category!=Slow"
       - name: Pack
@@ -47,7 +50,7 @@ jobs:
         run: |
           $version = if ($env:DAILY_TAG) { $env:DAILY_TAG.TrimStart('v') } elseif ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } else { "0.0.$env:GITHUB_RUN_NUMBER" }
           ./tools/release/pack.ps1 -Version $version
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: ro3emu-release
           path: |

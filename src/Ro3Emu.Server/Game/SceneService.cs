@@ -84,7 +84,7 @@ public sealed partial class SceneService(IOptions<ServerOptions> options, World 
             if (!ReferenceEquals(s.Role, role) || !ReferenceEquals(s.Attachment, lease) || lease?.Cancelled == true
                 || s.SceneGeneration != generation || s.SceneEntry != sourceScene || s.InstanceId != sourceInstance)
                 return false;
-            return await EnterSceneCoreAsync(s,scene,at,reason,instanceId,transfer,lineNumber,source,createLine);
+            return await EnterSceneCoreAsync(s, scene, at, reason, instanceId, transfer, lineNumber, source, createLine);
         }
         finally { s.SceneTransitionGate.Release(); }
     }
@@ -429,8 +429,11 @@ public sealed partial class SceneService(IOptions<ServerOptions> options, World 
     {
         var map = data.Row("MapConfig", req.SceneId) != null ? worldData.Map(req.SceneId) : null;
         var point = s.Dead || s.SceneLoading ? null : map?.Points.GetValueOrDefault(req.PointId);
-        await s.SendGameAsync(CustomJumpMap, new ClientCustomJumpMapResp { Result = point != null ? 0 : map == null ? ErrorCodes.SceneMissing
-            : s.Dead || s.SceneLoading ? ErrorCodes.FeatureUnavailable : ErrorCodes.Parameter });
+        await s.SendGameAsync(CustomJumpMap, new ClientCustomJumpMapResp
+        {
+            Result = point != null ? 0 : map == null ? ErrorCodes.SceneMissing
+            : s.Dead || s.SceneLoading ? ErrorCodes.FeatureUnavailable : ErrorCodes.Parameter
+        });
         if (point is { } p) await EnterSceneAsync(s, req.SceneId, p);
     }
 
@@ -483,22 +486,27 @@ public sealed partial class SceneService(IOptions<ServerOptions> options, World 
     }
 
     /// <summary>
-    /// Checks a client walk against the nav grid and the speed attribute. ServerOptions.WalkCheck:
-    /// "off", "log" (default: report only) or "enforce" (snap the client back to the last good position).
+    /// Checks a client walk against the nav grid and the speed attribute. ServerOptions.WalkSpeedCheck and
+    /// WalkPathCheck set each check's mode: "off", "log" (default: report only) or "enforce" (log and snap the client
+    /// back to the last good position). A walk failing an enforced check is refused.
     /// </summary>
     public async Task<bool> AcceptWalkAsync(GameSession s, WalkReq walk)
     {
-        var mode = options.Value.WalkCheck;
-        if (mode == "off" || worldData.Map(s.SceneEntry)?.Nav is not { } nav) return true;
+        var o = options.Value;
+        var speedMode = WalkCheckMode(nameof(o.WalkSpeedCheck), o.WalkSpeedCheck, ref _badWalkSpeedModeWarned);
+        var pathMode = WalkCheckMode(nameof(o.WalkPathCheck), o.WalkPathCheck, ref _badWalkPathModeWarned);
+        if ((speedMode == "off" && pathMode == "off") || worldData.Map(s.SceneEntry)?.Nav is not { } nav) return true;
         var now = DateTime.UtcNow;
         var from = s.Position;
         float dx = walk.Pos.X - from.X, dz = walk.Pos.Z - from.Z, dist = MathF.Sqrt(dx * dx + dz * dz);
         double seconds = Math.Clamp((now - s.LastWalkUtc).TotalSeconds, 0.05, 5);
         float maxDist = (float)(s.Speed / 100.0 * seconds * 1.5) + 1.5f;
-        string? problem = !nav.IsWalkable(walk.Pos.X, walk.Pos.Y, walk.Pos.Z) ? "unwalkable cell"
-            : dist > maxDist ? $"too fast ({dist:F1} m in {seconds:F2} s, max {maxDist:F1})"
+        string? pathProblem = pathMode == "off" ? null
+            : !nav.IsWalkable(walk.Pos.X, walk.Pos.Y, walk.Pos.Z) ? "unwalkable cell"
             : !nav.CanWalk(from.X, from.Y, from.Z, walk.Pos.X, walk.Pos.Z) ? "path crosses unwalkable cells"
             : null;
+        string? speedProblem = speedMode != "off" && dist > maxDist ? $"too fast ({dist:F1} m in {seconds:F2} s, max {maxDist:F1})" : null;
+        string? problem = speedProblem != null && pathProblem != null ? $"{pathProblem}, {speedProblem}" : pathProblem ?? speedProblem;
         if (problem == null)
         {
             s.LastWalkUtc = now;
@@ -508,12 +516,25 @@ public sealed partial class SceneService(IOptions<ServerOptions> options, World 
         if (++s.WalkCheckWarnings % 100 == 1)
             log.LogWarning("Walk check {Name} scene {Scene} {FromX:F1},{FromZ:F1} -> {X:F1},{Y:F1},{Z:F1}: {Problem} ({Count} so far)",
                 s.Role?.Name, s.SceneEntry, from.X, from.Z, walk.Pos.X, walk.Pos.Y, walk.Pos.Z, problem, s.WalkCheckWarnings);
-        if (mode != "enforce")
+        bool enforce = (speedProblem != null && speedMode == "enforce") || (pathProblem != null && pathMode == "enforce");
+        if (!enforce)
         {
             s.LastWalkUtc = now;
             return true;
         }
         await TeleportInMapAsync(s, new MapPoint(from.X, from.Y, from.Z, s.Face));
         return false;
+    }
+
+    private int _badWalkSpeedModeWarned, _badWalkPathModeWarned;
+
+    /// <summary>"off", "log" or "enforce", any case; anything else is read as "log" and warned about once per key.</summary>
+    private string WalkCheckMode(string key, string? value, ref int warned)
+    {
+        var mode = value?.Trim().ToLowerInvariant();
+        if (mode is "off" or "log" or "enforce") return mode;
+        if (Interlocked.Exchange(ref warned, 1) == 0)
+            log.LogWarning("Ro3Emu:{Key} is {Mode}, not off, log or enforce: logging only", key, value);
+        return "log";
     }
 }

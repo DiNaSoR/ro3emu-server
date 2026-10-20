@@ -17,12 +17,13 @@ namespace Ro3Emu.Server.Game;
 /// group and is never sent by the client; its widget opens UI_Sys_Skill_SeasonTalent_SelectPanel, whose Finish sends
 /// 83550 with a job node under one of its large branch nodes. LC_SeasonTalentHelper.FindSelectedChild shows the large
 /// node at max level as the chosen branch, and the panel's auto-advance needs the branch point itself at max level
-/// before its ordinary child. (inferred) Buying a large or small job node chooses its large node, puts the branch point
-/// at level 1 and, when another large node of the same branch point was chosen in this plan, clears that one and its
-/// small nodes. Job nodes open while their branch point would open; they cost what their row says (nothing in the
-/// export), need a row for the role's job, and do not count toward the total levels of tree and node thresholds.
+/// before its ordinary child. Choosing one (SeasonTalentService.Profession.cs) sets the branch point, one large node
+/// and, when the large node has options for the role's job, one small node to level 1, and clears any other choice of
+/// that branch point in this plan. Job nodes open while their branch point would open and (inferred) count toward the
+/// total talent level of tree and node thresholds: every tree's _iNeedLevel equals all ordinary levels of the trees
+/// before it plus 2 per branch point (SeasonTalentTreeConfig: 126 = 120 + 3 x 2, 228 = 220 + 4 x 2, up to 1590).
 /// </summary>
-public sealed class SeasonTalentService
+public sealed partial class SeasonTalentService
 {
     public const uint TalentSync = 5050, Upgrade = 83550, SetPlan = 83552, RenamePlan = 83553;
     private const long TalentFunction = 1003, ParentFunction = 10, TalentTask = 10103160, ParentTask = 10101170;
@@ -334,6 +335,12 @@ public sealed class SeasonTalentService
     /// <summary>83550: lock validation, payment, plan/oath mutation and durable save as one role operation.</summary>
     public async Task UpgradeAsync(GameSession s, SeasonTalentUpgradeReq req)
     {
+        if (data.Row("SeasonTalentConfig", req.TalentId) is { } requested
+            && GameData.Int(requested, "_iType") is BranchType or BranchPassiveType)
+        {
+            await SelectProfessionAsync(s, req);
+            return;
+        }
         int result;
         bool changed = false;
         using (await CharacterService.Lock(s))
@@ -343,7 +350,6 @@ public sealed class SeasonTalentService
             {
                 var next = s.SeasonTalent!.Clone();
                 if (isOath) next.BattleOathLevel++;
-                else if (IsJobNode(_byId![node].Type)) ChooseBranch(next.Plan[next.CurPlanId], node);
                 else next.Plan[next.CurPlanId].TalentNodes[node].CurrentLevel++; // (inferred) ordinary purchases belong to one plan
                 BuildUnlocks(s, next);
                 if (cost!.Count == 0)
@@ -354,8 +360,11 @@ public sealed class SeasonTalentService
                     try
                     {
                         var economy = character.ProgressionEconomy(s, "cd13c/season-talent-upgrade", cost, [],
-                            new { Node = node, Oath = isOath, Level = isOath ? next.BattleOathLevel
-                                : next.Plan[next.CurPlanId].TalentNodes[node].CurrentLevel, Plan = next.CurPlanId });
+                            new
+                            {
+                                Node = node, Oath = isOath, Level = isOath ? next.BattleOathLevel
+                                : next.Plan[next.CurPlanId].TalentNodes[node].CurrentLevel, Plan = next.CurPlanId
+                            });
                         paid = await character.ExchangeLockedAsync(s, cost, [], popup: false, sync: false,
                             persist: tx => { tx.RoleBlob(s.Role!.Id, "season_talent", next.ToByteArray()); tx.WithEconomy(economy); },
                             committed: () => s.SeasonTalent = next, asyncCommit: true);
@@ -400,27 +409,6 @@ public sealed class SeasonTalentService
         return 0;
     }
 
-    /// <summary>(inferred) One large node per branch point and plan: choosing a job node selects its large node, puts the
-    /// branch point at level 1 and drops a previously chosen sibling large node with its small nodes.</summary>
-    private void ChooseBranch(SeasonTalentPlan plan, long id)
-    {
-        var node = _byId![id];
-        long large = node.Type == BranchType ? id : _branchOf![id];
-        long point = _branchPoint![large];
-        foreach (var other in Nodes())
-        {
-            if (other.Type != BranchType || other.Id == large || _branchPoint.GetValueOrDefault(other.Id) != point) continue;
-            if (plan.TalentNodes[other.Id].CurrentLevel <= 0) continue;
-            plan.TalentNodes[other.Id].CurrentLevel = 0;
-            foreach (var small in Nodes())
-                if (small.Type == BranchPassiveType && _branchOf!.GetValueOrDefault(small.Id) == other.Id)
-                    plan.TalentNodes[small.Id].CurrentLevel = 0;
-        }
-        plan.TalentNodes[large].CurrentLevel = Math.Max(1, plan.TalentNodes[large].CurrentLevel);
-        plan.TalentNodes[point].CurrentLevel = Math.Max(1, plan.TalentNodes[point].CurrentLevel);
-        if (node.Type == BranchPassiveType) plan.TalentNodes[id].CurrentLevel = Math.Max(1, plan.TalentNodes[id].CurrentLevel);
-    }
-
     private int UpgradeLocked(GameSession s, long id, out List<(int Entry, long Count)>? cost, out long node, out bool oath)
     {
         cost = null; node = id; oath = false;
@@ -435,23 +423,11 @@ public sealed class SeasonTalentService
         long current = oath ? state.BattleOathLevel : plan.TalentNodes[id].CurrentLevel;
         long cap = oath ? state.BattleOathMaxLevel : GameData.Int(row, "_iMaxLevel");
         if (cap <= 0 || current >= cap) return ErrorCodes.SkillMaxLevel;
-        if (IsJobNode(config.Type))
-        {
-            // The small node's large node must also have a row for this job: it is chosen with it.
-            if (config.Type == BranchPassiveType && JobRow(_byId[_branchOf![id]], s.Progress.Career) == null)
-                return ErrorCodes.FeatureUnavailable;
-            if (JobRow(config, s.Progress.Career) is not { } jobRow) return ErrorCodes.FeatureUnavailable;
-            cost = HasEntries(jobRow, "_kCosts") ? Costs(jobRow) : [];
-            if (cost == null) return ErrorCodes.FeatureUnavailable;
-        }
-        else
-        {
-            long group = GameData.Int(row, "_iLevelGroupId");
-            if (group <= 0 || Effect(group, current + 1, s.Progress.Career) is not { } effect || !Supported(effect))
-                return ErrorCodes.FeatureUnavailable; // no invented connector or missing group
-            cost = Costs(effect);
-            if (cost == null) return ErrorCodes.FeatureUnavailable;
-        }
+        long group = GameData.Int(row, "_iLevelGroupId");
+        if (group <= 0 || Effect(group, current + 1, s.Progress.Career) is not { } effect || !Supported(effect))
+            return ErrorCodes.FeatureUnavailable; // no invented connector or missing group
+        cost = Costs(effect);
+        if (cost == null) return ErrorCodes.FeatureUnavailable;
         return cost.GroupBy(c => c.Entry).Any(g => character.CountOf(s, g.Key) < g.Sum(c => c.Count))
             ? character.ShortageOf(s, cost) : 0;
     }

@@ -27,9 +27,9 @@ public sealed partial class GuildService
     private static LanguageParam Str(string value) => new() { Tp = LanguageParamType.Str, StrParam = value };
     private static LanguageParam Int(long value) => new() { Tp = LanguageParamType.Int, IntParam = value };
 
-    internal static byte[] JournalRow(int cfgId, long[] players, params LanguageParam[] values)
+    internal static byte[] JournalRow(long timeMs, int cfgId, long[] players, params LanguageParam[] values)
     {
-        var row = new GuildEventData { EventCfgID = cfgId, Time = NowMs(), Param = new LanguageData() };
+        var row = new GuildEventData { EventCfgID = cfgId, Time = timeMs, Param = new LanguageData() };
         row.PlayerID.AddRange(players);
         row.Param.Param.AddRange(values);
         return row.ToByteArray();
@@ -39,12 +39,12 @@ public sealed partial class GuildService
     private void Journal(GuildStore.State g, int cfgId, long[] players, params LanguageParam[] values)
     {
         store.JournalCap = (int)Math.Clamp(Setting("GuildEventDateMaxNum", 500)[0], 1, 10_000);
-        g.PendingEvents.Add(JournalRow(cfgId, players, values));
+        g.PendingEvents.Add(JournalRow(NowMs(), cfgId, players, values));
     }
 
     /// <summary>A guild auction lot went to a member: "${1} won ${2} in the Guild Auction" (event 14).</summary>
-    internal static byte[] AuctionWonRow(long winner, string winnerName, long itemId) =>
-        JournalRow(EvAuction, [winner], Str(winnerName), Int(itemId));
+    internal static byte[] AuctionWonRow(long timeMs, long winner, string winnerName, long itemId) =>
+        JournalRow(timeMs, EvAuction, [winner], Str(winnerName), Int(itemId));
 
     private long JournalType(long cfgId) =>
         data.Row("GuildEventConfig", cfgId) is { } row ? GameData.Int(row, "_iType") : 0;
@@ -54,8 +54,11 @@ public sealed partial class GuildService
     private Task EventsCoreAsync(GameSession s, GuildEventReq req)
     {
         var g = Own(s);
-        var resp = new GuildEventResp { FromIndex = req.FromIndex, Count = req.Count, GetUp = req.GetUp,
-            OnlyShowMe = req.OnlyShowMe };
+        var resp = new GuildEventResp
+        {
+            FromIndex = req.FromIndex, Count = req.Count, GetUp = req.GetUp,
+            OnlyShowMe = req.OnlyShowMe
+        };
         if (g == null) { resp.Result = ErrorCodes.NotInGuild; return s.SendGameAsync(Events, resp); }
         var journal = store.Journal(g.Id);
         resp.LastIndex = journal.Count == 0 ? 0 : journal[0].Index;

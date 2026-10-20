@@ -54,7 +54,7 @@ public sealed partial class CustomContent
             try
             {
                 var root = JsonNode.Parse(File.ReadAllText(file), documentOptions: new JsonDocumentOptions
-                    { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true }) as JsonObject
+                { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true }) as JsonObject
                     ?? throw new InvalidDataException("not a JSON object");
                 // Check the whole file on a scratch copy first, so a broken file adds nothing.
                 new CustomContent().Add(file, root);

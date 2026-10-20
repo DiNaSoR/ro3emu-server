@@ -119,6 +119,7 @@ public static class ServerHost
         builder.Services.AddSingleton<TradeService>();
         builder.Services.AddSingleton<StallsService>();
         builder.Services.AddSingleton<GuildService>();
+        builder.Services.AddSingleton<GuildVoiceService>();
         builder.Services.AddSingleton<AdventureGroupStore>();
         builder.Services.AddSingleton<AdventureGroupService>();
         builder.Services.AddSingleton<GuildCaravanService>();
@@ -185,6 +186,7 @@ public static class ServerHost
         builder.Services.AddSingleton<Game.Messaging.IMessageModule, TitleMessages>();
         builder.Services.AddSingleton<Game.Messaging.IMessageModule, ParagonMessages>();
         builder.Services.AddSingleton<Game.Messaging.IMessageModule, Voice.VoiceTicketService>();
+        builder.Services.AddSingleton<Game.Messaging.IMessageModule>(sp => sp.GetRequiredService<GuildVoiceService>());
         builder.Services.AddSingleton<GameMessageHandler>();
         builder.Services.AddSingleton(sp => GateCrypto.LoadOrCreate(options.DataDir, sp.GetRequiredService<ILogger<GateCrypto>>()));
         builder.Services.AddSingleton<IMicroService, LoginService>();
@@ -400,6 +402,8 @@ public static class ServerHost
         var tavernChat = app.Services.GetRequiredService<ChatService>();
         tavernChat.TavernMember = tavern.InRoom; // chat channel 10
         tavern.Left.Add(tavernChat.TavernLeft);
+        app.Services.GetRequiredService<GuildService>().MembershipChanged.Add(app.Services.GetRequiredService<GuildVoiceService>().OnMembershipChanged);
+        app.Services.GetRequiredService<GuildService>().RightsChanged.Add(app.Services.GetRequiredService<GuildVoiceService>().OnRightsChanged);
         var social = app.Services.GetRequiredService<Micro.SocialOwnerCache>();
         questTasks.LoadFriendCount = async s => s.Role is { } role
             ? (await social.LoadSocialAsync([role.Id])).GetValueOrDefault(role.Id)?.Friends.LongLength : null; // 103019
@@ -414,6 +418,10 @@ public static class ServerHost
         app.Services.GetRequiredService<GateCrypto>();
         app.Logger.LogInformation("Data dir {DataDir}", options.DataDir);
         LogGmPolicy(app.Logger, options, builder.Environment.EnvironmentName);
+        // Release v2026.10.20 had one Ro3Emu:WalkCheck for both checks; it is no longer read (docs/guide/walk-check.md).
+        if (builder.Configuration["Ro3Emu:WalkCheck"] is { Length: > 0 } oldWalkCheck)
+            app.Logger.LogWarning("!!! Ro3Emu:WalkCheck={Mode} is no longer read: set Ro3Emu:WalkSpeedCheck and Ro3Emu:WalkPathCheck " +
+                "instead (now {Speed} and {Path}; docs/guide/walk-check.md)", oldWalkCheck, options.WalkSpeedCheck, options.WalkPathCheck);
         // D1 inventory across many short-lived servers (a whole test suite): each appends its loop waits on stop.
         if (Environment.GetEnvironmentVariable("RO3EMU_LOOPWAIT_DUMP") is { Length: > 0 } dump)
             app.Lifetime.ApplicationStopped.Register(() => Diagnostics.LoopWaitDump.Append(dump, app.Services.GetRequiredService<AccountStore>().AccessMetrics));
@@ -525,6 +533,7 @@ internal sealed class GameLoopTickers(IServiceProvider services) : IHostedServic
         Add<ItemBoxService>(); // award boxes; 05:00 item use-time rollover
         Add<PowerService>(); // throttled 31502/31503 republish of changed power
         Add<Voice.VoiceRooms>(); // VAD silence timeout every tick, team-membership sweep every second
+        Add<GuildVoiceService>(); // guild voice channels: drops the offline and those no longer in the guild, every second
         return Task.CompletedTask;
     }
 
