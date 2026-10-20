@@ -246,12 +246,6 @@ Reconstructed scripted scenes (`Reconstructed/scripted-scenes.json`, same switch
 - Guessed (see each scene's "guessed" list): the corridor region that ends 1000201's first stage, Bobo's place there,
   the jump as a teleport, the slide's speeds, no exploding ant eggs, which bell hides
   Katie (from both stories), a wrong guess changing nothing, the instrument retrieved within 4 m of mark point 37.
-- Staying in the run: the client's quest tracker auto-paths to the running main quest's target, which for Louie's
-  game (10106270) is the Culvert field entrance on map 10153. Seen live (Player.log): at the end of story 1014 the player
-  landed in the field before the instrument step, with no exit pressed. The request is *(inferred)* the client's own
-  cross-map travel (30012 from LC_Actor_ControlMove.CrossMapAutoFindPath), which a GM account was let through; the
-  quest's accept action (3000 EnterDungeon) then started a new run, round and round. Travel to another map (30012, 30016) is now
-  refused inside any instance or dungeon, GM or not; the exit button (30402) still leaves.
 - `DungeonTests.Scripted` resolves each scene against the client data, plays each one through its client events (wrong
   and premature events included) to a clear, and checks that the story step is delivered and the next one offered.
   The story walk plays these scenes with the same events (a fight step by its kills) and has no known-open blocker left.

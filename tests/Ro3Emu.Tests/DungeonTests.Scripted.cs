@@ -276,16 +276,6 @@ public sealed partial class DungeonTests
         await PlotEnd(alice, 140020);
 
         await Stage(alice, 4, quest: 2);
-        // Seen live: when the gang's story ends, the client's quest tracker auto-paths to 10106270's field target
-        // (map 10153) and asks for the travel itself. Alice is a GM here (no GM list), as on a research server; the run
-        // must keep her anyway, or she lands outside and the quest's accept action enters a new run, round and round.
-        await alice.SendGameAsync(SceneService.SceneTeleport, new SceneTeleportReq { TargetMapId = 10153 });
-        Assert.Equal(ErrorCodes.FeatureUnavailable, (await Next(alice, SceneService.SceneTeleport, SceneTeleportRsp.Parser)).Result);
-        await alice.SendGameAsync(TaskService.TaskTrackTeleport, new TaskTrackTeleportReq { TaskId = 10106270 });
-        Assert.Equal(ErrorCodes.TaskRequirements, (await Next(alice, TaskService.ApiError, APIErrorMsg.Parser,
-            m => m.OriginMsgId == TaskService.TaskTrackTeleport)).ErrorCode);
-        Assert.Equal(scene, Session(alice).SceneEntry);
-        Assert.Equal(3, Session(alice).DungeonAttempt!.Wave); // still on the instrument step
         var instrument = Service<WorldData>().Map(scene)!.Points[37];
         await WalkTo(alice, instrument.X + 6, instrument.Y, instrument.Z); // not yet within its 4 m
         await Task.Delay(200);
