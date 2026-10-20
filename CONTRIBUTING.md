@@ -1,7 +1,7 @@
 # Contributing to RO3Emu
 
 Thanks for helping improve the Ragnarok Online 3 server emulator. Bug reports, client evidence, documentation fixes
-and focused code changes are welcome. Start with an [issue](https://github.com/aethai/ro3emu-server/issues/new/choose)
+and focused code changes are welcome. Start with an [issue](https://github.com/akreao/ro3emu-server/issues/new/choose)
 for behavior that needs discussion, especially when the original server's rule is unknown.
 
 ## Set up and check a change
@@ -14,6 +14,7 @@ dotnet build src/Ro3Emu.Server/Ro3Emu.Server.csproj -c Release
 dotnet build tools/LuaDecode/LuaDecode.csproj -c Release
 dotnet build tools/ConfigExport/ConfigExport.csproj -c Release
 dotnet test tests/Ro3Emu.Patcher.Tests/Ro3Emu.Patcher.Tests.csproj -c Release
+dotnet test tests/Ro3Emu.Setup.Tests/Ro3Emu.Setup.Tests.csproj -c Release
 ```
 
 The full solution includes `Ro3Emu.ClientHooks` and `Ro3Emu.Loc`, which compile against DLLs from your own RO3 PC
