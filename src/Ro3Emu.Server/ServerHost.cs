@@ -530,6 +530,7 @@ internal sealed class GameLoopTickers(IServiceProvider services) : IHostedServic
         Add<Game.Persistence.SettingsPersistence>();
         Add<Game.Persistence.WildAfkPersistence>();
         Add<ShopService>(); // 05:00 purchase-limit rollover
+        Add<RankService>(); // leaderboard reward settlement at each _kPrizesTimeNew boundary
         Add<ItemBoxService>(); // award boxes; 05:00 item use-time rollover
         Add<PowerService>(); // throttled 31502/31503 republish of changed power
         Add<Voice.VoiceRooms>(); // VAD silence timeout every tick, team-membership sweep every second

@@ -382,7 +382,7 @@ public sealed partial class MailService(AccountStore accounts, RoleStore roles, 
     public Task<string> SendTemplateOnceAsync(long role, int templateId, IReadOnlyList<Attachment> attachments,
         string sourceKey, Action<RoleItemPlanBuilder> persist, Ownership.OwnerContext? ownerContext = null,
         Action<EscrowEconomyIntent>? authorize = null,
-        Func<IReadOnlyList<EconomyEffect>, EconomyEnvelope>? parentEconomy = null)
+        Func<IReadOnlyList<EconomyEffect>, EconomyEnvelope>? parentEconomy = null, object[]? contentParams = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceKey);
         ArgumentNullException.ThrowIfNull(persist);
@@ -394,7 +394,7 @@ public sealed partial class MailService(AccountStore accounts, RoleStore roles, 
         return DeliverAsync(role, new Letter
         {
             TemplateId = templateId, SenderId = "0", DeliveryKey = sourceKey,
-            Attachments = attachments.ToList()
+            Attachments = attachments.ToList(), ContentParams = EncodeLanguageData(contentParams ?? [])
         }, null, days > 0 ? days : 30, persist, ownerContext, authorize,
             parentEconomy);
     }
@@ -408,7 +408,16 @@ public sealed partial class MailService(AccountStore accounts, RoleStore roles, 
         var template = data.Row("MailConfig", templateId)
             ?? throw new ArgumentException($"Unknown MailConfig {templateId}.", nameof(templateId));
         long groupId = GameData.Int(template, "_iAward");
-        if (groupId == 0) return [];
+        return groupId == 0 ? [] : FixedGroupAward(groupId);
+    }
+
+    /// <summary>
+    /// A MultiverseGroupConfig id (_itype 0) through the season's AwardConfig row to its fixed _kAward grants: the route of
+    /// MailConfig._iAward and of LeaderBoardsGiftConfig._kReward (Lua_CFG_AwardConfig GetSeasonAwardPreview). Anything
+    /// that is not a plain unbound fixed grant is refused.
+    /// </summary>
+    internal IReadOnlyList<Attachment> FixedGroupAward(long groupId)
+    {
         var group = data.Row("MultiverseGroupConfig", groupId)
             ?? throw new AwardResolutionException($"Missing mail award group {groupId}");
         if (GameData.Int(group, "_itype") != 0)

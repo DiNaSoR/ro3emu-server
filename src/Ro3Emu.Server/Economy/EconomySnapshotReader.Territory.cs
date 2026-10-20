@@ -352,6 +352,22 @@ public static partial class EconomySnapshotReader
                             // Realm of the Gods first clears (hall of fame, Sacred Blessing unlocks): records, no balance.
                             ValidateProto(Convert.FromBase64String(value), DBMultiDungeonServerInfo.Descriptor);
                             break;
+                        case "rank_rewards":
+                            // Rank reward winners per board and period (RankService.Rewards): records, no balance; the
+                            // letters themselves are mail deliveries.
+                            using (var doc = Json(value))
+                                foreach (var board in Properties(Prop(doc.RootElement, "Boards")))
+                                {
+                                    if (!int.TryParse(board.Name, NumberStyles.None, CultureInfo.InvariantCulture, out int id) || id <= 0)
+                                        throw new FormatException("Invalid rank reward board.");
+                                    Fields(board.Value, "Period Winners");
+                                    if (Long(board.Value, "Period") <= 0) throw new FormatException("Invalid rank reward period.");
+                                    foreach (var winner in Properties(Prop(board.Value, "Winners")))
+                                        if (!int.TryParse(winner.Name, NumberStyles.None, CultureInfo.InvariantCulture, out int rank) || rank <= 0
+                                            || winner.Value.GetInt64() <= 0)
+                                            throw new FormatException("Invalid rank reward winner.");
+                                }
+                            break;
                         default:
                             Issue(EconomyIssueKind.UnknownSchema, key, "Unclassified server_state key.");
                             break;
