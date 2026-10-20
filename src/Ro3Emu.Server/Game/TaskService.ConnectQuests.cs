@@ -106,8 +106,37 @@ public sealed partial class TaskService
                     () => scored(session, amount, others), "connect quest intimacy");
     }
 
-    /// <summary>106014: Field Bonus Time seconds consumed by auto-battle (WildAfkService), counted while in a party.</summary>
-    public Task OnAutoBattleSecondsAsync(GameSession session, long seconds) => seconds <= 0 || !InParty(session)
-        ? Task.CompletedTask
-        : ProgressAsync(session, TPartyAutoBattle, t => t.Length == 2 ? seconds : 0);
+    /// <summary>106014 counts Field Bonus Time seconds consumed while the role is in a party.</summary>
+    public bool CountsPartyAutoBattle(GameSession session) => session.Tasks != null && InParty(session);
+
+    /// <summary>True when <paramref name="seconds"/> more would complete a running 106014 target.</summary>
+    public bool PartyAutoBattleCompletes(GameSession session, long seconds)
+    {
+        if (session.Tasks == null || seconds <= 0) return false;
+        foreach (var info in session.Tasks.Infos.Values)
+        {
+            if (info.Status != Running || !Defs().TryGetValue(info.TaskId, out var def)) continue;
+            for (int i = 0; i < def.Targets.Length && i < info.CompleteNum.Count; i++)
+                if (def.Targets[i] is [TPartyAutoBattle, _] && Required(session, def.Targets[i]) is var required and > 0
+                    && seconds >= required - Math.Clamp(info.CompleteNum[i], 0, required))
+                    return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// One quest pass for a Field Bonus Time tick (WildAfkService): <paramref name="partySeconds"/> batched 106014 seconds,
+    /// then the passive re-read when <paramref name="refresh"/>. Both share a single settle, so the tick saves and syncs
+    /// the quests at most once.
+    /// </summary>
+    public async Task OnAutoBattleTickAsync(GameSession session, long partySeconds, bool refresh)
+    {
+        if (partySeconds <= 0 && !refresh) return;
+        using var gate = await LockTasksAsync(session);
+        if (BeforeProgress is { } before) await before(session);
+        if (session.Tasks == null || session.Progress == null) return;
+        bool changed = partySeconds > 0 && AddProgress(session, TPartyAutoBattle, t => t.Length == 2 ? partySeconds : 0);
+        if (refresh) await RefreshCoreAsync(session);
+        else if (changed) await SettleAsync(session);
+    }
 }
