@@ -8,7 +8,7 @@ server first; changes to the original rules come after.
 
 <p align="center">
   <a href="https://github.com/akreao/ro3emu-server/releases/latest"><img src="https://img.shields.io/github/v/release/akreao/ro3emu-server?label=release" alt="Latest release"></a>
-  <a href="https://github.com/akreao/ro3emu-server/actions/workflows/tests.yml"><img src="https://github.com/akreao/ro3emu-server/actions/workflows/tests.yml/badge.svg" alt="Tests on Linux"></a>
+  <a href="https://github.com/akreao/ro3emu-server/actions/workflows/tests.yml"><img src="https://github.com/akreao/ro3emu-server/actions/workflows/tests.yml/badge.svg" alt="Tests on Linux and Windows"></a>
   <a href="https://github.com/akreao/ro3emu-server/actions/workflows/ci.yml"><img src="https://github.com/akreao/ro3emu-server/actions/workflows/ci.yml/badge.svg" alt="Client-independent .NET checks"></a>
   <img src="https://img.shields.io/badge/C%23-.NET%2010-512BD4?logo=dotnet&logoColor=white" alt=".NET 10">
   <img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="GPL-3.0">

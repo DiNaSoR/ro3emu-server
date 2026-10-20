@@ -32,3 +32,6 @@ tools/unluac-batch/*.class
 /prebuilt/
 /.client/
 /client-dlls/
+
+# Temporary solution of tools/AnalyzerBaseline
+/.analyzer-baseline.slnx

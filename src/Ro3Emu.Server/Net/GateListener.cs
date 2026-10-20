@@ -99,7 +99,7 @@ public abstract class GateListener(IPAddress address, int port, ILogger log, Dia
                         continue;
                     }
                     // No cancellation token on Task.Run: a canceled dispatch must still dispose its socket.
-                    var task = Task.Run(() => ServeAsync(socket, ct, completion));
+                    var task = Task.Run(() => ServeAsync(socket, ct, completion), CancellationToken.None);
                     _serves.Add(id, (socket, task));
                     if (remote != null) _perAddress[remote] = _perAddress.GetValueOrDefault(remote) + 1;
                     _ = task.ContinueWith(_ =>

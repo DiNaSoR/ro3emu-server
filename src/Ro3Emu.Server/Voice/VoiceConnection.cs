@@ -138,17 +138,17 @@ public sealed class VoiceConnection : IDisposable
     /// <summary>True once <see cref="Kick"/> ran: the connection is on its way out and its frames are ignored.</summary>
     public bool Kicked => _closeAfterDrain;
 
-    /// <summary>Queues a Kicked frame, then ends the connection once the writer has flushed it.</summary>
+    /// <summary>Queues a Kicked frame as the connection's last: queued audio is dropped, nothing is queued after it,
+    /// and the connection ends once the writer has flushed it.</summary>
     public void Kick(byte code)
     {
-        // Flag and frame under one lock, the one the writer decides under: it either sees neither (and comes back
-        // for the Kicked frame) or both. A flag set alone, while the writer was sending the last queued frame,
-        // let it end the stream without the Kicked frame.
         lock (_sync)
         {
-            _closeAfterDrain = true;
-            if (_closed) return;
+            if (_closed || _closeAfterDrain) return;
+            _audio.Clear();
             _control.Enqueue((VoiceDown.Kicked, [code]));
+            // Under the same lock as the frame: the writer that dequeues it also sees the flag.
+            _closeAfterDrain = true;
         }
         _signal.Release();
     }
@@ -169,7 +169,7 @@ public sealed class VoiceConnection : IDisposable
     {
         lock (_sync)
         {
-            if (_closed) return;
+            if (_closed || _closeAfterDrain) return;
             if (_audio.Count >= MaxQueuedAudio) _audio.Dequeue();
             _audio.Enqueue((VoiceDown.Audio, payload));
         }
@@ -180,7 +180,7 @@ public sealed class VoiceConnection : IDisposable
     {
         lock (_sync)
         {
-            if (_closed) return;
+            if (_closed || _closeAfterDrain) return;
             if (_control.Count >= MaxQueuedControl) { CloseLocked(); return; }
             _control.Enqueue((type, payload));
         }
@@ -215,21 +215,22 @@ public sealed class VoiceConnection : IDisposable
         catch (Exception e) when (e is OperationCanceledException or IOException or SocketException or ObjectDisposedException) { }
     }
 
-    /// <summary>How long a kicked client has to close its side after the Kicked frame before the socket closes.</summary>
+    /// <summary>How long a kicked client has to close its side after its Kicked frame before the socket closes.</summary>
     public static readonly TimeSpan KickedCloseDelay = TimeSpan.FromSeconds(2);
 
     // FIN right behind the Kicked frame; the serve task reads on (and drops) until the client closes its side, and
-    // the socket closes after KickedCloseDelay at the latest. Closing at once sends RST while the client's own
+    // the socket closes KickedCloseDelay later at the latest. Closing at once sends RST while the client's own
     // frames are still unread here, and a Windows client then loses the Kicked frame before it reads it.
     private void EndAfterKick()
     {
         try { _socket.Shutdown(SocketShutdown.Send); }
         catch (Exception e) when (e is SocketException or ObjectDisposedException) { Close(); return; }
-        _ = CloseLaterAsync();
+        _ = CloseLaterAsync(_cts.Token);
 
-        async Task CloseLaterAsync()
+        async Task CloseLaterAsync(CancellationToken closed)
         {
-            await Task.Delay(KickedCloseDelay);
+            try { await Task.Delay(KickedCloseDelay, closed); }
+            catch (OperationCanceledException) { return; } // the client closed first, or the server stopped
             Close();
         }
     }
