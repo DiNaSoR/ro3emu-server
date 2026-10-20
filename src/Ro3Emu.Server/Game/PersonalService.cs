@@ -29,7 +29,7 @@ public sealed class PersonalService
         ErrUnlocked = 3356, ErrUpvoted = 3359, ErrUpvoteSelf = 3361, ErrUpvoteCooldown = 3362,
         ErrPreset = 3363, ErrSignLength = 3364, ErrSignSensitive = 3365, ErrNameLength = 3366, ErrNameSensitive = 3367;
     // The gift panel's effect ids (UI_Sys_Friend_GiftToFriendsPanelCtrl: Intimacy 107, TotalPopularity 108, Charity 109).
-    private const int EffectPopularity = 108, EffectCharity = 109;
+    private const int EffectIntimacy = 107, EffectPopularity = 108, EffectCharity = 109;
     private const int Function = 63;
     // enum_PersonalUnlockType (Lua_GameDefine.lua:13645-13660); the editor's lists check Theme, BackGround and Action
     // (UI_Sys_Personal_EditTheme/EditBg/EditRoleAction_ListWidgetCtrl via LC_PersonalHelper.CheckItemIsOpen).
@@ -361,17 +361,26 @@ public sealed class PersonalService
 
     /// <summary>
     /// Popularity comes from friend gifts. The gift panel (UI_Sys_Friend_GiftToFriendsPanelCtrl._changeGiftShowInfo) adds the
-    /// item's _iUseEffect 108 (TotalPopularity) times the count to the receiver's weekly and total popularity, read from
+    /// item's _iUseEffect 107 (Intimacy) times the count to the pair's intimacy, and
+    /// 108 (TotalPopularity) times the count to the receiver's weekly and total popularity, read from
     /// PopularityStar; a received record shows "Popularity: +n" (record.popularity), a sent one "Affection: +n" from 109
     /// (Charity, record.affection; UI_Sys_Friend_GiftRecordListWidgetCtrl._initView). Likes add none: the client links them
     /// nowhere to popularity.
     /// </summary>
-    public (int Popularity, int Affection) GiftValues(long item, int count)
+    public (int Intimacy, int Popularity, int Affection) GiftValues(long item, int count)
     {
-        if (data.Row("ItemConfig", item) is not { } row) return (0, 0);
+        if (data.Row("ItemConfig", item) is not { } row) return (0, 0, 0);
         var effects = GameData.Pairs(row, "_iUseEffect").ToList();
         int Total(int effect) => (int)Math.Min(int.MaxValue, effects.Where(e => e.Id == effect).Sum(e => (long)e.Value * count));
-        return (Total(EffectPopularity), Total(EffectCharity));
+        return (Total(EffectIntimacy), Total(EffectPopularity), Total(EffectCharity));
+    }
+
+    /// <summary>A friend gift: an item FriendlyItemConfig lists (1004000-1004005 and 1004100 in the client's data). Without
+    /// that table (no client data) the earlier fixed range 1004000-1004006 still applies.</summary>
+    public bool IsFriendGift(long item)
+    {
+        var rows = data.Table("FriendlyItemConfig");
+        return rows.Count == 0 ? item is >= 1004000 and <= 1004006 : rows.Values.Any(row => GameData.Int(row, "_iItemId") == item);
     }
 
     /// <summary>Credits a committed gift: the receiver's popularity, the sender's affection.</summary>
