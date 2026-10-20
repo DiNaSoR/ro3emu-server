@@ -16,7 +16,14 @@ namespace Ro3Emu.Tests;
 public sealed class ActivityAdventuresTests : IAsyncLifetime
 {
     private readonly string dataDir = Path.Combine(Path.GetTempPath(), "ro3emu-adventure-" + Guid.NewGuid().ToString("N"));
-    private static readonly TimeSpan Wait = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan Wait = TimeSpan.FromSeconds(10);
+
+    private sealed class SureHits : CombatRolls
+    {
+        public override double Hit() => 0;
+    }
+    /// <summary>Mail is written by the kill's detached reward work; under full-suite load that can take well past <see cref="Wait"/>.</summary>
+    private static readonly TimeSpan MailWait = TimeSpan.FromSeconds(20);
     private WebApplication app = null!;
     private string http = "";
     private readonly Dictionary<string, BotClient> clients = new();
@@ -1160,12 +1167,16 @@ public sealed class ActivityAdventuresTests : IAsyncLifetime
             .Map(finder.WorldScene).Units.OfType<Ro3Emu.Server.Maps.MonsterUnit>().Single(u => u.Uid == bossUid)));
         Assert.Equal(80000002, boss.Template.NpcId);
 
-        // Bob hits it first without killing it, then Alice lands the final blow.
+        // Bob hits it first without killing it, then Alice lands the final blow. Hits always land: a random miss
+        // (the boss's Flee against a new character's Hit) would make Bob no helper.
+        app.Services.GetRequiredService<CombatService>().Rolls = new SureHits();
         await loop.InvokeAsync(() => { boss.Hp = Math.Max(boss.Template.MaxHp, 10_000_000); return Task.CompletedTask; });
         await bob.SendGameAsync(MsgId.Walk, new WalkReq { Pos = boss.Pos, BStop = true, SpeedRate = 1 });
         await bob.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1000001, TargetId = boss.Uid });
         Assert.Equal(0, (await Next(bob, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
-        await Next(bob, CombatService.SkillHit, SkillHitInfo.Parser, h => h.Dsts.Any(d => d.DstID == boss.Uid));
+        var bobHit = await Next(bob, CombatService.SkillHit, SkillHitInfo.Parser, h => h.Dsts.Any(d => d.DstID == boss.Uid));
+        // Only a hit that deals damage makes Bob a helper; a miss would leave him without the Co-op Chest.
+        Assert.True(bobHit.Dsts.Single(d => d.DstID == boss.Uid).Damage > 0, "Bob's hit dealt no damage");
         await loop.InvokeAsync(() => { boss.Hp = 1; return Task.CompletedTask; });
         await alice.SendGameAsync(MsgId.Walk, new WalkReq { Pos = boss.Pos, BStop = true, SpeedRate = 1 });
         await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1000001, TargetId = boss.Uid });
@@ -1178,7 +1189,7 @@ public sealed class ActivityAdventuresTests : IAsyncLifetime
             ? JsonSerializer.Deserialize<MailService.Mailbox>(blob)!.Letters.ToArray() : [];
         bool Mailed(GameSession s, int template, int entry) =>
             Letters(s).Any(l => l.TemplateId == template && l.Attachments.Any(a => a.Entry == entry && a.Count == 1));
-        var deadline = DateTime.UtcNow + Wait;
+        var deadline = DateTime.UtcNow + MailWait;
         while (DateTime.UtcNow < deadline && !(Mailed(finder, 11603, 1300088) && Mailed(helper, 11604, 1300089)))
             await Task.Delay(50);
         Assert.True(Mailed(finder, 11603, 1300088), "finder's Dig - Precious Chest mail");
