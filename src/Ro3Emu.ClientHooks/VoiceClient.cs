@@ -64,6 +64,8 @@ namespace Ro3Emu.ClientHooks
         // 10 s stats line while joined (Interlocked: capture, writer and reader threads count).
         private static int _captured, _peak, _linkDropped, _heard;
         private static string _lastNote;
+        private static readonly VoiceOffHint OffHint = new VoiceOffHint();
+        private const string OffHintText = "Voice chat is off on this server.";
 
         // ---- Called by the patched VoiceCallAdapter (main thread). Nothing may throw back into the game. ----
 
@@ -112,6 +114,7 @@ namespace Ro3Emu.ClientHooks
             Guard("SetMicrophoneMute", () =>
             {
                 if (channel == null || channel != _wanted) return;
+                if (OffHint.ShowOnMicChange(mute)) ShowTip(OffHintText);
                 _micOn = !mute;
                 if (_joined != null) _link?.Send(VoiceProtocol.SwitchFrame(VoiceProtocol.Mic, _micOn));
                 UpdateCapture();
@@ -141,6 +144,7 @@ namespace Ro3Emu.ClientHooks
         {
             Guard("Shutdown", () =>
             {
+                OffHint.Reset();
                 if (_wanted == null && _link == null) return;
                 Debug.Log("[Ro3Emu.Voice] game connection closed: voice off");
                 _wanted = null;
@@ -182,6 +186,7 @@ namespace Ro3Emu.ClientHooks
         {
             _ticketAskedAt = -TicketRetryMs;
             if (ticket == null) { Debug.LogWarning("[Ro3Emu.Voice] malformed ticket"); return; }
+            OffHint.OnTicket(ticket.Port == 0);
             if (ticket.Port == 0) { _rejoinAt = 0; Note("voice is off on this server"); return; }
             if (string.IsNullOrEmpty(ticket.Host)) { Debug.LogWarning("[Ro3Emu.Voice] the ticket names no relay host"); return; }
             if (_wanted == null || _link != null) return; // left meanwhile, or already connected
@@ -384,6 +389,16 @@ namespace Ro3Emu.ClientHooks
             var util = manager.Obf_jD()?.Obf_A?.Obf_RuA<Obf_R.Obf_ff>("VoiceCall_Util");
             if (util == null) { Note("VoiceCall_Util not loaded; " + name + " dropped"); return; }
             manager.Obf_OD(util, name, args);
+        }
+
+        /// <summary>The game's own short pop-up, LC_TipHelper.PopCommonTips(text) (it skips a repeat within 3 s).</summary>
+        private static void ShowTip(string text)
+        {
+            var manager = SingletonMonoBehaviour<LA_LuaManager>.Instance;
+            if (manager == null) return;
+            var tips = manager.Obf_jD()?.Obf_A?.Obf_RuA<Obf_R.Obf_ff>("LC_TipHelper");
+            if (tips == null) { Note("LC_TipHelper not loaded; hint dropped"); return; }
+            manager.Obf_OD(tips, "PopCommonTips", text);
         }
 
         private static bool IsTeamChannel(string channel)

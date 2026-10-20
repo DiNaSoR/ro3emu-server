@@ -24,6 +24,7 @@
     <!-- Client hooks code with no Unity dependency, compiled here so its logic can be tested (the hooks project itself
          builds only against a client's managed DLLs). -->
     <Compile Include="..\..\src\Ro3Emu.ClientHooks\VoiceLinkState.cs" Link="ClientHooks\VoiceLinkState.cs" />
+    <Compile Include="..\..\src\Ro3Emu.ClientHooks\VoiceOffHint.cs" Link="ClientHooks\VoiceOffHint.cs" />
   </ItemGroup>
 
   <ItemGroup>
