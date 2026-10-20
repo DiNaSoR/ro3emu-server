@@ -122,15 +122,43 @@ namespace Ro3Emu.ClientHooks
             _openAccountPanel?.Obf_HuA(self);
         }
 
-        /// <summary>What _loginCallBack does after a successful SDK login, with the launcher's token.</summary>
+        /// <summary>
+        /// What the SDK does after a successful login: GameLogic.LoginCallBack(result). It first loads the model name
+        /// tables (Lua_UT_StringDefine.SetRDStringMapping: the m_kAniName_Gen, m_kGfxName_Gen... globals LC_ModelLoader
+        /// needs, or character select shows models without heads), then sends the LoginCallBack event, whose handler
+        /// (the login widget's _loginCallBack) calls LC_LoginManager:AccountLoginBySdk(token, uid). Calling
+        /// AccountLoginBySdk directly skipped the first step.
+        /// </summary>
         private static void Login()
         {
             _loginPending = false;
-            var manager = LoginManager() ?? throw new InvalidOperationException("LC_LoginManager not found");
-            var call = manager.Obf_RuA<Obf_R.Obf_Ef>("AccountLoginBySdk") ?? throw new InvalidOperationException("AccountLoginBySdk not found");
-            call.Obf_HuA(manager, _token, _account);
+            var callback = _global?.Obf_LuA<Obf_R.Obf_Ef>("GameLogic.LoginCallBack");
+            var pack = _global?.Obf_LuA<Obf_R.Obf_Ef>("table.pack");
+            var rawset = _global?.Obf_LuA<Obf_R.Obf_Ef>("rawset");
+            if (callback != null && pack != null && rawset != null)
+            {
+                var result = (Obf_R.Obf_ff)pack.Obf_HuA()[0];
+                rawset.Obf_HuA(result, "n", null);
+                rawset.Obf_HuA(result, "isSuccess", true);
+                rawset.Obf_HuA(result, "uid", _account);
+                rawset.Obf_HuA(result, "token", _token);
+                rawset.Obf_HuA(result, "loginType", 0L);
+                rawset.Obf_HuA(result, "name", _account);
+                rawset.Obf_HuA(result, "code", 0L);
+                rawset.Obf_HuA(result, "banTime", 0L);
+                callback.Obf_HuA(result);
+            }
+            else
+            {
+                // Older builds: the same two steps by hand.
+                var mapping = _global?.Obf_LuA<Obf_R.Obf_Ef>("package.loaded.lua_ut_stringdefine.SetRDStringMapping");
+                mapping?.Obf_HuA();
+                var manager = LoginManager() ?? throw new InvalidOperationException("LC_LoginManager not found");
+                var call = manager.Obf_RuA<Obf_R.Obf_Ef>("AccountLoginBySdk") ?? throw new InvalidOperationException("AccountLoginBySdk not found");
+                call.Obf_HuA(manager, _token, _account);
+            }
             _token = null;
-            Debug.Log("[Ro3Emu.AutoLogin] logged in as " + _account);
+            Debug.Log("[Ro3Emu.AutoLogin] logged in as " + _account + (callback != null ? "" : " (direct)"));
         }
 
         private static void UpdateCurrentServer(Obf_R.Obf_ff self, object key, object server)
