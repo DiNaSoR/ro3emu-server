@@ -27,6 +27,8 @@ client cannot establish is marked `(inferred)` where it is implemented. Never pr
 
 - Game state changes only on the game loop (`GameLoop`). Persist first, then change the in-memory state from the
   commit callback.
+- The field names of a `DbPlan` and of the values it holds are written into receipts. Don't rename or move them:
+  `ReceiptFieldNamesTests` fails, and an operation recorded before the change would refuse its replay.
 - Validate every client request against the configuration and refuse it with an `ErrorCodes` value.
 - Read configuration through `GameData` (`Table`, `Row`, `GameData.Int(row, "_iField")`) and maps through
   `WorldData`, with the client's own table and field names. Don't copy config values into code.
