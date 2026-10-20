@@ -33,6 +33,9 @@ public sealed class AppearanceShopTests : IAsyncLifetime
     private const int Worldscorch = 5000061, WorldscorchSuit = 40060010, WorldscorchBrilliantGold = 20060010, WorldscorchFeatherstep = 90040001;
     private const int WorldscorchHeadwearVoucher = 3016101, WorldscorchAshenVoucher = 3016701, WorldscorchAshenEmbers = 70060010,
         WorldscorchHeadwear = 10060010;
+    // content/costume-shop.json: Silverwing Covenant [3,2380], award 180004 (piece vouchers); mount look 60050010 (row 5000071) [3,2380].
+    private const int Silverwing = 5000059, SilverwingSuit = 40050020, StarMount = 5000071, StarMountLook = 60050010;
+    private const int SilverwingHeadwear = 10050020, SilverwingPieceVoucher = 3045501, SilverwingVoucherLook = 50050020;
     private readonly string directory = Path.Combine(RepoRoot(), ".loadtest-temp", "fashion-shop-" + Guid.NewGuid().ToString("N"));
     private WebApplication app = null!;
     private string http = "";
@@ -161,6 +164,45 @@ public sealed class AppearanceShopTests : IAsyncLifetime
         await bot.SendGameAsync(CharacterService.ItemUse, new ItemUseReq { ItemGuid = headwear, ItemCount = 1 });
         Assert.Equal(0, (await Next(bot, CharacterService.ItemUse, ItemUseResp.Parser)).Result);
         Assert.True(SavedWardrobe.AllLightUpAppearances.ContainsKey(WorldscorchHeadwear));
+    }
+
+    // The client data disables these looks too; content/wardrobe-unlocks.json enables them, so they sell.
+    [ClientDataFact]
+    public async Task CustomCostumeRowsSellTheSilverwingSuitAndAMountTheClientDisables()
+    {
+        await using var bot = await Enter();
+        await Gm("!lvl 14"); // FunctionConfig 27 (mounts).
+        long crystals = Crystals;
+
+        var reply = await Batch(bot, (Silverwing, 1, 2380), (StarMount, 1, 2380));
+        Assert.Equal(0, reply.Result);
+        Assert.All(reply.Results, r => Assert.Equal(0, r.Result));
+        await Next(bot, MountService.Sync, DBMountsInfoIncrement.Parser, p => p.Mounts.ContainsKey(StarMountLook));
+        Assert.Equal(crystals - 4760, Crystals);
+        Assert.True(SavedWardrobe.AllLightUpAppearances.ContainsKey(SilverwingSuit));
+        Assert.True(SavedWardrobe.AllLightUpAppearances.ContainsKey(SilverwingHeadwear));
+        Assert.True(SavedWardrobe.AllLightUpAppearances.ContainsKey(StarMountLook));
+        Assert.True(Alice.Mounts!.Mounts.ContainsKey(StarMountLook));
+
+        // The other two pieces come as the gift's vouchers (award 180004); one of them lights its look.
+        long voucher = Alice.Items.First(i => i.Entry == SilverwingPieceVoucher && i.Grid == 0).Guid;
+        await bot.SendGameAsync(CharacterService.ItemUse, new ItemUseReq { ItemGuid = voucher, ItemCount = 1 });
+        Assert.Equal(0, (await Next(bot, CharacterService.ItemUse, ItemUseResp.Parser)).Result);
+        Assert.True(SavedWardrobe.AllLightUpAppearances.ContainsKey(SilverwingVoucherLook));
+    }
+
+    // Every look a custom costume row sells must be enabled once content/ is applied, or the buy answers 28.
+    [ClientDataFact]
+    public async Task EveryCustomCostumeRowSellsAnEnabledLook()
+    {
+        await using var bot = await Enter();
+        var data = Service<GameData>();
+        using var shop = JsonDocument.Parse(File.ReadAllText(Path.Combine(RepoRoot(), "content", "costume-shop.json")));
+        var disabled = shop.RootElement.GetProperty("rows").GetProperty("ShopCommodityConfig").EnumerateObject()
+            .Select(row => (Row: row.Name, Look: row.Value.GetProperty("_iAppearanceId").GetInt32()))
+            .Where(x => data.Row("WardRobeConfig", x.Look) is { } look && GameData.Int(look, "_iDisable") > 0)
+            .Select(x => $"{x.Row}:{x.Look}").ToList();
+        Assert.Empty(disabled);
     }
 
     [ClientDataFact]

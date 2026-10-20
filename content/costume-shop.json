@@ -1,5 +1,5 @@
 {
-  "//": "Every wardrobe look the client never sells or hands out, added to the Fashion shop (Costume tab) for Sacred Relic Crystals, once per role. Generated from WardRobeConfig: skipped are looks already sold, set pieces, disabled looks, default hairstyles and looks crafted with _kMaterial. Each row copies an existing commodity of the same tab (_base), one that is not on the Recommended page: a copy of a Recommended row (_iRecommendID 501, _kBooth) lands in that row's booth slot there, hidden behind it. Delete this file to remove them.",
+  "//": "Every wardrobe look the client never sells or hands out, added to the Fashion shop (Costume tab) for Sacred Relic Crystals, once per role. Generated from WardRobeConfig: skipped are looks already sold, set pieces, disabled looks (except the ones content/wardrobe-unlocks.json enables, which this file sells), default hairstyles and looks crafted with _kMaterial. Each row copies an existing commodity of the same tab (_base), one that is not on the Recommended page: a copy of a Recommended row (_iRecommendID 501, _kBooth) lands in that row's booth slot there, hidden behind it. Delete this file to remove them.",
   "rows": {
     "ShopCommodityConfig": {
       "5000039": {
