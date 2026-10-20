@@ -49,8 +49,8 @@ public sealed partial class AuctionService
         }
         catch (Exception e)
         {
-            log.LogError(e, committedResult.HasValue ? "Committed auction prebuy count notice failed for {Role}"
-                : "Auction prebuy count failed for {Role}", s.Role.Id);
+            log.LogError(e, "Auction prebuy count for {Role} failed (committed before the failure: {Committed})",
+                s.Role.Id, committedResult.HasValue);
             return committedResult ?? ErrorCodes.Unknown;
         }
     }

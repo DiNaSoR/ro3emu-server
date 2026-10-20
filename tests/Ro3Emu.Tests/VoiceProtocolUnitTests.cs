@@ -21,7 +21,7 @@ public sealed class VoiceProtocolUnitTests
         public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
 
         public override int Read(byte[] buffer, int offset, int count) =>
-            ReadAsync(buffer.AsMemory(offset, count)).GetAwaiter().GetResult();
+            ReadAsync(buffer.AsMemory(offset, count)).AsTask().GetAwaiter().GetResult();
 
         public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
         {

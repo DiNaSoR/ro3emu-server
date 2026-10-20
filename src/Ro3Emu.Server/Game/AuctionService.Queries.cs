@@ -126,7 +126,7 @@ public sealed partial class AuctionService
             }
             catch (Exception e)
             {
-                log.LogError(e, committed ? "Committed resume notification failed" : "Resume auto bidding failed");
+                log.LogError(e, "Resume auto bidding failed (committed before the failure: {Committed})", committed);
                 result = committed ? 0 : ErrorCodes.Unknown;
             }
         }
@@ -250,8 +250,7 @@ public sealed partial class AuctionService
         }
         catch (Exception e)
         {
-            log.LogError(e, committed ? "Committed auction cancellation notification failed for {Auction}"
-                : "Auction cancellation failed for {Auction}", id);
+            log.LogError(e, "Auction cancellation of {Auction} failed (committed before the failure: {Committed})", id, committed);
             return (committed ? 0 : ErrorCodes.Unknown, committed ? entry : 0);
         }
     }
