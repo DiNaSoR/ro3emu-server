@@ -83,6 +83,36 @@ public sealed partial class GuildService
     }
 
     /// <summary>
+    /// Guild League honor emblem: GuildLeagueRankConfig._iGuildIconID lists the tier's GuildIconConfig frame and design
+    /// (e.g. tier 1 [100105, 200106]), which mail 1039 tells the group winner are unlocked. They go into the same
+    /// unLockHeadIconData store as the 113 badge items and are pushed the same way. Icons already unlocked (by default or
+    /// before) are skipped, so a repeated settlement changes nothing. (inferred) Permanent (removetime 0): the tier row has
+    /// no duration. Returns how many icons were added.
+    /// </summary>
+    internal async Task<int> UnlockLeagueIconsAsync(long guildId, IReadOnlyCollection<long> icons)
+    {
+        int added = 0;
+        await RunGuildAsync(null, [guildId], [], async () =>
+        {
+            if (store.Get(guildId) is not { } g) return;
+            var fresh = icons.Where(id => data.Row("GuildIconConfig", id) is { } row
+                && GameData.Int(row, "_iType") is 1 or 2 && !IconUnlocked(g, row)).Distinct().ToList();
+            if (fresh.Count == 0) return;
+            foreach (long icon in fresh) g.UnlockedHeadIcons[icon] = 0;
+            if (!await SaveGuildAsync(g))
+            {
+                foreach (long icon in fresh) g.UnlockedHeadIcons.Remove(icon);
+                return;
+            }
+            added = fresh.Count;
+            var change = new GuildBaseInfoChangeNtf { Tp = GuildBaseInfoChangeNtf.Types.ChangeType.ChangeUnLockHeadIcon };
+            change.UnLockHeadIconData.AddRange(UnlockedIcons(g));
+            await PushBase(g, change);
+        });
+        return added;
+    }
+
+    /// <summary>
     /// 114 SendGuildMemberPackage [114, MultiverseGroupConfig, MailConfig, op, position]: 1211101..1211103 [114, 2004..2006,
     /// 1120, 6, 20] "send every guild Member except each Temporary Member a ... Pack by mail". Every member whose
     /// position compares true with the LC_InteractCondition operator table (6 is &lt;=: positions 1..20, without 21

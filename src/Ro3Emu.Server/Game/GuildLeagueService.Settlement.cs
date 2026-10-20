@@ -215,8 +215,9 @@ public sealed partial class GuildLeagueService
     /// <summary>
     /// After the finals: places 8 - score; per group the places 1.._iGroupUpNum move up a tier and the last _iGroupDownNum
     /// of the eight places move down (GuildLeagueBracket.Lift), shown as rankLift. Group
-    /// winners of the tiers with _iGuildIconID get mail 1039 (10140100044: the Honor Emblem is unlocked; adding the
-    /// emblem to the guild's icon choices is not implemented).
+    /// winners of the tiers with _iGuildIconID get the tier's frame and design added to their icon choices
+    /// (GuildService.UnlockLeagueIconsAsync) and mail 1039 (10140100044: the Honor Emblem is unlocked). The icons are
+    /// unlocked before the settlement commits: a failed commit settles again later, and a repeated unlock is a no-op.
     /// </summary>
     private async Task SettleCupAsync()
     {
@@ -224,6 +225,7 @@ public sealed partial class GuildLeagueService
         var cup = next.Cup!;
         var tiers = Tiers;
         var letters = new List<(long Leader, string Tier, int Place)>();
+        var emblems = new List<(long Guild, long[] Icons)>();
         foreach (var group in cup.Groups)
         {
             var scores = Scores(group);
@@ -244,9 +246,15 @@ public sealed partial class GuildLeagueService
             }
             if (real.Count > 0 && rank is { } row && row.TryGetProperty("_iGuildIconID", out var icons)
                 && icons.ValueKind == JsonValueKind.Array && icons.GetArrayLength() > 0
-                && guilds.Get(real[0]) is { } winner && winner.Members.Values.FirstOrDefault(m => m.Official == 1) is { } leader)
-                letters.Add((leader.RoleId, data.TextOf(row, "_iName"), 1));
+                && guilds.Get(real[0]) is { } winner)
+            {
+                emblems.Add((winner.Id, icons.EnumerateArray().Where(v => v.ValueKind == JsonValueKind.Number)
+                    .Select(v => v.GetInt64()).ToArray()));
+                if (winner.Members.Values.FirstOrDefault(m => m.Official == 1) is { } leader)
+                    letters.Add((leader.RoleId, data.TextOf(row, "_iName"), 1));
+            }
         }
+        foreach (var (guild, ids) in emblems) await guildService.UnlockLeagueIconsAsync(guild, ids);
         cup.Settled = true;
         int template = (int)Setting("GuildLeagueGuildIconNoticeMailID", 1039);
         using (await mail.LockRecipientsAsync(letters.Select(l => l.Leader)))
