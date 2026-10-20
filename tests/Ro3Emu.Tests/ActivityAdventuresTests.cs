@@ -17,6 +17,11 @@ public sealed class ActivityAdventuresTests : IAsyncLifetime
 {
     private readonly string dataDir = Path.Combine(Path.GetTempPath(), "ro3emu-adventure-" + Guid.NewGuid().ToString("N"));
     private static readonly TimeSpan Wait = TimeSpan.FromSeconds(10);
+
+    private sealed class SureHits : CombatRolls
+    {
+        public override double Hit() => 0;
+    }
     /// <summary>Mail is written by the kill's detached reward work; under full-suite load that can take well past <see cref="Wait"/>.</summary>
     private static readonly TimeSpan MailWait = TimeSpan.FromSeconds(20);
     private WebApplication app = null!;
@@ -1162,12 +1167,16 @@ public sealed class ActivityAdventuresTests : IAsyncLifetime
             .Map(finder.WorldScene).Units.OfType<Ro3Emu.Server.Maps.MonsterUnit>().Single(u => u.Uid == bossUid)));
         Assert.Equal(80000002, boss.Template.NpcId);
 
-        // Bob hits it first without killing it, then Alice lands the final blow.
+        // Bob hits it first without killing it, then Alice lands the final blow. Hits always land: a random miss
+        // (the boss's Flee against a new character's Hit) would make Bob no helper.
+        app.Services.GetRequiredService<CombatService>().Rolls = new SureHits();
         await loop.InvokeAsync(() => { boss.Hp = Math.Max(boss.Template.MaxHp, 10_000_000); return Task.CompletedTask; });
         await bob.SendGameAsync(MsgId.Walk, new WalkReq { Pos = boss.Pos, BStop = true, SpeedRate = 1 });
         await bob.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1000001, TargetId = boss.Uid });
         Assert.Equal(0, (await Next(bob, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
-        await Next(bob, CombatService.SkillHit, SkillHitInfo.Parser, h => h.Dsts.Any(d => d.DstID == boss.Uid));
+        var bobHit = await Next(bob, CombatService.SkillHit, SkillHitInfo.Parser, h => h.Dsts.Any(d => d.DstID == boss.Uid));
+        // Only a hit that deals damage makes Bob a helper; a miss would leave him without the Co-op Chest.
+        Assert.True(bobHit.Dsts.Single(d => d.DstID == boss.Uid).Damage > 0, "Bob's hit dealt no damage");
         await loop.InvokeAsync(() => { boss.Hp = 1; return Task.CompletedTask; });
         await alice.SendGameAsync(MsgId.Walk, new WalkReq { Pos = boss.Pos, BStop = true, SpeedRate = 1 });
         await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1000001, TargetId = boss.Uid });
