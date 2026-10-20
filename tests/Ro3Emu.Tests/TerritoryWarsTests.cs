@@ -207,8 +207,15 @@ public sealed class TerritoryWarsTests : IAsyncLifetime
         await c.SendGameAsync(TerritoryWarsService.ResultNotify, new TerritoryWarsDungeonResultNotify { CommonResultInfo = new DungeonResultInfo { WinEntityId = gc } });
         await c.SendGameAsync(30106, new ClientDungeonEvent { StrCmd = "win" });
         Assert.Equal(0, wars.OwnerOf(2));
+        IReadOnlyDictionary<long, long>? settledPersonal = null, settledGuilds = null;
+        wars.BattleSettled.Add((personal, guilds) => { settledPersonal = personal; settledGuilds = guilds; });
         clock.Set(1779625801); await OnLoop(wars.ReconcileAsync);
         var br = await Next(b, TerritoryWarsService.ResultNotify, TerritoryWarsDungeonResultNotify.Parser);
+        // Quest targets 106610 / 106609 read the committed personal and guild scores (TaskService.ParticipationTargets.cs).
+        Assert.NotNull(settledPersonal);
+        Assert.Equal(battle.State.Players[roleB].Score, settledPersonal![roleB]);
+        Assert.True(settledPersonal[roleB] > 0);
+        Assert.True(settledGuilds![gb] > 0);
         var cr = await Next(c, TerritoryWarsService.ResultNotify, TerritoryWarsDungeonResultNotify.Parser);
         Assert.Equal(gb, br.CommonResultInfo.WinEntityId); Assert.Equal(br, cr); Assert.Equal(gb, wars.OwnerOf(2));
         var bytes = Service<RoleStore>().LoadTerritoryWars(Session(b).Role!.Id)!;

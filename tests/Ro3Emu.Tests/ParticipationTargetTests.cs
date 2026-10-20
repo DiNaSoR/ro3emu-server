@@ -249,4 +249,37 @@ public sealed class ParticipationTargetTests : IAsyncLifetime
         Assert.Equal(1, (await QuestProbe.DoneAsync(app, "alice", 1602040)).CompleteNum[0]);
         await bot.DisposeAsync();
     }
+
+    /// <summary>
+    /// 106610 [n] (Realm Campaign 120001 "Reach 1000 Battle Merit") and 106609 [n] (120006 "Reach 10000 points in Guild
+    /// Territory War"): a settled Territory War battle adds the role's personal score and its guild's battle score.
+    /// Hook level: TerritoryWarsService raises BattleSettled after the settlement commit (TerritoryWarsTests drive that
+    /// path). Another guild's score does not count; the counts survive a relogin.
+    /// </summary>
+    [ClientDataFact]
+    public async Task TerritoryBattleSettlementCountsPersonalAndGuildPoints()
+    {
+        var bot = await InWorld();
+        long role = await Read(() => Session.Role!.Id);
+        await Accept(120001); // [106610,1000]
+        await Accept(120006); // [106609,10000]
+        await Service<GameLoop>().InvokeAsync(() => { Session.Guild = new DBRoleGuildInfo { GuildId = 77 }; return Task.CompletedTask; });
+        var wars = Service<TerritoryWarsService>();
+        Task Settle(long personal, long ownGuild, long otherGuild) => Service<GameLoop>().InvokeAsync(() =>
+        {
+            foreach (var h in wars.BattleSettled)
+                h(new Dictionary<long, long> { [role] = personal }, new Dictionary<long, long> { [77] = ownGuild, [78] = otherGuild });
+            return Task.CompletedTask;
+        });
+        await Settle(600, 4000, 9000);
+        await At(120001, 600);
+        await At(120006, 4000);
+        await Settle(400, 6000, 0);
+        await Done(120001);
+        await Done(120006);
+        bot = await Relog(bot);
+        Assert.Equal(1000, (await QuestProbe.DoneAsync(app, "alice", 120001)).CompleteNum[0]);
+        Assert.Equal(10000, (await QuestProbe.DoneAsync(app, "alice", 120006)).CompleteNum[0]);
+        await bot.DisposeAsync();
+    }
 }
