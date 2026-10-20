@@ -8,8 +8,8 @@ TestResults/
 .idea/
 
 # Game data and client research: exported from your own client, never committed
-/data/
-/re/
+/data
+/re
 
 # Third-party decompiler (download it yourself)
 unluac.jar
