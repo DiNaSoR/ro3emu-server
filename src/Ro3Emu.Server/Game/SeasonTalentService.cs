@@ -334,12 +334,6 @@ public sealed partial class SeasonTalentService
     /// <summary>83550: lock validation, payment, plan/oath mutation and durable save as one role operation.</summary>
     public async Task UpgradeAsync(GameSession s, SeasonTalentUpgradeReq req)
     {
-        if (data.Row("SeasonTalentConfig", req.TalentId) is { } requested
-            && GameData.Int(requested, "_iType") is ProfessionBranchType or ProfessionOptionType)
-        {
-            await SelectProfessionAsync(s, req);
-            return;
-        }
         int result;
         bool changed = false;
         using (await CharacterService.Lock(s))
