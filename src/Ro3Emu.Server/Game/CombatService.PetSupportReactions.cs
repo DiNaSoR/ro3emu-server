@@ -5,7 +5,15 @@ namespace Ro3Emu.Server.Game;
 
 public sealed partial class CombatService
 {
-    private readonly ConditionalWeakTable<GameSession, Dictionary<int, long>> _guardianReactionCds = [];
+    /// <summary>Internal reaction cooldowns of the connection's current role: a role switch on the same connection
+    /// starts with none, like its skill cooldowns (RoleSessionService clears those on entry).</summary>
+    private sealed class RoleReactionCooldowns(long roleId)
+    {
+        public long RoleId { get; } = roleId;
+        public Dictionary<int, long> Until { get; } = [];
+    }
+
+    private readonly ConditionalWeakTable<GameSession, RoleReactionCooldowns> _guardianReactionCds = [];
 
     private async Task GuardianSupportReactionAsync(GameSession s, GuardianPetRules.Skill passive, ActiveSkillCast action, Func<bool> current)
     {
@@ -59,9 +67,11 @@ public sealed partial class CombatService
 
     private bool ReserveGuardianReaction(GameSession source, int skillId, int milliseconds)
     {
-        var cooldowns = _guardianReactionCds.GetOrCreateValue(source);
-        if (cooldowns.GetValueOrDefault(skillId) > Now) return false;
-        cooldowns[skillId] = Now + Math.Max(0, milliseconds);
+        long role = source.Role?.Id ?? 0;
+        if (!_guardianReactionCds.TryGetValue(source, out var held) || held.RoleId != role)
+            _guardianReactionCds.AddOrUpdate(source, held = new RoleReactionCooldowns(role));
+        if (held.Until.GetValueOrDefault(skillId) > Now) return false;
+        held.Until[skillId] = Now + Math.Max(0, milliseconds);
         return true;
     }
 
@@ -73,9 +83,8 @@ public sealed partial class CombatService
         int buffId = passive.Id;
         if (passive.Reactive == GuardianPetRules.Reaction.FairyShield)
         {
-            var candidate = _data.Table("BuffConfig").Values.FirstOrDefault(b => GameData.Int(b, "_iBuffID") == FairyReactiveShieldGroup
-                && GameData.Int(b, "_iLevel") == passive.Star);
-            buffId = candidate.ValueKind == System.Text.Json.JsonValueKind.Undefined ? 0 : (int)GameData.Int(candidate, "_iID");
+            var candidates = GuardianTables.Of(_data).Buffs(FairyReactiveShieldGroup, passive.Star);
+            buffId = candidates.Count == 0 ? 0 : (int)GameData.Int(candidates[0], "_iID");
         }
         if (_data.Row("BuffConfig", buffId) is not { } buff) return;
         var stats = _character.Stats(s);

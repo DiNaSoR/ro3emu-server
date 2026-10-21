@@ -198,9 +198,8 @@ internal static partial class GuardianPetRules
 
     internal static int BuffAtStar(GameData data, int group, int star)
     {
-        var candidates = data.Table("BuffConfig").Values.Where(r => GameData.Int(r, "_iBuffID") == group
-            && GameData.Int(r, "_iLevel") == star).ToArray();
-        return candidates.Length == 1 ? (int)GameData.Int(candidates[0], "_iID") : 0;
+        var candidates = GuardianTables.Of(data).Buffs(group, star);
+        return candidates.Count == 1 ? (int)GameData.Int(candidates[0], "_iID") : 0;
     }
 
     /// <summary>(inferred) Named-family candidate links, validated against the entire advertised attribute payload.
@@ -278,9 +277,8 @@ internal static partial class GuardianPetRules
                 || !int.TryParse(text.AsSpan(prefix.Length, text.Length - prefix.Length - 2), out int reference)
                 || data.Row("BuffConfig", reference) is not { } named) continue;
             long group = GameData.Int(named, "_iBuffID");
-            var candidates = data.Table("BuffConfig").Values.Where(b => GameData.Int(b, "_iBuffID") == group
-                && GameData.Int(b, "_iLevel") == level).ToArray();
-            if (candidates.Length == 1) return (int)GameData.Int(candidates[0], "_iID");
+            var candidates = GuardianTables.Of(data).Buffs(group, level);
+            if (candidates.Count == 1) return (int)GameData.Int(candidates[0], "_iID");
         }
         return 0;
     }

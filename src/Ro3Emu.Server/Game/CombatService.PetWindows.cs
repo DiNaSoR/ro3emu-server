@@ -96,8 +96,8 @@ public sealed partial class CombatService
 
     private JsonElement? GuardianSkillAtStar(int group, int star)
     {
-        var rows = _data.Table("SkillConfig").Values.Where(r => GameData.Int(r, "_iSkillID") == group && GameData.Int(r, "_iLevel") == star).ToArray();
-        return rows.Length == 1 ? rows[0] : null;
+        var rows = GuardianTables.Of(_data).Skills(group, star);
+        return rows.Count == 1 ? rows[0] : null;
     }
 
     private void GuardianReactiveWindow(GameSession source, GuardianPetRules.Skill pet, ActiveSkillCast action)

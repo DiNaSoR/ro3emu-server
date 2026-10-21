@@ -11,9 +11,8 @@ public sealed partial class CombatService
     /// that family-specific join is inferred and validated against the advertised coefficient by its caller.</summary>
     private JsonElement? GuardianAuxiliary(GuardianPetRules.Skill pet, string script)
     {
-        var candidates = _data.Table("SkillConfig").Values.Where(r => GuardianPetRules.Script(r) == script
-            && GameData.Int(r, "_iLevel") == pet.Star).ToArray();
-        return candidates.Length == 1 ? candidates[0] : null;
+        var candidates = GuardianTables.Of(_data).Scripted(script, pet.Star);
+        return candidates.Count == 1 ? candidates[0] : null;
     }
 
     private ActiveSkillCast GuardianProcAction(GameSession source, GuardianPetRules.Skill pet, ActiveSkillCast parent,

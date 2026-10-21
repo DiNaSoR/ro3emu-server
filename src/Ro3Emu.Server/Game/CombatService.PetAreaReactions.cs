@@ -11,8 +11,9 @@ public sealed partial class CombatService
         double Desc(int index) => GuardianPetRules.Description(pet, index);
         if (pet.Reactive == GuardianPetRules.Reaction.IsisReduction)
         {
-            foreach (var ally in GuardianReactionAllies(source, (float)Desc(1), (int)Desc(2) + 1))
-                if (CurrentCastMap(source, action) && _pets.GuardianEquipped(source, pet))
+            foreach (var (ally, allyCurrent) in GuardianReactionAllies(source, (float)Desc(1), (int)Desc(2) + 1)
+                .Select(ally => (ally, GuardianRecipientCurrent(source, ally, action))).ToArray())
+                if (allyCurrent() && _pets.GuardianEquipped(source, pet))
                     await _buffs.AddGuardianAsync(ally, buff, (int)(Desc(0) * 1000), action.OwnerId);
             return;
         }

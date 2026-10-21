@@ -26,6 +26,10 @@ public sealed partial class CombatService
 
     private Fighter MonsterFighter(MonsterUnit unit)
     {
+        var t = unit.Template;
+        // The template as it was before guardians, without the per-hit attribute pass when nothing overlays it.
+        if (!_buffs.HasGuardianUnitBuffs(unit))
+            return new(t.Atk, t.Matk, t.Hit, t.Cri, t.Level, t.Element) { Def = t.Def, Mdef = t.Mdef, Flee = t.Flee };
         var stats = MonsterStats(unit);
         return new(stats[103], stats[104], stats[109], stats[111], unit.Template.Level, unit.Template.Element)
         { Def = stats[105], Mdef = stats[106], Flee = stats[110], ResCri = stats[112] };
@@ -33,6 +37,7 @@ public sealed partial class CombatService
 
     private long MonsterBuffDamage(MonsterUnit monster, JsonElement? skill, long amount)
     {
+        if (!_buffs.HasGuardianUnitBuffs(monster)) return amount;
         int element = skill is { } row && GameData.Int(row, "_iEleType") > 1
             ? (int)GameData.Int(row, "_iEleType") : monster.Template.Element;
         const int DamageBonus = 1215, FirstElementBonus = 301;

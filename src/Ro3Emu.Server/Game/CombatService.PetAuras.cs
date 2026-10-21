@@ -75,9 +75,10 @@ public sealed partial class CombatService
         var stats = _character.Stats(source);
         long amount = (long)Math.Floor(Math.Max(stats[103], stats[104]) * coefficient / 100);
         amount = GuardianPetRules.DirectHealing(pet.Effect, amount);
-        foreach (var ally in GuardianReactionAllies(source, radius, maximum))
-            if (Current() && !ally.Dead && ally.WorldScene == action.WorldScene && !ally.SceneLoading)
-                await GuardianHealAsync(source, ally, pet.EffectId, action.Id, amount, Current);
+        foreach (var (ally, allyCurrent) in GuardianReactionAllies(source, radius, maximum)
+            .Select(ally => (ally, GuardianRecipientCurrent(source, ally, action))).ToArray())
+            if (Current() && allyCurrent())
+                await GuardianHealAsync(source, ally, pet.EffectId, action.Id, amount, () => Current() && allyCurrent());
     }
 
     private async Task GuardianAreaShieldAsync(GameSession source, GuardianPetRules.Skill pet, ActiveSkillCast action,

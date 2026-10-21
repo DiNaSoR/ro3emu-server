@@ -93,14 +93,6 @@ public sealed partial class CombatService
                 {
                     foreach (var handler in PvpDealt) handler(source, target, effective, hp == 0);
                     foreach (var handler in PvpDealtAsync) await handler(source, target, effective, hp == 0);
-                    if (currentSource() && CurrentPlayerHit(source, target, attackerRole, targetRole, sceneId))
-                    {
-                        await GuardianTakenAsync(target, effective);
-                        await GuardianWindowHitAsync(source, targetRole.Id, target.Position, row, effective, hp == 0);
-                    }
-                    if (currentSource() && CurrentPlayerHit(source, target, attackerRole, targetRole, sceneId))
-                        await GuardianPlayerDamageReactionAsync(source, target, row, effective,
-                            () => currentSource() && CurrentPlayerHit(source, target, attackerRole, targetRole, sceneId));
                 }
                 var hit = new SkillHitInfo
                 {
@@ -130,6 +122,8 @@ public sealed partial class CombatService
                         await handler(source, target);
                     }
                 }
+                await GuardianPvpFollowUpsAsync(source, target, targetRole, row, effective, hp == 0,
+                    () => currentSource() && CurrentPlayerHit(source, target, attackerRole, targetRole, sceneId));
             }
             finally { if (hp == 0) ReleaseDeathPublication(target); }
         }
@@ -147,5 +141,18 @@ public sealed partial class CombatService
             _eventAttacks[source] = attack with { NextSwing = now + SkillMs(source, row) };
             _loop.PostRuntime(() => SwingEventAsync(source, attack.Target, attack.SkillId, ++_sessionIds));
         }
+    }
+
+    /// <summary>Guardian reactions to a committed player hit, after the hit, its HP and any death are published, so an
+    /// extra guardian hit that kills the target never precedes the hit that caused it. The victim's own reactions
+    /// answer the committed hit whatever became of the attacker's cast; the attacker's need it still current.</summary>
+    private async Task GuardianPvpFollowUpsAsync(GameSession source, GameSession target, Accounts.Role targetRole, JsonElement row,
+        long effective, bool killed, Func<bool> current)
+    {
+        if (effective <= 0 || !ReferenceEquals(target.Role, targetRole)) return;
+        await GuardianTakenAsync(target, effective);
+        if (!current()) return;
+        await GuardianWindowHitAsync(source, targetRole.Id, target.Position, row, effective, killed);
+        if (current()) await GuardianPlayerDamageReactionAsync(source, target, row, effective, current);
     }
 }
