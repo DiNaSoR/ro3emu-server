@@ -120,19 +120,13 @@ public sealed partial class CombatService
             && _sessions.All().Contains(s);
         string script = Script(row);
         var targets = SelectEnemies(s, action, center, field?.Trap == true ? field.Radius : null);
-        // Only Kuang Feng Xi Juan's second slow depends on an earlier one; no other cast pays for the scan.
-        bool slowMatters = GuardianPetRules.Script(row) == KuangFengXiJuan;
-        HashSet<long> alreadySlowed = slowMatters ? targets.Where(m => m.SlowMovementExpireMs > Now
-            || _buffs.GuardianUnitAttributes(m).Any(c => c.Id == GuardianPetRules.SpeedPercent && c.Value < 0))
-            .Select(m => m.Uid).ToHashSet() : [];
         var playerTargets = GameData.Int(row, "_iRangeType") == 2
             ? IsGuardianEffect(row) ? GuardianPlayerTargets(s, action, center) : EventAreaTargets(s, row)
             : EventTarget(s, action.Request.TargetId) is { } eventTarget
                 && PlayerDistance(s, eventTarget) <= Range(row) + 1.5f ? new[] { eventTarget } : [];
+        var alreadySlowed = GuardianPreviouslySlowed(row, targets, playerTargets);
         if (playerTargets.Length > 0)
         {
-            foreach (var player in playerTargets.Where(p => slowMatters && p.Buffs.Any(b => b.ExpireMs > Now
-                && b.Changes.Any(c => c.Attr == GuardianPetRules.SpeedPercent && c.Value < 0)))) alreadySlowed.Add(player.Role!.Id);
             int maxTargets = checked((int)Math.Max(1, GameData.Int(row, "_iTargetMax")));
             var selected = targets.Select(m => (Id: m.Uid, Distance: MonsterService.Distance(m, s)))
                 .Concat(playerTargets.Select(p => (Id: p.Role!.Id, Distance: PlayerDistance(s, p))))
@@ -141,14 +135,9 @@ public sealed partial class CombatService
             await HitEventPlayersAsync(s, playerTargets.Where(p => selected.Contains(p.Role!.Id)).ToArray(),
                 row, action.Request.SkillId, HitEffect(GameData.Int(row, "_iScriptShow")), action.Id, CanApplyMoreEffects,
                 action.GuardianDamage == null ? null : (id, amount) => RecordGuardianDamage(action, id, amount));
-            if (GameData.Int(row, "_iSystemType") == GuardianPetRules.EffectType || row.TryGetProperty("_ro3GuardianProc", out _))
-                foreach (var player in playerTargets.Where(p => selected.Contains(p.Role!.Id)))
-                    foreach (var tuple in Tuples(row, "_kBuff2"))
-                        if (CanApplyMoreEffects() && CanPlayerHit(s, player)
-                            && GuardianAllowsHostileBuff(row, tuple, alreadySlowed.Contains(player.Role!.Id))
-                            && RollHostileBuff(GuardianPetRules.PlayerBuffTuple(row, tuple), s, null, player, null, out int id, out int duration))
-                            await _buffs.AddGuardianAsync(player, id, duration, castingRole.Id,
-                                attributeMultiplier: GuardianPetRules.BuffMultiplier(row));
+            if (IsGuardianEffect(row))
+                await GuardianPlayerDebuffsAsync(s, row, playerTargets.Where(p => selected.Contains(p.Role!.Id)),
+                    alreadySlowed, castingRole.Id, CanApplyMoreEffects);
         }
         if (!CanApplyMoreEffects()) return; // player publication can yield before any monster hit is committed
         bool friendly = Relation(row, true, true) || Relation(row, true);
@@ -189,19 +178,7 @@ public sealed partial class CombatService
                 processed.Add(target);
                 if (damage)
                 {
-                    var defender = MonsterFighter(target);
-                    var (amount, result) = Damage(attacker, defender, row, script == "Heal" ? 1 : 0,
-                        GuardianPetRules.CriticalChance(row), GuardianPetRules.CriticalAtHp(row, target.Hp, target.Template.MaxHp));
-                    bool fixedGuardianHit = row.TryGetProperty("_ro3GuardianFixedHit", out var fixedValue);
-                    if (fixedGuardianHit) { amount = fixedValue.GetInt64(); result = DamageHitResult.Normal; }
-                    amount = GuardianPetRules.DirectDamage(row, amount);
-                    if (amount > 0 && !fixedGuardianHit)
-                    {
-                        foreach (var modifier in DamageAdjusters) amount = Math.Max(0, modifier(s, target, row, result, amount));
-                        foreach (var extra in ExtraHitDamage) amount += Math.Max(0, extra(s, target, row, amount));
-                    }
-                    if (!fixedGuardianHit)
-                        amount = ApplyPetSupportResistance(amount, _buffs.GuardianUnitAttributes(target), row, attacker.Element);
+                    var (amount, result) = MonsterHitDamage(s, attacker, target, row, script);
                     long beforeHp = target.Hp;
                     target.Hp = Math.Max(0, beforeHp - amount);
                     long effective = beforeHp - target.Hp;
@@ -556,5 +533,49 @@ public sealed partial class CombatService
         if (field == null) return false;
         if (--field.Charges == 0) await RemoveSkillObjectAsync(field);
         return true;
+    }
+
+    /// <summary>One monster's damage from a player's cast: the hit, the guardian factors, the shared adjusters and a
+    /// guardian's resistance changes. A guardian's fixed hit takes only its direct-damage factor.</summary>
+    private (long Amount, DamageHitResult Result) MonsterHitDamage(GameSession s, Fighter attacker, MonsterUnit target,
+        JsonElement row, string script)
+    {
+        var (amount, result) = Damage(attacker, MonsterFighter(target), row, script == "Heal" ? 1 : 0,
+            GuardianPetRules.CriticalChance(row), GuardianPetRules.CriticalAtHp(row, target.Hp, target.Template.MaxHp));
+        if (row.TryGetProperty("_ro3GuardianFixedHit", out var fixedValue))
+            return (GuardianPetRules.DirectDamage(row, fixedValue.GetInt64()), DamageHitResult.Normal);
+        amount = GuardianPetRules.DirectDamage(row, amount);
+        if (amount > 0)
+        {
+            foreach (var modifier in DamageAdjusters) amount = Math.Max(0, modifier(s, target, row, result, amount));
+            foreach (var extra in ExtraHitDamage) amount += Math.Max(0, extra(s, target, row, amount));
+        }
+        return (ApplyPetSupportResistance(amount, _buffs.GuardianUnitAttributes(target), row, attacker.Element), result);
+    }
+
+    /// <summary>Targets already slowed before this cast. Only Kuang Feng Xi Juan's second slow depends on that, so no
+    /// other cast pays for the scan.</summary>
+    private HashSet<long> GuardianPreviouslySlowed(JsonElement row, List<MonsterUnit> monsters, GameSession[] players)
+    {
+        if (GuardianPetRules.Script(row) != KuangFengXiJuan) return [];
+        var slowed = monsters.Where(m => m.SlowMovementExpireMs > Now
+            || _buffs.GuardianUnitAttributes(m).Any(c => c.Id == GuardianPetRules.SpeedPercent && c.Value < 0))
+            .Select(m => m.Uid).ToHashSet();
+        foreach (var player in players.Where(p => p.Buffs.Any(b => b.ExpireMs > Now
+            && b.Changes.Any(c => c.Attr == GuardianPetRules.SpeedPercent && c.Value < 0)))) slowed.Add(player.Role!.Id);
+        return slowed;
+    }
+
+    /// <summary>A guardian effect's hostile buffs on the players it hit.</summary>
+    private async Task GuardianPlayerDebuffsAsync(GameSession s, JsonElement row, IEnumerable<GameSession> players,
+        HashSet<long> alreadySlowed, long sourceRoleId, Func<bool> canApply)
+    {
+        foreach (var player in players.ToArray())
+            foreach (var tuple in Tuples(row, "_kBuff2"))
+                if (canApply() && CanPlayerHit(s, player)
+                    && GuardianAllowsHostileBuff(row, tuple, alreadySlowed.Contains(player.Role!.Id))
+                    && RollHostileBuff(GuardianPetRules.PlayerBuffTuple(row, tuple), s, null, player, null, out int id, out int duration))
+                    await _buffs.AddGuardianAsync(player, id, duration, sourceRoleId,
+                        attributeMultiplier: GuardianPetRules.BuffMultiplier(row));
     }
 }

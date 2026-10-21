@@ -55,20 +55,19 @@ public sealed partial class CombatService
             // Complete the runtime admission before any socket send can suspend. Frozen packets
             // retain the original order; an obsolete attachment cannot start a committed cast.
             if (s.Owners?.Current is { Notices: null } context) notices = new OwnerNotices(context);
-            await CastCoreAsync(s, request);
+            if (IsGuardianRequest(request)) await CastGuardianAsync(s, request.Clone());
+            else await CastCoreAsync(s, request);
         }
         finally { notices?.Dispose(); s.SkillCastGate.Release(); admission?.Dispose(); }
         if (notices != null) await notices.FlushAsync();
     }
 
+    /// <summary>A pet wrapper or its child effect: the guardian path validates and runs it (31102).</summary>
+    private bool IsGuardianRequest(CastSkillReq request) => _data.Row("SkillConfig", request.SkillId) is { } row
+        && GameData.Int(row, "_iSystemType") is GuardianPetRules.WrapperType or GuardianPetRules.EffectType;
+
     private async Task CastCoreAsync(GameSession s, CastSkillReq request)
     {
-        if (_data.Row("SkillConfig", request.SkillId) is { } petRow
-            && GameData.Int(petRow, "_iSystemType") is GuardianPetRules.WrapperType or GuardianPetRules.EffectType)
-        {
-            await CastGuardianAsync(s, request.Clone());
-            return;
-        }
         var req = request.Clone();
         var row = EffectiveSkillRow(s, req.SkillId);
         var owned = req.OpUnitId == 0 || req.OpUnitId == s.Role?.Id ? null

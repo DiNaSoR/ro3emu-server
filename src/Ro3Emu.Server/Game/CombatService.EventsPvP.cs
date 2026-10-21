@@ -68,18 +68,7 @@ public sealed partial class CombatService
             var attackerRole = source.Role!;
             var targetRole = target.Role!;
             long sceneId = source.WorldScene;
-            var attack = _character.Stats(source); var defend = _character.Stats(target);
-            var a = new Fighter(attack[103], attack[104], attack[109], attack[111], source.Progress!.Level, 1);
-            var b = new Fighter(0, 0, 0, 0, target.Progress!.Level, 1)
-            { Def = defend[105], Mdef = defend[106], Flee = defend[110], ResCri = defend[112] };
-            var (damage, result) = Damage(a, b, row, bonusCrit: GuardianPetRules.CriticalChance(row),
-                forceCrit: GuardianPetRules.CriticalAtHp(row, defend[2000], defend[101]));
-            damage = GuardianPetRules.DirectDamage(row, damage);
-            damage = GuardianOutgoingDamage(source, row, damage);
-            damage = GuardianControlledDamage(source, GuardianControlTarget(target), damage);
-            if (result != DamageHitResult.Miss) damage = ApplyPlayerRestraints(source, target, damage);
-            if (row.TryGetProperty("_ro3GuardianFixedHit", out var fixedValue))
-            { damage = fixedValue.GetInt64(); result = DamageHitResult.Normal; }
+            var (damage, result) = PlayerHitDamage(source, target, row);
             var committed = await CommitPlayerDamageAsync(target, damage, row,
                 () => currentSource() && CurrentPlayerHit(source, target, attackerRole, targetRole, sceneId)
                     && CanPlayerHit(source, target));
@@ -154,5 +143,23 @@ public sealed partial class CombatService
         if (!current()) return;
         await GuardianWindowHitAsync(source, targetRole.Id, target.Position, row, effective, killed);
         if (current()) await GuardianPlayerDamageReactionAsync(source, target, row, effective, current);
+    }
+
+    /// <summary>One player's damage from another's skill: the hit with a guardian's crit rules, the guardian factors and
+    /// the restraints; a guardian's fixed hit replaces the amount.</summary>
+    private (long Damage, DamageHitResult Result) PlayerHitDamage(GameSession source, GameSession target, JsonElement row)
+    {
+        var attack = _character.Stats(source); var defend = _character.Stats(target);
+        var a = new Fighter(attack[103], attack[104], attack[109], attack[111], source.Progress!.Level, 1);
+        var b = new Fighter(0, 0, 0, 0, target.Progress!.Level, 1)
+        { Def = defend[105], Mdef = defend[106], Flee = defend[110], ResCri = defend[112] };
+        var (damage, result) = Damage(a, b, row, bonusCrit: GuardianPetRules.CriticalChance(row),
+            forceCrit: GuardianPetRules.CriticalAtHp(row, defend[2000], defend[101]));
+        damage = GuardianPetRules.DirectDamage(row, damage);
+        damage = GuardianOutgoingDamage(source, row, damage);
+        damage = GuardianControlledDamage(source, GuardianControlTarget(target), damage);
+        if (result != DamageHitResult.Miss) damage = ApplyPlayerRestraints(source, target, damage);
+        return row.TryGetProperty("_ro3GuardianFixedHit", out var fixedValue)
+            ? (fixedValue.GetInt64(), DamageHitResult.Normal) : (damage, result);
     }
 }

@@ -351,18 +351,22 @@ public sealed partial class MonsterService : MonsterBrain, IGameTicker
 
     internal Func<WorldUnit, int, bool>? Forbidden { get; set; }
 
+    /// <summary>A guardian control that forbids walking stops a moving monster where it is.</summary>
+    private void StopWhenRooted(MonsterUnit m, long now)
+    {
+        if (Forbidden?.Invoke(m, ForbiddenState.Walk) != true || !m.Moving) return;
+        m.Advance(now);
+        m.Moving = false;
+        SendStop(m, now);
+    }
+
     public void Tick(MonsterUnit m, MapInstance map)
     {
         if (m.RuntimeMap.Kind == RuntimeMapKind.PublicLine
             && (!_spawns.TryGetValue(m.RuntimeMap, out var state) || state.Retired)) return;
         if (m.Dead || m.Hp <= 0) return; // lethal HP is authoritative before the awaited death broadcast finishes
         long now = NowMs;
-        if (Forbidden?.Invoke(m, ForbiddenState.Walk) == true && m.Moving)
-        {
-            m.Advance(now);
-            m.Moving = false;
-            SendStop(m, now);
-        }
+        StopWhenRooted(m, now);
         if (m.SlowMovementExpireMs > 0 && now >= m.SlowMovementExpireMs)
         {
             m.SlowMovementBp = 0;
