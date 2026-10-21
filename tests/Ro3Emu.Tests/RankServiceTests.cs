@@ -204,6 +204,29 @@ public sealed class RankServiceTests : IAsyncLifetime
         }
     }
 
+    [ClientDataFact]
+    public void EveryRankRewardGiftResolvesToFixedGrantsAndItsLetterExists()
+    {
+        var data = Service<Ro3Emu.Server.Data.GameData>();
+        var mail = Service<MailService>();
+        var paying = new List<int>();
+        foreach (var row in data.Table("LeaderBoardsConfig").Values)
+        {
+            if (!row.TryGetProperty("_iRankRewards", out var gifts) || gifts.ValueKind != JsonValueKind.Array || gifts.GetArrayLength() == 0)
+                continue;
+            paying.Add((int)Ro3Emu.Server.Data.GameData.Int(row, "_iID"));
+            Assert.NotNull(data.Row("MailConfig", Ro3Emu.Server.Data.GameData.Int(row, "_iMailId")));
+            foreach (var id in gifts.EnumerateArray())
+            {
+                var gift = data.Row("LeaderBoardsGiftConfig", id.GetInt64());
+                Assert.NotNull(gift);
+                Assert.NotEmpty(mail.FixedGroupAward(Ro3Emu.Server.Data.GameData.Int(gift!.Value, "_kReward")));
+            }
+        }
+        // Spirit Tower (8001: ranks 1-10, letter 1104) and Fashion (130101: ranks 1-10, letter 1057).
+        Assert.Equal([RankService.SpiritTower, RankService.Fashion], paying.Order());
+    }
+
     private static DBClimTower Tower(int floor, int remain, long complete, int[]? pets = null)
     {
         var tower = new DBClimTower { LayerConfID = floor, RemainDuration = remain, CompleteTime = complete };

@@ -68,6 +68,8 @@ public static partial class EconomySnapshotReader
     // markers; a Received honor is only the once-only source of its event/dungeon/honor-award receipt. server_state
     // multi_dungeon_server (DBMultiDungeonServerInfo) holds the realm's first clears: the hall of fame keeps the clearing
     // roles' equipment as a display snapshot, never a holding.
+    // Rank rewards: server_state rank_rewards (RankService.RewardState) names each paying board's last settled period and
+    // its winners; markers, no balance and no asset (the letters are once-only mail deliveries).
     // Mock Battle: role.timed_battle CasualMmr/CasualRecords/CasualBest/CasualTotal are a rating and statistics, and
     // CasualSettled the once-only markers of each match's event/casual-battle receipt; no balance, no asset.
     // Tavern: role.barroom DBBarRoomInfo holds Star Power received (popularity, weekPopularity) and the Daily Tavern
@@ -86,7 +88,7 @@ public static partial class EconomySnapshotReader
     // receipt that also writes the timed_battle state and marks the row delivered.
     // Field Bonus Time: role.wild_afk WildAfkService.State.PartyAutoBattleSeconds holds party auto-battle seconds not yet
     // added to Connect Quest 106014. A counter, no balance and no asset: the quest's only effect is friend Intimacy.
-    public const string ExpectedFormatManifestHash = "7DE402B0501C3D77772009AFB204AD2476C0560CBA1CBDFF942A2F122CCCA352";
+    public const string ExpectedFormatManifestHash = "426A27F6BDF013BC3CE96A102485281DB26525FA539F93DB744383AEE7732DB4";
     public static string FormatManifestHash => State.FormatManifestHash;
 
     private sealed partial class State
@@ -159,6 +161,8 @@ public static partial class EconomySnapshotReader
             TypeShape(typeof(Ro3Emu.Server.Game.SeasonService.Season));
             entries.Add("server_state/multi_dungeon_server:romsg.DBMultiDungeonServerInfo");
             Message(Romsg.DBMultiDungeonServerInfo.Descriptor);
+            entries.Add("server_state/rank_rewards:Ro3Emu.Server.Micro.RankService.RewardState");
+            TypeShape(typeof(Ro3Emu.Server.Micro.RankService.RewardState));
             return Hash(string.Join("\n", entries));
         }
     }

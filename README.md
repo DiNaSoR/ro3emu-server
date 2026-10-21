@@ -163,7 +163,7 @@ show is playable from day one, without season or server-day gates ([details](doc
 - bosses cast their special skills, with phases and summons
 - Monster Hunt, Rift Crisis, Survivor Battle, Wedding Crashers,
   Dragon Coffin Island, Mock Battle (40 vs 40), Hunting Challenge,
-  timed events, daily activities, leaderboards
+  timed events, daily activities, leaderboards and their rank rewards
 
 </td></tr>
 </table>
@@ -179,7 +179,6 @@ show is playable from day one, without season or server-day gates ([details](doc
 - **Guild voice invites:** guild voice rooms work, but voice invites are not answered yet.
 - **Guild Technology and Timed Strategies**, the Starshatter Dragon Summon Ritual, party teleport invites and big-map
   marks: the client sends these requests and the server does not answer them yet.
-- **Leaderboard rewards:** the boards show, but they don't pay out their rewards yet.
 
 **Voice.** Party voice goes through a relay in the server instead of the publisher's Tencent GME, and the patched
 client records and plays it through Windows' own winmm. It is off by default: `Ro3Emu:Voice:Port` turns it on. The
