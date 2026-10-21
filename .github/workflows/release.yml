@@ -4,7 +4,7 @@ name: release
 # The daily release workflow (daily-release.yml) calls this one with a dated tag: it builds that commit and publishes
 # the release, with a changelog of the pull requests merged since the previous daily release.
 # The rolling "launcher" release (this fork's own RO3Emu.exe and the server it bundles; tools/update-launcher.sh
-# installs it) gets the files of every daily release, and of every change on main to anything that goes into
+# installs it) gets the files of every daily release and v* tag, and of every change on main to anything that goes into
 # RO3Emu.exe or the client DLLs. The server is left out of the push filter on purpose: main changes it many times a
 # day, so a server change reaches the launcher release with the next daily build.
 # CI has no game client: pack.ps1 (tools/release/client-dlls.ps1) downloads just the client's managed DLLs from the
@@ -98,7 +98,7 @@ jobs:
   # commit.txt and uploads without the other running in between.
   launcher:
     needs: pack
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     concurrency:
@@ -115,9 +115,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           SHA: ${{ inputs.sha || github.sha }}
-          BUILD: ${{ inputs.tag || format('0.0.{0}', github.run_number) }}
+          BUILD: ${{ inputs.tag || (github.ref_type == 'tag' && github.ref_name) || format('0.0.{0}', github.run_number) }}
         run: |
-          # A daily build and a push build can overlap; don't replace a newer build of main with an older one.
+          # Builds can overlap or come from an older tag; don't replace a newer build with an older one.
           current=$(gh release download launcher --pattern commit.txt --output - 2>/dev/null || true)
           if [ -n "$current" ]; then
             status=$(gh api "repos/$GH_REPO/compare/$SHA...$current" --jq .status 2>/dev/null || true)
@@ -127,7 +127,7 @@ jobs:
             fi
           fi
           echo "$SHA" > dist/commit.txt
-          notes="RO3Emu-win-x64.zip (RO3Emu.exe, the server and the client DLLs) built by CI from main at $SHA, build $BUILD. Replaced by every daily release and on every change to the launcher, patcher or client DLL sources; tools/update-launcher.sh installs it."
+          notes="RO3Emu-win-x64.zip (RO3Emu.exe, the server and the client DLLs) built by CI from main at $SHA, build $BUILD. Replaced by every daily release, every v* tag and on every change to the launcher, patcher or client DLL sources; tools/update-launcher.sh installs it."
           if ! gh release view launcher >/dev/null 2>&1; then
             gh release create launcher --target "$SHA" --prerelease --latest=false --title "RO3Emu.exe (latest main build)" --notes "$notes"
           fi
