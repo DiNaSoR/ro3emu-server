@@ -30,7 +30,8 @@ server first; changes to the original rules come after.
 
 1. Download **`RO3Emu-win-x64.zip`** from the [latest release](https://github.com/akreao/ro3emu-server/releases/latest)
    and extract it anywhere. A release is cut every day main changes, and its notes list what changed. The very newest
-   build of main is the rolling [`launcher` release](https://github.com/akreao/ro3emu-server/releases/tag/launcher).
+   build of main is the rolling [`launcher` release](https://github.com/akreao/ro3emu-server/releases/tag/launcher):
+   it gets every daily release and hand-pushed `v*` tag, and is also rebuilt right away when the launcher, patcher or client DLLs change.
 2. Double-click **`RO3Emu.exe`**. Nothing to install: no .NET, Java or Node.js. If Windows says "Windows protected
    your PC" (RO3Emu is not signed), click *More info*, then *Run anyway*.
 3. The first time, it finds your Ragnarok 3: Genesis game folder (or asks for the one with `ro3.exe`), prepares the
@@ -269,9 +270,10 @@ to test) and on main, where it publishes them to the rolling
 [`client-dlls` release](https://github.com/akreao/ro3emu-server/releases/tag/client-dlls).
 `tools/update-client-dlls.sh` installs that build (or a folder you give it) into RO3Emu and the game.
 
-This fork's own `RO3Emu.exe` is built by the `release` workflow on every change to main that goes into it (the
-launcher, patcher and client DLL sources) and published to the rolling
-[`launcher` release](https://github.com/akreao/ro3emu-server/releases/tag/launcher) as `RO3Emu-win-x64.zip`.
+This fork's own `RO3Emu.exe` and the server it bundles are published to the rolling
+[`launcher` release](https://github.com/akreao/ro3emu-server/releases/tag/launcher) as `RO3Emu-win-x64.zip` by every
+daily release (below) and hand-pushed `v*` tag, and by the `release` workflow on every change to main that goes into the exe (the launcher,
+patcher and client DLL sources). A change to the server alone reaches it with the next daily release.
 `tools/update-launcher.sh` installs it into RO3Emu (backing up the old exe) and then runs `update-client-dlls.sh`
 with the DLLs from the same zip.
 

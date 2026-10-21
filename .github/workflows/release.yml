@@ -3,8 +3,10 @@ name: release
 # A tag v* builds the two release archives (tools/release/pack.ps1) and attaches them to a draft release.
 # The daily release workflow (daily-release.yml) calls this one with a dated tag: it builds that commit and publishes
 # the release, with a changelog of the pull requests merged since the previous daily release.
-# A change on main to anything that goes into RO3Emu.exe or the client DLLs rebuilds them and replaces the files of the
-# rolling "launcher" release (this fork's own RO3Emu.exe; tools/update-launcher.sh installs it).
+# The rolling "launcher" release (this fork's own RO3Emu.exe and the server it bundles; tools/update-launcher.sh
+# installs it) gets the files of every daily release and v* tag, and of every change on main to anything that goes into
+# RO3Emu.exe or the client DLLs. The server is left out of the push filter on purpose: main changes it many times a
+# day, so a server change reaches the launcher release with the next daily build.
 # CI has no game client: pack.ps1 (tools/release/client-dlls.ps1) downloads just the client's managed DLLs from the
 # publisher and builds the client hooks/loc DLLs against them. Run tools/release/smoke.ps1 locally (it needs the
 # clients) before publishing the draft.
@@ -13,7 +15,8 @@ on:
     tags: ['v*']
     branches: [main]
     paths: ['src/Ro3Emu.Setup/**', 'src/Ro3Emu.Patcher/**', 'src/Ro3Emu.ClientTools/**', 'src/Ro3Emu.DataExport/**', 'src/Ro3Emu.Desktop/**',
-      'src/Ro3Emu.ClientHooks/**', 'src/Ro3Emu.Loc/**', 'tools/release/**', '.github/workflows/release.yml']
+      'src/Ro3Emu.ClientHooks/**', 'src/Ro3Emu.Loc/**', 'tools/release/**', '.github/workflows/release.yml',
+      'Directory.Build.props', 'Directory.Packages.props', 'global.json']
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -90,17 +93,43 @@ jobs:
             args+=(--notes "$(printf '%s\n\nFirst daily release. Everything merged so far:\n\n%s\n' "$notes" "$changes")")
           fi
           gh release create "$TAG" dist/RO3Emu-win-x64.zip dist/RO3Emu-server-linux-x64.tar.gz "${args[@]}"
+
+  # Its own job so that daily and push builds (different concurrency groups above) take turns: each one checks
+  # commit.txt and uploads without the other running in between.
+  launcher:
+    needs: pack
+    if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: launcher-release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          name: ro3emu-release
+          path: dist
       - name: Publish to the launcher release
-        if: github.ref == 'refs/heads/main' && !inputs.tag
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          SHA: ${{ inputs.sha || github.sha }}
+          BUILD: ${{ inputs.tag || (github.ref_type == 'tag' && github.ref_name) || format('0.0.{0}', github.run_number) }}
         run: |
-          echo "$GITHUB_SHA" > dist/commit.txt
-          notes="RO3Emu.exe (in RO3Emu-win-x64.zip) built by CI from main at $GITHUB_SHA, version 0.0.$GITHUB_RUN_NUMBER. Replaced on every change to the launcher, patcher or client DLL sources; tools/update-launcher.sh installs it."
+          # Builds can overlap or come from an older tag; don't replace a newer build with an older one.
+          current=$(gh release download launcher --pattern commit.txt --output - 2>/dev/null || true)
+          if [ -n "$current" ]; then
+            status=$(gh api "repos/$GH_REPO/compare/$SHA...$current" --jq .status 2>/dev/null || true)
+            if [ "$status" = "ahead" ] || [ "$status" = "identical" ]; then
+              echo "The launcher release already has $current, which includes $SHA; not replacing it." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+          fi
+          echo "$SHA" > dist/commit.txt
+          notes="RO3Emu-win-x64.zip (RO3Emu.exe, the server and the client DLLs) built by CI from main at $SHA, build $BUILD. Replaced by every daily release, every v* tag and on every change to the launcher, patcher or client DLL sources; tools/update-launcher.sh installs it."
           if ! gh release view launcher >/dev/null 2>&1; then
-            gh release create launcher --target "$GITHUB_SHA" --prerelease --latest=false --title "RO3Emu.exe (latest main build)" --notes "$notes"
+            gh release create launcher --target "$SHA" --prerelease --latest=false --title "RO3Emu.exe (latest main build)" --notes "$notes"
           fi
           gh release upload launcher dist/RO3Emu-win-x64.zip dist/RO3Emu-server-linux-x64.tar.gz dist/commit.txt --clobber
           gh release edit launcher --notes "$notes"
