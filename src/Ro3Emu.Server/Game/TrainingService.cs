@@ -43,6 +43,8 @@ public sealed class TrainingService : IGameTicker
         public long Damage;
         public bool Settling;
     }
+    /// <summary>After a challenge's result is committed (quest target 210006, TaskService.OnDummyChallengeSettled).</summary>
+    public List<Action<GameSession>> ChallengeSettled { get; } = new();
     private long Now => clock.UtcNow.ToUnixTimeMilliseconds();
     private int Duration => data.Table("PublicParamConfig").TryGetValue("TrainingChallengeTimeLimit", out var v)
         ? checked((int)(GameData.Number(v) ?? 60)) : 60;
@@ -312,6 +314,8 @@ public sealed class TrainingService : IGameTicker
                 Res = (DungeonRes)1, Data = new() { TrainingGroundData = new() { MaxDps = dps, SumDamage = a.Damage } }
             });
             await CharacterService.SyncAsync(s, Sync, next.Clone()); await SnapshotAsync(s, a);
+            if (a.Challenge)
+                foreach (var handler in ChallengeSettled) handler(s);
         }
         finally { a.Settling = false; }
     }
