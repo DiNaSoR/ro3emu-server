@@ -10,7 +10,8 @@ namespace Ro3Emu.Server.Data;
 /// The client's own config tables, exported to data/config/*.json by tools/ConfigExport. <see cref="Preload"/> parses
 /// every table and skill template before the gates open (a cold table cost seconds inside a player's request); after
 /// that, lookups are lock-free reads of a frozen snapshot. Without a preload (tests, tools) tables load on first use.
-/// A missing table is empty (the server still runs, it just knows less).
+/// A missing table is empty, except that a client export must carry every table and field the server declares
+/// (Data/Config, checked by <see cref="Config.ConfigValidator"/> during the preload).
 /// </summary>
 public sealed class GameData(IOptions<ServerOptions> options, ILogger<GameData> log)
 {
@@ -82,9 +83,18 @@ public sealed class GameData(IOptions<ServerOptions> options, ILogger<GameData> 
             _frozen = _tables.ToFrozenDictionary();
         }
         Text(0); // builds the text index
-        log.LogInformation("Game data preloaded: {Tables} tables in {Ms} ms, managed heap {Mb} MB",
-            files.Length, watch.ElapsedMilliseconds, GC.GetTotalMemory(false) >> 20);
+        // A client export (with export.json) must carry every declared table and field; any data set must give each
+        // declared field values of its kind. A mismatch stops the server here, before players are admitted.
+        bool export = File.Exists(Path.Combine(Root, ExportManifest));
+        Config.ConfigValidator.Check(this, Config.ConfigTables.All, strict: export);
+        log.LogInformation(
+            "Game data preloaded: {Tables} tables in {Ms} ms, managed heap {Mb} MB, {Views} config views checked{Strict}",
+            files.Length, watch.ElapsedMilliseconds, GC.GetTotalMemory(false) >> 20, Config.ConfigTables.All.Count,
+            export ? " against the client export" : "");
     }
+
+    /// <summary>tools/ConfigExport writes this next to config/ for a complete client export.</summary>
+    public const string ExportManifest = "export.json";
 
     public JsonElement? Row(string table, long id) => Table(table).TryGetValue(id.ToString(), out var row) ? row : null;
 
@@ -150,9 +160,8 @@ public sealed class GameData(IOptions<ServerOptions> options, ILogger<GameData> 
         return result;
     }
 
-    /// <summary>An integer field of a row (0 when absent or not a number).</summary>
-    public static long Int(JsonElement row, string field) =>
-        row.TryGetProperty(field, out var v) && v.ValueKind == JsonValueKind.Number ? (long)v.GetDouble() : 0;
+    /// <summary>An integer field of a row (0 when absent or not a number), exact beyond 2^53.</summary>
+    public static long Int(JsonElement row, string field) => Config.ConfigValue.Integral(row, field);
 
     /// <summary>A field holding [[id, value, ...], ...] (attribute lists): (id, first value) pairs.</summary>
     public static IEnumerable<(long Id, double Value)> Pairs(JsonElement row, string field)
@@ -166,12 +175,7 @@ public sealed class GameData(IOptions<ServerOptions> options, ILogger<GameData> 
     }
 
     /// <summary>A number, also when the Lua table stored it as a string ("2000").</summary>
-    public static double? Number(JsonElement e) => e.ValueKind switch
-    {
-        JsonValueKind.Number => e.GetDouble(),
-        JsonValueKind.String when double.TryParse(e.GetString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var d) => d,
-        _ => null,
-    };
+    public static double? Number(JsonElement e) => Config.ConfigValue.Number(e);
 
     /// <summary>
     /// A skill template (Config/Skill/skill_<scriptShow>.lua exported to data/skills): m_fAtkRange (m), m_fTotalTime (s),
