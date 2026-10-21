@@ -275,7 +275,7 @@ public sealed partial class CombatService
     }
 
     /// <summary>A recipient chosen before the loop's awaits: still the same attached, living role in the cast's scene.</summary>
-    private Func<bool> GuardianRecipientCurrent(GameSession source, GameSession recipient, ActiveSkillCast action)
+    private static Func<bool> GuardianRecipientCurrent(GameSession source, GameSession recipient, ActiveSkillCast action)
     {
         var role = recipient.Role;
         var attachment = recipient.Attachment;

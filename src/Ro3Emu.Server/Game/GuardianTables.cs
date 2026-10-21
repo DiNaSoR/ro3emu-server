@@ -10,7 +10,7 @@ namespace Ro3Emu.Server.Game;
 /// </summary>
 internal sealed class GuardianTables
 {
-    private static readonly ConditionalWeakTable<GameData, GuardianTables> Cache = new();
+    private static readonly ConditionalWeakTable<GameData, GuardianTables> Cache = [];
     private readonly Dictionary<(long Group, long Level), JsonElement[]> _buffs;
     private readonly Dictionary<(long Group, long Level), JsonElement[]> _skills;
     private readonly Dictionary<(string Script, long Level), JsonElement[]> _scripts;
