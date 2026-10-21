@@ -19,7 +19,29 @@ permissions:
   contents: write
 
 jobs:
+  # Publishing a draft pushes its tag, which starts this workflow again; a tag whose release is already published needs
+  # nothing more (the API finds published releases by tag, not drafts).
+  published:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      exists: ${{ steps.check.outputs.exists }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ] && gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" > /dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "$TAG is already published; nothing to build."
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
   pack:
+    needs: published
+    if: needs.published.outputs.exists != 'true'
     runs-on: windows-latest
     env:
       TAG: ${{ github.ref_type == 'tag' && github.ref_name || (inputs.version && format('v{0}', inputs.version) || '') }}
