@@ -12,6 +12,9 @@ namespace Ro3Emu.Server.Accounts;
 /// </summary>
 public sealed class AdventureGroupStore(AccountStore accounts)
 {
+    /// <summary>The aggregate's table, as <see cref="RowMissingException"/> names it.</summary>
+    internal const string Table = "adventure_group";
+
     private readonly AccountStore _accounts = accounts;
 
     public sealed class State
@@ -176,6 +179,6 @@ public sealed class AdventureGroupStore(AccountStore accounts)
 
     /// <summary>True when a SQLite failure is the name or membership uniqueness (constraint 19).</summary>
     internal static bool IsConflict(Exception e) => e is SqliteException { SqliteErrorCode: 19 }
-        || e is InvalidOperationException { Message: "Adventure group disappeared during save." }
+        || e is RowMissingException { Table: Table }
         || e is OwnerRevisionConflictException;
 }

@@ -161,8 +161,9 @@ public sealed class GuildWriteCaptureTests : IDisposable
         var missing = new RoleItemPlanBuilder(_accounts);
         _guilds.EnlistSave(new GuildStore.State { Id = existing.Id + 10, Name = "missing" }, missing,
             "guild disappeared during rename");
-        Assert.Equal("guild disappeared during rename",
-            Assert.Throws<InvalidOperationException>(() => missing.Commit(_accounts, "test/guild-missing")).Message);
+        var gone = Assert.Throws<RowMissingException>(() => missing.Commit(_accounts, "test/guild-missing"));
+        Assert.True(gone.Is(GuildStore.Table, existing.Id + 10));
+        Assert.Equal("guild disappeared during rename", gone.Message);
     }
 
     [Fact]

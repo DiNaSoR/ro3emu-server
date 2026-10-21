@@ -6,6 +6,9 @@ namespace Ro3Emu.Server.Accounts;
 /// <summary>Durable guild aggregate and exclusive role membership.</summary>
 public sealed class GuildStore(AccountStore accounts)
 {
+    /// <summary>The aggregate's table, as <see cref="RowMissingException"/> names it.</summary>
+    internal const string Table = "guild";
+
     private readonly AccountStore _accounts = accounts;
 
     public sealed class State
@@ -138,7 +141,7 @@ public sealed class GuildStore(AccountStore accounts)
     {
         var plan = MarketPlan(market, affected);
         try { plan.Commit(_accounts, "guild/market"); return true; }
-        catch (InvalidOperationException e) when (e.Message == "Guild disappeared during save.") { return false; }
+        catch (RowMissingException e) when (e.Table == Table) { return false; }
     }
 
     /// <summary>Commit the complete market book, guild balances, and membership indexes as one value-only writer plan.</summary>
@@ -148,7 +151,7 @@ public sealed class GuildStore(AccountStore accounts)
         var plan = MarketPlan(market, affected);
         plan.WithEscrowEconomy(economy);
         try { await plan.CommitAsync(_accounts, "guild/market"); return true; }
-        catch (InvalidOperationException e) when (e.Message == "Guild disappeared during save.") { return false; }
+        catch (RowMissingException e) when (e.Table == Table) { return false; }
     }
 
     private RoleItemPlanBuilder MarketPlan(MarketState market, IEnumerable<State> affected)
@@ -258,7 +261,7 @@ public sealed class GuildStore(AccountStore accounts)
         EnlistSave(state, plan);
         try { plan.Commit(_accounts, "guild/save"); return true; }
         catch (SqliteException e) when (e.SqliteErrorCode == 19) { return false; }
-        catch (InvalidOperationException e) when (e.Message == "Guild disappeared during save.") { return false; }
+        catch (RowMissingException e) when (e.Table == Table) { return false; }
     }
 
     /// <summary>Capture payment-enlisted guild state; publish a generated identity on the caller only after commit.</summary>

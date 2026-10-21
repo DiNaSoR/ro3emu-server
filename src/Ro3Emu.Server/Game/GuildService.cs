@@ -856,7 +856,7 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
                                 {
                                     code = ErrorCodes.GuildNameTaken;
                                 }
-                                catch (InvalidOperationException ex) when (ex.Message == "guild disappeared during rename")
+                                catch (RowMissingException ex) when (ex.Is(GuildStore.Table, g.Id))
                                 {
                                     code = ErrorCodes.GuildMissing;
                                 }

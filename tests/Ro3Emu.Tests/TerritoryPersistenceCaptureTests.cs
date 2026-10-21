@@ -47,7 +47,9 @@ public sealed class TerritoryPersistenceCaptureTests : IDisposable
         candidateRealm[0] = 99;
         candidateRole[0] = 99;
 
-        Assert.Throws<InvalidOperationException>(() => transaction.Commit(_accounts, "test/territory-missing-guild"));
+        var gone = Assert.Throws<RowMissingException>(
+            () => transaction.Commit(_accounts, "test/territory-missing-guild"));
+        Assert.True(gone.Is(GuildStore.Table, long.MaxValue));
         Assert.Equal(initialRealm, _accounts.ReadSync<byte[]?>(new TerritoryRealmReadPlan(kind)));
         Assert.Equal(initialRole, wars ? _roles.LoadTerritoryWars(role) : _roles.LoadTerritoryEscort(role));
     }
