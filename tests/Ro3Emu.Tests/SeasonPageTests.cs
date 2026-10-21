@@ -46,7 +46,14 @@ public sealed class SeasonPageTests : IAsyncLifetime
         }, clock);
         await app.StartAsync();
         http = $"http://127.0.0.1:{port}";
+        // The 20 Oct 2026 client closes the season page (function 69, condition 2000062 now [1002,9999]); these tests
+        // pin the page's own rules, so they keep it open at the level the 16 Oct client asked for.
+        var functions = Service<FunctionService>();
+        var original = functions.ConditionOverride;
+        functions.ConditionOverride = (s, id) => id == SeasonPageCondition ? s.Progress is { Level: >= 50 } : original?.Invoke(s, id);
     }
+
+    private const long SeasonPageCondition = 2000062;
 
     public async Task DisposeAsync()
     {

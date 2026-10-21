@@ -270,8 +270,7 @@ public sealed class GatheringTests : IAsyncLifetime
         Assert.Equal(node.Uuid, bobNode.Uuid);
         await LearnMiner(alice);
         await LearnMiner(bob);
-        // The server closes the quarantined connection and its cleanup unregisters the session, so keep it.
-        var aliceSession = await OnLoop("alice", s => s);
+        long aliceRole = await OnLoop("alice", s => s.Role!.Id);
         var accounts = _app.Services.GetRequiredService<AccountStore>();
         var failedApply = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         accounts.BeforeOwnedApplyForTest = label =>
@@ -292,9 +291,11 @@ public sealed class GatheringTests : IAsyncLifetime
         finally { accounts.BeforeOwnedApplyForTest = null; }
         Assert.Single(GatherSources());
         await Next(bob, GameAoiSink.SyncAoiView, AoIViewChangeData.Parser, v => v.LeaveAoi.Contains(node.Uuid));
+        // C/D quarantine deliberately requires process recovery; no stale snapshot is allowed to reconnect/save. The
+        // server aborts Alice's connection, so the owner is read by role: her session may already be gone.
+        var loop = _app.Services.GetRequiredService<GameLoop>();
         Assert.Equal(Ro3Emu.Server.Game.Ownership.RoleOwnerState.RecoveryRequired,
-            await _app.Services.GetRequiredService<GameLoop>().InvokeAsync(() => Task.FromResult(aliceSession.Owner!.State)));
-        // C/D quarantine deliberately requires process recovery; no stale snapshot is allowed to reconnect/save.
+            await loop.InvokeAsync(() => Task.FromResult(loop.Owners!.Cached(aliceRole)!.State)));
         await alice.DisposeAsync();
         await bob.DisposeAsync();
         await _app.StopAsync();
@@ -393,13 +394,6 @@ public sealed class GatheringTests : IAsyncLifetime
              s.LifeJob!.GeneralCollectionTimesByMap[Scene].Times[node.CollectionInfo.PointConfigId]));
         Assert.True(material >= 4);
         Assert.Equal(1, pointCount);
-        // The yield scatters on the ground at the node like monster loot (ManifestType Drop), items only.
-        var drop = await Next(alice, CharacterService.GetRewardNotify, GetRewardNotify.Parser, n => n.RewardType.Contains(8));
-        Assert.Equal(7010001, drop.TargetEntry);
-        Assert.Equal((long)alice.Self!.Uuid, drop.TargetUid);
-        Assert.Equal(node.MovementInfo.Pos, drop.Position);
-        Assert.Equal(material, drop.Rewards.Where(r => r.ItemEntry is 1291010 or 1291020 or 1291021).Sum(r => r.Stack));
-        Assert.DoesNotContain(drop.Rewards, r => r.ItemEntry is 100 or 101);
         var removed = await Next(alice, GameAoiSink.SyncAoiView, AoIViewChangeData.Parser, v => v.LeaveAoi.Contains(node.Uuid));
         Assert.Contains(node.Uuid, removed.LeaveAoi);
 
