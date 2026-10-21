@@ -259,6 +259,28 @@ public sealed class SkillGrowthTests : IAsyncLifetime
     }
 
     [ClientDataFact]
+    public async Task ArcherCanLoadArrowAttackOnTheBar()
+    {
+        await using var alice = await InWorld("Alice");
+        await Next(alice, SkillService.SkillDataSync, DBSkillDataIncrement.Parser);
+        await Gm("alice", "!job 3100");
+        await Next(alice, SkillService.SkillDataSync, DBSkillDataIncrement.Parser,
+            m => !m.SyncAllMark && m.SkillList.All.Value.Contains(13006));
+        // Arrow Attack 1300001 (group 13000) is the Archer's bow attack in JobAttackConfig.
+        await alice.SendGameAsync(SkillService.SkillLoad, new SkillLoadReq
+        {
+            OpType = SkillLoadOperation.SkillLoadOpLoad, IsManual = true, SocketNum = 2,
+            Info = new SkillData { SkillId = 13000, SkillLevel = 1 }
+        });
+        Assert.Equal(0, (await Next(alice, SkillService.SkillLoad, SkillLoadResp.Parser)).Result);
+        var alicePlayer = _app.Services.GetRequiredService<SessionRegistry>().All().Single(s => s.Account == "alice" && s.Role != null);
+        Assert.Equal(13000, alicePlayer.SkillPlans!.SkillAssignPlans[0].ManualLoadSkill[2].SkillId);
+        int attack = alicePlayer.SkillPlans.CurrentAtkSkillId;
+        Assert.Equal(attack, _app.Services.GetRequiredService<SkillService>().Build(alicePlayer)
+            .SkillWheel.WhellSkills[3].SkillConfigId);
+    }
+
+    [ClientDataFact]
     public async Task BarSkillFollowsALevelUp()
     {
         await using var alice = await InWorld("Alice");

@@ -916,9 +916,11 @@ public sealed class SkillService
         }
         else if (code == 0)
         {
+            // Any career may load its normal attack: the skill window draws the Novice tree's Normal Attack cell as
+            // the current one (Arrow Attack for an Archer with a bow), and UI_Sys_Skill_SetItemWidget_PCCtrl only
+            // stops passives, unlearned skills and PublicParamConfig BanSkill/BanSkillCanPoints from being dragged.
             int learned = Level(p, group);
             if (group <= 0 || learned <= 0 || !IsActive(group)
-                || (IsNormalGroup(p, group) && p.Career != 1000)
                 || req.Info!.SkillLevel < 1 || req.Info.SkillLevel > learned
                 || op == 1 && target < loadList.Count && loadList[target].SkillId > 0
                     && loadList[target].SkillId != group
