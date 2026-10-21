@@ -9,7 +9,7 @@
 #   --host ADDRESS  the address players connect to (default: this machine's first address)
 #   --gm ACCOUNT    an account that gets GM commands in game (repeatable)
 #   --voice-port PORT  turn on party voice chat on this TCP port, for example 33101 (off by default)
-#   --dev           run as Development, not Production (docs/guide/development-mode.md): GM for everyone without --gm
+#   --dev           run as Development, not Production, for testing (README.txt)
 #   --service       install and start a systemd service (needs sudo) instead of running in this terminal
 #   --reexport      export the game data again (after a game update)
 set -euo pipefail
@@ -84,12 +84,10 @@ settings=(
 )
 for i in "${!gms[@]}"; do settings+=("Ro3Emu__GmAccounts__$i=${gms[$i]}"); done
 [ -z "$voice" ] || settings+=("Ro3Emu__Voice__Port=$voice")
-if [ "$dev" = 1 ]; then
-  echo '  Development mode: appsettings.Development.json applies (the Exchange seller and buy-back too).'
-  [ ${#gms[@]} -gt 0 ] || echo '  No --gm account: in Development EVERY account has GM commands in game.'
-else
-  [ ${#gms[@]} -gt 0 ] || echo '  No --gm account: nobody has GM commands in game.'
-fi
+# Without --gm nobody has GM, also with --dev (Development alone would open GM to every account).
+settings+=("Ro3Emu__GmOpenWhenEmpty=false")
+[ "$dev" = 0 ] || echo '  Development mode: appsettings.Development.json applies (the Exchange seller and buy-back too).'
+[ ${#gms[@]} -gt 0 ] || echo '  No --gm account: nobody has GM commands in game.'
 
 ports_note() {
   if [ -n "$voice" ]; then
