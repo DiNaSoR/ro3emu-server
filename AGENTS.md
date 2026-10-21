@@ -27,6 +27,9 @@ client cannot establish is marked `(inferred)` where it is implemented. Never pr
 
 - Game state changes only on the game loop (`GameLoop`). Persist first, then change the in-memory state from the
   commit callback.
+- Mutable state belongs to a host instance (a service, `AccountStore`), never to a `static` field: tests run several
+  hosts in one process. The only process-wide state is diagnostic: `MessageCoverage`, the SQLite trace hooks of
+  `SqliteMetrics` (native callbacks) and the GC event listener.
 - The field names of a `DbPlan` and of the values it holds are written into receipts. Don't rename or move them:
   `ReceiptFieldNamesTests` fails, and an operation recorded before the change would refuse its replay.
 - Validate every client request against the configuration and refuse it with an `ErrorCodes` value.
