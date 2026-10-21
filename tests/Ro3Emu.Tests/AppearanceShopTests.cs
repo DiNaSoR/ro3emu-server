@@ -107,6 +107,14 @@ public sealed class AppearanceShopTests : IAsyncLifetime
     }
 
     // A look voucher is _QuickUse [3, 0]: the server uses it as soon as the purchase commits (ItemAutoUseService).
+    // A tradable voucher (_iTrade nonzero) is not auto-used: the player uses it by hand (31323).
+    private async Task UseAsync(BotClient bot, int item)
+    {
+        long guid = Alice.Items.First(i => i.Entry == item && i.Grid == 0).Guid;
+        await bot.SendGameAsync(CharacterService.ItemUse, new ItemUseReq { ItemGuid = guid, ItemCount = 1 });
+        Assert.Equal(0, (await Next(bot, CharacterService.ItemUse, ItemUseResp.Parser, m => m.ItemId == item)).Result);
+    }
+
     private static async Task AutoUsed(BotClient bot, int item) =>
         Assert.Equal(0, (await Next(bot, CharacterService.ItemUse, ItemUseResp.Parser, m => m.ItemId == item)).Result);
 
@@ -154,13 +162,13 @@ public sealed class AppearanceShopTests : IAsyncLifetime
         Assert.True(SavedWardrobe.AllLightUpAppearances.ContainsKey(WorldscorchBrilliantGold));
         Assert.False(SavedWardrobe.AllLightUpAppearances.ContainsKey(WorldscorchFeatherstep));
 
-        // The gift's vouchers are used on receipt. Ashen Embers is also enabled by content/wardrobe-unlocks.json, and so
-        // is the headwear look, which the 2026-10-17 export disables with the rest of the set.
-        await AutoUsed(bot, WorldscorchAshenVoucher);
-        await AutoUsed(bot, WorldscorchHeadwearVoucher);
+        // The gift's vouchers are tradable (_iTrade 2), so they wait in the bag. Ashen Embers is also enabled by
+        // content/wardrobe-unlocks.json, and so is the headwear look, which the 2026-10-17 export disables with the set.
+        Assert.Equal((1, 1), (Bag(WorldscorchAshenVoucher), Bag(WorldscorchHeadwearVoucher)));
+        await UseAsync(bot, WorldscorchAshenVoucher);
+        await UseAsync(bot, WorldscorchHeadwearVoucher);
         Assert.True(SavedWardrobe.AllLightUpAppearances.ContainsKey(WorldscorchAshenEmbers));
         Assert.True(SavedWardrobe.AllLightUpAppearances.ContainsKey(WorldscorchHeadwear));
-        Assert.Equal(0, Bag(WorldscorchAshenVoucher) + Bag(WorldscorchHeadwearVoucher));
     }
 
     // The client data disables these looks too; content/wardrobe-unlocks.json enables them, so they sell.
@@ -181,7 +189,8 @@ public sealed class AppearanceShopTests : IAsyncLifetime
         Assert.True(SavedWardrobe.AllLightUpAppearances.ContainsKey(StarMountLook));
         Assert.True(Alice.Mounts!.Mounts.ContainsKey(StarMountLook));
 
-        // The other two pieces come as the gift's vouchers (award 180004), used on receipt; one of them lights its look.
+        // The other two pieces come as the gift's vouchers (award 180004), untradable and so used on receipt; one of
+        // them lights its look.
         await AutoUsed(bot, SilverwingPieceVoucher);
         Assert.True(SavedWardrobe.AllLightUpAppearances.ContainsKey(SilverwingVoucherLook));
         Assert.Equal(0, Bag(SilverwingPieceVoucher));
@@ -219,14 +228,12 @@ public sealed class AppearanceShopTests : IAsyncLifetime
         Assert.Equal(TeaPartySuit, (await Next(bot, WardrobeService.UnlockNotice, WardRobeUnLockNtf.Parser)).AppearanceId);
         var counter = await Next(bot, ShopService.ShopSync, DBShopInfoIncrement.Parser, s => s.CommodityBuyTimes.ContainsKey(TeaParty));
         Assert.Equal(1, counter.CommodityBuyTimes[TeaParty].All);
-        // The bonus voucher ("Activate the Sweetheart Tea Party matching Headwear") is used on receipt and lights the hat.
-        await AutoUsed(bot, TeaPartyBonus);
 
         Assert.Equal(crystals - 1880, Crystals);
-        Assert.Equal(bonus, Bag(TeaPartyBonus));
+        Assert.Equal(bonus + 1, Bag(TeaPartyBonus)); // tradable (_iTrade 2): it waits in the bag
         Assert.Equal(crystals - 1880, Service<RoleStore>().LoadProgress(Alice.Role!.Id).Currency[Fashion]);
         Assert.True(SavedWardrobe.AllLightUpAppearances.ContainsKey(TeaPartySuit));
-        Assert.True(SavedWardrobe.AllLightUpAppearances.ContainsKey(TeaPartyHat));
+        Assert.False(SavedWardrobe.AllLightUpAppearances.ContainsKey(TeaPartyHat));
         Assert.Equal(1, SavedShop.Bought[TeaParty].Count);
 
         var closing = Cut();
@@ -239,11 +246,16 @@ public sealed class AppearanceShopTests : IAsyncLifetime
         var source = Assert.Single(ledger.Legs, x => x.Kind == EconomyLegKind.Source && x.OperationId == receipt.OperationId);
         Assert.Equal((EconomyReason.ShopGoods, (long)TeaPartyBonus, 1L), (source.Reason, source.Asset.Id, source.Delta));
         Exact(opening, closing, ledger);
+
+        // The bonus voucher ("Activate the Sweetheart Tea Party matching Headwear") lights the hat when used.
+        await UseAsync(bot, TeaPartyBonus);
+        Assert.Equal(bonus, Bag(TeaPartyBonus));
+        Assert.True(SavedWardrobe.AllLightUpAppearances.ContainsKey(TeaPartyHat));
     }
 
-    // A look voucher sold as an item (class 260) is used on receipt too: the look lights, the bag keeps nothing.
+    // A look voucher sold as an item (class 260) is stall-sellable (TradeConfig _iTrade 2): it is not auto-used.
     [ClientDataFact]
-    public async Task VoucherCommodityIsUsedOnPurchase()
+    public async Task VoucherCommodityStaysInTheBag()
     {
         const int Voucher = 26101, VoucherItem = 3005117, VoucherLook = 10050427; // [500,400], [[200,0,10050427]].
         await using var bot = await Enter();
@@ -251,8 +263,10 @@ public sealed class AppearanceShopTests : IAsyncLifetime
         await Gm("!item 500 400");
 
         Assert.Equal(0, (await Buy(bot, Voucher, price: 400)).Result);
-        await AutoUsed(bot, VoucherItem);
-        Assert.Equal(0, Bag(VoucherItem));
+        await Service<GameLoop>().InvokeAsync(() => Task.CompletedTask);
+        Assert.Equal(1, Bag(VoucherItem));
+        Assert.False(SavedWardrobe.AllLightUpAppearances.ContainsKey(VoucherLook));
+        await UseAsync(bot, VoucherItem);
         Assert.True(SavedWardrobe.AllLightUpAppearances.ContainsKey(VoucherLook));
     }
 

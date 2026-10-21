@@ -19,11 +19,12 @@ namespace Ro3Emu.Tests;
 /// </summary>
 public sealed class ItemAutoUseTests : IAsyncLifetime
 {
-    // ItemConfig [[200, 0, look]], _iLevelNeed 1, _iCD 5000; the looks are enabled in WardRobeConfig.
-    private const int GmVoucher = 3003101, GmLook = 10030417;
-    private const int MailVoucher = 3003102, MailLook = 10030419;
-    private const int LootVoucher = 3003103, LootLook = 10030425;
-    private const int StackVoucher = 3003104, StackLook = 10030426;
+    // ItemConfig [[200, 0, look]], _iTrade 0, _iLevelNeed 1, _iCD 5000; the looks are enabled in WardRobeConfig.
+    private const int GmVoucher = 3045203, GmLook = 20060012;
+    private const int MailVoucher = 3045403, MailLook = 40050030;
+    private const int LootVoucher = 3045802, LootLook = 80050021;
+    private const int StackVoucher = 3046111, StackLook = 10060011;
+    private const int TradableVoucher = 3003101, TradableLook = 10030417; // _iTrade 2
     private const int ActivatedAppearance = 200, ActivatedMounts = 201, AddPetIncubateRoomExp = 603; // ActionConfig
 
     private readonly string directory = Path.Combine(RepoRoot(), ".loadtest-temp", "auto-use-" + Guid.NewGuid().ToString("N"));
@@ -113,7 +114,42 @@ public sealed class ItemAutoUseTests : IAsyncLifetime
         Assert.Equal(1, Bag(StackVoucher));
     }
 
-    // Every _QuickUse [3, 0] item with a use effect is one the server auto-uses, through an action it hosts.
+    // Two units of the timed Peco mount voucher (1501023 [201, 600 s, 60040010], _iCD 5000): both are used, the
+    // second once the cooldown is over, and the wait is a timer, not a retry on every pass.
+    [ClientDataFact]
+    public async Task ASecondUnitWaitsOutTheCooldown()
+    {
+        const int TimedVoucher = 1501023;
+        await using var bot = await Enter();
+        await Gm("!lvl 14"); // FunctionConfig 27 (mounts)
+        var autoUse = Service<ItemAutoUseService>();
+        int before = autoUse.Attempts;
+        await Gm($"!item {TimedVoucher} 2");
+        Assert.Equal(0, (await Next(bot, CharacterService.ItemUse, ItemUseResp.Parser, m => m.ItemId == TimedVoucher)).Result);
+        var started = DateTime.UtcNow;
+        using var second = bot.Inbox.Expect(e => e.IsGame(CharacterService.ItemUse)
+            && ItemUseResp.Parser.ParseFrom(e.Body) is { ItemId: TimedVoucher, Result: 0 });
+        await second.WaitAsync(TimeSpan.FromSeconds(15));
+        Assert.True(DateTime.UtcNow - started > TimeSpan.FromSeconds(3));
+        Assert.Equal(0, Bag(TimedVoucher));
+        Assert.InRange(autoUse.Attempts - before, 2, 4); // the two uses and the one cooldown refusal
+    }
+
+    // A voucher that can be traded or sold waits in the bag for its owner (Steven, 2026-10-21).
+    [ClientDataFact]
+    public async Task ATradableVoucherStaysInTheBag()
+    {
+        await using var bot = await Enter();
+        int before = Service<ItemAutoUseService>().Attempts;
+        await Gm($"!item {TradableVoucher} 1");
+        await Service<GameLoop>().InvokeAsync(() => Task.CompletedTask);
+        Assert.Equal(1, Bag(TradableVoucher));
+        Assert.False(SavedWardrobe.AllLightUpAppearances.ContainsKey(TradableLook));
+        Assert.Equal(before, Service<ItemAutoUseService>().Attempts);
+    }
+
+    // Every _QuickUse [3, 0] item with a use effect that cannot be traded or sold is one the server auto-uses, through
+    // an action it hosts.
     [ClientDataFact]
     public async Task EveryAutoUseItemInTheClientDataQualifies()
     {
@@ -128,7 +164,9 @@ public sealed class ItemAutoUseTests : IAsyncLifetime
             int id = (int)GameData.Int(row, "_iID");
             var actions = row.GetProperty("_iUseEffect").EnumerateArray()
                 .Select(e => e.GetArrayLength() > 0 ? (int)(GameData.Number(e[0]) ?? 0) : 0).Where(a => a > 0).ToList();
-            if (actions.Count == 0) { Assert.False(autoUse.IsAutoUse(id)); continue; } // the empty card chest 1300060
+            bool tradable = GameData.Int(row, "_iTrade") != 0
+                || data.Row("TradeConfig", id) is { } trade && GameData.Int(trade, "_iTrade") != 0;
+            if (actions.Count == 0 || tradable) { Assert.False(autoUse.IsAutoUse(id), $"item {id}"); continue; } // 1300060 has no effect
             Assert.True(autoUse.IsAutoUse(id), $"item {id}");
             Assert.All(actions, a => Assert.Contains(a, new[] { ActivatedAppearance, ActivatedMounts, AddPetIncubateRoomExp }));
             Assert.All(actions, a => Assert.Equal(1, GameData.Int(data.Row("ActionConfig", a)!.Value, "_iEXECHost")));
