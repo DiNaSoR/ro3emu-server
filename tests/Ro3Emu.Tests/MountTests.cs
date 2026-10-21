@@ -636,6 +636,71 @@ public sealed class MountTests : IAsyncLifetime
         Assert.Equal(0, s.MountSkillShown);
     }
 
+    // Over a cell with no walkable layer (water, a cliff face) the dragon keeps flying under the 50 m band counted from that
+    // layer, cannot cast its landing there, and getting off there puts the rider back where it took off. Off the grid no
+    // move is taken.
+    [ClientDataFact]
+    public async Task StarshatterDragonFliesOverUnwalkableGroundButLandsOnlyOnWalkableGround()
+    {
+        const int Dragon = 60060010, TakeFlight = 3112101, Land = 3112201;
+        await using var a = await InWorld("Alice");
+        var loop = app.Services.GetRequiredService<GameLoop>();
+        await UnlockMount(a, "alice", 1501004);
+        var s = Session("alice");
+        long self = s.Role!.Id;
+        Task Cast(int skill) => a.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = skill, TargetId = self });
+        Task Ready() => loop.InvokeAsync(() =>
+        {
+            if (s.SkillCast is { } cast) { cast.Cancelled = true; s.SkillCast = null; }
+            s.SkillCds.Clear(); s.SkillModeCds.Clear(); return Task.CompletedTask;
+        });
+        await a.SendGameAsync(32743, new PlayerMountsSetCfgReq { MountId = Dragon });
+        await Next(a, 32743, PlayerMountsSetCfgResp.Parser);
+        await a.SendGameAsync(32745, new PlayerRiderMountReq { Tp = (eRiderType)1 });
+        Assert.Equal(0, (await Next(a, 32745, PlayerRiderMountResp.Parser)).Result);
+        var takeOff = s.Position.Clone();
+        await Cast(TakeFlight);
+        Assert.Equal(0, (await Next(a, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
+        Assert.True(s.WorldState.Flying);
+
+        var nav = app.Services.GetRequiredService<WorldData>().Map(s.SceneEntry)!.Nav!;
+        var (x, z, floor) = Enumerable.Range(0, nav.Width).SelectMany(cx => Enumerable.Range(0, nav.Height).Select(cz => (cx, cz)))
+            .Select(c => (X: c.cx + 0.5f, Z: c.cz + 0.5f, Layers: nav.Layers(c.cx + 0.5f, c.cz + 0.5f).ToList()))
+            .Where(c => c.Layers.Count > 0 && c.Layers.All(l => !l.Walkable))
+            .Select(c => (c.X, c.Z, c.Layers[0].Height)).First();
+        await loop.InvokeAsync(() => { s.Position = new Vec3 { X = x, Y = floor + 10, Z = z }; return Task.CompletedTask; });
+
+        var ahead = new Vec3 { X = x, Y = floor + 12, Z = z };
+        await a.SendGameAsync(WorldCoreService.FlyMove, new FlyMoveReq { Pos = ahead, Dir = new Vec3 { Y = 1 }, Face = 90 });
+        await Task.Delay(300);
+        Assert.Equal(ahead.Y, s.Position.Y); // taken over unwalkable ground
+
+        var high = new Vec3 { X = x, Y = floor + 70, Z = z };
+        await a.SendGameAsync(WorldCoreService.FlyMove, new FlyMoveReq { Pos = high, Dir = new Vec3 { Y = 1 }, Face = 90 });
+        await Next(a, GameAoiSink.MovementChange, MovementChangeNtf.Parser, m => m.Uid == self && m.TransType == MovementTransitionType.MoveTransForceTeleport);
+        Assert.Equal(ahead.Y, s.Position.Y); // above the band, put back
+
+        // Off a cliff into a lower band: holding or losing height is taken, climbing further is not.
+        await loop.InvokeAsync(() => { s.Position = new Vec3 { X = x, Y = floor + 60, Z = z }; return Task.CompletedTask; });
+        var down = new Vec3 { X = x, Y = floor + 59, Z = z };
+        await a.SendGameAsync(WorldCoreService.FlyMove, new FlyMoveReq { Pos = down, Dir = new Vec3 { Y = -1 }, Face = 90 });
+        await Task.Delay(300);
+        Assert.Equal(down.Y, s.Position.Y);
+
+        await Ready();
+        await Cast(Land);
+        Assert.Equal(ErrorCodes.SkillRequirements, (await Next(a, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
+        Assert.True(s.WorldState.Flying);
+
+        await a.SendGameAsync(32745, new PlayerRiderMountReq { Tp = (eRiderType)0 });
+        Assert.Equal(0, (await Next(a, 32745, PlayerRiderMountResp.Parser)).Result);
+        await Next(a, WorldCoreService.FixLand, FixLandNtf.Parser);
+        Assert.False(s.WorldState.Flying);
+        Assert.Equal(takeOff.X, s.Position.X);
+        Assert.Equal(takeOff.Z, s.Position.Z);
+        Assert.True(nav.IsWalkable(s.Position.X, s.Position.Y, s.Position.Z));
+    }
+
     private sealed class ManualClock(DateTimeOffset initial) : TimeProvider
     {
         private long ticks = initial.UtcTicks;

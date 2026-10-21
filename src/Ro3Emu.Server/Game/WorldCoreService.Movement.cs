@@ -8,7 +8,8 @@ namespace Ro3Emu.Server.Game;
 public sealed partial class WorldCoreService
 {
     // FlyBuffTag and MapConfig._iFly are consumed by the client's flight availability checks. A ridden flying mount
-    // counts too: its air buff arrives a few sends after a take-off, and the 1 s tick landed riders in that gap.
+    // counts too: FlightStateAsync awaits the AOIAttrChange sends before FlightChanged adds its air buff, and the 1 s tick,
+    // queued on the loop, ran in that gap and landed the rider (MountTests failed about one run in four).
     private bool CanFly(GameSession s) => Ready(s) && !s.Dead
         && data.Row("MapConfig", s.SceneEntry) is { } map && GameData.Int(map, "_iFly") == 1
         && (MountService.FlySkills(s, data) != null || s.Buffs.Any(b => b.ExpireMs > Now && data.Row("BuffConfig", b.ConfigId) is { } row
@@ -51,6 +52,7 @@ public sealed partial class WorldCoreService
         { await ErrorAsync(s, FlySwitch, ErrorCodes.Parameter); return; }
         s.WorldState.Flying = true;
         s.WorldState.LastFlyMs = Now;
+        s.WorldState.TakeOff = s.Position.Clone();
         await MoveFlightAsync(s, position, s.Face, new Vec3(), true, MovementTransitionType.MoveTransFlyUp);
         await FlightStateAsync(s);
     }
@@ -62,7 +64,9 @@ public sealed partial class WorldCoreService
     /// 31084: AStarAgentNew sends position plus a three-dimensional direction, not a ground yaw. Climbing and diving are
     /// free inside the 50 m band over the ground (a mount's take-off skill climbs on its own, 20 m over 3.5 s for the
     /// Starshatter Dragon, while the client already sends 31084), so the speed check is horizontal, and the ground under
-    /// a flyer need not be walkable (water, cliffs). A move outside these bounds is put back without an error tip: the
+    /// a flyer need not be walkable (water, cliffs): the band counts from its nearest layer of any kind, and a cell with no
+    /// layer (off the map's grid) is refused. Flying off a cliff over the sea may hold or lose height above the new band
+    /// (no invisible wall at the edge), only not climb further. A move outside these bounds is put back without an error tip: the
     /// client sends 31084 many times a second and showed a "parameter error" for each refusal.
     /// </summary>
     public async Task FlyMoveAsync(GameSession s, FlyMoveReq req)
@@ -72,9 +76,9 @@ public sealed partial class WorldCoreService
         double seconds = Math.Clamp((Now - s.WorldState.LastFlyMs) / 1000.0, 0.05, 2);
         float speed = FlightSpeed(s);
         var map = worldData.Map(s.SceneEntry);
-        var grounded = map?.Grounded(new MapPoint(req.Pos.X, req.Pos.Y, req.Pos.Z, req.Face));
-        if (!s.WorldState.Flying || !CanFly(s) || grounded is not { } ground
-            || req.Pos.Y < ground.Y - 1 || req.Pos.Y > ground.Y + 50
+        var floor = map?.FloorHeight(new MapPoint(req.Pos.X, req.Pos.Y, req.Pos.Z, req.Face));
+        if (!s.WorldState.Flying || !CanFly(s) || floor is not { } ground
+            || req.Pos.Y < ground - 1 || req.Pos.Y > Math.Max(ground + 50, s.Position.Y)
             || MonsterService.Distance(s.Position.X, s.Position.Z, req.Pos.X, req.Pos.Z) > speed * seconds * 1.5 + 1.5)
         { await CorrectFlightAsync(s); return; }
         s.WorldState.LastFlyMs = Now;
@@ -90,14 +94,25 @@ public sealed partial class WorldCoreService
         await LandAsync(s, req.ToPos, req.Face);
     }
 
-    private async Task LandAsync(GameSession s, Vec3 requested, float face)
+    /// <param name="forced">The server ends the flight (the mount or the flight buff is gone): over ground with no walkable
+    /// layer it puts the rider back where it took off, else on the map's born point (inferred), instead of refusing, or
+    /// the flight would never end.</param>
+    private async Task LandAsync(GameSession s, Vec3 requested, float face, bool forced = false)
     {
         var map = worldData.Map(s.SceneEntry);
         if (map == null) return;
-        var at = map.Grounded(new MapPoint(requested.X, requested.Y, requested.Z, face));
-        if (!map.IsWalkable(at.X, at.Y, at.Z)) { await ErrorAsync(s, FreeFall, ErrorCodes.Parameter); return; }
+        var transition = MovementTransitionType.MoveTransLanding;
+        var at = map.Landing(new MapPoint(requested.X, requested.Y, requested.Z, face));
+        if (at == null && forced)
+        {
+            var origin = s.WorldState.TakeOff ?? requested;
+            var back = new MapPoint(origin.X, origin.Y, origin.Z, face);
+            at = map.Landing(back) ?? (map.Born is { } born ? map.Landing(born) ?? map.Grounded(born) : map.Grounded(back));
+            transition = MovementTransitionType.MoveTransForceTeleport;
+        }
+        if (at is not { } spot) { await ErrorAsync(s, FreeFall, ErrorCodes.Parameter); return; }
         s.WorldState.Flying = false;
-        await MoveFlightAsync(s, new Vec3 { X = at.X, Y = at.Y, Z = at.Z }, face, new Vec3(), true, MovementTransitionType.MoveTransLanding);
+        await MoveFlightAsync(s, new Vec3 { X = spot.X, Y = spot.Y, Z = spot.Z }, face, new Vec3(), true, transition);
         // FixLandNtf instructs the client to end the special landing state; immediate landing has zero remaining time.
         await ToSelfAndViewersAsync(s, FixLand, new FixLandNtf { Uuid = s.Role!.Id, FixLandTime = 0 });
         await FlightStateAsync(s);
