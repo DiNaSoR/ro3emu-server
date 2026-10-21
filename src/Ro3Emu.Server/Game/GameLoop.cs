@@ -341,23 +341,31 @@ public sealed partial class GameLoop : IHostedService, IDisposable
         finally { Release(permit); }
     }
 
+    /// <summary>
+    /// Drops one reference to the permit and closes it at zero, then its parent the same way. The parents are walked in
+    /// a loop: a detached run started from another detached run chains its permit to the previous one, and such a chain
+    /// can be thousands long (#253), too deep to release recursively.
+    /// </summary>
     private void Release(WorkPermit permit)
     {
         lock (_lifecycle)
         {
-            if (!permit.IsOpen || --permit.RefCount < 0) throw new InvalidOperationException("Game loop completion released twice.");
-            if (permit.RefCount != 0) return;
-            permit.IsOpen = false;
-            _outstanding.Remove(permit.Id);
-            if (permit.Cleanup) _cleanupWork--;
-            else if (permit.OrdinarySlot) _ordinaryWork--;
-            _metrics?.RecordLoopLifecycle((int)_phase, _outstanding.Count, _rejected, _drainFailed);
-            if (permit.Parent is { } parent)
-            {
-                Release(parent);
-            }
+            for (WorkPermit? next = permit; next != null && Close(next); next = next.Parent) { }
             TryFinishDrain();
         }
+    }
+
+    /// <summary>One reference less; true when that was the last one and the permit is now closed. Holds _lifecycle.</summary>
+    private bool Close(WorkPermit permit)
+    {
+        if (!permit.IsOpen || --permit.RefCount < 0) throw new InvalidOperationException("Game loop completion released twice.");
+        if (permit.RefCount != 0) return false;
+        permit.IsOpen = false;
+        _outstanding.Remove(permit.Id);
+        if (permit.Cleanup) _cleanupWork--;
+        else if (permit.OrdinarySlot) _ordinaryWork--;
+        _metrics?.RecordLoopLifecycle((int)_phase, _outstanding.Count, _rejected, _drainFailed);
+        return true;
     }
 
     private void TryFinishDrain()
