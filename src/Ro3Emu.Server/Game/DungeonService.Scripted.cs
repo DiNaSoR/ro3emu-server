@@ -26,8 +26,8 @@ public sealed partial class DungeonService
     internal const long SceneActorUidBase = 1L << 47;
     /// <summary>The interaction reach (inferred): SceneService's 4 m plus its walk-report slack of 8 m.</summary>
     private const float SceneActorReach = 12f;
-    private static long _sceneActorSerial;
-    private static long _sceneActorBuffGuid = 1L << 56;
+    private long _sceneActorSerial;
+    private long _sceneActorBuffGuid = 1L << 56;
 
     /// <summary>
     /// A scene actor: NPCConfig _iNPCType 1 is created by the client as a monster unit (entity type 1, with its HP
@@ -127,7 +127,7 @@ public sealed partial class DungeonService
         }
     }
 
-    private static BuffInfo ActorBuff(SceneActorUnit unit, int configId) => new()
+    private BuffInfo ActorBuff(SceneActorUnit unit, int configId) => new()
     {
         BuffGuid = Interlocked.Increment(ref _sceneActorBuffGuid), ConfigId = configId, ExpireTime = 0, Duration = 0,
         PileCount = 1, SourceId = unit.Uid,

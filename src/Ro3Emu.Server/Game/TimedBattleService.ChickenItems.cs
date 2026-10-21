@@ -55,7 +55,7 @@ public sealed partial class TimedBattleService
         PickupNotify = 82642, ItemUpgrade = 82678, ItemUpgradeAll = 82679;
     /// <summary>Chest units: their own UID namespace below 2^53 (see DungeonService.SceneActorUidBase).</summary>
     private const long ChestUidBase = 1L << 48;
-    private static long _chestSerial;
+    private long _chestSerial;
     /// <summary>(inferred) Bar slots: the client's InitChickenBar drops key 0, so slots start at 1.</summary>
     private const int MaxBarSlot = 10;
     private const int ItemTypeItem = 1, ItemTypeSkill = 2, ItemTypeEquip = 3, ItemTypeCard = 5;

@@ -19,7 +19,7 @@ public sealed partial class GuildLeagueService
     /// <summary>LC_DunGeon_VarDefine 10103 PGuildLeagueOccupyNpcId: the circle the player stands in (the BattleVS bar).</summary>
     private const int OccupyNpcVar = 10103;
     private const long CircleUidBase = 1L << 54;
-    private static long _circleSerial;
+    private long _circleSerial;
 
     /// <summary>GuildSettingConfig GuildLeagueOccupyNoticeType [[42,1],[43,2],[44,0]]: region -> circle 0-2, the a/b/c of
     /// Lua_ImageDefine.GuildLeagueOccupationCircleMap[state * 3 + id].</summary>

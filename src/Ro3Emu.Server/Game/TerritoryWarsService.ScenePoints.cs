@@ -16,7 +16,7 @@ public sealed partial class TerritoryWarsService
     /// (_iNPCSubType 250), unselectable, no name or HP bar, _iNeedNotifyGlobalData 1.</summary>
     private const int ScenePointNpc = 4905010;
     private const long ScenePointUidBase = 1L << 53;
-    private static long _scenePointSerial;
+    private long _scenePointSerial;
 
     /// <summary>
     /// Config/Dungeon/DungeonLua_3030101.lua UIModule_NpcData {spawnPointId: [4905010, eObjectType]}, read by

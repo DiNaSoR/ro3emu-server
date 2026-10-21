@@ -93,7 +93,7 @@ public sealed class AdventureGroupStore(AccountStore accounts)
         public string Third { get; set; } = "";
     }
 
-    // ---- generation cache (as GuildStore, C/D 16) ----
+    // ---- generation cache (as GuildStore, C/D 16; static generation for the same reason) ----
 
     private static long _cacheGeneration;
     private readonly object _cacheLock = new();

@@ -18,6 +18,10 @@ public sealed class TowerPetCombatTests : IAsyncLifetime
     private WebApplication _app = null!;
     private string _http = "";
     private T Service<T>() where T : notnull => _app.Services.GetRequiredService<T>();
+
+    /// <summary>Uids for pets this test spawns itself, far above the ones TowerService numbers.</summary>
+    private long _petUid = TowerPetUnit.UidBase + (1L << 40);
+    private long NextPetUid() => ++_petUid;
     private Task Run(Func<Task> action) => Service<GameLoop>().InvokeAsync(action);
     private static readonly TimeSpan Wait = TimeSpan.FromSeconds(10);
 
@@ -120,7 +124,8 @@ public sealed class TowerPetCombatTests : IAsyncLifetime
             for (int i = 0; i < 7; i++)
             {
                 var pet = TowerPetUnit.Create(Service<GameData>(), s.Pets!, s, Service<World>(), Service<MonsterService>(),
-                    Service<CombatService>(), 13001, a.InstanceId, s.Position.X + (i == 6 ? 9 : i), s.Position.Y, s.Position.Z)!;
+                    Service<CombatService>(), NextPetUid(), 13001, a.InstanceId, s.Position.X + (i == 6 ? 9 : i),
+                    s.Position.Y, s.Position.Z)!;
                 added.Add(pet); a.Pets.Add(pet); await Service<World>().AddUnitAsync(pet);
                 // Only the caster may auto-cast; reserve other actors' cooldown before the controlled cast.
                 if (i > 0) Assert.True(pet.TryBeginCast(pet.SupportSkills.Single(), MonsterService.NowMs));
@@ -190,7 +195,7 @@ public sealed class TowerPetCombatTests : IAsyncLifetime
             foreach (int id in new[] { 10001, 13001 })
             {
                 var unit = TowerPetUnit.Create(Service<GameData>(), s.Pets!, s, Service<World>(), Service<MonsterService>(),
-                    Service<CombatService>(), id, a.InstanceId, s.Position.X, s.Position.Y, s.Position.Z)!;
+                    Service<CombatService>(), NextPetUid(), id, a.InstanceId, s.Position.X, s.Position.Y, s.Position.Z)!;
                 a.Pets.Add(unit); await Service<World>().AddUnitAsync(unit);
                 if (id == 10001) choco = unit; else bobo = unit;
             }
@@ -226,7 +231,7 @@ public sealed class TowerPetCombatTests : IAsyncLifetime
             foreach (var old in a.Pets.ToArray()) await Service<World>().RemoveUnitAsync(old);
             a.Pets.Clear(); foreach (var monster in a.Monsters) monster.Dead = true;
             healer = TowerPetUnit.Create(Service<GameData>(), s.Pets!, s, Service<World>(), Service<MonsterService>(),
-                Service<CombatService>(), 11001, a.InstanceId, s.Position.X, s.Position.Y, s.Position.Z)!;
+                Service<CombatService>(), NextPetUid(), 11001, a.InstanceId, s.Position.X, s.Position.Y, s.Position.Z)!;
             healer.Hp = 1; a.Pets.Add(healer); await Service<World>().AddUnitAsync(healer);
             await Service<CombatService>().TowerPetSupportAsync(s, healer, 2356401);
         });
@@ -239,7 +244,7 @@ public sealed class TowerPetCombatTests : IAsyncLifetime
         await Run(async () =>
         {
             cancelled = TowerPetUnit.Create(Service<GameData>(), s.Pets!, s, Service<World>(), Service<MonsterService>(),
-                Service<CombatService>(), 13001, a.InstanceId, s.Position.X, s.Position.Y, s.Position.Z)!;
+                Service<CombatService>(), NextPetUid(), 13001, a.InstanceId, s.Position.X, s.Position.Y, s.Position.Z)!;
             a.Pets.Add(cancelled); await Service<World>().AddUnitAsync(cancelled);
             await Service<CombatService>().TowerPetSupportAsync(s, cancelled, 2354301);
             a.Settled = true;

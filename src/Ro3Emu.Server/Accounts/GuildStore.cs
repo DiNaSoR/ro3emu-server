@@ -188,7 +188,8 @@ public sealed class GuildStore(AccountStore accounts)
     // mutate. Any writer job that touches the guild tables bumps the generation after it ends (DbWriter.AfterJob);
     // a read during which the generation changed is returned but not cached. A read that began before a commit and ended before the bump
     // is cached until the bump: callers may see pre-commit bytes in that window, and a save from them then
-    // conflicts on the revision (never a silent overwrite).
+    // conflicts on the revision (never a silent overwrite). The generation is static because the writer's after-job
+    // hook has no store instance: another host in the same process (tests) only invalidates this cache needlessly.
     private static long _cacheGeneration;
     private readonly object _cacheLock = new();
     private long _cachedGeneration = -1;

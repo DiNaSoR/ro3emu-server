@@ -79,7 +79,7 @@ public sealed class AccountSwitchTests : IAsyncLifetime
         var accounts = Service<AccountStore>();
         await accounts.SignInAsync("alice", "pw");
         await accounts.SignInAsync("bob", "pw");
-        var session = new MicroSession(null!);
+        var session = new MicroSession(null!, 1);
         async Task Verify(string account) => await router.InvokeAsync(session, "LoginService", "verifySdk",
             MessagePackSerializer.Serialize(new Dictionary<string, object> { ["Ticket"] = await accounts.IssueSdkTokenAsync(account) }));
 
