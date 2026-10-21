@@ -18,6 +18,8 @@ public sealed class MicroServiceRouter(IEnumerable<IMicroService> services, ILog
 {
     private readonly Dictionary<string, IMicroService> _services = services.ToDictionary(s => s.Name);
 
+    internal IReadOnlyCollection<string> ServiceNames => _services.Keys;
+
     /// <summary>
     /// Every msgpack payload a client sends (micro args, game-gate rpc args, login tokens): collision-resistant map
     /// hashing and a shallow depth limit. The trusted default let a crafted 160 KB map cost ~600 ms of CPU before login.
@@ -25,8 +27,28 @@ public sealed class MicroServiceRouter(IEnumerable<IMicroService> services, ILog
     public static readonly MessagePackSerializerOptions Untrusted = MessagePackSerializerOptions.Standard
         .WithSecurity(MessagePackSecurity.UntrustedData.WithMaximumObjectGraphDepth(32));
 
+    /// <summary>
+    /// What a micro connection may call before an account is bound to it: the SDK ticket check (LC_LoginManager's
+    /// ConnectToMicroServer -> Phonest LoginAgent.VerifyWithSdk, before the area list, role list or any other
+    /// service) and the gate auth of a reconnected connection (ClientAvatarEntity PhonestGate.bind).
+    /// </summary>
+    private static bool AllowedBeforeSignIn(string service, string method) =>
+        (service, method) is ("LoginService", "verifySdk") or ("PhonestGate", "bind");
+
     public async ValueTask<byte[]> InvokeAsync(MicroSession session, string service, string method, ReadOnlyMemory<byte> packedArgs)
     {
+        if (session.Account == null && !AllowedBeforeSignIn(service, method))
+        {
+            // Refused before the arguments are read and before any reservation: the client never calls it then.
+            if (!session.RefusalLogged)
+            {
+                session.RefusalLogged = true;
+                log.LogWarning(
+                    "Micro {Service}.{Method} from session {Id} refused: no account is bound; later ones not logged",
+                    service, method, session.Id);
+            }
+            return MessagePackSerializer.Serialize(Fail("not verified"));
+        }
         object? args = packedArgs.IsEmpty ? null : MessagePackSerializer.Deserialize<object>(packedArgs, Untrusted);
         log.LogInformation("Micro {Service}.{Method} {Args}", service, method, Describe(args));
 
