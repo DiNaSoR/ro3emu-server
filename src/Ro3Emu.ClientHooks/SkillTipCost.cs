@@ -79,7 +79,11 @@ namespace Ro3Emu.ClientHooks
             if (First(Method(skills, "IsPassiveSkill", id)) is bool passive && passive) return null;
             if (!(First(_class.Obf_RuA<Obf_R.Obf_Ef>("_generateCostString")?.Obf_HuA(self, id)) is string costs)
                 || costs.Length == 0) return null;
-            costs = WithLiveSp(costs, skills, words, id);
+            // The 31132 list is per skill group, for the learned level: a next-level or change-target item keeps its
+            // configured amount (_refreshView: m_kData.bNextLevel shows TTXT_Next, iTargetSkillID the change view).
+            var data = self.Obf_RuA<Obf_R.Obf_ff>("m_kData");
+            bool otherLevel = data?.Obf_RuA<object>("bNextLevel") is bool next && next || data?.Obf_RuA<object>("iTargetSkillID") != null;
+            if (!otherLevel) costs = WithLiveSp(costs, skills, words, id);
             return First(Method(words, "GetWord", CostWord)) is string format ? format.Replace("${1}", costs) : costs;
         }
 
