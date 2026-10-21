@@ -188,6 +188,29 @@ public sealed class GameLoopTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task AVeryLongChainOfDetachedRunsReleasesWithoutOverflowingTheStack()
+    {
+        // Each run starts the next from its own continuation, so every permit is the parent of the next one and stays
+        // open until the end of the chain (#253: an auto-use retry loop built such a chain and overflowed Release).
+        const int Length = 100_000;
+        int ran = 0;
+        var last = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        void Spawn(int left) => _loop.TrackDetached("chain", async () =>
+        {
+            await Task.Yield();
+            ran++;
+            if (left > 1) Spawn(left - 1);
+            else last.SetResult();
+        });
+        await _loop.InvokeAsync(() => { Spawn(Length); return Task.CompletedTask; });
+        await last.Task.WaitAsync(TimeSpan.FromSeconds(30));
+        var until = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+        while (_loop.DrainStatus.Outstanding != 0 && DateTime.UtcNow < until) await Task.Delay(5);
+        Assert.Equal(Length, ran);
+        Assert.Equal(0, _loop.DrainStatus.Outstanding);
+    }
+
+    [Fact]
     public async Task StopWaitsForTickerStartedDetachedCompletion()
     {
         using var loop = new GameLoop(NullLogger<GameLoop>.Instance);
