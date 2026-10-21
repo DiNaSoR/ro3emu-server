@@ -31,7 +31,7 @@ public sealed class RankRewardTests
         await using var host = await SyntheticHost.StartAsync(clock: clock);
         var roles = host.Service<RoleStore>();
         long alice = Role(roles, "Alice"), bob = Role(roles, "Bob"), carol = Role(roles, "Carol"), dave = Role(roles, "Dave");
-        // The 2026-10-05 05:00 period settles at start with an empty board: nobody is paid.
+        // The first start only records the latest boundary (2026-10-05 05:00): nobody is paid.
         long first = new DateTimeOffset(2026, 10, 5, 5, 0, 0, TimeSpan.Zero).ToUnixTimeSeconds();
         await Until(() => Settled(host)?.Period == first, "the start-up settlement");
         Assert.Empty(Settled(host)!.Winners);
@@ -64,6 +64,81 @@ public sealed class RankRewardTests
         await Until(() => Rewards(roles, alice).Count == 2, "Alice's second letter");
         Assert.Equal(2L, Amount(Rewards(roles, alice)[1]));
         Assert.Single(Rewards(roles, carol)); // fourth now
+    }
+
+    [Fact]
+    public async Task AnInterruptedPeriodIsFinishedBeforeTheNextOneIsRecorded()
+    {
+        var clock = new TestClock();
+        await using var host = await SyntheticHost.StartAsync(clock: clock);
+        var roles = host.Service<RoleStore>();
+        long alice = Role(roles, "Alice"), bob = Role(roles, "Bob");
+        long first = new DateTimeOffset(2026, 10, 5, 5, 0, 0, TimeSpan.Zero).ToUnixTimeSeconds();
+        await Until(() => Settled(host)?.Period == first, "the start-up settlement");
+        Climb(roles, alice, 94);
+        Climb(roles, bob, 93);
+        // The 10-05 winners were saved but the server stopped before Bob's letter went out.
+        var interrupted = new RankService.RewardState
+        {
+            Boards = { [1011] = new RankService.BoardSettlement { Period = first, Winners = { [1] = bob } } },
+        };
+        await host.Service<AccountStore>().WriteLegacyAsync<int>(
+            new SeasonStateWritePlan(RankService.RewardStateKey, JsonSerializer.Serialize(interrupted)));
+
+        // It comes back after the next boundary: Bob is paid for 10-05, then 10-06 (missed while down) is only recorded.
+        clock.Advance(TimeSpan.FromHours(1));
+        await host.RestartAsync();
+        roles = host.Service<RoleStore>();
+        await Until(() => Settled(host)?.Period == first + 86400, "the 10-06 record");
+        Assert.Equal([5L], Rewards(roles, bob).Select(l => Amount(l)));
+        Assert.Empty(Rewards(roles, alice));
+        Assert.Empty(Settled(host)!.Winners);
+    }
+
+    [Fact]
+    public async Task MissedBoundariesAreOnlyRecorded()
+    {
+        var clock = new TestClock();
+        await using var host = await SyntheticHost.StartAsync(clock: clock);
+        var roles = host.Service<RoleStore>();
+        long alice = Role(roles, "Alice");
+        long first = new DateTimeOffset(2026, 10, 5, 5, 0, 0, TimeSpan.Zero).ToUnixTimeSeconds();
+        await Until(() => Settled(host)?.Period == first, "the start-up settlement");
+        Climb(roles, alice, 94);
+
+        // 10-06 and 10-07 both pass before the next check: 10-07 is recorded with no winners and nobody is paid.
+        clock.Advance(TimeSpan.FromHours(25));
+        await Until(() => Settled(host)?.Period == first + 2 * 86400, "the 10-07 record");
+        Assert.Empty(Settled(host)!.Winners);
+        Assert.Empty(Rewards(roles, alice));
+
+        clock.Advance(TimeSpan.FromDays(1)); // 10-08 directly follows the recorded 10-07: paid
+        await Until(() => Rewards(roles, alice).Count == 1, "the 10-08 letter");
+        Assert.Equal(5L, Amount(Rewards(roles, alice)[0]));
+    }
+
+    [Fact]
+    public async Task AFailedSettlementOfABoundaryTheServerSawCloseStillPaysOnRetry()
+    {
+        var clock = new TestClock();
+        await using var host = await SyntheticHost.StartAsync(clock: clock);
+        var roles = host.Service<RoleStore>();
+        var rank = host.Service<RankService>();
+        long alice = Role(roles, "Alice");
+        long first = new DateTimeOffset(2026, 10, 5, 5, 0, 0, TimeSpan.Zero).ToUnixTimeSeconds();
+        await Until(() => Settled(host)?.Period == first, "the start-up settlement");
+        Climb(roles, alice, 94);
+        int attempts = 0;
+        rank.RewardRetryEvery = TimeSpan.FromMilliseconds(200);
+        rank.BeforeRankForTest = _ => Interlocked.Increment(ref attempts) == 1
+            ? throw new InvalidOperationException("transient failure") : Task.CompletedTask;
+
+        // The first attempt at 10-06 05:00 fails; the retry still pays the boundary it saw close.
+        clock.Advance(TimeSpan.FromHours(1));
+        await Until(() => Rewards(roles, alice).Count == 1, "the retried 10-06 letter");
+        Assert.Equal(2, attempts);
+        Assert.Equal(first + 86400, Settled(host)!.Period);
+        Assert.Equal(alice, Settled(host)!.Winners[1]);
     }
 
     private static RankService.BoardSettlement? Settled(SyntheticHost host) =>
