@@ -51,7 +51,9 @@ The head icon, frame, chat bubble, title and honor shown on the card are social 
 - **Attributes:** the attribute view of another player's card (`UI_Sys_Personal_PropertyleftWidgetCtrl`
   `_refreshOtherPlayerPropertyInfo`) reads `Extra` (`romsg.RoleExpandInfo.selfproperty`, the character window's full
   property list). It goes out only while the role's own `SettingShowDetailInfo` is ShowAll, and `Base.isShowDetail`
-  says the same; a role that never chose is NoShow, the enum's zero value. The own card uses the local stats.
+  says the same; a role that never chose is NoShow, the enum's zero value. The own card uses the local stats. The
+  setting arrives as `{showDetailInfo}` alone (`LC_SettingServer`), so NoShow is an empty submessage: under type
+  ShowDetailInfo the sent value replaces the stored one instead of being merged.
 - **Other players** get the current preset as `Personal` only when they ask for it, and `PopularityStar` and the like
   count with every field present (the card re-asks until they arrive). The avatar, frame and title ids go in `Base`.
   `PersonalAvatarConfig` and `PersonalAvatarFrameConfig` export only placeholder rows and `PersonalTitleConfig` is

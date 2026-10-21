@@ -59,11 +59,12 @@ public sealed class ProfileDetailTests : IAsyncLifetime
     private static bool ShowsDetail(Dictionary<object, object?> card)
         => RoleAdditionBaseInfo.Parser.ParseFrom((byte[])card["Base"]!).IsShowDetail;
 
+    /// <summary>As LC_SettingServer sends it: the value alone, so NoShow is an empty submessage.</summary>
     private static async Task ShowDetail(BotClient bot, ShowDetailInfoType value)
     {
         var req = new SaveSettingReq
         {
-            DbSettingInfo = new DBSettingInfo { ShowDetailInfo = new SettingShowDetailInfo { ShowDetailInfo = value, Init = true } },
+            DbSettingInfo = new DBSettingInfo { ShowDetailInfo = new SettingShowDetailInfo { ShowDetailInfo = value } },
         };
         req.Type.Add(SettingType.ShowDetailInfo);
         using var reply = bot.Inbox.Expect(e => e.IsGame(MsgId.SaveSetting));
