@@ -11,8 +11,8 @@ public sealed partial class WorldCoreService
     // counts too: FlightStateAsync awaits the AOIAttrChange sends before FlightChanged adds its air buff, and the 1 s tick,
     // queued on the loop, ran in that gap and landed the rider (MountTests failed about one run in four).
     private bool CanFly(GameSession s) => Ready(s) && !s.Dead
-        && data.Row("MapConfig", s.SceneEntry) is { } map && GameData.Int(map, "_iFly") == 1
-        && (MountService.FlySkills(s, data) != null || s.Buffs.Any(b => b.ExpireMs > Now && data.Row("BuffConfig", b.ConfigId) is { } row
+        && _data.Row("MapConfig", s.SceneEntry) is { } map && GameData.Int(map, "_iFly") == 1
+        && (MountService.FlySkills(s, _data) != null || s.Buffs.Any(b => b.ExpireMs > Now && _data.Row("BuffConfig", b.ConfigId) is { } row
             && row.TryGetProperty("_kBuffCategory", out var tags) && tags.ValueKind == JsonValueKind.Array
             && tags.EnumerateArray().Any(t => GameData.Number(t) == 3100000)));
 
@@ -24,12 +24,12 @@ public sealed partial class WorldCoreService
     /// </summary>
     private async Task<bool> WingJumpAsync(GameSession s, long scene)
     {
-        if (worldData.Map(scene) is not { } map) return false;
-        if (scene != s.SceneEntry) return await this.scene.EnterSceneAsync(s, scene, map.KafraArrival);
+        if (_worldData.Map(scene) is not { } map) return false;
+        if (scene != s.SceneEntry) return await this._scene.EnterSceneAsync(s, scene, map.KafraArrival);
         var spots = map.Points.Values.Concat(map.SpawnGroups.SelectMany(g => g.Points).Select(p => new MapPoint(p.X, p.Y, p.Z, p.Face)))
             .Select(map.Grounded).Where(p => map.IsWalkable(p.X, p.Y, p.Z)).ToList();
         if (spots.Count == 0) return false;
-        await this.scene.TeleportInMapAsync(s, spots[Random.Shared.Next(spots.Count)]);
+        await this._scene.TeleportInMapAsync(s, spots[Random.Shared.Next(spots.Count)]);
         return true;
     }
 
@@ -47,7 +47,7 @@ public sealed partial class WorldCoreService
         // (inferred) Height is a desired offset; cap each takeoff to the same one-second flight budget.
         var position = s.Position.Clone();
         position.Y += Math.Min(req.Height, FlightSpeed(s));
-        var map = worldData.Map(s.SceneEntry);
+        var map = _worldData.Map(s.SceneEntry);
         if (map == null || position.Y > map.Grounded(new MapPoint(position.X, position.Y, position.Z, s.Face)).Y + 50)
         { await ErrorAsync(s, FlySwitch, ErrorCodes.Parameter); return; }
         s.WorldState.Flying = true;
@@ -57,7 +57,7 @@ public sealed partial class WorldCoreService
         await FlightStateAsync(s);
     }
 
-    private float FlightSpeed(GameSession s) => data.Table("PublicParamConfig").TryGetValue("MountFlyMaxSpeed", out var value)
+    private float FlightSpeed(GameSession s) => _data.Table("PublicParamConfig").TryGetValue("MountFlyMaxSpeed", out var value)
         ? Math.Max(1, (float)(GameData.Number(value) ?? s.Speed) / 100) : Math.Max(1, s.Speed / 100f);
 
     /// <summary>
@@ -75,7 +75,7 @@ public sealed partial class WorldCoreService
         { await ErrorAsync(s, FlyMove, ErrorCodes.Parameter); return; }
         double seconds = Math.Clamp((Now - s.WorldState.LastFlyMs) / 1000.0, 0.05, 2);
         float speed = FlightSpeed(s);
-        var map = worldData.Map(s.SceneEntry);
+        var map = _worldData.Map(s.SceneEntry);
         var floor = map?.FloorHeight(new MapPoint(req.Pos.X, req.Pos.Y, req.Pos.Z, req.Face));
         if (!s.WorldState.Flying || !CanFly(s) || floor is not { } ground
             || req.Pos.Y < ground - 1 || req.Pos.Y > Math.Max(ground + 50, s.Position.Y)
@@ -99,7 +99,7 @@ public sealed partial class WorldCoreService
     /// the flight would never end.</param>
     private async Task LandAsync(GameSession s, Vec3 requested, float face, bool forced = false)
     {
-        var map = worldData.Map(s.SceneEntry);
+        var map = _worldData.Map(s.SceneEntry);
         if (map == null) return;
         var transition = MovementTransitionType.MoveTransLanding;
         var at = map.Landing(new MapPoint(requested.X, requested.Y, requested.Z, face));
@@ -138,9 +138,9 @@ public sealed partial class WorldCoreService
             move.MovementMove = new MovementMove { StartVelocity = new Vec3 { X = direction.X / length * speed, Y = direction.Y / length * speed, Z = direction.Z / length * speed }, AccVelocity = new Vec3() };
         }
         s.PreviousPosition = s.Position; s.Position = pos.Clone(); s.Face = face; s.LastWalkUtc = DateTime.UtcNow; s.Walking = false;
-        combat.PlayerMoved(s);
+        _combat.PlayerMoved(s);
         var notify = new MovementChangeNtf { Uid = s.Role!.Id, TransType = transition, MovementInfo = move };
         if (self) await s.SendGameAsync(GameAoiSink.MovementChange, notify);
-        await world.MoveAsync(s, new WalkReq { Pos = pos.Clone(), Face = face, BStop = true, SpeedRate = 1 }, movement: notify);
+        await _world.MoveAsync(s, new WalkReq { Pos = pos.Clone(), Face = face, BStop = true, SpeedRate = 1 }, movement: notify);
     }
 }

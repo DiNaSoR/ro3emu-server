@@ -69,8 +69,8 @@ public sealed partial class BuffService
 
     /// <summary>The categories of a player's live buffs.</summary>
     internal HashSet<int> CategoriesOf(GameSession p) => p.Buffs
-        .Where(b => b.ExpireMs > MonsterService.NowMs && data.Row("BuffConfig", b.ConfigId) is { })
-        .SelectMany(b => Categories(data.Row("BuffConfig", b.ConfigId)!.Value)).ToHashSet();
+        .Where(b => b.ExpireMs > MonsterService.NowMs && _data.Row("BuffConfig", b.ConfigId) is { })
+        .SelectMany(b => Categories(_data.Row("BuffConfig", b.ConfigId)!.Value)).ToHashSet();
 
     /// <summary>The categories of a unit's live buffs plus its NPCConfig born buffs (MVP and boss immunities).</summary>
     internal HashSet<int> CategoriesOf(WorldUnit unit)
@@ -78,7 +78,7 @@ public sealed partial class BuffService
         var result = new HashSet<int>();
         if (_unitBuffs.TryGetValue(unit.Uid, out var list))
             foreach (var buff in list.Where(b => b.ExpireMs > MonsterService.NowMs))
-                if (data.Row("BuffConfig", buff.ConfigId) is { } row) result.UnionWith(Categories(row));
+                if (_data.Row("BuffConfig", buff.ConfigId) is { } row) result.UnionWith(Categories(row));
         if (unit is MonsterUnit m) result.UnionWith(BornCategories(m.Template.NpcId));
         return result;
     }
@@ -91,11 +91,11 @@ public sealed partial class BuffService
     {
         if (_bornCategories.TryGetValue(npcId, out var cached)) return cached;
         var result = new List<int>();
-        if (data.Row("NPCConfig", npcId) is { } npc && npc.TryGetProperty("_kBornEventBuff", out var born)
+        if (_data.Row("NPCConfig", npcId) is { } npc && npc.TryGetProperty("_kBornEventBuff", out var born)
             && born.ValueKind == JsonValueKind.Array)
             foreach (var tuple in born.EnumerateArray())
                 if (tuple.ValueKind == JsonValueKind.Array && tuple.GetArrayLength() > 0
-                    && data.Row("BuffConfig", (long)(GameData.Number(tuple[0]) ?? 0)) is { } row)
+                    && _data.Row("BuffConfig", (long)(GameData.Number(tuple[0]) ?? 0)) is { } row)
                     result.AddRange(Categories(row));
         return _bornCategories[npcId] = result.Distinct().ToArray();
     }
@@ -114,7 +114,7 @@ public sealed partial class BuffService
         foreach (var buff in live.Where(b => b.StateOrdinal is > 0 and < 33))
         {
             status |= 1UL << (buff.StateOrdinal - 1);
-            if (data.Row("SpecialStatusConfig", buff.StateOrdinal) is not { } row) continue;
+            if (_data.Row("SpecialStatusConfig", buff.StateOrdinal) is not { } row) continue;
             if (row.TryGetProperty("_kForbidden", out var actions) && actions.ValueKind == JsonValueKind.Array)
                 foreach (var action in actions.EnumerateArray())
                     if (GameData.Number(action) is { } ordinal && ordinal is > 0 and < 64)
@@ -137,7 +137,7 @@ public sealed partial class BuffService
             m.BuffStatusBits = (long)status;
             m.ForbiddenBits = forbiddenMask;
             m.StaggerBits = stagger;
-            await world.ToUnitViewersAsync(m, AoiAttrChange, new AOIAttrChange
+            await _world.ToUnitViewersAsync(m, AoiAttrChange, new AOIAttrChange
             {
                 EntityUuid = (ulong)m.Uid,
                 StateInfo = new AoiObjStateInfo { Data = Mask((ulong)m.StatusBits) },
@@ -163,10 +163,10 @@ public sealed partial class BuffService
         foreach (var buff in list.Where(b => b.StateOrdinal is 11 or 12 or 19 && b.ExpireMs > MonsterService.NowMs).ToArray())
         {
             await RemoveUnitBuffAsync(unit, buff);
-            if (data.Row("BuffConfig", buff.ConfigId) is not { } row) continue;
+            if (_data.Row("BuffConfig", buff.ConfigId) is not { } row) continue;
             var logic = row.TryGetProperty("_kLogicData", out var l) && l.ValueKind == JsonValueKind.Array
                 ? l.EnumerateArray().Select(v => (int)(GameData.Number(v) ?? 0)).ToArray() : [];
-            if (logic.Length >= 2 && logic[0] > 0 && logic[1] > 0 && data.Row("BuffConfig", logic[0]) != null)
+            if (logic.Length >= 2 && logic[0] > 0 && logic[1] > 0 && _data.Row("BuffConfig", logic[0]) != null)
                 await AddSupportAsync(unit, logic[0], logic[1], buff.SourceId);
         }
     }

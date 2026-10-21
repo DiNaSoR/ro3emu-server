@@ -43,18 +43,18 @@ public sealed partial class CombatService
         DealtAsync.Add(MeltDownAsync);
         MonsterDamageAdjusters.Add(MeltDownDamage);
         PvpDealtAsync.Add(MeltDownPlayerAsync);
-        buffs.Changed.Add(SyncWeaponDamageAsync);
+        _buffs.Changed.Add(SyncWeaponDamageAsync);
     }
 
     private ActiveBuff? LiveGroup(GameSession p, int group) =>
-        p.Buffs.FirstOrDefault(b => b.ExpireMs > Now && !b.IsPassive && data.Row("BuffConfig", b.ConfigId) is { } row
+        p.Buffs.FirstOrDefault(b => b.ExpireMs > Now && !b.IsPassive && _data.Row("BuffConfig", b.ConfigId) is { } row
             && GameData.Int(row, "_iBuffID") == group);
 
     private double[] SkillDescAt(int group, int level) =>
-        data.Row("SkillConfig", skills.RealId(group, Math.Max(1, level))) is { } row ? Numbers(row, "_kDescData") : [];
+        _data.Row("SkillConfig", _skills.RealId(group, Math.Max(1, level))) is { } row ? Numbers(row, "_kDescData") : [];
 
     private int BuffLevel(ActiveBuff buff) =>
-        data.Row("BuffConfig", buff.ConfigId) is { } row ? (int)Math.Max(1, GameData.Int(row, "_iLevel")) : 1;
+        _data.Row("BuffConfig", buff.ConfigId) is { } row ? (int)Math.Max(1, GameData.Int(row, "_iLevel")) : 1;
 
     // ------------------------------------------------------------------ damage sharing
 
@@ -66,14 +66,14 @@ public sealed partial class CombatService
         bool devotion = link != null;
         link ??= LiveGroup(target, KingsGraceLinkGroup);
         if (link == null || link.SourceId == target.Role.Id
-            || data.Row("BuffConfig", link.ConfigId) is not { } row || Numbers(row, "_kLogicData") is not [var percent, ..] || percent <= 0)
+            || _data.Row("BuffConfig", link.ConfigId) is not { } row || Numbers(row, "_kLogicData") is not [var percent, ..] || percent <= 0)
             return damage;
-        var guardian = sessions.All().FirstOrDefault(g => g.Role?.Id == link.SourceId);
+        var guardian = _sessions.All().FirstOrDefault(g => g.Role?.Id == link.SourceId);
         if (guardian == null || guardian.Dead || guardian.SceneLoading || guardian.WorldScene != target.WorldScene) return damage;
         if (devotion && SkillDescAt(DevotionSkillGroup, BuffLevel(link)) is { Length: > 3 } desc && desc[3] > 0
             && Distance(guardian.Position, target.Position) > desc[3])
         {
-            await buffs.RemoveAsync(target, link); // "If the Distance between you exceeds 10 meters ... the effect ends"
+            await _buffs.RemoveAsync(target, link); // "If the Distance between you exceeds 10 meters ... the effect ends"
             return damage;
         }
         long share = (long)(damage * percent / 100);
@@ -97,7 +97,7 @@ public sealed partial class CombatService
                 SrcID = protectedId, SessionId = ++_sessionIds, SrcElement = 1,
                 Dsts = { new DamageInfo { DstID = role.Id, Damage = damage, SheildDamage = shieldDamage, DstElement = 1, IsDead = hp == 0 } },
             });
-            await character.SetHpSpAsync(guardian, null, null);
+            await _character.SetHpSpAsync(guardian, null, null);
             if (hp == 0 && ReferenceEquals(guardian.Role, role)) await PlayerDiesAsync(guardian);
         }
         finally { if (hp == 0) ReleaseDeathPublication(guardian); }
@@ -126,18 +126,18 @@ public sealed partial class CombatService
     private async Task SyncUnionAsync(GameSession s)
     {
         int piles = 0;
-        if (skills.Level(s.Progress!, UnionSkillGroup) > 0)
+        if (_skills.Level(s.Progress!, UnionSkillGroup) > 0)
         {
             var desc = SkillDescAt(UnionSkillGroup, 1);
             int cap = desc.Length > 1 && desc[1] > 0 ? (int)desc[1] : 10;
             var members = TeamMembers?.Invoke(s.Role!.Id) ?? [s.Role!.Id];
-            piles = Math.Min(cap, members.Count(id => sessions.All().FirstOrDefault(m => m.Role?.Id == id) is { Progress: { } p }
+            piles = Math.Min(cap, members.Count(id => _sessions.All().FirstOrDefault(m => m.Role?.Id == id) is { Progress: { } p }
                 && p.Career is 1210 or 1310 or 1410));
         }
         if (piles == s.UnionPiles && (piles == 0 || s.Buffs.Any(b => b.ConfigId == UnionBuff))) return;
         s.UnionPiles = piles;
-        if (s.Buffs.FirstOrDefault(b => b.ConfigId == UnionBuff) is { } old) await buffs.RemoveAsync(s, old);
-        if (piles > 0) await buffs.AddLastingAsync(s, UnionBuff, s.Role!.Id, piles);
+        if (s.Buffs.FirstOrDefault(b => b.ConfigId == UnionBuff) is { } old) await _buffs.RemoveAsync(s, old);
+        if (piles > 0) await _buffs.AddLastingAsync(s, UnionBuff, s.Role!.Id, piles);
     }
 
     private async Task KingsGraceSlowAsync(GameSession s)
@@ -148,18 +148,18 @@ public sealed partial class CombatService
         if (Now < s.ProcState.GetValueOrDefault(KingsGraceSkillGroup)) return;
         s.ProcState[KingsGraceSkillGroup] = Now + every;
         int stun = desc.Length > 5 && desc[5] > 0 ? (int)(desc[5] * 1000) : 1000;
-        foreach (var unit in world.Map(s.WorldScene).Units.OfType<MonsterUnit>().Where(m => !m.Dead && m.Hp > 0).ToArray())
+        foreach (var unit in _world.Map(s.WorldScene).Units.OfType<MonsterUnit>().Where(m => !m.Dead && m.Hp > 0).ToArray())
         {
-            var orbit = buffs.UnitBuffs(unit).FirstOrDefault(b => b.ExpireMs > Now && b.SourceId == s.Role!.Id
-                && data.Row("BuffConfig", b.ConfigId) is { } r && GameData.Int(r, "_iBuffID") == KingsGraceOrbitGroup);
-            if (orbit == null || data.Row("BuffConfig", orbit.ConfigId) is not { } orbitRow
-                || Numbers(orbitRow, "_kLogicData") is not [var slowId, ..] || data.Row("BuffConfig", (long)slowId) is not { } slowRow) continue;
+            var orbit = _buffs.UnitBuffs(unit).FirstOrDefault(b => b.ExpireMs > Now && b.SourceId == s.Role!.Id
+                && _data.Row("BuffConfig", b.ConfigId) is { } r && GameData.Int(r, "_iBuffID") == KingsGraceOrbitGroup);
+            if (orbit == null || _data.Row("BuffConfig", orbit.ConfigId) is not { } orbitRow
+                || Numbers(orbitRow, "_kLogicData") is not [var slowId, ..] || _data.Row("BuffConfig", (long)slowId) is not { } slowRow) continue;
             int max = (int)Math.Max(1, desc.Length > 9 && desc[9] > 0 ? desc[9] : GameData.Int(slowRow, "_iMaxStack"));
-            await buffs.ShowOnUnitAsync(unit, (int)slowId, 3000, s.Role!.Id);
-            var slow = buffs.UnitBuffs(unit).FirstOrDefault(b => b.ConfigId == (int)slowId);
+            await _buffs.ShowOnUnitAsync(unit, (int)slowId, 3000, s.Role!.Id);
+            var slow = _buffs.UnitBuffs(unit).FirstOrDefault(b => b.ConfigId == (int)slowId);
             if (slow == null || slow.PileCount < max) continue;
-            await buffs.RemoveUnitConfigAsync(unit, (int)slowId);
-            await buffs.ShowOnUnitAsync(unit, StunBuff, stun, s.Role.Id);
+            await _buffs.RemoveUnitConfigAsync(unit, (int)slowId);
+            await _buffs.ShowOnUnitAsync(unit, StunBuff, stun, s.Role.Id);
         }
     }
 
@@ -168,19 +168,19 @@ public sealed partial class CombatService
     {
         float radius = 0;
         if (LiveGroup(s, SightBuffGroup) != null && SkillDescAt(SightSkillGroup, 1) is { Length: > 1 } sight) radius = (float)sight[1];
-        if (skills.Level(s.Progress!, SightSproutGroup) > 0 && SkillDescAt(SightSproutGroup, 1) is { Length: > 0 } sprout)
+        if (_skills.Level(s.Progress!, SightSproutGroup) > 0 && SkillDescAt(SightSproutGroup, 1) is { Length: > 0 } sprout)
             radius = Math.Max(radius, (float)sprout[0]);
         var ruwach = LiveGroup(s, RuwachBuffGroup);
         if (radius <= 0 && ruwach == null) return;
-        var hidden = world.PlayersIn(s.WorldScene).Where(p => p != s && p.Stealthed && !p.Dead && PlayerHostile?.Invoke(s, p) == true)
+        var hidden = _world.PlayersIn(s.WorldScene).Where(p => p != s && p.Stealthed && !p.Dead && PlayerHostile?.Invoke(s, p) == true)
             .OrderBy(p => Distance(p.Position, s.Position)).ToArray();
-        foreach (var p in hidden.Where(p => Distance(p.Position, s.Position) <= radius)) await buffs.UncoverAsync(p);
-        if (ruwach == null || data.Row("BuffConfig", ruwach.ConfigId) is not { } ruwachRow
-            || Numbers(ruwachRow, "_kLogicData") is not [var strikeId, ..] || data.Row("SkillConfig", (long)strikeId) is not { } strike) return;
+        foreach (var p in hidden.Where(p => Distance(p.Position, s.Position) <= radius)) await _buffs.UncoverAsync(p);
+        if (ruwach == null || _data.Row("BuffConfig", ruwach.ConfigId) is not { } ruwachRow
+            || Numbers(ruwachRow, "_kLogicData") is not [var strikeId, ..] || _data.Row("SkillConfig", (long)strikeId) is not { } strike) return;
         float reach = SkillDescAt(RuwachSkillGroup, 1) is { Length: > 0 } rd && rd[0] > 0 ? (float)rd[0] : 20;
         if (hidden.FirstOrDefault(p => Distance(p.Position, s.Position) <= reach) is not { } found) return;
-        await buffs.UncoverAsync(found);
-        await buffs.RemoveAsync(s, ruwach); // "disappears after Discovering a target"
+        await _buffs.UncoverAsync(found);
+        await _buffs.RemoveAsync(s, ruwach); // "disappears after Discovering a target"
         await HitEventPlayersAsync(s, [found], strike, (int)strikeId, HitEffect(GameData.Int(strike, "_iScriptShow")), ++_sessionIds,
             () => s.Role != null && !s.Dead);
     }
@@ -190,11 +190,11 @@ public sealed partial class CombatService
     private async Task MeltDownAsync(GameSession s, MonsterUnit target, JsonElement row, long amount)
     {
         if (amount <= 0 || target.Dead || target.Hp <= 0 || LiveGroup(s, MeltDownGroup) is not { } melt
-            || data.Row("BuffConfig", melt.ConfigId) is not { } meltRow) return;
+            || _data.Row("BuffConfig", melt.ConfigId) is not { } meltRow) return;
         var desc = Numbers(meltRow, "_kDescData");
         var logic = Numbers(meltRow, "_kLogicData");
         if (desc.Length < 6 || logic.Length < 3 || Rolls.Proc(10000) >= desc[3] * 100) return;
-        await buffs.ShowOnUnitAsync(target, (int)logic[2], (int)(desc[5] * 1000), s.Role!.Id);
+        await _buffs.ShowOnUnitAsync(target, (int)logic[2], (int)(desc[5] * 1000), s.Role!.Id);
     }
 
     private const int WeaponDamageBuff = 1620401;
@@ -202,27 +202,27 @@ public sealed partial class CombatService
     private async Task MeltDownPlayerAsync(GameSession s, GameSession target, long amount, bool killed)
     {
         if (amount <= 0 || killed || LiveGroup(s, MeltDownGroup) is not { } melt
-            || data.Row("BuffConfig", melt.ConfigId) is not { } meltRow) return;
+            || _data.Row("BuffConfig", melt.ConfigId) is not { } meltRow) return;
         var desc = Numbers(meltRow, "_kDescData");
         if (desc.Length < 3 || Rolls.Proc(10000) >= desc[1] * 100) return;
-        await buffs.AddAsync(target, WeaponDamageBuff, (int)(desc[2] * 1000), s.Role!.Id);
+        await _buffs.AddAsync(target, WeaponDamageBuff, (int)(desc[2] * 1000), s.Role!.Id);
     }
 
     /// <summary>Weapon Damage carries no attribute changes, so its start and end resend the stat sheet here.</summary>
     private async Task SyncWeaponDamageAsync(GameSession p)
     {
-        bool damaged = CharacterService.WeaponDamaged(p, data);
+        bool damaged = CharacterService.WeaponDamaged(p, _data);
         if (damaged == p.WeaponDamagedShown) return;
         p.WeaponDamagedShown = damaged;
-        await character.RefreshStatsAsync(p);
+        await _character.RefreshStatsAsync(p);
     }
 
     private long MeltDownDamage(MonsterUnit monster, long damage, bool monsterAttacks)
     {
         if (damage <= 0) return damage;
-        var melted = buffs.UnitBuffs(monster).FirstOrDefault(b => b.ExpireMs > Now && data.Row("BuffConfig", b.ConfigId) is { } r
+        var melted = _buffs.UnitBuffs(monster).FirstOrDefault(b => b.ExpireMs > Now && _data.Row("BuffConfig", b.ConfigId) is { } r
             && GameData.Int(r, "_iBuffID") == MeltDownDebuffGroup);
-        if (melted == null || data.Row("BuffConfig", melted.ConfigId) is not { } row || Numbers(row, "_kDescData") is not [var percent, ..]) return damage;
+        if (melted == null || _data.Row("BuffConfig", melted.ConfigId) is not { } row || Numbers(row, "_kDescData") is not [var percent, ..]) return damage;
         return Math.Max(1, (long)Math.Round(damage * (monsterAttacks ? 100 - percent : 100 + percent) / 100));
     }
 }

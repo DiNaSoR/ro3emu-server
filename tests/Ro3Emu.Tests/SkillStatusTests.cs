@@ -22,38 +22,38 @@ public sealed class SkillStatusTests : IAsyncLifetime
 
     private static GameData Data => Exported.Value;
 
-    private readonly string dataDir = Path.Combine(Path.GetTempPath(), "ro3emu-skillstatus-" + Guid.NewGuid().ToString("N"));
+    private readonly string _dataDir = Path.Combine(Path.GetTempPath(), "ro3emu-skillstatus-" + Guid.NewGuid().ToString("N"));
     private static readonly TimeSpan Wait = TimeSpan.FromSeconds(8);
-    private WebApplication? app;
-    private string http = "";
+    private WebApplication? _app;
+    private string _http = "";
 
     public Task InitializeAsync() => Task.CompletedTask;
 
     public async Task DisposeAsync()
     {
-        if (app == null) return;
-        await app.StopAsync();
-        await app.DisposeAsync();
+        if (_app == null) return;
+        await _app.StopAsync();
+        await _app.DisposeAsync();
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
-        try { Directory.Delete(dataDir, true); } catch (IOException) { }
+        try { Directory.Delete(_dataDir, true); } catch (IOException) { }
     }
 
     private async Task Server()
     {
         var ports = TestPorts.FreePorts();
-        app = ServerHost.Create([], o =>
+        _app = ServerHost.Create([], o =>
         {
-            o.DataDir = dataDir; o.GameDataDir = Path.Combine(ClientData.RepoRoot, "data");
+            o.DataDir = _dataDir; o.GameDataDir = Path.Combine(ClientData.RepoRoot, "data");
             o.HttpPort = ports.Item1; o.MicroGatePort = ports.Item2; o.GameGatePort = ports.Item3;
         });
-        SureHitRolls.Install(app);
-        await app.StartAsync();
-        http = $"http://127.0.0.1:{ports.Item1}";
+        SureHitRolls.Install(_app);
+        await _app.StartAsync();
+        _http = $"http://127.0.0.1:{ports.Item1}";
     }
 
     private async Task<BotClient> InWorld(string name)
     {
-        var bot = new BotClient(http, File.ReadAllText(Path.Combine(dataDir, "gate_rsa_public.pem")));
+        var bot = new BotClient(_http, File.ReadAllText(Path.Combine(_dataDir, "gate_rsa_public.pem")));
         await bot.LoginAsync(name.ToLowerInvariant(), "pw");
         await bot.EnterGateAsync();
         var role = await bot.CreateRoleAsync(name);
@@ -61,11 +61,11 @@ public sealed class SkillStatusTests : IAsyncLifetime
         return bot;
     }
 
-    private GameSession Session(string name) => app!.Services.GetRequiredService<SessionRegistry>().All()
+    private GameSession Session(string name) => _app!.Services.GetRequiredService<SessionRegistry>().All()
         .Single(s => s.Account == name.ToLowerInvariant());
-    private GameLoop Loop => app!.Services.GetRequiredService<GameLoop>();
-    private BuffService Buffs => app!.Services.GetRequiredService<BuffService>();
-    private MonsterService Monsters => app!.Services.GetRequiredService<MonsterService>();
+    private GameLoop Loop => _app!.Services.GetRequiredService<GameLoop>();
+    private BuffService Buffs => _app!.Services.GetRequiredService<BuffService>();
+    private MonsterService Monsters => _app!.Services.GetRequiredService<MonsterService>();
     private Task Run(Func<Task> work) => Loop.InvokeAsync(work);
 
     private async Task Eventually(Func<bool> check, string what)

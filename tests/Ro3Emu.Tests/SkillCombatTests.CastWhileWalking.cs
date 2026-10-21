@@ -22,7 +22,7 @@ public sealed partial class SkillCombatTests
         var target = await Target("alice", stationary: true);
         await Loop.InvokeAsync(() => { target.Hp = 1_000_000_000; return Task.CompletedTask; });
         var start = Session("alice").Position.Clone();
-        var nav = app.Services.GetRequiredService<WorldData>().Map(Session("alice").SceneEntry)!.Nav!;
+        var nav = _app.Services.GetRequiredService<WorldData>().Map(Session("alice").SceneEntry)!.Nav!;
         var step = new[] { (0.4f, 0f), (-0.4f, 0f), (0f, 0.4f), (0f, -0.4f) }
             .Select(o => new Vec3 { X = start.X + o.Item1, Y = start.Y, Z = start.Z + o.Item2 })
             .First(p => nav.IsWalkable(p.X, p.Y, p.Z) && nav.CanWalk(p.X, p.Y, p.Z, start.X, start.Z));

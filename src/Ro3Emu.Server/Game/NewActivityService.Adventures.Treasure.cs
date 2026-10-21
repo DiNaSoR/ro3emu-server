@@ -33,7 +33,7 @@ public sealed partial class NewActivityService
 
     /// <summary>Role ids that hit each live treasure monster that pays an assist award, keyed by monster UID.</summary>
     private readonly System.Collections.Concurrent.ConcurrentDictionary<long,
-        System.Collections.Concurrent.ConcurrentDictionary<long, byte>> treasureHelpers = new();
+        System.Collections.Concurrent.ConcurrentDictionary<long, byte>> _treasureHelpers = new();
 
     /// <summary>Test aid: forces the TreasureHuntResultRateConfig row a dig rolls.</summary>
     internal long? TreasureOutcomeForTest { get; set; }
@@ -54,8 +54,8 @@ public sealed partial class NewActivityService
         var cursor = session.ActivityRuntime.AdventureTreasure;
         if ((cursor.PointId != 0 && Now < cursor.Began + 10800) || cursor.PendingMonsterAward != 0)
             return ErrorCodes.TaskExists;
-        var points = data.Table("TreasureHuntMapPointConfig").Values
-            .Where(r => GameData.Int(r, "_iId") > 0 && scene.TreasurePoint(GameData.Int(r, "_iId")) != null
+        var points = _data.Table("TreasureHuntMapPointConfig").Values
+            .Where(r => GameData.Int(r, "_iId") > 0 && _scene.TreasurePoint(GameData.Int(r, "_iId")) != null
                 && (item.Entry == 1112002 ? GameData.Int(r, "_iId") >= 2000 : GameData.Int(r, "_iId") < 2000))
             .OrderBy(r => GameData.Int(r, "_iId")).ToArray();
         if (points.Length == 0) return ErrorCodes.FeatureUnavailable;
@@ -69,20 +69,20 @@ public sealed partial class NewActivityService
         };
         // Use the canonical bag transaction and the selected GUID; publish the hunt and cooldown
         // together before any StateChanged observer can see the consumed map.
-        var consumed = await character.ExchangeLockedAsync(session, [], [],
+        var consumed = await _character.ExchangeLockedAsync(session, [], [],
             instances: new Dictionary<long, int> { [item.Guid] = 1 }, popup: false, sync: false,
             persist: tx =>
             {
                 tx.RoleBlob(session.Role!.Id, "activity_runtime", System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(runtime));
                 persistCooldown(tx);
                 // E05a owns map consumption and the resolved hunt source; later hunt rewards stay in the activity family.
-                tx.WithEconomy(character.FamilyEconomy(session, "cd13a/character-treasure-use",
+                tx.WithEconomy(_character.FamilyEconomy(session, "cd13a/character-treasure-use",
                     [(item.Entry, 1L)], [], new { ItemGuid = item.Guid, Hunt = runtime.AdventureTreasure }));
             },
             committed: () => { session.ActivityRuntime = runtime; publishCooldown(); });
         if (consumed == null) return ErrorCodes.ItemsShort;
         await SyncAsync(session);
-        await scene.SpawnTreasureNpcAsync(session);
+        await _scene.SpawnTreasureNpcAsync(session);
         return 0;
     }
 
@@ -93,16 +93,16 @@ public sealed partial class NewActivityService
         {
             var runtime = CloneRuntime(session);
             runtime.AdventureTreasure = new AdventureTreasureCursor();
-            var transaction = roles.NewTransaction();
+            var transaction = _roles.NewTransaction();
             transaction.RoleBlob(session.Role!.Id, "activity_runtime",
                 System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(runtime));
             transaction.WithEscrowEconomy(new EscrowEconomyIntent("activity/treasure-expire",
                 session.Account ?? "", session.Role.Id).Evidence(new
                 { Role = session.Role.Id, c.PointId, c.Began }));
-            await roles.CommitAsync(transaction, "activity/treasure-expire", _ => session.ActivityRuntime = runtime);
+            await _roles.CommitAsync(transaction, "activity/treasure-expire", _ => session.ActivityRuntime = runtime);
             c = runtime.AdventureTreasure;
-            await scene.RemoveTreasureNpcAsync(session);
-            if (!deadlines.IsCurrent(session, lease)) return;
+            await _scene.RemoveTreasureNpcAsync(session);
+            if (!_deadlines.IsCurrent(session, lease)) return;
         }
         await CharacterService.SyncAsync(session, 5064, new DBTreasureInfo
         {
@@ -118,9 +118,9 @@ public sealed partial class NewActivityService
             if (ActivityError(session, 106, 6) is var error and not 0) return error;
             var cursor = session.ActivityRuntime.AdventureTreasure;
             if (cursor.PointId == 0 || cursor.PendingMonsterAward != 0 || cursor.Began + 10800 <= Now
-                || scene.TreasurePoint(cursor.PointId) is not { } target || target.Scene != session.SceneEntry)
+                || _scene.TreasurePoint(cursor.PointId) is not { } target || target.Scene != session.SceneEntry)
                 return ErrorCodes.NpcMissing;
-            var outcomes = data.Table("TreasureHuntResultRateConfig").Values
+            var outcomes = _data.Table("TreasureHuntResultRateConfig").Values
                 .Where(r => TreasureGroup(r, cursor.GroupId) && GameData.Int(r, "_kGroupProbability") > 0)
                 .OrderBy(r => GameData.Int(r, "_iId")).ToArray();
             int total = outcomes.Sum(r => (int)GameData.Int(r, "_kGroupProbability"));
@@ -138,12 +138,12 @@ public sealed partial class NewActivityService
             bool announce = false;
             if (type == 1 && action == 300 && value > 0)
             {
-                try { grants = awards.Resolve(session, value, Playbook(session)).Grants.ToArray(); }
+                try { grants = _awards.Resolve(session, value, Playbook(session)).Grants.ToArray(); }
                 catch (AwardResolutionException) { return ErrorCodes.RewardMissing; }
             }
             else if (type is 4 or 5 && action == 302 && value > 0)
             {
-                if (data.Row("TreasureHuntMonsterRewardConfig", value) is not { } monsterRow
+                if (_data.Row("TreasureHuntMonsterRewardConfig", value) is not { } monsterRow
                     || !monsterRow.TryGetProperty("_iMonsterArray", out var array) || array.ValueKind != System.Text.Json.JsonValueKind.Array
                     || array.GetArrayLength() == 0 || array[0].ValueKind != System.Text.Json.JsonValueKind.Array
                     || array[0].GetArrayLength() < 1) return ErrorCodes.FeatureUnavailable;
@@ -155,11 +155,11 @@ public sealed partial class NewActivityService
                 announce = GameData.Int(monsterRow, "_iView") == 1;
                 try
                 {
-                    _ = awards.Resolve(session, awardGroup, Playbook(session));
-                    if (assistGroup > 0) _ = awards.Resolve(session, assistGroup, Playbook(session));
+                    _ = _awards.Resolve(session, awardGroup, Playbook(session));
+                    if (assistGroup > 0) _ = _awards.Resolve(session, assistGroup, Playbook(session));
                 }
                 catch (AwardResolutionException) { return ErrorCodes.RewardMissing; }
-                monster = await scene.SpawnTreasureMonsterAsync(session, monsterId, target.Position);
+                monster = await _scene.SpawnTreasureMonsterAsync(session, monsterId, target.Position);
                 if (monster == null) return ErrorCodes.FeatureUnavailable;
             }
             else return ErrorCodes.FeatureUnavailable;
@@ -178,12 +178,12 @@ public sealed partial class NewActivityService
             {
                 if (monster != null)
                 {
-                    treasureHelpers.TryRemove(monster.Uid, out _);
-                    await scene.RemoveTreasureMonsterAsync(monster);
+                    _treasureHelpers.TryRemove(monster.Uid, out _);
+                    await _scene.RemoveTreasureMonsterAsync(monster);
                 }
                 return result;
             }
-            await scene.RemoveTreasureNpcAsync(session);
+            await _scene.RemoveTreasureNpcAsync(session);
             var notice = new TreasureEventNotify
             {
                 Type = (ETreasureEventNum)type,
@@ -197,7 +197,7 @@ public sealed partial class NewActivityService
                 };
             if (monsterId != 0) notice.Param.Add(monsterId);
             await session.SendGameAsync(83251, notice);
-            tasks.OnTreasureDug(session); // quest target 106802, after the dig's commit
+            _tasks.OnTreasureDug(session); // quest target 106802, after the dig's commit
             if (announce) await AnnounceTreasureBossAsync(session);
             return 0;
         }
@@ -216,8 +216,8 @@ public sealed partial class NewActivityService
     private async Task OnTreasureMonsterKilledAsync(GameSession killer, MonsterUnit dead)
     {
         // Any participant may land the final blow; the owner of this one-off spawn receives the configured award.
-        var owner = sessions.All().FirstOrDefault(s => s.ActivityRuntime.AdventureTreasure.PendingMonsterUid == dead.Uid);
-        if (owner == null) { treasureHelpers.TryRemove(dead.Uid, out _); return; }
+        var owner = _sessions.All().FirstOrDefault(s => s.ActivityRuntime.AdventureTreasure.PendingMonsterUid == dead.Uid);
+        if (owner == null) { _treasureHelpers.TryRemove(dead.Uid, out _); return; }
         var role = owner.Role;
         var attachment = owner.Attachment;
         long assist = 0;
@@ -248,15 +248,15 @@ public sealed partial class NewActivityService
 
     /// <summary>The TreasureHuntMonsterRewardConfig row a pending fight came from, found by its kill award.</summary>
     private System.Text.Json.JsonElement? TreasureMonsterReward(long killAward) => killAward <= 0 ? null
-        : data.Table("TreasureHuntMonsterRewardConfig").Values
+        : _data.Table("TreasureHuntMonsterRewardConfig").Values
             .Where(r => GameData.Int(r, "_iAwardId") == killAward).Cast<System.Text.Json.JsonElement?>().FirstOrDefault();
 
     private void TrackTreasureHelpers(long monsterUid) =>
-        treasureHelpers.TryAdd(monsterUid, new System.Collections.Concurrent.ConcurrentDictionary<long, byte>());
+        _treasureHelpers.TryAdd(monsterUid, new System.Collections.Concurrent.ConcurrentDictionary<long, byte>());
 
     private Task OnTreasureMonsterDamagedAsync(GameSession player, MonsterUnit monster, long damage)
     {
-        if (damage > 0 && player.Role is { } role && treasureHelpers.TryGetValue(monster.Uid, out var helpers))
+        if (damage > 0 && player.Role is { } role && _treasureHelpers.TryGetValue(monster.Uid, out var helpers))
             helpers.TryAdd(role.Id, 0);
         return Task.CompletedTask;
     }
@@ -267,10 +267,10 @@ public sealed partial class NewActivityService
     /// </summary>
     private async Task AwardTreasureHelpersAsync(long ownerRole, long monsterUid, long assistAward)
     {
-        if (!treasureHelpers.TryRemove(monsterUid, out var helpers)) return;
+        if (!_treasureHelpers.TryRemove(monsterUid, out var helpers)) return;
         foreach (long roleId in helpers.Keys.Where(id => id != ownerRole))
         {
-            var helper = sessions.All().FirstOrDefault(s => s.Role?.Id == roleId);
+            var helper = _sessions.All().FirstOrDefault(s => s.Role?.Id == roleId);
             if (helper == null) continue;
             var role = helper.Role;
             var attachment = helper.Attachment;
@@ -299,7 +299,7 @@ public sealed partial class NewActivityService
         MailService.Attachment[] attachments;
         try
         {
-            var grants = awards.Resolve(session, awardGroup, Playbook(session)).Grants.ToArray();
+            var grants = _awards.Resolve(session, awardGroup, Playbook(session)).Grants.ToArray();
             if (grants.Length == 0 || grants.Any(g => g.ExpireTimeStamp != 0)) return ErrorCodes.RewardMissing;
             attachments = grants.GroupBy(g => (g.Entry, g.BindType))
                 .Select(g => new MailService.Attachment(g.Key.Entry, checked(g.Sum(i => i.Count)), g.Key.BindType)).ToArray();
@@ -308,7 +308,7 @@ public sealed partial class NewActivityService
         byte[]? runtimeBytes = runtime == null ? null : System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(runtime);
         try
         {
-            await mail.DeliverActivityBatchAsync(session, [new MailService.ActivityTemplateDelivery(template, attachments)], tx =>
+            await _mail.DeliverActivityBatchAsync(session, [new MailService.ActivityTemplateDelivery(template, attachments)], tx =>
             {
                 if (session.Role?.Id != roleId)
                     throw new OperationCanceledException("Role changed before the treasure award mail committed.");
@@ -323,7 +323,7 @@ public sealed partial class NewActivityService
         }
         catch (Exception e) when (e is InvalidOperationException or OperationCanceledException)
         {
-            log.LogWarning(e, "Treasure award mail {Template} for role {Role} failed", template, roleId);
+            _log.LogWarning(e, "Treasure award mail {Template} for role {Role} failed", template, roleId);
             return ErrorCodes.FeatureUnavailable;
         }
     }
@@ -331,11 +331,11 @@ public sealed partial class NewActivityService
     /// <summary>Server-wide 1022 marquee, parameters encoded as MvpService does (inferred).</summary>
     private async Task AnnounceTreasureBossAsync(GameSession finder)
     {
-        if (data.Row("ChatConfig", TreasureBossChat) == null || finder.Role == null) return;
+        if (_data.Row("ChatConfig", TreasureBossChat) == null || finder.Role == null) return;
         var ntf = new SystemBoardCastMsgNtf { Source = MsgSource.System, ChatId = TreasureBossChat };
         ntf.ParamList[1] = new ChatParameter { Params = { finder.Role.Name }, Type = ChatParamType.ChatParamString };
-        ntf.ParamList[2] = new ChatParameter { Params = { data.MapName(finder.SceneEntry) }, Type = ChatParamType.ChatParamString };
-        await RoleFanout.EachAsync(sessions.All().Where(p => p.Role != null), p => p.SendGameAsync(SystemBroadcast, ntf));
+        ntf.ParamList[2] = new ChatParameter { Params = { _data.MapName(finder.SceneEntry) }, Type = ChatParamType.ChatParamString };
+        await RoleFanout.EachAsync(_sessions.All().Where(p => p.Role != null), p => p.SendGameAsync(SystemBroadcast, ntf));
     }
 
     private async Task OnTreasureSceneLoadedAsync(GameSession session)
@@ -343,7 +343,7 @@ public sealed partial class NewActivityService
         var cursor = session.ActivityRuntime.AdventureTreasure;
         if (cursor.PendingMonsterAward == 0)
         {
-            await scene.SpawnTreasureNpcAsync(session);
+            await _scene.SpawnTreasureNpcAsync(session);
             return;
         }
         await session.ActivityGate.WaitAsync();
@@ -351,18 +351,18 @@ public sealed partial class NewActivityService
         {
             cursor = session.ActivityRuntime.AdventureTreasure;
             if (cursor.PendingMonsterAward == 0 || cursor.PendingMonsterId <= 0
-                || scene.HasTreasureMonster(cursor.PendingMonsterUid)) return;
+                || _scene.HasTreasureMonster(cursor.PendingMonsterUid)) return;
             // A world restart loses transient monsters; the durable fight cursor recreates the encounter.
-            var at = scene.BornPoint(session.SceneEntry);
+            var at = _scene.BornPoint(session.SceneEntry);
             if (at == null) return;
-            var monster = await scene.SpawnTreasureMonsterAsync(session, cursor.PendingMonsterId, at.Value);
+            var monster = await _scene.SpawnTreasureMonsterAsync(session, cursor.PendingMonsterId, at.Value);
             if (monster == null) return;
             if (TreasureMonsterReward(cursor.PendingMonsterAward) is { } reward && GameData.Int(reward, "_iAssistAwardId") > 0)
                 TrackTreasureHelpers(monster.Uid);
             var runtime = CloneRuntime(session);
             runtime.AdventureTreasure.PendingMonsterUid = monster.Uid;
             int result = await CommitAdventureAsync(session, session.NewActivities!.Clone(), runtime: runtime);
-            if (result != 0) await scene.RemoveTreasureMonsterAsync(monster);
+            if (result != 0) await _scene.RemoveTreasureMonsterAsync(monster);
         }
         finally { session.ActivityGate.Release(); }
     }

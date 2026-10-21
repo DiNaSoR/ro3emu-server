@@ -150,7 +150,7 @@ public sealed partial class SkillCombatTests
     {
         await using var alice = await InWorld("Alice");
         var target = await Target("alice", stationary: true);
-        var row = app.Services.GetRequiredService<GameData>().Row("SkillConfig", 1510201)!.Value; // [7600, 9120, 9500], +20% at or below 50% HP
+        var row = _app.Services.GetRequiredService<GameData>().Row("SkillConfig", 1510201)!.Value; // [7600, 9120, 9500], +20% at or below 50% HP
         var (high, low) = await Loop.InvokeAsync(() =>
         {
             var s = Session("alice");

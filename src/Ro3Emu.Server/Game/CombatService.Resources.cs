@@ -57,24 +57,24 @@ public sealed partial class CombatService
                     var phantom = Numbers(illusion, "_kDescData");
                     if (phantom.Length > 9 && phantom[9] > 0) scale *= phantom[9];
                     if (phantom.Length > 10) scale *= 1 + phantom[10] / 100;
-                    await buffs.ConsumeBuffPilesAsync(s, BlackPhantomGroup, 1);
+                    await _buffs.ConsumeBuffPilesAsync(s, BlackPhantomGroup, 1);
                 }
                 action.ProcScale = scale;
-                long resetAt = desc.Length > 4 && desc[4] > 0 ? (long)desc[4] : buffs.EnergyLimit(CrossBladesEnergy);
+                long resetAt = desc.Length > 4 && desc[4] > 0 ? (long)desc[4] : _buffs.EnergyLimit(CrossBladesEnergy);
                 action.ResetsCooldown = count > 0 && count >= resetAt;
-                await buffs.SetEnergyAsync(s, CrossBladesEnergy, 0);
+                await _buffs.SetEnergyAsync(s, CrossBladesEnergy, 0);
                 break;
             case "huixuandaoren" when s.Energy.TryGetValue(CrossBladesEnergy, out var cutter):
                 long add = desc.Length > 5 && desc[5] > 0 ? (long)desc[5] : 1;
-                long cap = desc.Length > 6 && desc[6] > 0 ? (long)desc[6] : buffs.EnergyLimit(CrossBladesEnergy);
-                if (cutter.Value < cap) await buffs.SetEnergyAsync(s, CrossBladesEnergy, Math.Min(cap, cutter.Value + add));
+                long cap = desc.Length > 6 && desc[6] > 0 ? (long)desc[6] : _buffs.EnergyLimit(CrossBladesEnergy);
+                if (cutter.Value < cap) await _buffs.SetEnergyAsync(s, CrossBladesEnergy, Math.Min(cap, cutter.Value + add));
                 break;
             case "hesehuanying" when s.Energy.TryGetValue(CrossBladesEnergy, out var illusionBlades):
-                long gain = desc.Length > 8 && desc[8] > 0 ? (long)desc[8] : buffs.EnergyLimit(CrossBladesEnergy);
-                await buffs.SetEnergyAsync(s, CrossBladesEnergy, illusionBlades.Value + gain);
+                long gain = desc.Length > 8 && desc[8] > 0 ? (long)desc[8] : _buffs.EnergyLimit(CrossBladesEnergy);
+                await _buffs.SetEnergyAsync(s, CrossBladesEnergy, illusionBlades.Value + gain);
                 break;
             case "Smite2":
-                await buffs.ConsumeBuffPilesAsync(s, EnhanceShieldBashGroup, 1);
+                await _buffs.ConsumeBuffPilesAsync(s, EnhanceShieldBashGroup, 1);
                 break;
             case "book":
                 await RemoveBuffGroupAsync(s, ReadingBuffGroup);
@@ -108,8 +108,8 @@ public sealed partial class CombatService
         var row = action.Row;
         if (action.Proc || SpellbookPages(row) is not { } pages || !HasBuffGroup(s, ReadingBuffGroup)
             || !s.Energy.TryGetValue(PagesEnergy, out var meter) || meter.Value < pages
-            || Numbers(row, "_kAutoLearnSkill") is not [var copyId, ..] || data.Row("SkillConfig", (long)copyId) is not { } copy) return;
-        await buffs.SetEnergyAsync(s, PagesEnergy, meter.Value - pages);
+            || Numbers(row, "_kAutoLearnSkill") is not [var copyId, ..] || _data.Row("SkillConfig", (long)copyId) is not { } copy) return;
+        await _buffs.SetEnergyAsync(s, PagesEnergy, meter.Value - pages);
         var target = FindMonster(s.WorldScene, action.Request.TargetId);
         var at = (action.Request.TargetPos ?? action.Origin).Clone();
         float face = action.Request.Face;
@@ -159,32 +159,32 @@ public sealed partial class CombatService
         int group = (int)GameData.Int(row, "_iSkillID");
         if (group == PrecisionThrustGroup && Full(PrecisionEnergy))
         {
-            await buffs.SetEnergyAsync(s, PrecisionEnergy, 0);
-            if (s.Energy.TryGetValue(SpearEnergy, out var spears)) await buffs.SetEnergyAsync(s, SpearEnergy, spears.Value + 1);
+            await _buffs.SetEnergyAsync(s, PrecisionEnergy, 0);
+            if (s.Energy.TryGetValue(SpearEnergy, out var spears)) await _buffs.SetEnergyAsync(s, SpearEnergy, spears.Value + 1);
         }
         else if (Script(row) == "Smite3" && Full(ShieldBashEnergy))
         {
-            await buffs.SetEnergyAsync(s, ShieldBashEnergy, 0);
-            int piles = data.Row("BuffConfig", EnhanceShieldBashBuff) is { } buff ? (int)Math.Max(1, GameData.Int(buff, "_iMaxStack")) : 3;
-            await buffs.AddLastingAsync(s, EnhanceShieldBashBuff, s.Role!.Id, piles);
+            await _buffs.SetEnergyAsync(s, ShieldBashEnergy, 0);
+            int piles = _data.Row("BuffConfig", EnhanceShieldBashBuff) is { } buff ? (int)Math.Max(1, GameData.Int(buff, "_iMaxStack")) : 3;
+            await _buffs.AddLastingAsync(s, EnhanceShieldBashBuff, s.Role!.Id, piles);
         }
 
-        bool Full(int id) => s.Energy.TryGetValue(id, out var meter) && buffs.EnergyLimit(id) is var limit and > 0 && meter.Value >= limit;
+        bool Full(int id) => s.Energy.TryGetValue(id, out var meter) && _buffs.EnergyLimit(id) is var limit and > 0 && meter.Value >= limit;
     }
 
     /// <summary>Furious Storm 1132401 (Sonic Burst): "immediately gains 5 floors of Enhance Hundred Spear charge"
     /// (_kDescData[0]) in 140003.</summary>
     private async Task LastingBuffGrantedAsync(GameSession p, int id)
     {
-        if (id != FuriousStormBuff || data.Row("BuffConfig", id) is not { } row) return;
+        if (id != FuriousStormBuff || _data.Row("BuffConfig", id) is not { } row) return;
         var desc = Numbers(row, "_kDescData");
-        long charges = desc.Length > 0 && desc[0] > 0 ? (long)desc[0] : buffs.EnergyLimit(EnhancedSpearEnergy);
-        await buffs.SetEnergyAsync(p, EnhancedSpearEnergy, charges);
+        long charges = desc.Length > 0 && desc[0] > 0 ? (long)desc[0] : _buffs.EnergyLimit(EnhancedSpearEnergy);
+        await _buffs.SetEnergyAsync(p, EnhancedSpearEnergy, charges);
     }
 
     private JsonElement? DarkIllusionRow(GameSession s) =>
-        s.Progress is { } progress && skills.Level(progress, DarkIllusionGroup) is var level and > 0
-            ? data.Row("SkillConfig", skills.RealId(DarkIllusionGroup, level)) : null;
+        s.Progress is { } progress && _skills.Level(progress, DarkIllusionGroup) is var level and > 0
+            ? _data.Row("SkillConfig", _skills.RealId(DarkIllusionGroup, level)) : null;
 
     private static bool CostsEnergy(JsonElement row, int energy) =>
         row.TryGetProperty("_kCost", out var costs) && costs.ValueKind == JsonValueKind.Array
@@ -193,9 +193,9 @@ public sealed partial class CombatService
 
     private async Task RemoveBuffGroupAsync(GameSession s, int group)
     {
-        foreach (var buff in s.Buffs.Where(b => !b.IsPassive && data.Row("BuffConfig", b.ConfigId) is { } r
+        foreach (var buff in s.Buffs.Where(b => !b.IsPassive && _data.Row("BuffConfig", b.ConfigId) is { } r
             && GameData.Int(r, "_iBuffID") == group).ToArray())
-            await buffs.RemoveAsync(s, buff);
+            await _buffs.RemoveAsync(s, buff);
     }
 
     /// <summary>Ends every cooldown of a skill group (all its modes) and tells the client.</summary>

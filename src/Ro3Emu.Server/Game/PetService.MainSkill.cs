@@ -14,15 +14,15 @@ public sealed partial class PetService
     /// </summary>
     internal PetMainSkill? MainSkill(GameSession s)
     {
-        if (s.Pets is not { } pets || s.Progress == null || !functions.IsOpen(s, 33)
+        if (s.Pets is not { } pets || s.Progress == null || !_functions.IsOpen(s, 33)
             || !pets.SetupPlans.TryGetValue(pets.CurrentPlan, out var plan)
             || !plan.SetUpPets.TryGetValue(MainSlot, out int petId) || !pets.ListPet.TryGetValue(petId, out var pet)
             || StarRow(pet) is not { } row || GameData.Int(row, "_iProtectSkill") is not (> 0 and var skill and <= int.MaxValue)
-            || data.Row("SkillConfig", skill) == null) return null;
+            || _data.Row("SkillConfig", skill) == null) return null;
         return new PetMainSkill((int)skill, petId);
     }
 
-    private int MainSlot => data.Table("PublicParamConfig").TryGetValue("PetProtectPosition", out var v)
+    private int MainSlot => _data.Table("PublicParamConfig").TryGetValue("PetProtectPosition", out var v)
         && GameData.Number(v) is { } slot and > 0 ? (int)slot : 1;
 
     /// <summary>Resend 5025 when the pet slot's skill changed (deploy, swap, star up, plan switch, login).</summary>
@@ -31,6 +31,6 @@ public sealed partial class PetService
         int now = MainSkill(s)?.SkillId ?? 0;
         if (now == s.PetMainSkillShown || s.SkillPlans == null) return;
         s.PetMainSkillShown = now;
-        await skills.SyncAsync(s);
+        await _skills.SyncAsync(s);
     }
 }

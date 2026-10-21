@@ -76,12 +76,12 @@ public sealed partial class CombatService
         var (effectId, ms) = MovementEffect(GameData.Int(action.Row, "_iScriptShow"));
         target.Moving = false;
         target.X = end.X; target.Y = end.Y; target.Z = end.Z;
-        await world.ToUnitViewersAsync(target, SkillMove, new SkillStartMoveNotify
+        await _world.ToUnitViewersAsync(target, SkillMove, new SkillStartMoveNotify
         {
             EntityID = (ulong)target.Uid, StartPos = start, EndPos = end, SkillConfigId = action.Request.SkillId,
             EffectId = effectId, MoveType = 2, StartTimestampMs = Now, Face = target.Face, MoveTimeMs = ms > 0 ? ms : 300,
         });
-        await world.MoveUnitAsync(target, new MovementChangeNtf { Uid = target.Uid, MovementInfo = target.CurrentMovement(Now) });
+        await _world.MoveUnitAsync(target, new MovementChangeNtf { Uid = target.Uid, MovementInfo = target.CurrentMovement(Now) });
     }
 
     /// <summary>Ganbantein: remove up to _kDescData[2] live skill fields within _kDescData[1] m of the chosen point,
@@ -92,7 +92,7 @@ public sealed partial class CombatService
         float radius = desc.Length > 1 && desc[1] > 0 ? (float)desc[1] : 3;
         int max = desc.Length > 2 && desc[2] > 0 ? (int)desc[2] : 15;
         var center = action.Request.TargetPos ?? action.Origin;
-        var fields = world.Map(s.WorldScene).Units.OfType<SkillObject>()
+        var fields = _world.Map(s.WorldScene).Units.OfType<SkillObject>()
             .Where(u => !u.Removing && u.InstanceId == s.InstanceId && Distance(u.Pos, center) <= radius)
             .OrderBy(u => Distance(u.Pos, center)).ThenBy(u => u.Uid).Take(max).ToList();
         foreach (var field in fields) await RemoveSkillObjectAsync(field);

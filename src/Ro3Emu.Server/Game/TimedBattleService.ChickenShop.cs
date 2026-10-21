@@ -39,14 +39,14 @@ public sealed partial class TimedBattleService
     /// <summary>Service NPC uids: inside the chest namespace (2^48), above every chest serial, so the dispatcher can tell
     /// a match NPC from the uid alone.</summary>
     private const long NpcUidBase = ChestUidBase | (1L << 46);
-    private static long npcSerial;
+    private static long _npcSerial;
 
     internal static bool IsChickenNpcUid(long uid) => uid >= NpcUidBase && uid < NpcUidBase + (1L << 46);
 
     /// <summary>Spawns the shop NPCs and Rescue Wagons of the 2240101 respawn regions at the battle start.</summary>
     private async Task SpawnServiceNpcsAsync(Match match, ChickenRun run)
     {
-        foreach (var row in data.Table("NpcLevelRegionRespawnConfig").Values
+        foreach (var row in _data.Table("NpcLevelRegionRespawnConfig").Values
             .Where(r => GameData.Int(r, "_iMapid") == ChickenScene).OrderBy(r => GameData.Int(r, "_iId")))
         {
             int regionId = (int)GameData.Int(row, "_iRespawnregionid");
@@ -55,7 +55,7 @@ public sealed partial class TimedBattleService
             if (region.Region <= 0 || !row.TryGetProperty("_iNpcrespawngroup", out var groups) || groups.ValueKind != JsonValueKind.Array) continue;
             foreach (var groupId in groups.EnumerateArray())
             {
-                if (data.Row("NpcRespawnGroupConfig", (long)(GameData.Number(groupId) ?? 0)) is not { } group
+                if (_data.Row("NpcRespawnGroupConfig", (long)(GameData.Number(groupId) ?? 0)) is not { } group
                     || !group.TryGetProperty("_kNpcgroup", out var npcs) || npcs.ValueKind != JsonValueKind.Array
                     || !group.TryGetProperty("_iByNum", out var counts) || counts.ValueKind != JsonValueKind.Array) continue;
                 for (int i = 0; i < npcs.GetArrayLength() && i < counts.GetArrayLength(); i++)
@@ -84,19 +84,19 @@ public sealed partial class TimedBattleService
 
     private async Task<ChickenNpcUnit?> SpawnServiceNpcAsync(Match match, ChickenRun run, int npcId, int shopId, MapPoint at)
     {
-        if (data.Row("NPCConfig", npcId) is not { } npc) return null;
+        if (_data.Row("NPCConfig", npcId) is not { } npc) return null;
         var unit = new ChickenNpcUnit
         {
-            Uid = NpcUidBase + Interlocked.Increment(ref npcSerial), SceneEntry = ChickenScene, InstanceId = match.Room!.Id,
-            X = at.X, Y = at.Y, Z = at.Z, Face = at.Face, NpcId = npcId, Name = data.TextOf(npc, "_kName"), ShopId = shopId,
+            Uid = NpcUidBase + Interlocked.Increment(ref _npcSerial), SceneEntry = ChickenScene, InstanceId = match.Room!.Id,
+            X = at.X, Y = at.Y, Z = at.Z, Face = at.Face, NpcId = npcId, Name = _data.TextOf(npc, "_kName"), ShopId = shopId,
         };
-        if (!await instances.AddPropAsync(match.Room, unit)) return null;
+        if (!await _instances.AddPropAsync(match.Room, unit)) return null;
         run.Npcs.Add(unit);
         return unit;
     }
 
     /// <summary>ShopConfig: the chicken shop an NPC opens (801 for 15000054, 802 for 15000060), else 0.</summary>
-    private int ShopOfNpc(int npcId) => data.Table("ShopConfig").Values
+    private int ShopOfNpc(int npcId) => _data.Table("ShopConfig").Values
         .Where(r => GameData.Int(r, "_iShopType") == ChickenShopType && GameData.Int(r, "_iNpcId") == npcId)
         .Select(r => (int)GameData.Int(r, "_iShopId")).FirstOrDefault();
 
@@ -109,8 +109,8 @@ public sealed partial class TimedBattleService
     {
         if (run.ShopGoods.TryGetValue(shopId, out var goods)) return goods;
         goods = new List<int>();
-        var commodities = data.Table("ShopCommodityConfig").Values.ToArray();
-        foreach (var tab in data.Table("ShopConfig").Values
+        var commodities = _data.Table("ShopCommodityConfig").Values.ToArray();
+        foreach (var tab in _data.Table("ShopConfig").Values
             .Where(r => GameData.Int(r, "_iShopType") == ChickenShopType && GameData.Int(r, "_iShopId") == shopId)
             .OrderBy(r => GameData.Int(r, "_iClassID")))
         {
@@ -149,7 +149,7 @@ public sealed partial class TimedBattleService
         var resp = new GetDungeonShopResp();
         foreach (int id in ShopGoods(run, shopId))
         {
-            if (data.Row("ShopCommodityConfig", id) is not { } row) continue;
+            if (_data.Row("ShopCommodityConfig", id) is not { } row) continue;
             int left = LeftToBuy(me, row);
             resp.CommodityInfo[id] = new DungeonCommodityInfo { CommodityId = id, RemainCount = left, CanBuyCount = left < 0 ? 999 : left };
         }
@@ -190,7 +190,7 @@ public sealed partial class TimedBattleService
                 if (NpcInReach(run, session, req.NpcId, out result) is not { ShopId: > 0 } npc)
                 { if (result == 0) result = ErrorCodes.NpcParameter; return; }
                 if (req.Count <= 0 || !ShopGoods(run, npc.ShopId).Contains(req.CommodityId)
-                    || data.Row("ShopCommodityConfig", req.CommodityId) is not { } row) { result = ErrorCodes.NotForSale; return; }
+                    || _data.Row("ShopCommodityConfig", req.CommodityId) is not { } row) { result = ErrorCodes.NotForSale; return; }
                 int left = LeftToBuy(me, row);
                 if (left >= 0 && req.Count > left) { result = ErrorCodes.PurchaseLimit; return; }
                 if (!row.TryGetProperty("_kItemPerPrice", out var cost) || cost.ValueKind != JsonValueKind.Array || cost.GetArrayLength() < 2)
@@ -232,7 +232,7 @@ public sealed partial class TimedBattleService
             await RunMatchTransitionAsync(match, "chicken npc interact", async () =>
             {
                 if (NpcInReach(run, session, req.NpcUid, out result) is not { } npc) return;
-                if (data.Row("NPCConfig", npc.NpcId) is not { } row || !row.TryGetProperty("_iInteractID", out var ids)
+                if (_data.Row("NPCConfig", npc.NpcId) is not { } row || !row.TryGetProperty("_iInteractID", out var ids)
                     || ids.ValueKind != JsonValueKind.Array || ids.EnumerateArray().All(x => GameData.Number(x) != req.InteractionId))
                     result = ErrorCodes.NpcParameter;
                 else if (npc.NpcId == MagicDie && (result = CanAct(run, me, session)) == 0)

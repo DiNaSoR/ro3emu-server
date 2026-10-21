@@ -48,15 +48,15 @@ public sealed partial class CombatService
     private IEnumerable<(int Chance, JsonElement Row)> LearnedProcs(GameSession s, JsonElement row, bool normal)
     {
         if (s.Progress is not { } progress) yield break;
-        if (normal && skills.Level(progress, BlitzBeatGroup) is var blitz and > 0
-            && data.Row("BuffConfig", skills.RealId(BlitzBeatGroup, blitz)) is { } blitzBuff
+        if (normal && _skills.Level(progress, BlitzBeatGroup) is var blitz and > 0
+            && _data.Row("BuffConfig", _skills.RealId(BlitzBeatGroup, blitz)) is { } blitzBuff
             && Numbers(blitzBuff, "_kLogicData") is [var chance, var autoGroup, ..]
-            && data.Row("SkillConfig", skills.RealId(BlitzBeatGroup, blitz)) is { } blitzRow && SkillConditionMet(s, blitzRow)
-            && data.Row("SkillConfig", skills.RealId((int)autoGroup, blitz)) is { } auto)
+            && _data.Row("SkillConfig", _skills.RealId(BlitzBeatGroup, blitz)) is { } blitzRow && SkillConditionMet(s, blitzRow)
+            && _data.Row("SkillConfig", _skills.RealId((int)autoGroup, blitz)) is { } auto)
             yield return ((int)chance, auto);
         if (GameData.Int(row, "_iSkillID") == CrimsonRockGroup && Numbers(row, "_kLogicData") is [var meteorChance, ..])
             foreach (long id in Numbers(row, "_kAutoLearnSkill"))
-                if (data.Row("SkillConfig", id) is { } meteor && Script(meteor) == "FireStar")
+                if (_data.Row("SkillConfig", id) is { } meteor && Script(meteor) == "FireStar")
                     yield return ((int)meteorChance, meteor);
     }
 
@@ -64,7 +64,7 @@ public sealed partial class CombatService
     private async Task BurnAsync(GameSession s, JsonElement row, List<(MonsterUnit Target, long Amount)> landed, Func<bool> current)
     {
         if (GameData.Int(row, "_iSkillID") != DragonBreathFireGroup || Numbers(row, "_kDescData") is not { Length: > 5 } desc
-            || data.Row("SkillConfig", DragonBurnRow) is not { } burn) return;
+            || _data.Row("SkillConfig", DragonBurnRow) is not { } burn) return;
         foreach (var (target, amount) in landed.DistinctBy(l => l.Target.Uid).ToArray())
         {
             if (!current()) break;
@@ -74,9 +74,9 @@ public sealed partial class CombatService
 
     private async Task EnchantBladeAsync(GameSession s, MonsterUnit target, JsonElement row, long amount)
     {
-        if (amount <= 0 || LiveGroup(s, EnchantBladeGroup) is not { } blade || data.Row("BuffConfig", blade.ConfigId) is not { } bladeRow
+        if (amount <= 0 || LiveGroup(s, EnchantBladeGroup) is not { } blade || _data.Row("BuffConfig", blade.ConfigId) is not { } bladeRow
             || Numbers(bladeRow, "_kLogicData") is not [var defId, ..]) return;
-        await buffs.AddAsync(s, (int)defId, EnchantBladeMs, s.Role!.Id);
+        await _buffs.AddAsync(s, (int)defId, EnchantBladeMs, s.Role!.Id);
     }
 
     private const int AdvancedKatarGroup = 15220;
@@ -84,60 +84,60 @@ public sealed partial class CombatService
     private long AdvancedKatarCrit(GameSession s, MonsterUnit target, JsonElement row, Romsg.DamageHitResult result, long damage)
     {
         if (result != Romsg.DamageHitResult.Critical || GameData.Int(row, "_iIsNormalAtk") != 1 || s.Progress is not { } progress
-            || skills.Level(progress, AdvancedKatarGroup) is not (var level and > 0)) return damage;
+            || _skills.Level(progress, AdvancedKatarGroup) is not (var level and > 0)) return damage;
         long now = MonsterService.NowMs;
         if (now < s.ProcState.GetValueOrDefault(AdvancedKatarGroup)
-            || data.Row("SkillConfig", skills.RealId(AdvancedKatarGroup, level)) is not { } skill
+            || _data.Row("SkillConfig", _skills.RealId(AdvancedKatarGroup, level)) is not { } skill
             || Numbers(skill, "_kDescData") is not { Length: > 2 } desc
-            || data.Row("BuffConfig", skills.RealId(AdvancedKatarGroup, level)) is not { } buff
+            || _data.Row("BuffConfig", _skills.RealId(AdvancedKatarGroup, level)) is not { } buff
             || Numbers(buff, "_kLogicData") is not [var critId, ..]) return damage;
         s.ProcState[AdvancedKatarGroup] = now + (long)(desc[0] * 1000);
         var role = s.Role;
         ScheduleRuntime(s.WorldScene, TimeSpan.Zero, async () =>
         {
-            if (ReferenceEquals(s.Role, role) && !s.Dead) await buffs.AddAsync(s, (int)critId, (int)(desc[2] * 1000), role!.Id);
+            if (ReferenceEquals(s.Role, role) && !s.Dead) await _buffs.AddAsync(s, (int)critId, (int)(desc[2] * 1000), role!.Id);
         });
         return damage;
     }
 
     private async Task SoulDrainAsync(GameSession s, MonsterUnit monster)
     {
-        if (s.Progress is not { } progress || s.Dead || skills.Level(progress, SoulDrainGroup) is not (var level and > 0)
-            || data.Row("SkillConfig", skills.RealId(SoulDrainGroup, level)) is not { } row
+        if (s.Progress is not { } progress || s.Dead || _skills.Level(progress, SoulDrainGroup) is not (var level and > 0)
+            || _data.Row("SkillConfig", _skills.RealId(SoulDrainGroup, level)) is not { } row
             || Numbers(row, "_kDescData") is not { Length: > 1 } desc) return;
-        var stats = character.Stats(s);
+        var stats = _character.Stats(s);
         long restore = (long)Math.Ceiling(stats[102] * desc[1] / 100);
-        if (restore > 0 && stats[2001] < stats[102]) await character.SetHpSpAsync(s, null, stats[2001] + restore);
+        if (restore > 0 && stats[2001] < stats[102]) await _character.SetHpSpAsync(s, null, stats[2001] + restore);
     }
 
     /// <summary>The learned and buff-borne answers to a monster's hit (any distance or type).</summary>
     private async Task ReactWithTriggersAsync(MonsterUnit attacker, GameSession p, long now)
     {
         var progress = p.Progress!;
-        if (skills.Level(progress, EnergyCoatGroup) is var coat and > 0 && now >= p.ProcState.GetValueOrDefault(EnergyCoatGroup)
-            && data.Row("SkillConfig", skills.RealId(EnergyCoatGroup, coat)) is { } coatRow
+        if (_skills.Level(progress, EnergyCoatGroup) is var coat and > 0 && now >= p.ProcState.GetValueOrDefault(EnergyCoatGroup)
+            && _data.Row("SkillConfig", _skills.RealId(EnergyCoatGroup, coat)) is { } coatRow
             && Numbers(coatRow, "_kDescData") is { Length: > 2 } coatDesc
-            && data.Row("BuffConfig", EnergyCoatBuffRow) is { } coatBuff && Numbers(coatBuff, "_kLogicData") is [var coatId, ..])
+            && _data.Row("BuffConfig", EnergyCoatBuffRow) is { } coatBuff && Numbers(coatBuff, "_kLogicData") is [var coatId, ..])
         {
             p.ProcState[EnergyCoatGroup] = now + (long)(coatDesc[2] * 1000);
-            await buffs.AddAsync(p, (int)coatId, (int)(coatDesc[0] * 1000), p.Role!.Id);
+            await _buffs.AddAsync(p, (int)coatId, (int)(coatDesc[0] * 1000), p.Role!.Id);
         }
         if (attacker.Dead || attacker.Hp <= 0) return;
         if (LiveGroup(p, ShrinkGroup) is { } shrink && LiveGroup(p, AutoGuardGroup) != null
             && now >= p.ProcState.GetValueOrDefault(ShrinkGroup)
-            && data.Row("SkillConfig", skills.RealId(RecoilSkill, Math.Max(1, skills.Level(progress, RecoilSkill)))) is { } recoil
+            && _data.Row("SkillConfig", _skills.RealId(RecoilSkill, Math.Max(1, _skills.Level(progress, RecoilSkill)))) is { } recoil
             && Numbers(recoil, "_kDescData") is { Length: > 4 } rdesc
             && MonsterService.Distance(attacker, p) <= rdesc[4]
-            && data.Row("BuffConfig", shrink.ConfigId) is { } shrinkRow && Numbers(shrinkRow, "_kLogicData") is [var answerGroup, ..]
-            && data.Row("SkillConfig", skills.RealId((int)answerGroup, 1)) is { } answer
+            && _data.Row("BuffConfig", shrink.ConfigId) is { } shrinkRow && Numbers(shrinkRow, "_kLogicData") is [var answerGroup, ..]
+            && _data.Row("SkillConfig", _skills.RealId((int)answerGroup, 1)) is { } answer
             && Rolls.Proc(10000) < rdesc[1] * 100)
         {
             p.ProcState[ShrinkGroup] = now + (long)(rdesc[3] * 1000);
             await ProcCastAsync(p, answer, attacker);
         }
         if (LiveGroup(p, ShieldDefenseOrbitGroup) is { } orbit && now >= p.ProcState.GetValueOrDefault(ShieldDefenseOrbitGroup)
-            && data.Row("BuffConfig", orbit.ConfigId) is { } orbitRow && Numbers(orbitRow, "_kLogicData") is [var counterGroup, ..]
-            && data.Row("SkillConfig", skills.RealId((int)counterGroup, Math.Max(1, skills.Level(progress, ShieldDefenseSkill)))) is { } counter
+            && _data.Row("BuffConfig", orbit.ConfigId) is { } orbitRow && Numbers(orbitRow, "_kLogicData") is [var counterGroup, ..]
+            && _data.Row("SkillConfig", _skills.RealId((int)counterGroup, Math.Max(1, _skills.Level(progress, ShieldDefenseSkill)))) is { } counter
             && InFront(p, attacker))
         {
             var cdesc = Numbers(counter, "_kDescData");

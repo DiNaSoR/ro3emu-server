@@ -27,35 +27,35 @@ public sealed class ItemAutoUseTests : IAsyncLifetime
     private const int TradableVoucher = 3003101, TradableLook = 10030417; // _iTrade 2
     private const int ActivatedAppearance = 200, ActivatedMounts = 201, AddPetIncubateRoomExp = 603; // ActionConfig
 
-    private readonly string directory = Path.Combine(RepoRoot(), ".loadtest-temp", "auto-use-" + Guid.NewGuid().ToString("N"));
-    private WebApplication app = null!;
-    private string http = "";
+    private readonly string _directory = Path.Combine(RepoRoot(), ".loadtest-temp", "auto-use-" + Guid.NewGuid().ToString("N"));
+    private WebApplication _app = null!;
+    private string _http = "";
     private static readonly TimeSpan Wait = TimeSpan.FromSeconds(10);
-    private T Service<T>() where T : notnull => app.Services.GetRequiredService<T>();
+    private T Service<T>() where T : notnull => _app.Services.GetRequiredService<T>();
     private GameSession Alice => Service<SessionRegistry>().All().Single(s => s.Account == "autousealice" && s.Role != null);
 
     public async Task InitializeAsync()
     {
         var (web, micro, game) = TestPorts.FreePorts();
-        app = ServerHost.Create([], o =>
+        _app = ServerHost.Create([], o =>
         {
-            o.DataDir = directory; o.GameDataDir = Path.Combine(RepoRoot(), "data");
+            o.DataDir = _directory; o.GameDataDir = Path.Combine(RepoRoot(), "data");
             o.HttpPort = web; o.MicroGatePort = micro; o.GameGatePort = game;
         });
-        await app.StartAsync();
-        http = $"http://127.0.0.1:{web}";
+        await _app.StartAsync();
+        _http = $"http://127.0.0.1:{web}";
     }
 
     public async Task DisposeAsync()
     {
-        await app.StopAsync(); await app.DisposeAsync();
+        await _app.StopAsync(); await _app.DisposeAsync();
         SqliteConnection.ClearAllPools();
-        try { Directory.Delete(directory, true); } catch (IOException) { }
+        try { Directory.Delete(_directory, true); } catch (IOException) { }
     }
 
     private async Task<BotClient> Enter()
     {
-        var bot = new BotClient(http, File.ReadAllText(Path.Combine(directory, "gate_rsa_public.pem")));
+        var bot = new BotClient(_http, File.ReadAllText(Path.Combine(_directory, "gate_rsa_public.pem")));
         await bot.LoginAsync("autousealice", "pw"); await bot.EnterGateAsync();
         long role = (await bot.CreateRoleAsync("AutoUseAlice")).RoleBaseInfo.Id;
         await bot.EnterWorldAsync(role);
@@ -66,7 +66,7 @@ public sealed class ItemAutoUseTests : IAsyncLifetime
     private async Task Gm(string command)
     {
         using var client = new HttpClient();
-        (await client.PostAsync(http + "/ro3emu/gm?account=autousealice", new StringContent(command))).EnsureSuccessStatusCode();
+        (await client.PostAsync(_http + "/ro3emu/gm?account=autousealice", new StringContent(command))).EnsureSuccessStatusCode();
     }
 
     private static async Task<T> Next<T>(BotClient bot, uint id, MessageParser<T> parser, Func<T, bool>? match = null) where T : IMessage<T> =>

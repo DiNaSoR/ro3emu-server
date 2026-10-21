@@ -12,7 +12,7 @@ public sealed partial class SkillCombatTests
     private Task<MonsterUnit> Spawn(string name, Func<MonsterTemplate, MonsterTemplate> change) => Loop.InvokeAsync(async () =>
     {
         var s = Session(name);
-        var monsters = app.Services.GetRequiredService<MonsterService>();
+        var monsters = _app.Services.GetRequiredService<MonsterService>();
         var template = change(monsters.Template(5000001)! with { RoamDistance = 0 });
         var unit = await monsters.SpawnSingleAsync(s.SceneEntry, 5000001, new MapPoint(s.Position.X, s.Position.Y, s.Position.Z, 0),
             s.InstanceId, customTemplate: template);

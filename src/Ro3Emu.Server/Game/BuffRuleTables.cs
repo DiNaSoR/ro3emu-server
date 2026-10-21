@@ -48,7 +48,7 @@ internal sealed partial class BuffRuleTables
 
     public static BuffRuleTables For(GameData data) => Cache.GetValue(data, d => new BuffRuleTables(d));
 
-    private readonly GameData data;
+    private readonly GameData _data;
     private readonly ConcurrentDictionary<long, int> _sceneDecay = new();
 
     public IReadOnlyDictionary<int, TagRule> Tags { get; }
@@ -65,7 +65,7 @@ internal sealed partial class BuffRuleTables
 
     private BuffRuleTables(GameData data)
     {
-        this.data = data;
+        this._data = data;
         var tags = new Dictionary<int, TagRule>();
         foreach (var row in data.Table("BuffTagConfig").Values)
         {
@@ -185,8 +185,8 @@ internal sealed partial class BuffRuleTables
     /// <summary>The decay type of a map: DungeonConfig._iDecayType, else WorldConfig's, 0 meaning the default set.</summary>
     public int DecayTypeOf(long sceneEntry) => _sceneDecay.GetOrAdd(sceneEntry, scene =>
     {
-        long type = data.Row("DungeonConfig", scene) is { } dungeon ? GameData.Int(dungeon, "_iDecayType")
-            : data.Row("WorldConfig", scene) is { } world ? GameData.Int(world, "_iDecayType") : 0;
+        long type = _data.Row("DungeonConfig", scene) is { } dungeon ? GameData.Int(dungeon, "_iDecayType")
+            : _data.Row("WorldConfig", scene) is { } world ? GameData.Int(world, "_iDecayType") : 0;
         return type > 0 ? (int)type : DefaultDecayType;
     });
 
@@ -237,7 +237,7 @@ internal sealed partial class BuffRuleTables
         long ratio = Ints(row, "_kData1").FirstOrDefault();
         if (GameData.Int(row, "_iType") == 1 && dmgType is 1 or 2 && ratio > 0
             && row.TryGetProperty("_iDescription", out var healDesc) && healDesc.ValueKind == JsonValueKind.Array
-            && healDesc.GetArrayLength() > 0 && healDesc[0].TryGetInt64(out long healText) && ContinuousHealText().IsMatch(data.Text(healText)))
+            && healDesc.GetArrayLength() > 0 && healDesc[0].TryGetInt64(out long healText) && ContinuousHealText().IsMatch(_data.Text(healText)))
             return new PeriodicRule(id, PeriodicKind.Heal, 1000, dmgType == 2, 0, ratio, 0, 0, Ints(row, "_kData2").FirstOrDefault(), default);
         if (GameData.Int(row, "_iType") != 2 || dmgType is not (1 or 2) || ratio <= 0) return null;
         int interval = 0;
@@ -245,7 +245,7 @@ internal sealed partial class BuffRuleTables
         else if (row.TryGetProperty("_iDescription", out var desc) && desc.ValueKind == JsonValueKind.Array
                  && desc.GetArrayLength() > 0 && desc[0].TryGetInt64(out long textId))
         {
-            string text = data.Text(textId);
+            string text = _data.Text(textId);
             if (!HurtsText().IsMatch(text)) return null;
             if (EveryFirstParameter().IsMatch(text) && desc.GetArrayLength() > 1 && GameData.Number(desc[1]) is { } seconds)
                 interval = (int)Math.Round(seconds * 1000);

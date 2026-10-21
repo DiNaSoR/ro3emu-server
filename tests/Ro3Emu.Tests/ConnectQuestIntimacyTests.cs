@@ -9,35 +9,35 @@ namespace Ro3Emu.Tests;
 /// <summary>Activity Intimacy (Connect Quests): both directions, a daily limit per pair, the maximum, friends only.</summary>
 public sealed class ConnectQuestIntimacyTests : IDisposable
 {
-    private readonly string directory = Path.Combine(Path.GetTempPath(), "ro3-connect-" + Guid.NewGuid().ToString("N"));
-    private readonly AccountStore accounts;
-    private readonly RoleStore roles;
-    private readonly FriendStore friends;
+    private readonly string _directory = Path.Combine(Path.GetTempPath(), "ro3-connect-" + Guid.NewGuid().ToString("N"));
+    private readonly AccountStore _accounts;
+    private readonly RoleStore _roles;
+    private readonly FriendStore _friends;
 
     public ConnectQuestIntimacyTests()
     {
-        accounts = new AccountStore(Options.Create(new ServerOptions { DataDir = directory }));
-        roles = new RoleStore(accounts);
-        friends = new FriendStore(accounts);
+        _accounts = new AccountStore(Options.Create(new ServerOptions { DataDir = _directory }));
+        _roles = new RoleStore(_accounts);
+        _friends = new FriendStore(_accounts);
     }
 
-    private long Role(string name) => roles.Create("test-account", 1, name, 1, 1000, 1)!.Id;
+    private long Role(string name) => _roles.Create("test-account", 1, name, 1, 1000, 1)!.Id;
 
     [Fact]
     public async Task ActivityIntimacyIsSharedLimitedPerDayAndOnlyForFriends()
     {
         long a = Role("Alice"), b = Role("Bob"), c = Role("Carol");
-        friends.Link(a, b);
-        Assert.Equal(600, await friends.AddActivityIntimacyAsync(a, b, 600, day: 1, dailyLimit: 1000, max: 180000));
-        Assert.Equal(600, friends.Intimacy(b, a));
-        Assert.Equal(1000, await friends.AddActivityIntimacyAsync(b, a, 600, day: 1, dailyLimit: 1000, max: 180000));
-        Assert.Null(await friends.AddActivityIntimacyAsync(a, b, 5, day: 1, dailyLimit: 1000, max: 180000)); // today's limit
-        Assert.Equal(1005, await friends.AddActivityIntimacyAsync(a, b, 5, day: 2, dailyLimit: 1000, max: 180000)); // next day
-        Assert.Equal(1010, await friends.AddActivityIntimacyAsync(a, b, 50, day: 3, dailyLimit: 1000, max: 1010)); // maximum
-        Assert.Equal(1010, friends.Intimacy(a, b));
-        Assert.Equal(1010, friends.Intimacy(b, a));
-        Assert.Null(await friends.AddActivityIntimacyAsync(a, c, 5, day: 3, dailyLimit: 1000, max: 180000)); // not friends
-        Assert.Null(await friends.AddActivityIntimacyAsync(a, a, 5, day: 3, dailyLimit: 1000, max: 180000));
+        _friends.Link(a, b);
+        Assert.Equal(600, await _friends.AddActivityIntimacyAsync(a, b, 600, day: 1, dailyLimit: 1000, max: 180000));
+        Assert.Equal(600, _friends.Intimacy(b, a));
+        Assert.Equal(1000, await _friends.AddActivityIntimacyAsync(b, a, 600, day: 1, dailyLimit: 1000, max: 180000));
+        Assert.Null(await _friends.AddActivityIntimacyAsync(a, b, 5, day: 1, dailyLimit: 1000, max: 180000)); // today's limit
+        Assert.Equal(1005, await _friends.AddActivityIntimacyAsync(a, b, 5, day: 2, dailyLimit: 1000, max: 180000)); // next day
+        Assert.Equal(1010, await _friends.AddActivityIntimacyAsync(a, b, 50, day: 3, dailyLimit: 1000, max: 1010)); // maximum
+        Assert.Equal(1010, _friends.Intimacy(a, b));
+        Assert.Equal(1010, _friends.Intimacy(b, a));
+        Assert.Null(await _friends.AddActivityIntimacyAsync(a, c, 5, day: 3, dailyLimit: 1000, max: 180000)); // not friends
+        Assert.Null(await _friends.AddActivityIntimacyAsync(a, a, 5, day: 3, dailyLimit: 1000, max: 180000));
     }
 
     [Fact]
@@ -52,8 +52,8 @@ public sealed class ConnectQuestIntimacyTests : IDisposable
 
     public void Dispose()
     {
-        accounts.Dispose();
+        _accounts.Dispose();
         SqliteConnection.ClearAllPools();
-        try { Directory.Delete(directory, true); } catch (IOException) { }
+        try { Directory.Delete(_directory, true); } catch (IOException) { }
     }
 }

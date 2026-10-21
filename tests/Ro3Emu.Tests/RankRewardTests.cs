@@ -18,10 +18,10 @@ public sealed class RankRewardTests
 
     private sealed class TestClock : TimeProvider
     {
-        private long seconds = new DateTimeOffset(2026, 10, 6, 4, 0, 0, TimeSpan.Zero).ToUnixTimeSeconds();
-        public override DateTimeOffset GetUtcNow() => DateTimeOffset.FromUnixTimeSeconds(Interlocked.Read(ref seconds));
+        private long _seconds = new DateTimeOffset(2026, 10, 6, 4, 0, 0, TimeSpan.Zero).ToUnixTimeSeconds();
+        public override DateTimeOffset GetUtcNow() => DateTimeOffset.FromUnixTimeSeconds(Interlocked.Read(ref _seconds));
         public override TimeZoneInfo LocalTimeZone => TimeZoneInfo.Utc;
-        public void Advance(TimeSpan by) => Interlocked.Add(ref seconds, (long)by.TotalSeconds);
+        public void Advance(TimeSpan by) => Interlocked.Add(ref _seconds, (long)by.TotalSeconds);
     }
 
     [Fact]

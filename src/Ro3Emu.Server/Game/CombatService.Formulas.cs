@@ -101,7 +101,7 @@ public sealed partial class CombatService
         int branch = Script(row) switch
         {
             "Heal" => 1,
-            "HolyCross" => skills.Weapon(s).SubType == TwoHandedSpear ? 1 : 0,
+            "HolyCross" => _skills.Weapon(s).SubType == TwoHandedSpear ? 1 : 0,
             "Soul_Strike" => target is { } t && (t.Template.Element == UndeadElement || t.Template.Race == UndeadRace) ? 1 : 0,
             "Magnus_Exorcismus" => target is { } m && (m.Template.Race is UndeadRace or DemonRace
                 || m.Template.Element is ShadowElement or UndeadElement) ? 1 : 0,
@@ -116,8 +116,8 @@ public sealed partial class CombatService
     {
         if (target == null || target.Template.MaxHp <= 0) return 0;
         double hp = target.Hp * 10000.0 / target.Template.MaxHp;
-        if (s.Progress is { } p && skills.Level(p, SupersonicBlowGroup) > 0
-            && data.Row("SkillConfig", skills.RealId(SupersonicBlowGroup, skills.Level(p, SupersonicBlowGroup))) is { } super
+        if (s.Progress is { } p && _skills.Level(p, SupersonicBlowGroup) > 0
+            && _data.Row("SkillConfig", _skills.RealId(SupersonicBlowGroup, _skills.Level(p, SupersonicBlowGroup))) is { } super
             && Numbers(super, "_kDescData") is [var threshold and > 0, ..] && hp <= threshold * 100) return 2;
         var logic = Numbers(row, "_kLogicData");
         return logic.Length >= 3 && logic[1] == 101 && hp <= logic[2] ? 1 : 0;
@@ -130,12 +130,12 @@ public sealed partial class CombatService
     /// </summary>
     private long PreyOnTheWeak(GameSession s, MonsterUnit target, JsonElement row, DamageHitResult result, long amount)
     {
-        if (amount <= 0 || s.Progress is not { } p || skills.Level(p, PreyOnTheWeakGroup) is not (var level and > 0)
-            || data.Row("BuffConfig", skills.RealId(PreyOnTheWeakGroup, level)) is not { } buff
+        if (amount <= 0 || s.Progress is not { } p || _skills.Level(p, PreyOnTheWeakGroup) is not (var level and > 0)
+            || _data.Row("BuffConfig", _skills.RealId(PreyOnTheWeakGroup, level)) is not { } buff
             || Numbers(buff, "_kLogicData") is not [var bp and > 0, ..]) return amount;
         long now = Now;
-        bool afflicted = buffs.UnitBuffs(target).Any(b => b.ExpireMs > now
-            && data.Row("BuffConfig", b.ConfigId) is { } config && GameData.Int(config, "_iType") == 2);
+        bool afflicted = _buffs.UnitBuffs(target).Any(b => b.ExpireMs > now
+            && _data.Row("BuffConfig", b.ConfigId) is { } config && GameData.Int(config, "_iType") == 2);
         return afflicted ? (long)Math.Round(amount * (1 + bp / 10000)) : amount;
     }
 
@@ -203,13 +203,13 @@ public sealed partial class CombatService
     }
 
     private double[] AttackPoints(JsonElement row) =>
-        data.SkillTemplate(GameData.Int(row, "_iScriptShow")) is { } t ? Numbers(t, "m_kAtkPoints") : [];
+        _data.SkillTemplate(GameData.Int(row, "_iScriptShow")) is { } t ? Numbers(t, "m_kAtkPoints") : [];
 
     /// <summary>Lands a cast in its <see cref="HitPlan"/> packets: the first now (the impact), the rest at their offsets
     /// on the cast timeline. A packet finds its targets again when it lands.</summary>
     private async Task ApplyStagedEffectsAsync(GameSession s, ActiveSkillCast action, Vec3 center, IReadOnlyList<(double Point, HitStage Stage)> plan)
     {
-        var template = data.SkillTemplate(GameData.Int(action.Row, "_iScriptShow"));
+        var template = _data.SkillTemplate(GameData.Int(action.Row, "_iScriptShow"));
         int start = ImpactOffset(template, plan[0].Point, action.ChantMs, action.ActionMs);
         for (int i = 1; i < plan.Count; i++)
         {
@@ -241,7 +241,7 @@ public sealed partial class CombatService
         async Task NextAsync(int left)
         {
             if (!CurrentCastMap(s, action)) return;
-            var candidates = world.Map(s.WorldScene).Units.OfType<MonsterUnit>()
+            var candidates = _world.Map(s.WorldScene).Units.OfType<MonsterUnit>()
                 .Where(m => m.Hp > 0 && !m.Dead && !hit.Contains(m.Uid) && CanHitMonster(s, m) && Hostile(action, m)
                     && Distance(from, m.Pos) <= radius + 0.1f)
                 .OrderBy(m => m.Uid).ToList();
@@ -275,7 +275,7 @@ public sealed partial class CombatService
         string script = Script(row);
         var target = FindMonster(s.WorldScene, action.Request.TargetId);
         bool TargetOk() => target != null && target.Hp > 0 && CanHitMonster(s, target) && Hostile(action, target);
-        IEnumerable<MonsterUnit> Others() => world.Map(s.WorldScene).Units.OfType<MonsterUnit>()
+        IEnumerable<MonsterUnit> Others() => _world.Map(s.WorldScene).Units.OfType<MonsterUnit>()
             .Where(m => m != target && m.Hp > 0 && CanHitMonster(s, m) && Hostile(action, m));
         var logic = Numbers(row, "_kLogicData");
         if (script == "BlitzBeat" && logic is [var cm and > 0, var total and > 1, ..])

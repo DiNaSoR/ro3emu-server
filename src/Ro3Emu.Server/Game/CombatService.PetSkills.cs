@@ -36,7 +36,7 @@ public sealed partial class CombatService
         JsonElement? fallback = null;
         foreach (var id in Numbers(main, "_kAutoLearnSkill"))
         {
-            if (data.Row("SkillConfig", (long)id) is not { } row || GameData.Int(row, "_iSystemType") != GuardianSkill) continue;
+            if (_data.Row("SkillConfig", (long)id) is not { } row || GameData.Int(row, "_iSystemType") != GuardianSkill) continue;
             if (GameData.Int(row, "_iSkillID") == group) return row;
             fallback ??= row;
         }
@@ -45,7 +45,7 @@ public sealed partial class CombatService
 
     private async Task PetGuardianAsync(GameSession s, ActiveSkillCast action)
     {
-        if (GuardianRow(action.Row) is not { } row || skills.PetMainSkill?.Invoke(s) is not { } pet
+        if (GuardianRow(action.Row) is not { } row || _skills.PetMainSkill?.Invoke(s) is not { } pet
             || pet.SkillId != action.Request.SkillId) return;
         var target = FindMonster(s.WorldScene, action.Request.TargetId);
         if (target != null && !CanHitMonster(s, target)) target = null;

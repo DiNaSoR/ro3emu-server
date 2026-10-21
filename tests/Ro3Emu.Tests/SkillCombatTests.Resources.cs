@@ -9,8 +9,8 @@ namespace Ro3Emu.Tests;
 /// <summary>Class resources (Cross Ripper's blades, spellbook pages, spear charges, Shield Bash count) and stealth.</summary>
 public sealed partial class SkillCombatTests
 {
-    private GameData Data => app.Services.GetRequiredService<GameData>();
-    private MonsterService Monsters => app.Services.GetRequiredService<MonsterService>();
+    private GameData Data => _app.Services.GetRequiredService<GameData>();
+    private MonsterService Monsters => _app.Services.GetRequiredService<MonsterService>();
 
     private int ActionMs(int skill) => (int)GameData.Int(Data.Row("SkillConfig", skill)!.Value, "_iActionTime");
 

@@ -23,7 +23,7 @@ public sealed partial class TimedBattleService
 {
     public const uint AdventureSelect = 83421, AdventureRefresh = 83422, AdventureSync = 5039;
 
-    private JsonElement? AdventureDeck() => data.Row("AdventureDeckConfig", AdventureFunction);
+    private JsonElement? AdventureDeck() => _data.Row("AdventureDeckConfig", AdventureFunction);
 
     private static int[] DeckList(JsonElement deck, string field) =>
         deck.TryGetProperty(field, out var list) && list.ValueKind == JsonValueKind.Array
@@ -32,7 +32,7 @@ public sealed partial class TimedBattleService
     /// <summary>Weighted draw of distinct cards from the deck's pool.</summary>
     private List<long> DrawCards(ChickenRun run, int count)
     {
-        var pool = data.Table("AdventureCardConfig").Values
+        var pool = _data.Table("AdventureCardConfig").Values
             .Where(r => GameData.Int(r, "_iPoolId") == AdventureFunction)
             .Select(r => (Id: GameData.Int(r, "_iCardId"), Weight: Math.Max(0, GameData.Int(r, "_iWeight"))))
             .Where(c => c.Weight > 0).OrderBy(c => c.Id).ToList();
@@ -57,14 +57,14 @@ public sealed partial class TimedBattleService
         pick.Cards.Clear();
         int i = 1;
         foreach (long card in DrawCards(run, personal.Length > 0 && personal[0] > 0 ? personal[0] : 3)) pick.Cards[i++] = card;
-        pick.EndTime = time.GetUtcNow().ToUnixTimeSeconds() + AutoSelectSeconds();
+        pick.EndTime = _time.GetUtcNow().ToUnixTimeSeconds() + AutoSelectSeconds();
     }
 
     /// <summary>32700 on a die (TryChickenInteractAsync, inside the match transition): the die goes, a pick opens.</summary>
     private async Task TriggerAdventureAsync(Match match, ChickenRun run, GameSession session, ChickenPlayer me, ChickenNpcUnit die)
     {
         run.Npcs.Remove(die);
-        if (match.Room != null) await instances.RemovePropAsync(match.Room, die);
+        if (match.Room != null) await _instances.RemovePropAsync(match.Room, die);
         var personal = AdventureDeck() is { } deck ? DeckList(deck, "_kRewardStagePersonal") : [];
         var pick = new AdventureEventSelectInfo
         {
@@ -151,7 +151,7 @@ public sealed partial class TimedBattleService
         foreach (long card in cards)
         {
             me.Cards.Add(card);
-            if (data.Row("AdventureCardConfig", card) is not { } row || !row.TryGetProperty("_kEffect", out var effects)
+            if (_data.Row("AdventureCardConfig", card) is not { } row || !row.TryGetProperty("_kEffect", out var effects)
                 || effects.ValueKind != JsonValueKind.Array) continue;
             foreach (var effect in effects.EnumerateArray())
             {
@@ -180,7 +180,7 @@ public sealed partial class TimedBattleService
                 }
             }
         }
-        if (gear) await character.RefreshStatsAsync(session);
+        if (gear) await _character.RefreshStatsAsync(session);
         if (bag) await SyncRoundAsync(match, run, session);
         await SyncAdventureAsync(match, session, me);
     }
@@ -188,7 +188,7 @@ public sealed partial class TimedBattleService
     /// <summary>Per tick: picks past their endTime take the first card (inferred auto-selection).</summary>
     private async Task TickAdventureAsync(Match match, ChickenRun run)
     {
-        long now = time.GetUtcNow().ToUnixTimeSeconds();
+        long now = _time.GetUtcNow().ToUnixTimeSeconds();
         foreach (var (player, me) in run.Players.ToArray())
             foreach (var pick in me.Picks.Values.Where(p => p.EndTime <= now).ToArray())
             {
@@ -205,7 +205,7 @@ public sealed partial class TimedBattleService
         var pick = new AdventureEventSelectInfo
         {
             OperateId = ++me.NextOperate, PoolId = AdventureFunction, ChooseCount = 1,
-            EndTime = time.GetUtcNow().ToUnixTimeSeconds() + AutoSelectSeconds(),
+            EndTime = _time.GetUtcNow().ToUnixTimeSeconds() + AutoSelectSeconds(),
         };
         for (int i = 0; i < cards.Length; i++) pick.Cards[i + 1] = cards[i];
         me.Picks[pick.OperateId] = pick;

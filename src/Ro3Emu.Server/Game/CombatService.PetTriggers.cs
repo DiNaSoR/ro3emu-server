@@ -58,24 +58,24 @@ public sealed partial class CombatService
             state = TriggerState(s);
             if (state.NineTailGuid != nine.Buff.Guid)
                 (state.NineTailGuid, state.NineTailLeft) = (nine.Buff.Guid, Math.Max(1, (int)desc.ElementAtOrDefault(3)));
-            if (--state.NineTailLeft <= 0) await buffs.RemoveAsync(s, nine.Buff);
+            if (--state.NineTailLeft <= 0) await _buffs.RemoveAsync(s, nine.Buff);
         }
         if (!target.Dead && target.Hp > 0 && LivePetBuff(s, ExecutionGroup) is { Row: var execution }
             && Numbers(execution, "_kLogicData") is [var slow, var chance, var ms, ..])
         {
             using var tuple = JsonDocument.Parse($"[{(long)slow},{chance},{ms}]");
             if (RollHostileBuff(tuple.RootElement, s, null, null, target, out int id, out int duration))
-                await buffs.ShowOnUnitAsync(target, id, duration, s.Role!.Id);
+                await _buffs.ShowOnUnitAsync(target, id, duration, s.Role!.Id);
         }
         if (now >= (state?.IronBallReadyMs ?? 0) && LivePetBuff(s, IronBallGroup) is { Row: var ball }
-            && Numbers(ball, "_kLogicData") is [var ballId, ..] && data.Row("SkillConfig", (long)ballId) is { } ballRow)
+            && Numbers(ball, "_kLogicData") is [var ballId, ..] && _data.Row("SkillConfig", (long)ballId) is { } ballRow)
         {
             state = TriggerState(s);
             state.IronBallReadyMs = now + (long)(Numbers(ball, "_kDescData").ElementAtOrDefault(3) * 1000);
             AfterHit(s, () => target.Dead || target.Hp <= 0 ? Task.CompletedTask : ProcCastAsync(s, ballRow, target));
         }
         if (now >= (state?.FlameFistReadyMs ?? 0) && LivePetBuff(s, FlameFistGroup) is { Row: var fist }
-            && Numbers(fist, "_kLogicData") is [var fistId, ..] && data.Row("SkillConfig", (long)fistId) is { } fistRow)
+            && Numbers(fist, "_kLogicData") is [var fistId, ..] && _data.Row("SkillConfig", (long)fistId) is { } fistRow)
         {
             state = TriggerState(s);
             state.FlameFistReadyMs = now + (long)(desc.ElementAtOrDefault(6) * 1000);
@@ -90,13 +90,13 @@ public sealed partial class CombatService
         if (LivePetBuff(p, ReconGroup) is { Row: var recon } && Numbers(recon, "_kLogicData") is [var stackId, ..])
         {
             double seconds = Numbers(recon, "_kDescData").ElementAtOrDefault(3);
-            await buffs.AddAsync(p, (int)stackId, (int)((seconds > 0 ? seconds : 5) * 1000), p.Role.Id);
+            await _buffs.AddAsync(p, (int)stackId, (int)((seconds > 0 ? seconds : 5) * 1000), p.Role.Id);
         }
         if (LivePetBuff(p, BunnyDollGroup) is { } doll && Numbers(doll.Row, "_kLogicData") is [_, var bp, ..]
             && TriggerState(p) is var state && state.BunnyGuid != doll.Buff.Guid)
         {
             double below = MainSkillDesc(p).ElementAtOrDefault(2);
-            var stats = character.Stats(p);
+            var stats = _character.Stats(p);
             if (stats[2000] > 0 && stats[2000] * 100 < stats[101] * (below > 0 ? below : 50))
             {
                 state.BunnyGuid = doll.Buff.Guid;
@@ -133,7 +133,7 @@ public sealed partial class CombatService
         {
             var buff = s.Buffs.FirstOrDefault(b => b.Guid == guid);
             if (!ReferenceEquals(s.Role, role) || s.Dead || s.SceneLoading || buff == null
-                || buff.ExpireMs + GameLoop.TickInterval.TotalMilliseconds < due || data.Row("BuffConfig", buff.ConfigId) is not { } row)
+                || buff.ExpireMs + GameLoop.TickInterval.TotalMilliseconds < due || _data.Row("BuffConfig", buff.ConfigId) is not { } row)
             {
                 _petHealLoops.Remove(guid);
                 return;
@@ -148,9 +148,9 @@ public sealed partial class CombatService
     private async Task FlatHealAsync(GameSession p, long amount, int skillId)
     {
         if (amount <= 0 || p.Role == null || p.Dead) return;
-        var before = character.Stats(p);
+        var before = _character.Stats(p);
         long actual = Math.Min(amount, Math.Max(0, before[101] - before[2000]));
-        await character.SetHpSpAsync(p, before[2000] + actual, null);
+        await _character.SetHpSpAsync(p, before[2000] + actual, null);
         await ToPlayerAndViewersAsync(p, SkillHit, new SkillHitInfo
         {
             SrcID = p.Role.Id, SkillId = skillId, SessionId = ++_sessionIds,

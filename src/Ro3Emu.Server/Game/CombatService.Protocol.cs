@@ -30,7 +30,7 @@ public sealed partial class CombatService
     private int[]? _passiveGroups;
 
     private Dictionary<(int Group, int Level, int Mode), int> ConfiguredModeRows =>
-        _configuredModeRows ??= data.Table("SkillConfig").Values
+        _configuredModeRows ??= _data.Table("SkillConfig").Values
             .Where(r => GameData.Int(r, "_iSkillID") > 0 && GameData.Int(r, "_iLevel") > 0)
             .GroupBy(r => ((int)GameData.Int(r, "_iSkillID"), (int)GameData.Int(r, "_iLevel"), (int)GameData.Int(r, "_iMode")))
             .ToDictionary(g => g.Key, g => (int)GameData.Int(g.First(), "_iID"));
@@ -41,17 +41,17 @@ public sealed partial class CombatService
     /// </summary>
     public JsonElement? EffectiveSkillRow(GameSession session, int requestedRowId)
     {
-        if (session.Progress == null || data.Row("SkillConfig", requestedRowId) is not { } requested) return null;
+        if (session.Progress == null || _data.Row("SkillConfig", requestedRowId) is not { } requested) return null;
         SyncPassiveSkillModifiers(session);
         int group = (int)GameData.Int(requested, "_iSkillID"), level = (int)GameData.Int(requested, "_iLevel");
-        int mode = SkillParameterRules.Mode(group, SkillParameterRules.CategoriesOf(data, requested), SkillParameterRules.Active(session, data));
+        int mode = SkillParameterRules.Mode(group, SkillParameterRules.CategoriesOf(_data, requested), SkillParameterRules.Active(session, _data));
         int requestedMode = (int)GameData.Int(requested, "_iMode");
         if (requestedMode != 0 && requestedMode != mode) return null;
         if (mode != 0 && ConfiguredModeRows.TryGetValue((group, level, mode), out int selectedId)
-            && data.Row("SkillConfig", selectedId) is { } selected)
-            return SkillParameterRules.Effective(session, data, selected);
+            && _data.Row("SkillConfig", selectedId) is { } selected)
+            return SkillParameterRules.Effective(session, _data, selected);
         if (requestedMode != 0) return null;
-        return SkillParameterRules.Effective(session, data, requested);
+        return SkillParameterRules.Effective(session, _data, requested);
     }
 
     public bool SkillModeAllowed(GameSession session, JsonElement row) =>
@@ -61,13 +61,13 @@ public sealed partial class CombatService
     /// <summary>SkillConfig._iQueue plus BuffConfig type 44; never trusts a request's queue claim.</summary>
     public bool CanQueueSkill(GameSession session, int group)
     {
-        if (session.Progress == null || skills.Level(session.Progress, group) is not > 0) return false;
+        if (session.Progress == null || _skills.Level(session.Progress, group) is not > 0) return false;
         SyncPassiveSkillModifiers(session);
-        int rowId = skills.RealId(group, skills.Level(session.Progress, group));
-        if (data.Row("SkillConfig", rowId) is not { } row) return false;
+        int rowId = _skills.RealId(group, _skills.Level(session.Progress, group));
+        if (_data.Row("SkillConfig", rowId) is not { } row) return false;
         long allowed = GameData.Int(row, "_iQueue");
-        var tags = SkillParameterRules.CategoriesOf(data, row);
-        foreach (var mod in SkillParameterRules.Active(session, data))
+        var tags = SkillParameterRules.CategoriesOf(_data, row);
+        foreach (var mod in SkillParameterRules.Active(session, _data))
             if (mod.Type == 44 && SkillParameterRules.Matches(mod, group, tags)) allowed = SkillParameterRules.Apply(allowed, mod);
         return allowed != 0;
     }
@@ -87,30 +87,30 @@ public sealed partial class CombatService
     {
         if (session.Role == null || session.Progress == null) return;
         SyncPassiveSkillModifiers(session);
-        var mods = SkillParameterRules.Active(session, data);
+        var mods = SkillParameterRules.Active(session, _data);
         var update = new SkillBeAffectedParamExNotify { IsAll = true, Uuid = session.Role.Id };
         // Scope 0 names its group; a scope-1 tag selector reaches every learned skill whose row carries its tags.
         var groups = new SortedSet<int>(mods.Where(m => m.Scope == 0).Select(m => m.Group));
-        var stats = character.Stats(session);
+        var stats = _character.Stats(session);
         // per_sp_dedution changes every learned SP cost, so the client needs those skills' cost lists too.
         bool spDeduction = stats[SpDeductionAttribute] != 0;
         if (spDeduction)
             foreach (int learned in session.Progress.Skills.Keys)
-                if (skills.Level(session.Progress, learned) is var at and > 0
-                    && data.Row("SkillConfig", skills.RealId(learned, at)) is { } learnedRow && HasSpCost(learnedRow))
+                if (_skills.Level(session.Progress, learned) is var at and > 0
+                    && _data.Row("SkillConfig", _skills.RealId(learned, at)) is { } learnedRow && HasSpCost(learnedRow))
                     groups.Add(learned);
         if (mods.Any(m => m.Scope == 1))
             foreach (int learned in session.Progress.Skills.Keys)
-                if (skills.Level(session.Progress, learned) is var at and > 0
-                    && data.Row("SkillConfig", skills.RealId(learned, at)) is { } learnedRow
-                    && mods.Any(m => m.Scope == 1 && SkillParameterRules.Matches(m, learned, SkillParameterRules.CategoriesOf(data, learnedRow))))
+                if (_skills.Level(session.Progress, learned) is var at and > 0
+                    && _data.Row("SkillConfig", _skills.RealId(learned, at)) is { } learnedRow
+                    && mods.Any(m => m.Scope == 1 && SkillParameterRules.Matches(m, learned, SkillParameterRules.CategoriesOf(_data, learnedRow))))
                     groups.Add(learned);
         foreach (var group in groups)
         {
-            int level = skills.Level(session.Progress, group);
-            if (level <= 0 || data.Row("SkillConfig", skills.RealId(group, level)) is not { } baseRow) continue;
+            int level = _skills.Level(session.Progress, group);
+            if (level <= 0 || _data.Row("SkillConfig", _skills.RealId(group, level)) is not { } baseRow) continue;
             var row = EffectiveSkillRow(session, (int)GameData.Int(baseRow, "_iID")) ?? baseRow;
-            var tags = SkillParameterRules.CategoriesOf(data, baseRow);
+            var tags = SkillParameterRules.CategoriesOf(_data, baseRow);
             var groupInfo = new BeAffectedParamInfoEx();
             var types = mods.Where(m => SkillParameterRules.Matches(m, group, tags)).Select(m => m.Type);
             if (spDeduction) types = types.Append(35);
@@ -119,7 +119,7 @@ public sealed partial class CombatService
                 if (type == 35)
                 {
                     // Compared with the configured cost of the row the client casts (a mode row, when type 15 picks one).
-                    var configured = data.Row("SkillConfig", (int)GameData.Int(row, "_iID")) ?? baseRow;
+                    var configured = _data.Row("SkillConfig", (int)GameData.Int(row, "_iID")) ?? baseRow;
                     if (ClientCostList(stats, configured, row) is { } costs) groupInfo.AffectParam[type] = costs;
                 }
                 else if (type == 15) groupInfo.AffectParam[type] = new BeAffectedValueEx { AffectValue = SkillParameterRules.Mode(group, tags, mods) };
@@ -158,10 +158,10 @@ public sealed partial class CombatService
         foreach (int slot in session.Progress!.SkillBar.Keys.Concat(old.Keys).Distinct().Order())
         {
             int group = session.Progress.SkillBar.GetValueOrDefault(slot);
-            int learned = group > 0 ? skills.Level(session.Progress, group) : 0;
+            int learned = group > 0 ? _skills.Level(session.Progress, group) : 0;
             int selected = plan != null && slot > 0 && slot <= plan.ManualLoadSkill.Count
                 && plan.ManualLoadSkill[slot - 1].SkillId == group ? plan.ManualLoadSkill[slot - 1].SkillLevel : learned;
-            int baseId = learned > 0 && selected > 0 && selected <= learned ? skills.RealId(group, selected) : 0;
+            int baseId = learned > 0 && selected > 0 && selected <= learned ? _skills.RealId(group, selected) : 0;
             int next = baseId > 0 && EffectiveSkillRow(session, baseId) is { } row ? (int)GameData.Int(row, "_iID") : baseId;
             // A follow-up offered by a status buff takes the slot while it lasts (CombatService.Chains).
             if (baseId > 0 && ChainOffer(session, group) is { } chain) next = (int)GameData.Int(chain.Row, "_iID");
@@ -190,7 +190,7 @@ public sealed partial class CombatService
     {
         bool ownedSource = extra && OwnsActiveSkillSource(caster, info.SrcID);
         if (caster.Role == null || (info.SrcID != caster.Role.Id && !ownedSource) || info.SessionId <= 0
-            || data.Row("SkillConfig", info.SkillID) == null) return Task.CompletedTask;
+            || _data.Row("SkillConfig", info.SkillID) == null) return Task.CompletedTask;
         uint route = extra ? highLevel ? ExtraUseInSkillHigh : ExtraUseInSkill : highLevel ? UseInSkillHigh : UseInSkill;
         return ToPlayerAndViewersAsync(caster, route, info);
     }
@@ -198,15 +198,15 @@ public sealed partial class CombatService
     public Task SendMonsterTimelineAsync(MonsterUnit monster, UseInSkillInfo info, bool highLevel = false, bool extra = false)
     {
         if (monster.Dead || info.SrcID != monster.Uid || info.SessionId <= 0
-            || data.Row("SkillConfig", info.SkillID) == null) return Task.CompletedTask;
+            || _data.Row("SkillConfig", info.SkillID) == null) return Task.CompletedTask;
         uint route = extra ? highLevel ? ExtraUseInSkillHigh : ExtraUseInSkill : highLevel ? UseInSkillHigh : UseInSkill;
-        return world.ToUnitViewersAsync(monster, route, info);
+        return _world.ToUnitViewersAsync(monster, route, info);
     }
 
     /// <summary>Standalone presentation only, after the script resolves a real effect; never replaces 31101.</summary>
     public Task SendSkillEffectAsync(GameSession source, SkillEffectDisplayNotify effect, bool highLevel = false) =>
         source.Role != null && effect.SourceId == source.Role.Id && effect.EffectId > 0
-            && data.Row("SkillConfig", effect.SkillId) != null
+            && _data.Row("SkillConfig", effect.SkillId) != null
             ? ToPlayerAndViewersAsync(source, highLevel ? SkillEffectHigh : SkillEffect, effect) : Task.CompletedTask;
 
     private readonly System.Collections.Concurrent.ConcurrentDictionary<long, (int Effect, int FlightMs, float Speed, int IntervalMs)> _serverBullets = new();
@@ -221,10 +221,10 @@ public sealed partial class CombatService
     internal (int Effect, int FlightMs, float Speed, int IntervalMs) ServerBullet(long scriptShow) => scriptShow <= 0 ? default
         : _serverBullets.GetOrAdd(scriptShow, show =>
         {
-            if (data.SkillTemplate(show) is not { } template || template.TryGetProperty("m_kClientPoints", out _)) return default;
+            if (_data.SkillTemplate(show) is not { } template || template.TryGetProperty("m_kClientPoints", out _)) return default;
             var referenced = new HashSet<long>();
             CollectNumbers(template, referenced);
-            var effects = data.SkillTemplateTable("Lua_Config_EffectData");
+            var effects = _data.SkillTemplateTable("Lua_Config_EffectData");
             (int Effect, int FlightMs, float Speed, int IntervalMs) found = default;
             int count = 0;
             for (long id = show * 100; id < show * 100 + 100; id++)
@@ -269,7 +269,7 @@ public sealed partial class CombatService
     /// <summary>Server-timed bullet only when a skill script owns projectile travel.</summary>
     public Task SendSkillBulletAsync(GameSession source, SkillFixTimeBulletNotify bullet, bool highLevel = false) =>
         source.Role != null && bullet.SourceId == source.Role.Id && bullet.EffectId > 0 && bullet.FixedTime > 0
-            && data.Row("SkillConfig", bullet.SkillConfigId) != null
+            && _data.Row("SkillConfig", bullet.SkillConfigId) != null
             ? ToPlayerAndViewersAsync(source, highLevel ? SkillBulletHigh : SkillBullet, bullet) : Task.CompletedTask;
 
     /// <summary>Reflect a real target eligibility transition for an AOI-visible unit (31122).</summary>
@@ -302,10 +302,10 @@ public sealed partial class CombatService
     /// </summary>
     public async Task BossCooldownStartedAsync(MonsterUnit boss, int skillId, long endMs)
     {
-        if (boss.Dead || endMs <= Now || skillId == boss.Template.NormalSkill || data.Row("SkillConfig", skillId) == null
-            || data.Row("NPCConfig", boss.Template.NpcId) is not { } npc || GameData.Int(npc, "_iImportantSkill") != 1) return;
+        if (boss.Dead || endMs <= Now || skillId == boss.Template.NormalSkill || _data.Row("SkillConfig", skillId) == null
+            || _data.Row("NPCConfig", boss.Template.NpcId) is not { } npc || GameData.Int(npc, "_iImportantSkill") != 1) return;
         boss.BossSkillCds[skillId] = endMs;
-        await world.ToUnitViewersAsync(boss, BossSkillCd,
+        await _world.ToUnitViewersAsync(boss, BossSkillCd,
             new BossSkillShowCdNotify { SkillId = skillId, EndSkillCdTime = endMs, BossUId = boss.Uid });
     }
 
@@ -313,9 +313,9 @@ public sealed partial class CombatService
     public async Task BossCooldownSnapshotAsync(GameSession viewer, BossAllSkillShowCdReq request)
     {
         var response = new BossAllSkillShowCdRes { BossUId = request.BossUId };
-        var boss = world.Map(viewer.WorldScene).Units.OfType<MonsterUnit>()
+        var boss = _world.Map(viewer.WorldScene).Units.OfType<MonsterUnit>()
             .FirstOrDefault(m => m.Uid == request.BossUId && !m.Dead && m.Viewers.Contains(viewer));
-        if (viewer.Role == null || boss == null || data.Row("NPCConfig", boss.Template.NpcId) is not { } npc
+        if (viewer.Role == null || boss == null || _data.Row("NPCConfig", boss.Template.NpcId) is not { } npc
             || GameData.Int(npc, "_iImportantSkill") != 1) response.Result = ErrorCodes.SkillTargetInvalid;
         else foreach (var (skillId, end) in boss.BossSkillCds.Where(x => x.Value > Now).OrderBy(x => x.Key))
             response.BossSkillCds.Add(new BossSkillShowCdNotify { SkillId = skillId, EndSkillCdTime = end, BossUId = boss.Uid });
@@ -335,7 +335,7 @@ public sealed partial class CombatService
         if (source.Role == null || (entry.DamageSourceId != source.Role.Id
             && !OwnsActiveSkillSource(source, entry.DamageSourceId)) || entry.SkillId == 0 && entry.BuffId == 0) return;
         var notification = new DamageStatisticsNotify { Damages = { entry } };
-        foreach (var viewer in world.Viewers(source).Prepend(source).Distinct())
+        foreach (var viewer in _world.Viewers(source).Prepend(source).Distinct())
             if (viewer.Role != null && !viewer.SkillProtocol.TrainingPaused)
                 await viewer.SendGameAsync(DamageStatistics, notification);
     }

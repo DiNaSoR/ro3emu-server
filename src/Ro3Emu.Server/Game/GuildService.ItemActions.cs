@@ -21,13 +21,13 @@ public sealed partial class GuildService
     private const int GuildStoreClass = 2702, FundsCurrency = 104;
     private const int IconRight = 5; // GuildPermissionConfig 5 "Change Icon" (32230 tp 3)
 
-    private bool itemActionsHooked;
+    private bool _itemActionsHooked;
 
     /// <summary>On the first guild login, as HookDeposits: the item actions reserve the actor's own guild keys.</summary>
     private void HookItemActions()
     {
-        if (itemActionsHooked) return;
-        itemActionsHooked = true;
+        if (_itemActionsHooked) return;
+        _itemActionsHooked = true;
         character.RegisterItemAction(UnlockBadgeAction, UseBadgeItemAsync, keys: OwnGuildKeys);
         character.RegisterItemAction(MemberPackageAction, UsePackageItemAsync, keys: OwnGuildKeys);
     }

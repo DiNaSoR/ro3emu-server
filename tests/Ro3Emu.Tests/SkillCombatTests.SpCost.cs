@@ -37,7 +37,7 @@ public sealed partial class SkillCombatTests
         await Loop.InvokeAsync(async () =>
         {
             player.StatusBits |= 1L << 15; player.LastCombatMs = long.MaxValue / 2; // no regeneration under test
-            await app.Services.GetRequiredService<BuffService>().AddAsync(player, 1420410, 600000, player.Role!.Id);
+            await _app.Services.GetRequiredService<BuffService>().AddAsync(player, 1420410, 600000, player.Role!.Id);
         });
         var notice = await Next(alice, CombatService.SkillAffectedEx, SkillBeAffectedParamExNotify.Parser,
             n => n.AffectParamDict.ContainsKey(14001) && n.AffectParamDict[14001].AffectParam.ContainsKey(35));
@@ -63,10 +63,10 @@ public sealed partial class SkillCombatTests
         await using var alice = await InWorld("Alice");
         await Gm("alice", "!job 1400"); // Paladin: basic attack 1001101
         var player = Session("alice");
-        var combat = app.Services.GetRequiredService<CombatService>();
-        var skills = app.Services.GetRequiredService<SkillService>();
+        var combat = _app.Services.GetRequiredService<CombatService>();
+        var skills = _app.Services.GetRequiredService<SkillService>();
         // Sacrifice 10 (buff 1150110) switches basic attacks 10011/10012/11400 to mode 10, whose rows cost 30 HP.
-        await Loop.InvokeAsync(() => app.Services.GetRequiredService<BuffService>().AddAsync(player, 1150110, 600000, player.Role!.Id));
+        await Loop.InvokeAsync(() => _app.Services.GetRequiredService<BuffService>().AddAsync(player, 1150110, 600000, player.Role!.Id));
         int normal = await Loop.InvokeAsync(() => Task.FromResult(skills.NormalAttack(player)));
         var row = await Loop.InvokeAsync(() => Task.FromResult(combat.EffectiveSkillRow(player, normal)));
         Assert.NotNull(row);

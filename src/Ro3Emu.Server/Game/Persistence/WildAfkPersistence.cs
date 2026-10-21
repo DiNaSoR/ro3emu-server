@@ -12,11 +12,11 @@ namespace Ro3Emu.Server.Game.Persistence;
 /// </summary>
 public sealed class WildAfkPersistence : LazyRolePart
 {
-    private readonly RoleStore roles;
+    private readonly RoleStore _roles;
 
     public WildAfkPersistence(RoleStore roles, GameLoop loop, ILogger<WildAfkPersistence> log) : base(loop, roles, log)
     {
-        this.roles = roles;
+        this._roles = roles;
         Interval = TimeSpan.FromSeconds(30);
     }
 
@@ -28,6 +28,6 @@ public sealed class WildAfkPersistence : LazyRolePart
     protected override Func<long, long, long, Task<bool>> Capture(GameSession s)
     {
         byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(s.WildAfk!);
-        return (role, epoch, revision) => roles.SaveBlobLazyAsync(role, epoch, revision, "wild_afk", bytes);
+        return (role, epoch, revision) => _roles.SaveBlobLazyAsync(role, epoch, revision, "wild_afk", bytes);
     }
 }

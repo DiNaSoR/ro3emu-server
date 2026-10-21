@@ -56,7 +56,7 @@ public sealed partial class SkillCombatTests
         await using var alice = await InWorld("Alice");
         var target = await Target("alice", stationary: true);
         await Loop.InvokeAsync(() => { target.Hp = 1_000_000_000; return Task.CompletedTask; });
-        int normal = await Loop.InvokeAsync(() => Task.FromResult(app.Services.GetRequiredService<SkillService>().NormalAttack(Session("alice"))));
+        int normal = await Loop.InvokeAsync(() => Task.FromResult(_app.Services.GetRequiredService<SkillService>().NormalAttack(Session("alice"))));
 
         await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = normal, TargetId = target.Uid });
         var first = await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser);
@@ -85,7 +85,7 @@ public sealed partial class SkillCombatTests
         await Gm("alice", "!job 3100");
         var session = Session("alice");
         await Loop.InvokeAsync(() => { session.Items.RemoveAll(i => i.Grid is 1 or 2); return Task.CompletedTask; });
-        Assert.Equal(1000001, await Loop.InvokeAsync(() => Task.FromResult(app.Services.GetRequiredService<SkillService>().NormalAttack(session))));
+        Assert.Equal(1000001, await Loop.InvokeAsync(() => Task.FromResult(_app.Services.GetRequiredService<SkillService>().NormalAttack(session))));
         var target = await Target("alice", stationary: true);
 
         await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1300001, TargetId = target.Uid });
@@ -110,7 +110,7 @@ public sealed partial class SkillCombatTests
         }
 
         // The same walk to a real point next to the player moves it.
-        var nav = app.Services.GetRequiredService<WorldData>().Map(session.SceneEntry)!.Nav!;
+        var nav = _app.Services.GetRequiredService<WorldData>().Map(session.SceneEntry)!.Nav!;
         var step = new[] { (1f, 0f), (-1f, 0f), (0f, 1f), (0f, -1f) }
             .Select(o => new Vec3 { X = start.X + o.Item1, Y = start.Y, Z = start.Z + o.Item2 })
             .First(p => nav.IsWalkable(p.X, p.Y, p.Z) && nav.CanWalk(start.X, start.Y, start.Z, p.X, p.Z));

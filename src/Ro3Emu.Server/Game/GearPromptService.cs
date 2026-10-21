@@ -23,23 +23,16 @@ namespace Ro3Emu.Server.Game;
 /// GUIDs already in the bag at login, unequipped gear and gear moved between packs keep their GUIDs, so they never
 /// count as new. Only appraised gear gets a row of its own: CanFastEquip refuses the rest.
 /// </summary>
-public sealed class GearPromptService
+public sealed class GearPromptService(CharacterService character, GameData data, GameLoop loop)
 {
     /// <summary>Long enough for a grant's own 5009 + 31322 pair to go out first.</summary>
     internal static TimeSpan FlushDelay { get; set; } = TimeSpan.FromMilliseconds(800);
 
     private const int ManifestFloat = 1, ItemTypeEquip = 5;
 
-    private readonly CharacterService character;
-    private readonly GameData data;
-    private readonly GameLoop loop;
-
-    public GearPromptService(CharacterService character, GameData data, GameLoop loop)
-    {
-        this.character = character;
-        this.data = data;
-        this.loop = loop;
-    }
+    private readonly CharacterService _character = character;
+    private readonly GameData _data = data;
+    private readonly GameLoop _loop = loop;
 
     private sealed class State
     {
@@ -57,10 +50,10 @@ public sealed class GearPromptService
         session.BeforeGameSend = (msgId, body) => Observe(session, state, msgId, body);
     }
 
-    private bool IsEquipment(int entry) => data.Row("ItemConfig", entry) is { } row && GameData.Int(row, "_iType") == ItemTypeEquip;
+    private bool IsEquipment(int entry) => _data.Row("ItemConfig", entry) is { } row && GameData.Int(row, "_iType") == ItemTypeEquip;
 
     private bool InBag(InvItem item) => item.Grid == 0 && item.Guid > 0
-        && data.Row("ItemConfig", item.Entry) is { } row && item.Pack == CharacterService.ConfigPack(row);
+        && _data.Row("ItemConfig", item.Entry) is { } row && item.Pack == CharacterService.ConfigPack(row);
 
     private void Observe(GameSession session, State state, uint msgId, IMessage body)
     {
@@ -82,7 +75,7 @@ public sealed class GearPromptService
         state.FlushScheduled = true;
         long role = session.Role?.Id ?? 0;
         var attachment = session.Attachment;
-        loop.Schedule(FlushDelay, async () =>
+        _loop.Schedule(FlushDelay, async () =>
         {
             state.FlushScheduled = false;
             if (role == 0 || session.Role?.Id != role || !ReferenceEquals(session.Attachment, attachment)
@@ -111,7 +104,7 @@ public sealed class GearPromptService
             int left = row.Stack - fresh.Count;
             foreach (var item in fresh)
             {
-                var shown = character.ItemInfoOf(item);
+                var shown = _character.ItemInfoOf(item);
                 // A drop notice row carries the set-up source key the dropped-item flight reads.
                 notify.Rewards.Insert(r++, shown);
                 Mark(state, item.Guid);
@@ -136,7 +129,7 @@ public sealed class GearPromptService
         state.Pending.Clear();
         if (rows.Count == 0 || session.Role is not { } role) return;
         var notify = new GetRewardNotify { TargetUid = role.Id, RewardType = { ManifestFloat } };
-        foreach (var item in rows) notify.Rewards.Add(character.ItemInfoOf(item));
+        foreach (var item in rows) notify.Rewards.Add(_character.ItemInfoOf(item));
         await session.SendGameAsync(CharacterService.GetRewardNotify, notify);
     }
 }

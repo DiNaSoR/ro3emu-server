@@ -35,7 +35,7 @@ public sealed partial class CombatService
     private void WireChains()
     {
         CastLanded.Add(ChainCastLandedAsync);
-        buffs.Changed.Add(DropOlderChainStatusAsync);
+        _buffs.Changed.Add(DropOlderChainStatusAsync);
     }
 
     /// <summary>The live status buff on <paramref name="slotGroup"/>'s slot and the row it offers.</summary>
@@ -45,9 +45,9 @@ public sealed partial class CombatService
         // The newest status wins (Thousand Shadows' Shadow Loop Status over the one it spends).
         foreach (var buff in s.Buffs.OrderByDescending(b => b.ExpireMs == 0 ? long.MaxValue : b.ExpireMs))
         {
-            if (buff.ExpireMs != 0 && buff.ExpireMs <= now || data.Row("BuffConfig", buff.ConfigId) is not { } row
+            if (buff.ExpireMs != 0 && buff.ExpireMs <= now || _data.Row("BuffConfig", buff.ConfigId) is not { } row
                 || !ChainStatusSlots.TryGetValue((int)GameData.Int(row, "_iBuffID"), out int slot) || slot != slotGroup
-                || Numbers(row, "_kLogicData") is not [var next, ..] || data.Row("SkillConfig", (long)next) is not { } offered) continue;
+                || Numbers(row, "_kLogicData") is not [var next, ..] || _data.Row("SkillConfig", (long)next) is not { } offered) continue;
             return (buff, offered);
         }
         return null;
@@ -63,9 +63,9 @@ public sealed partial class CombatService
         foreach (int slot in ChainStatusSlots.Values.Distinct())
         {
             if (ChainOffer(s, slot) is not { } newest) continue;
-            var older = s.Buffs.Where(b => !ReferenceEquals(b, newest.Buff) && data.Row("BuffConfig", b.ConfigId) is { } row
+            var older = s.Buffs.Where(b => !ReferenceEquals(b, newest.Buff) && _data.Row("BuffConfig", b.ConfigId) is { } row
                 && ChainStatusSlots.TryGetValue((int)GameData.Int(row, "_iBuffID"), out int other) && other == slot).ToArray();
-            foreach (var buff in older) await buffs.RemoveAsync(s, buff);
+            foreach (var buff in older) await _buffs.RemoveAsync(s, buff);
         }
     }
 
@@ -75,19 +75,19 @@ public sealed partial class CombatService
         // A follow-up that grants the next status (Thousand Shadows) leaves the spent one to DropOlderChainStatusAsync,
         // so the slot goes straight to the next skill; the last one (Shadow Loop) spends it now and the slot goes back.
         bool continues = Tuples(row, "_kBuff1").Any(tuple => tuple.ValueKind == JsonValueKind.Array && tuple.GetArrayLength() > 0
-            && data.Row("BuffConfig", (long)(GameData.Number(tuple[0]) ?? 0)) is { } granted
+            && _data.Row("BuffConfig", (long)(GameData.Number(tuple[0]) ?? 0)) is { } granted
             && ChainStatusSlots.ContainsKey((int)GameData.Int(granted, "_iBuffID")));
         if (!continues)
             foreach (int slot in ChainStatusSlots.Values.Distinct())
                 if (ChainOffer(s, slot) is { } offer && GameData.Int(offer.Row, "_iID") == id)
-                    await buffs.RemoveAsync(s, offer.Buff);
+                    await _buffs.RemoveAsync(s, offer.Buff);
         string script = Script(row);
         if (script.StartsWith(ShadowEchoScript, StringComparison.Ordinal) && script != ShadowEchoReturnScript)
             s.ShadowEchoPos = s.Position.Clone();
         else if (script == ShadowEchoReturnScript && s.ShadowEchoPos is { } shadow)
         {
             s.ShadowEchoPos = null;
-            await scene.TeleportInMapAsync(s, new MapPoint(shadow.X, shadow.Y, shadow.Z, s.Face));
+            await _scene.TeleportInMapAsync(s, new MapPoint(shadow.X, shadow.Y, shadow.Z, s.Face));
         }
     }
 }

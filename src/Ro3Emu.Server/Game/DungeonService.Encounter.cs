@@ -49,19 +49,19 @@ public sealed partial class DungeonService
 
     private readonly Random _encounterRandom = new();
 
-    private ReconstructedDungeons? reconstructed;
+    private ReconstructedDungeons? _reconstructed;
 
     /// <summary>From the constructor (optional: a fixture without the reconstruction leaves it null).</summary>
     private void UseReconstruction(ReconstructedDungeons? value)
     {
-        reconstructed = value;
-        combat.NonPlayerKillCredit.Add(KillCredit);
+        _reconstructed = value;
+        _combat.NonPlayerKillCredit.Add(KillCredit);
     }
 
     /// <summary>A companion's lethal hit on the boss is settled as the first living participant's kill.</summary>
     private GameSession? KillCredit(MonsterUnit target)
     {
-        if (instances.Find(target.InstanceId) is not { } room) return null;
+        if (_instances.Find(target.InstanceId) is not { } room) return null;
         var members = room.ActiveMembers.Select(m => m.Session).ToArray();
         if (members.Select(s => s.DungeonAttempt).FirstOrDefault(a => a?.Encounter != null) is not { } a) return null;
         return Present(a).FirstOrDefault(s => !s.Dead && a.Loaded.Contains(s)) ?? Present(a).FirstOrDefault(a.Loaded.Contains);
@@ -72,23 +72,23 @@ public sealed partial class DungeonService
 
     private async Task BeginEncounterAsync(Attempt a)
     {
-        if (reconstructed?.EncounterFor(a.Plan.SceneEntry) is not { } def || a.Settled || a.Room.Closed) return;
+        if (_reconstructed?.EncounterFor(a.Plan.SceneEntry) is not { } def || a.Settled || a.Room.Closed) return;
         if (a.Room.Monsters.FirstOrDefault(m => m.Template.NpcId == def.Boss && !m.Dead) is not { } boss) return;
         boss.ScriptedTargeting = true;
         var run = new EncounterRun { Def = def, Boss = boss, StageStartMs = MonsterService.NowMs };
         a.Encounter = run;
         foreach (var skill in def.BossSkills) run.BossReady[skill.Skill] = run.StageStartMs + 3000; // a short opening (inferred)
-        log.LogInformation("Story encounter {Name} starts in room {Room}", def.Name, a.Room.Id);
+        _log.LogInformation("Story encounter {Name} starts in room {Room}", def.Name, a.Room.Id);
         await BroadcastAsync(a, BaseInfo, Snapshot(a)); // the tracker shows stage 1's quest
         await BeginStageAsync(a, run);
         ScheduleEncounterTick(a, run);
     }
 
-    private void ScheduleEncounterTick(Attempt a, EncounterRun run) => loop.ScheduleLegacy(TimeSpan.FromMilliseconds(TickMs), async () =>
+    private void ScheduleEncounterTick(Attempt a, EncounterRun run) => _loop.ScheduleLegacy(TimeSpan.FromMilliseconds(TickMs), async () =>
     {
         if (run.Done || a.Settled || a.Room.Closed || !ReferenceEquals(a.Encounter, run)) return;
         try { await TickEncounterAsync(a, run); }
-        catch (Exception e) { log.LogError(e, "Story encounter {Name} tick failed", run.Def.Name); }
+        catch (Exception e) { _log.LogError(e, "Story encounter {Name} tick failed", run.Def.Name); }
         ScheduleEncounterTick(a, run);
     });
 
@@ -106,7 +106,7 @@ public sealed partial class DungeonService
         {
             if (a.Settled || a.Room.Closed) return;
             if (await SpawnAllyAsync(a, run, spec) is { } ally && ally.Unit.Template.NpcId == stage.FirstTarget)
-                monsters.Engage(run.Boss, ally.Unit);
+                _monsters.Engage(run.Boss, ally.Unit);
         }
         run.NextRetargetMs = MonsterService.NowMs + run.Def.RetargetMs;
         if (run.Stage > 0) await BroadcastAsync(a, BaseInfo, Snapshot(a)); // the tracker moves to the next quest
@@ -115,15 +115,15 @@ public sealed partial class DungeonService
 
     private async Task<AllyState?> SpawnAllyAsync(Attempt a, EncounterRun run, EncounterAlly spec)
     {
-        if (catalog.ScenePoint(a.Plan.SceneEntry, spec.Point) is not { } at || monsters.Template(spec.NpcId) is not { } template
+        if (_catalog.ScenePoint(a.Plan.SceneEntry, spec.Point) is not { } at || _monsters.Template(spec.NpcId) is not { } template
             || !run.Def.Kits.TryGetValue(spec.NpcId, out var kit)) return null;
         // The kit's first damaging row is the companion's swing (the story templates name none of their own).
-        var normal = kit.Skills.Select(id => data.Row("SkillConfig", id)).FirstOrDefault(r => r is { } row
+        var normal = kit.Skills.Select(id => _data.Row("SkillConfig", id)).FirstOrDefault(r => r is { } row
             && GameData.Int(row, "_iDmgType") == 1);
         if (normal is { } swing)
         {
             int ms = (int)Math.Max(300, GameData.Int(swing, "_iActionTime"));
-            float hitPoint = data.SkillTemplate(GameData.Int(swing, "_iScriptShow")) is { } tpl && tpl.TryGetProperty("m_kAtkPoints", out var pts)
+            float hitPoint = _data.SkillTemplate(GameData.Int(swing, "_iScriptShow")) is { } tpl && tpl.TryGetProperty("m_kAtkPoints", out var pts)
                 && pts.ValueKind == JsonValueKind.Array && pts.GetArrayLength() > 0 && GameData.Number(pts[0]) is { } hp ? (float)hp : 0.2f;
             template = template with
             {
@@ -137,11 +137,11 @@ public sealed partial class DungeonService
             };
         }
         else template = template with { NormalSkill = 0, Aggressive = false, RoamDistance = 0, SpeedCm = 0 };
-        if (await instances.SpawnAsync(a.Room, spec.NpcId, at, customTemplate: template) is not { } unit) return null;
+        if (await _instances.SpawnAsync(a.Room, spec.NpcId, at, customTemplate: template) is not { } unit) return null;
         unit.ScriptedTargeting = true;
         var ally = new AllyState { Unit = unit, Kit = kit };
         run.Allies.Add(ally);
-        if (normal != null) monsters.Engage(unit, run.Boss);
+        if (normal != null) _monsters.Engage(unit, run.Boss);
         return ally;
     }
 
@@ -157,7 +157,7 @@ public sealed partial class DungeonService
         {
             run.Ending = true;
             SayLines(a, run, stage.EndLines);
-            loop.ScheduleLegacy(TimeSpan.FromMilliseconds(stage.EndDelayMs), async () =>
+            _loop.ScheduleLegacy(TimeSpan.FromMilliseconds(stage.EndDelayMs), async () =>
             {
                 if (run.Done || a.Settled || a.Room.Closed || boss.Dead) return;
                 run.Stage++;
@@ -184,7 +184,7 @@ public sealed partial class DungeonService
         if (args.Length == 1 && args[0].Equals("next", StringComparison.OrdinalIgnoreCase))
         {
             if (!await SkipEncounterStageAsync(a)) throw new ArgumentException("the encounter is on its last stage");
-            log.LogWarning("GM test aid: {Role} skips story encounter {Name} to stage {Stage}", s.Role?.Id, run.Def.Name, run.Stage + 1);
+            _log.LogWarning("GM test aid: {Role} skips story encounter {Name} to stage {Stage}", s.Role?.Id, run.Def.Name, run.Stage + 1);
         }
         var boss = run.Boss;
         await GmCommands.ReplyAsync(s, FormattableString.Invariant(
@@ -204,7 +204,7 @@ public sealed partial class DungeonService
         if (now >= run.NextRetargetMs || targetLost)
         {
             run.NextRetargetMs = now + run.Def.RetargetMs;
-            if (run.Provoker is { Dead: false } provoker && now < run.ProvokeUntilMs) monsters.Engage(boss, provoker);
+            if (run.Provoker is { Dead: false } provoker && now < run.ProvokeUntilMs) _monsters.Engage(boss, provoker);
             else
             {
                 // Weighted: a player counts twice a companion (inferred: the scene is the player's fight).
@@ -214,7 +214,7 @@ public sealed partial class DungeonService
                 foreach (var (player, unit, weight) in pool)
                 {
                     if ((roll -= weight) >= 0) continue;
-                    if (player != null) monsters.Retarget(boss, player); else monsters.Engage(boss, unit!);
+                    if (player != null) _monsters.Retarget(boss, player); else _monsters.Engage(boss, unit!);
                     break;
                 }
             }
@@ -226,7 +226,7 @@ public sealed partial class DungeonService
         float distance = MonsterService.Distance(boss.X, boss.Z, at.X, at.Z);
         foreach (var skill in run.Def.BossSkills)
         {
-            if (now < run.BossReady.GetValueOrDefault(skill.Skill) || data.Row("SkillConfig", skill.Skill) is not { } row) continue;
+            if (now < run.BossReady.GetValueOrDefault(skill.Skill) || _data.Row("SkillConfig", skill.Skill) is not { } row) continue;
             if (distance > Math.Max(4f, GameData.Int(row, "_iDistanceMax") / 100f)) continue;
             await CastBossSkillAsync(a, run, skill, row, at, now);
             return;
@@ -244,8 +244,8 @@ public sealed partial class DungeonService
         boss.NextSwingMs = Math.Max(boss.NextSwingMs, boss.BusyUntilMs + 300);
         run.BossReady[skill.Skill] = now + Math.Max(1000, GameData.Int(row, "_iCD"));
         run.BossNextCastMs = boss.BusyUntilMs + run.Def.BossSkillGapMs;
-        await world.MoveUnitAsync(boss, new MovementChangeNtf { Uid = boss.Uid, MovementInfo = boss.CurrentMovement(now) });
-        await combat.SendMonsterTimelineAsync(boss, new UseInSkillInfo
+        await _world.MoveUnitAsync(boss, new MovementChangeNtf { Uid = boss.Uid, MovementInfo = boss.CurrentMovement(now) });
+        await _combat.SendMonsterTimelineAsync(boss, new UseInSkillInfo
         {
             SrcID = boss.Uid, SkillID = skill.Skill, TargetId = boss.Target?.Role?.Id ?? boss.MonsterTarget?.Uid ?? 0,
             TargetPos = new Vec3 { X = at.X, Y = boss.Y, Z = at.Z }, Face = boss.Face, SessionId = castId,
@@ -254,14 +254,14 @@ public sealed partial class DungeonService
         if (skill.Line != 0 && run.SaidSkillLines.Add(skill.Line)) SayLines(a, run, [new EncounterLine(skill.Line, 0, 0)]);
         (float X, float Z, float Face) origin = (boss.X, boss.Z, boss.Face);
         foreach (var hit in skill.Hits)
-            loop.ScheduleLegacy(TimeSpan.FromMilliseconds(hit.Ms), async () =>
+            _loop.ScheduleLegacy(TimeSpan.FromMilliseconds(hit.Ms), async () =>
             {
                 if (run.Done || a.Settled || a.Room.Closed || boss.Dead || boss.Hp <= 0) return;
                 var players = Present(a).Where(p => p.Role != null && !p.Dead && !p.SceneLoading && p.WorldScene == boss.WorldScene
                     && InArea(hit, origin, p.Position.X, p.Position.Z)).ToArray();
-                if (players.Length > 0) await combat.MonsterSkillHitAsync(boss, row, players, boss.Uid, session: castId, scaleBp: hit.ShareBp);
+                if (players.Length > 0) await _combat.MonsterSkillHitAsync(boss, row, players, boss.Uid, session: castId, scaleBp: hit.ShareBp);
                 foreach (var ally in run.Allies.Select(s => s.Unit).Where(u => !u.Dead && InArea(hit, origin, u.X, u.Z)).ToArray())
-                    await combat.MonsterDamagesMonsterAsync(boss, ally, row, castId, hit.ShareBp);
+                    await _combat.MonsterDamagesMonsterAsync(boss, ally, row, castId, hit.ShareBp);
             });
     }
 
@@ -301,11 +301,11 @@ public sealed partial class DungeonService
             await TickSupportAsync(a, run, ally, now);
             return;
         }
-        if (unit.MonsterTarget == null && !run.Boss.Dead) monsters.Engage(unit, run.Boss);
+        if (unit.MonsterTarget == null && !run.Boss.Dead) _monsters.Engage(unit, run.Boss);
         float distance = MonsterService.Distance(unit.X, unit.Z, run.Boss.X, run.Boss.Z);
         foreach (int id in ally.Kit.Skills)
         {
-            if (id == unit.Template.NormalSkill || now < ally.Ready.GetValueOrDefault(id) || data.Row("SkillConfig", id) is not { } row) continue;
+            if (id == unit.Template.NormalSkill || now < ally.Ready.GetValueOrDefault(id) || _data.Row("SkillConfig", id) is not { } row) continue;
             bool damaging = GameData.Int(row, "_iDmgType") != 0;
             float reach = GameData.Int(row, "_iDistanceMax") / 100f;
             if (damaging && distance > Math.Max(unit.Template.AttackRange, reach) + 0.5f) continue;
@@ -325,7 +325,7 @@ public sealed partial class DungeonService
         var units = run.Allies.Select(s => s.Unit).Where(u => !u.Dead && MonsterService.Distance(unit.X, unit.Z, u.X, u.Z) <= AllyReach).ToArray();
         foreach (int id in ally.Kit.Skills)
         {
-            if (now < ally.Ready.GetValueOrDefault(id) || data.Row("SkillConfig", id) is not { } row) continue;
+            if (now < ally.Ready.GetValueOrDefault(id) || _data.Row("SkillConfig", id) is not { } row) continue;
             int max = (int)Math.Max(1, GameData.Int(row, "_iTargetMax"));
             if (GameData.Int(row, "_iDmgType") == 0)
             {
@@ -347,7 +347,7 @@ public sealed partial class DungeonService
 
     private double HpPct(GameSession p)
     {
-        var stats = character.Stats(p);
+        var stats = _character.Stats(p);
         return stats[2000] * 100.0 / Math.Max(1, stats[101]);
     }
 
@@ -360,17 +360,17 @@ public sealed partial class DungeonService
         unit.BusyUntilMs = now + actionMs;
         long castId = Interlocked.Increment(ref _encounterCasts);
         var first = players.Select(p => (Id: p.Role!.Id, Pos: p.Position.Clone())).Concat(units.Select(u => (Id: u.Uid, Pos: u.Pos))).FirstOrDefault();
-        await combat.SendMonsterTimelineAsync(unit, new UseInSkillInfo
+        await _combat.SendMonsterTimelineAsync(unit, new UseInSkillInfo
         {
             SrcID = unit.Uid, SkillID = id, TargetId = first.Id, TargetPos = first.Pos ?? unit.Pos, Face = unit.Face,
             SessionId = castId, SkillMs = actionMs, StartTime = now,
         });
         int hitMs = HitMs(row, actionMs);
-        loop.ScheduleLegacy(TimeSpan.FromMilliseconds(hitMs), async () =>
+        _loop.ScheduleLegacy(TimeSpan.FromMilliseconds(hitMs), async () =>
         {
             if (unit.Dead) return;
-            if (heal) await combat.MonsterHealsAsync(unit, row, players, units, castId);
-            else await combat.MonsterBuffsAsync(unit, row, players, units);
+            if (heal) await _combat.MonsterHealsAsync(unit, row, players, units, castId);
+            else await _combat.MonsterBuffsAsync(unit, row, players, units);
         });
     }
 
@@ -385,12 +385,12 @@ public sealed partial class DungeonService
         unit.NextSwingMs = Math.Max(unit.NextSwingMs, unit.BusyUntilMs);
         if (damaging) unit.Face = MonsterService.Angle(unit.X, unit.Z, boss.X, boss.Z);
         long castId = Interlocked.Increment(ref _encounterCasts);
-        await combat.SendMonsterTimelineAsync(unit, new UseInSkillInfo
+        await _combat.SendMonsterTimelineAsync(unit, new UseInSkillInfo
         {
             SrcID = unit.Uid, SkillID = id, TargetId = damaging ? boss.Uid : unit.Uid, TargetPos = damaging ? boss.Pos : unit.Pos,
             Face = unit.Face, SessionId = castId, SkillMs = actionMs, StartTime = now,
         });
-        loop.ScheduleLegacy(TimeSpan.FromMilliseconds(HitMs(row, actionMs)), async () =>
+        _loop.ScheduleLegacy(TimeSpan.FromMilliseconds(HitMs(row, actionMs)), async () =>
         {
             if (unit.Dead || run.Done || a.Settled || a.Room.Closed) return;
             if (!damaging)
@@ -401,25 +401,25 @@ public sealed partial class DungeonService
                 var players = party ? Present(a).Where(p => p.Role != null && !p.Dead && MonsterService.Distance(unit, p) <= radius).ToArray() : [];
                 var units = party ? run.Allies.Select(s => s.Unit).Where(u => !u.Dead && MonsterService.Distance(unit.X, unit.Z, u.X, u.Z) <= radius)
                     .Cast<WorldUnit>().ToArray() : [unit];
-                await combat.MonsterBuffsAsync(unit, row, players, units);
+                await _combat.MonsterBuffsAsync(unit, row, players, units);
                 return;
             }
             if (boss.Dead || boss.Hp <= 0) return;
-            await combat.MonsterDamagesMonsterAsync(unit, boss, row, castId);
+            await _combat.MonsterDamagesMonsterAsync(unit, boss, row, castId);
             // Provoke (its _kBuff1 1109401 is the taunt): the boss turns on the swordman for the buff's time (inferred).
             if (Script(row) == "Provoke" && Tuples(row, "_kBuff1").FirstOrDefault() is { ValueKind: JsonValueKind.Array } taunt)
             {
                 run.Provoker = unit;
                 run.ProvokeUntilMs = MonsterService.NowMs + (long)(GameData.Number(taunt[2]) ?? 10000);
                 run.NextRetargetMs = 0;
-                await combat.MonsterBuffsAsync(unit, row, [], [boss]);
+                await _combat.MonsterBuffsAsync(unit, row, [], [boss]);
             }
         });
     }
 
     /// <summary>The first hit mark of the row's timeline (m_kAtkPoints), else 40% of its action time (as tower pets).</summary>
     private int HitMs(JsonElement row, int actionMs) =>
-        data.SkillTemplate(GameData.Int(row, "_iScriptShow")) is { } tpl && tpl.TryGetProperty("m_kAtkPoints", out var pts)
+        _data.SkillTemplate(GameData.Int(row, "_iScriptShow")) is { } tpl && tpl.TryGetProperty("m_kAtkPoints", out var pts)
         && pts.ValueKind == JsonValueKind.Array && pts.GetArrayLength() > 0 && GameData.Number(pts[0]) is { } s && s > 0
             ? (int)(s * 1000) : (int)(actionMs * 0.4);
 
@@ -443,7 +443,7 @@ public sealed partial class DungeonService
     private void SayLines(Attempt a, EncounterRun run, IReadOnlyList<EncounterLine> lines)
     {
         foreach (var line in lines)
-            loop.ScheduleLegacy(TimeSpan.FromMilliseconds(line.Ms), async () =>
+            _loop.ScheduleLegacy(TimeSpan.FromMilliseconds(line.Ms), async () =>
             {
                 if (run.Done && line.Ms > 0 || a.Room.Closed) return;
                 await SayAsync(a, run, line);
@@ -452,7 +452,7 @@ public sealed partial class DungeonService
 
     private async Task SayAsync(Attempt a, EncounterRun run, EncounterLine line)
     {
-        if (data.Row("ChatConfig", line.Chat) is not { } chat) return;
+        if (_data.Row("ChatConfig", line.Chat) is not { } chat) return;
         var speaker = line.By == 0 ? null
             : line.By == run.Boss.Template.NpcId ? run.Boss
             : run.Allies.Select(s => s.Unit).FirstOrDefault(u => u.Template.NpcId == line.By && !u.Dead);

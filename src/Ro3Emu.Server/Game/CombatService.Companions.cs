@@ -40,7 +40,7 @@ public sealed partial class CombatService
     /// <summary>The row's _iSkillCondition holds (no condition, or an unknown clause type, holds).</summary>
     internal bool SkillConditionMet(GameSession s, JsonElement row) =>
         GameData.Int(row, "_iSkillCondition") is not (var id and > 0)
-        || data.Row("LC_ConditionList", id) is not { } condition || ConditionMet(s, condition);
+        || _data.Row("LC_ConditionList", id) is not { } condition || ConditionMet(s, condition);
 
     private bool ConditionMet(GameSession s, JsonElement node)
     {
@@ -65,17 +65,17 @@ public sealed partial class CombatService
         [2006, var pendant, ..] => HasPendantType(s, (int)pendant),
         [2007, var pendant, ..] => !HasPendantType(s, (int)pendant),
         // CheckSceneFlyable (LC_ConditionDefine): the map allows flight (MapConfig _iFly), e.g. Take Flight's 86000558.
-        [2009, var flag, ..] => (data.Row("MapConfig", s.SceneEntry) is { } map && GameData.Int(map, "_iFly") == 1) == (flag != 0),
+        [2009, var flag, ..] => (_data.Row("MapConfig", s.SceneEntry) is { } map && GameData.Int(map, "_iFly") == 1) == (flag != 0),
         _ => true,
     };
 
     /// <summary>CheckEquipStatue: any worn ItemConfig _iType 5 (equipment) item of that subtype.</summary>
     private bool EquipsSubType(GameSession s, int subType) => s.Items.Any(i => i.Grid > 0
-        && data.Row("ItemConfig", i.Entry) is { } item && GameData.Int(item, "_iType") == 5 && GameData.Int(item, "_iSubType") == subType);
+        && _data.Row("ItemConfig", i.Entry) is { } item && GameData.Int(item, "_iType") == 5 && GameData.Int(item, "_iSubType") == subType);
 
     /// <summary>LC_Pendant_Manager.HasPendantByConfigId: a shown pendant whose PendantConfig _iType matches.</summary>
     private bool HasPendantType(GameSession s, int type) =>
-        s.CareerPendants.Any(p => data.Row("PendantConfig", p) is { } row && GameData.Int(row, "_iType") == type);
+        s.CareerPendants.Any(p => _data.Row("PendantConfig", p) is { } row && GameData.Int(row, "_iType") == type);
 
     private bool RidesWolf(GameSession s) => RiddenMountType(s) == WolfMountType;
 
@@ -87,7 +87,7 @@ public sealed partial class CombatService
     public async Task FlightChangedAsync(GameSession s)
     {
         await SyncCompanionsAsync(s);
-        await skills.RefreshMountSkillAsync(s);
+        await _skills.RefreshMountSkillAsync(s);
     }
 
     public async Task SyncCompanionsAsync(GameSession s)
@@ -96,36 +96,36 @@ public sealed partial class CombatService
         var want = new HashSet<int>();
         var info = s.CareerSpecial;
         foreach (long lease in new[] { info?.PendantSlot?.CartRemouldCfg ?? 0, info?.MountsSlot?.CartRemouldCfg ?? 0 })
-            if (lease != 0 && data.Row("CartRemouldTable", lease) is { } cart && GameData.Int(cart, "_iPendantBuffID") is var buff and > 0
+            if (lease != 0 && _data.Row("CartRemouldTable", lease) is { } cart && GameData.Int(cart, "_iPendantBuffID") is var buff and > 0
                 && s.CareerPendants.Contains((int)GameData.Int(cart, "_iPendantId")))
                 want.Add((int)buff);
         long ride = MountService.RidingBattle(s);
-        if (ride != 0 && data.Row("CartRemouldTable", ride) is { } mount)
+        if (ride != 0 && _data.Row("CartRemouldTable", ride) is { } mount)
             foreach (var bound in Numbers(mount, "_kBindBuff")) if (bound > 0) want.Add((int)bound);
         // A flying System mount: on the ground its MountsConfig _kBindBuff (Starshatter Dragon 3112101), in the air the
         // buff that shares the landing skill's id (3112201, FlyBuffTag 3100000, which WorldCoreService.CanFly needs).
         // The two rows name each other's group in _kLogicData (31121 <-> 31122), so one replaces the other (inferred).
-        if (MountService.RidingSystem(s) is var system and > 0 && data.Row("MountsConfig", system) is { } ridden)
+        if (MountService.RidingSystem(s) is var system and > 0 && _data.Row("MountsConfig", system) is { } ridden)
         {
-            if (s.WorldState.Flying && MountService.FlySkills(s, data) is { } fly) want.Add(fly.Down);
+            if (s.WorldState.Flying && MountService.FlySkills(s, _data) is { } fly) want.Add(fly.Down);
             else foreach (var bound in Numbers(ridden, "_kBindBuff")) if (bound > 0) want.Add((int)bound);
         }
-        if (RidesWolf(s) && skills.Level(s.Progress, WolfsFangGroup) is var fang and > 0
-            && data.Row("BuffConfig", skills.RealId(WolfsFangGroup, fang)) is { } fangRow && Numbers(fangRow, "_kLogicData") is [var fangBuff, ..])
+        if (RidesWolf(s) && _skills.Level(s.Progress, WolfsFangGroup) is var fang and > 0
+            && _data.Row("BuffConfig", _skills.RealId(WolfsFangGroup, fang)) is { } fangRow && Numbers(fangRow, "_kLogicData") is [var fangBuff, ..])
             want.Add((int)fangBuff);
-        want.RemoveWhere(id => data.Row("BuffConfig", id) == null);
+        want.RemoveWhere(id => _data.Row("BuffConfig", id) == null);
 
         foreach (var ending in s.Buffs.Where(b => s.CompanionBuffs.Contains(b.ConfigId) && !want.Contains(b.ConfigId)
                      && b.ExpireMs == long.MaxValue).ToArray())
-            await buffs.RemoveAsync(s, ending);
+            await _buffs.RemoveAsync(s, ending);
         foreach (int id in want)
-            if (!s.Buffs.Any(b => b.ConfigId == id && b.ExpireMs == long.MaxValue)) await buffs.AddLastingAsync(s, id, s.Role.Id);
+            if (!s.Buffs.Any(b => b.ConfigId == id && b.ExpireMs == long.MaxValue)) await _buffs.AddLastingAsync(s, id, s.Role.Id);
         s.CompanionBuffs = want;
 
         if (s.CompanionRide != ride)
         {
             s.CompanionRide = ride;
-            await skills.WeaponChangedAsync(s);
+            await _skills.WeaponChangedAsync(s);
         }
     }
 
@@ -134,15 +134,15 @@ public sealed partial class CombatService
     {
         if (s.Role == null || s.Progress == null || !HasPendantType(s, WolfPendantType) || RidesWolf(s)) return;
         long now = MonsterService.NowMs;
-        if (now < s.WargHowlMs || skills.Level(s.Progress, WolfTamingGroup) is not (var level and > 0)
-            || data.Row("SkillConfig", skills.RealId(WolfTamingGroup, level)) is not { } taming
-            || data.Row("SkillConfig", skills.RealId(WargHowlGroup, 1)) is not { } howl
+        if (now < s.WargHowlMs || _skills.Level(s.Progress, WolfTamingGroup) is not (var level and > 0)
+            || _data.Row("SkillConfig", _skills.RealId(WolfTamingGroup, level)) is not { } taming
+            || _data.Row("SkillConfig", _skills.RealId(WargHowlGroup, 1)) is not { } howl
             || Tuples(howl, "_kBuff1").FirstOrDefault() is not { ValueKind: JsonValueKind.Array } grant || grant.GetArrayLength() < 3) return;
         var desc = Numbers(taming, "_kDescData");
         long every = desc.Length > 1 && desc[1] > 0 ? (long)(desc[1] * 1000) : 30000;
         int duration = desc.Length > 3 && desc[3] > 0 ? (int)(desc[3] * 1000) : (int)(GameData.Number(grant[2]) ?? 10000);
         s.WargHowlMs = now + every;
-        await buffs.AddAsync(s, (int)(GameData.Number(grant[0]) ?? 0), duration, s.Role.Id);
+        await _buffs.AddAsync(s, (int)(GameData.Number(grant[0]) ?? 0), duration, s.Role.Id);
     }
 
     // ------------------------------------------------------------------ wolf skill links
@@ -163,13 +163,13 @@ public sealed partial class CombatService
         if (!charge && group != WargBiteGroup) return;
 
         long now = MonsterService.NowMs;
-        var pack = s.Buffs.Where(b => b.ExpireMs > now && !b.IsPassive).Select(b => data.Row("BuffConfig", b.ConfigId))
+        var pack = s.Buffs.Where(b => b.ExpireMs > now && !b.IsPassive).Select(b => _data.Row("BuffConfig", b.ConfigId))
             .FirstOrDefault(r => r is { } c && GameData.Int(c, "_iBuffID") == KingOfThePackBuffGroup);
         if (pack is not { } packRow || Numbers(packRow, "_kLogicData") is not [var chargeId, var biteId, ..]
-            || data.Row("SkillConfig", (long)(charge ? chargeId : biteId)) is not { } companion
+            || _data.Row("SkillConfig", (long)(charge ? chargeId : biteId)) is not { } companion
             || FindMonster(s.WorldScene, action.Request.TargetId) is not { } target) return;
         int followers = 1;
-        if (charge && data.Row("SkillConfig", skills.RealId(KingOfTheWargsGroup, (int)Math.Max(1, GameData.Int(packRow, "_iLevel")))) is { } king
+        if (charge && _data.Row("SkillConfig", _skills.RealId(KingOfTheWargsGroup, (int)Math.Max(1, GameData.Int(packRow, "_iLevel")))) is { } king
             && Numbers(king, "_kDescData") is [_, var count, ..] && count > 0)
             followers = (int)count;
         for (int i = 0; i < followers && !target.Dead && target.Hp > 0; i++) await ProcCastAsync(s, companion, target);

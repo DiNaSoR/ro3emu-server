@@ -25,14 +25,14 @@ public sealed partial class BuffService
     /// <summary>The chances a buff row grants (its description's first parameter), or 0 for an unlimited one.</summary>
     internal int ImmunityCharges(JsonElement row) =>
         row.TryGetProperty("_iDescription", out var desc) && desc.ValueKind == JsonValueKind.Array && desc.GetArrayLength() > 1
-        && desc[0].TryGetInt64(out long text) && ChargedImmunityText().IsMatch(data.Text(text))
+        && desc[0].TryGetInt64(out long text) && ChargedImmunityText().IsMatch(_data.Text(text))
             ? (int)Math.Max(1, DescriptionNumber(desc, 1, 1)) : 0;
 
     /// <summary>Does the player shrug this buff off; a charged immunity that stops it spends a chance.</summary>
     private async Task<bool> ImmuneAsync(GameSession p, JsonElement row)
     {
         long now = MonsterService.NowMs;
-        var live = p.Buffs.Where(b => b.ExpireMs > now).Select(b => (Buff: b, Row: data.Row("BuffConfig", b.ConfigId)))
+        var live = p.Buffs.Where(b => b.ExpireMs > now).Select(b => (Buff: b, Row: _data.Row("BuffConfig", b.ConfigId)))
             .Where(x => x.Row != null).Select(x => (x.Buff, Row: x.Row!.Value, Charges: ImmunityCharges(x.Row!.Value))).ToList();
         var unlimited = live.Where(x => x.Charges == 0).SelectMany(x => Categories(x.Row)).ToHashSet();
         if (Blocks(unlimited, row)) return true;

@@ -10,13 +10,13 @@ namespace Ro3Emu.Tests;
 /// <summary>Skills that cast other skills: chance procs, follow-up hits, Lex Aeterna and the parry counters.</summary>
 public sealed partial class SkillCombatTests
 {
-    private BuffService Buffs => app.Services.GetRequiredService<BuffService>();
+    private BuffService Buffs => _app.Services.GetRequiredService<BuffService>();
 
     private async Task<(MonsterUnit Target, CastSkillRsp Reply)> SwingAt(BotClient bot, string name)
     {
         var target = await Target(name, stationary: true);
         await Loop.InvokeAsync(() => { target.Hp = 1_000_000; return Task.CompletedTask; });
-        int attack = app.Services.GetRequiredService<SkillService>().NormalAttack(Session(name));
+        int attack = _app.Services.GetRequiredService<SkillService>().NormalAttack(Session(name));
         await bot.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = attack, TargetId = target.Uid });
         var reply = await Next(bot, CombatService.UseSkill, CastSkillRsp.Parser);
         Assert.Equal(0, reply.Result);

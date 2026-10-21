@@ -15,32 +15,32 @@ namespace Ro3Emu.Tests;
 /// </summary>
 public sealed class WeaponPassiveTests : IAsyncLifetime
 {
-    private readonly string dataDir = Path.Combine(Path.GetTempPath(), "ro3emu-weaponpassive-" + Guid.NewGuid().ToString("N"));
-    private WebApplication? app;
-    private string http = "";
+    private readonly string _dataDir = Path.Combine(Path.GetTempPath(), "ro3emu-weaponpassive-" + Guid.NewGuid().ToString("N"));
+    private WebApplication? _app;
+    private string _http = "";
 
     public Task InitializeAsync() => Task.CompletedTask;
 
     public async Task DisposeAsync()
     {
-        if (app == null) return;
-        await app.StopAsync();
-        await app.DisposeAsync();
+        if (_app == null) return;
+        await _app.StopAsync();
+        await _app.DisposeAsync();
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
-        try { Directory.Delete(dataDir, true); } catch (IOException) { }
+        try { Directory.Delete(_dataDir, true); } catch (IOException) { }
     }
 
     private async Task<BotClient> InWorld(string name)
     {
         var ports = TestPorts.FreePorts();
-        app = ServerHost.Create([], o =>
+        _app = ServerHost.Create([], o =>
         {
-            o.DataDir = dataDir; o.GameDataDir = Path.Combine(ClientData.RepoRoot, "data");
+            o.DataDir = _dataDir; o.GameDataDir = Path.Combine(ClientData.RepoRoot, "data");
             o.HttpPort = ports.Item1; o.MicroGatePort = ports.Item2; o.GameGatePort = ports.Item3;
         });
-        await app.StartAsync();
-        http = $"http://127.0.0.1:{ports.Item1}";
-        var bot = new BotClient(http, File.ReadAllText(Path.Combine(dataDir, "gate_rsa_public.pem")));
+        await _app.StartAsync();
+        _http = $"http://127.0.0.1:{ports.Item1}";
+        var bot = new BotClient(_http, File.ReadAllText(Path.Combine(_dataDir, "gate_rsa_public.pem")));
         await bot.LoginAsync(name.ToLowerInvariant(), "pw");
         await bot.EnterGateAsync();
         var role = await bot.CreateRoleAsync(name);
@@ -48,9 +48,9 @@ public sealed class WeaponPassiveTests : IAsyncLifetime
         return bot;
     }
 
-    private GameSession Session(string name) => app!.Services.GetRequiredService<SessionRegistry>().All()
+    private GameSession Session(string name) => _app!.Services.GetRequiredService<SessionRegistry>().All()
         .Single(s => s.Account == name.ToLowerInvariant());
-    private T Service<T>() where T : notnull => app!.Services.GetRequiredService<T>();
+    private T Service<T>() where T : notnull => _app!.Services.GetRequiredService<T>();
     private Task<T> Run<T>(Func<T> work) => Service<GameLoop>().InvokeAsync(() => Task.FromResult(work()));
 
     /// <summary>Holds <paramref name="entry"/> in the main hand (grid 1) or off hand (grid 2), replacing what was there.</summary>

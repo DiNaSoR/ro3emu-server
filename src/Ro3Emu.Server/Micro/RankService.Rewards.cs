@@ -39,16 +39,16 @@ public sealed partial class RankService : IGameTicker
     /// <summary>Test hook: runs before a paid period is ranked (a throw fails that attempt).</summary>
     internal Func<int, Task>? BeforeRankForTest { get; set; }
 
-    private TimeSpan lastRewardCheck, rewardRetryAt;
-    private long? previousCheckUnix;
-    private bool rewardChecked, settling;
-    private RewardState? rewardState;
+    private TimeSpan _lastRewardCheck, _rewardRetryAt;
+    private long? _previousCheckUnix;
+    private bool _rewardChecked, _settling;
+    private RewardState? _rewardState;
 
     /// <summary>Boards whose saved period may still owe letters: every saved board after a start, until delivered.</summary>
-    private readonly HashSet<int> unfinished = [];
+    private readonly HashSet<int> _unfinished = [];
 
     /// <summary>A boundary not yet saved and whether it pays: decided at its first check, kept for its retries.</summary>
-    private readonly Dictionary<int, (long Period, bool Pay)> pending = [];
+    private readonly Dictionary<int, (long Period, bool Pay)> _pending = [];
 
     /// <summary>The last settled period of each paying board and its winners (rank to role).</summary>
     public sealed class RewardState
@@ -71,14 +71,14 @@ public sealed partial class RankService : IGameTicker
 
     public void Tick(GameTime time)
     {
-        if (settling || rewardChecked && time.Now - lastRewardCheck < RewardCheckEvery) return;
-        rewardChecked = true;
-        lastRewardCheck = time.Now;
+        if (_settling || _rewardChecked && time.Now - _lastRewardCheck < RewardCheckEvery) return;
+        _rewardChecked = true;
+        _lastRewardCheck = time.Now;
         var state = RewardStateNow();
-        bool retry = time.Now >= rewardRetryAt;
+        bool retry = time.Now >= _rewardRetryAt;
         var now = clock.GetLocalNow();
-        long? previousCheck = previousCheckUnix;
-        previousCheckUnix = now.ToUnixTimeSeconds();
+        long? previousCheck = _previousCheckUnix;
+        _previousCheckUnix = now.ToUnixTimeSeconds();
         var due = new List<DueSettlement>();
         foreach (var board in PayingBoards())
         {
@@ -86,20 +86,20 @@ public sealed partial class RankService : IGameTicker
             long settled = state.Boards.GetValueOrDefault(board.Id)?.Period ?? 0;
             if (period > settled)
             {
-                if (pending.TryGetValue(board.Id, out var decided) && decided.Period == period)
+                if (_pending.TryGetValue(board.Id, out var decided) && decided.Period == period)
                 {
                     if (retry) due.Add(new DueSettlement(board, period, decided.Pay));
                     continue;
                 }
                 bool pay = settled > 0 && previousCheck < period && PreviousBoundary(board.Id, period) == settled;
-                pending[board.Id] = (period, pay);
+                _pending[board.Id] = (period, pay);
                 due.Add(new DueSettlement(board, period, pay));
             }
-            else if (retry && period == settled && unfinished.Contains(board.Id)) due.Add(new DueSettlement(board, period, true));
+            else if (retry && period == settled && _unfinished.Contains(board.Id)) due.Add(new DueSettlement(board, period, true));
         }
         if (due.Count == 0) return;
-        settling = true;
-        rewardRetryAt = time.Now + RewardRetryEvery;
+        _settling = true;
+        _rewardRetryAt = time.Now + RewardRetryEvery;
         loop.PostLegacy(async () =>
         {
             try
@@ -110,7 +110,7 @@ public sealed partial class RankService : IGameTicker
                     catch (Exception e) { LogSettlementFailed(log, e, settlement.Board.Id, settlement.Period); }
                 }
             }
-            finally { settling = false; }
+            finally { _settling = false; }
         }, "rank reward settlement");
     }
 
@@ -121,7 +121,7 @@ public sealed partial class RankService : IGameTicker
         if (saved != null && saved.Period != period)
         {
             // An interrupted period is finished before the new one replaces its winners.
-            if (unfinished.Contains(board.Id) && !await DeliverAsync(board, saved)) return;
+            if (_unfinished.Contains(board.Id) && !await DeliverAsync(board, saved)) return;
             saved = null;
         }
         await DeliverAsync(board, saved ?? await RankAsync(board, period, pay));
@@ -145,9 +145,9 @@ public sealed partial class RankService : IGameTicker
             for (int rank = Math.Max(1, min); rank <= Math.Min(max, rows.Count); rank++) saved.Winners[rank] = rows[rank - 1].Id;
         var next = new RewardState { Boards = new(RewardStateNow().Boards) { [board.Id] = saved } };
         await accounts.WriteLegacyAsync<int>(new SeasonStateWritePlan(RewardStateKey, JsonSerializer.Serialize(next)));
-        rewardState = next;
-        pending.Remove(board.Id);
-        unfinished.Add(board.Id);
+        _rewardState = next;
+        _pending.Remove(board.Id);
+        _unfinished.Add(board.Id);
         LogSettled(log, board.Id, period, saved.Winners.Count);
         return saved;
     }
@@ -177,18 +177,18 @@ public sealed partial class RankService : IGameTicker
                 LogLetterFailed(log, e, board.Id, rank, role);
             }
         }
-        if (delivered) unfinished.Remove(board.Id);
+        if (delivered) _unfinished.Remove(board.Id);
         return delivered;
     }
 
     private RewardState RewardStateNow()
     {
-        if (rewardState != null) return rewardState;
-        rewardState = accounts.ReadSync<string?>(new SeasonStateReadPlan(RewardStateKey)) is { Length: > 0 } saved
+        if (_rewardState != null) return _rewardState;
+        _rewardState = accounts.ReadSync<string?>(new SeasonStateReadPlan(RewardStateKey)) is { Length: > 0 } saved
             ? JsonSerializer.Deserialize<RewardState>(saved) ?? new RewardState() : new RewardState();
         // After a start the saved periods are delivered again (once-only letters) in case they were interrupted.
-        unfinished.UnionWith(rewardState.Boards.Keys);
-        return rewardState;
+        _unfinished.UnionWith(_rewardState.Boards.Keys);
+        return _rewardState;
     }
 
     /// <summary>Role boards with gift rows and a letter (equipment rows are items, guild rows guilds: neither pays).</summary>

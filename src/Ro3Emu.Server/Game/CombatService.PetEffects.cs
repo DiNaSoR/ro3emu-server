@@ -64,9 +64,9 @@ public sealed partial class CombatService
         {
             var found = new HashSet<long>();
             foreach (int group in new[] { EvilCurseGroup, WarriorFuryGroup, IronBallGroup, FlameFistGroup })
-                foreach (var (_, buff) in data.Table("BuffConfig"))
+                foreach (var (_, buff) in _data.Table("BuffConfig"))
                     if (GameData.Int(buff, "_iBuffID") == group && Numbers(buff, "_kLogicData") is [var id, ..]
-                        && data.Row("SkillConfig", (long)id) != null) found.Add((long)id);
+                        && _data.Row("SkillConfig", (long)id) != null) found.Add((long)id);
             _petProcRows = found;
         }
         return _petProcRows.Contains(GameData.Int(row, "_iID"));
@@ -83,14 +83,14 @@ public sealed partial class CombatService
     {
         long now = MonsterService.NowMs;
         foreach (var buff in s.Buffs)
-            if (buff.ExpireMs > now && data.Row("BuffConfig", buff.ConfigId) is { } row && GameData.Int(row, "_iBuffID") == group)
+            if (buff.ExpireMs > now && _data.Row("BuffConfig", buff.ConfigId) is { } row && GameData.Int(row, "_iBuffID") == group)
                 return (buff, row);
         return null;
     }
 
     /// <summary>The master's current Main Skill description numbers, or none when the pet left the Main Slot.</summary>
-    private double[] MainSkillDesc(GameSession s) => skills.PetMainSkill?.Invoke(s) is { } pet
-        && data.Row("SkillConfig", pet.SkillId) is { } main ? Numbers(main, "_kDescData") : [];
+    private double[] MainSkillDesc(GameSession s) => _skills.PetMainSkill?.Invoke(s) is { } pet
+        && _data.Row("SkillConfig", pet.SkillId) is { } main ? Numbers(main, "_kDescData") : [];
 
     private Task PetBuffDealtAsync(GameSession s, MonsterUnit target, JsonElement row, long amount)
     {
@@ -106,11 +106,11 @@ public sealed partial class CombatService
         long now = MonsterService.NowMs;
         var desc = MainSkillDesc(s);
         if (LivePetBuff(s, MoonlightGroup) is { Row: var moon } && Numbers(moon, "_kLogicData") is [var bonus, var ms, ..]
-            && data.Row("BuffConfig", (long)bonus) != null)
+            && _data.Row("BuffConfig", (long)bonus) != null)
         {
             double chance = desc.ElementAtOrDefault(5), far = desc.ElementAtOrDefault(8);
             bool sure = far > 0 && MonsterService.Distance(target, s) > far;
-            if (sure || Rolls.Proc(10000) < chance * 100) await buffs.AddAsync(s, (int)bonus, (int)ms, s.Role!.Id);
+            if (sure || Rolls.Proc(10000) < chance * 100) await _buffs.AddAsync(s, (int)bonus, (int)ms, s.Role!.Id);
         }
         _petEffects.TryGetValue(s.Role!.Id, out var state);
         if (GameData.Int(row, "_iIsNormalAtk") == 1 && now >= (state?.PetrifyReadyMs ?? 0) && !target.Dead && target.Hp > 0
@@ -120,11 +120,11 @@ public sealed partial class CombatService
             state.PetrifyReadyMs = now + (long)(desc.ElementAtOrDefault(7) * 1000);
             using var tuple = JsonDocument.Parse($"[{PetrifyBuff},{petrifyChance},{petrifyMs}]");
             if (RollHostileBuff(tuple.RootElement, s, null, null, target, out int id, out int duration))
-                await buffs.ShowOnUnitAsync(target, id, duration, s.Role!.Id);
+                await _buffs.ShowOnUnitAsync(target, id, duration, s.Role!.Id);
         }
         await PetTriggerHitAsync(s, target, desc);
         if (now >= (state?.FuryReadyMs ?? 0) && LivePetBuff(s, WarriorFuryGroup) is { Row: var fury }
-            && Numbers(fury, "_kLogicData") is [var extraId, ..] && data.Row("SkillConfig", (long)extraId) is { } extra)
+            && Numbers(fury, "_kLogicData") is [var extraId, ..] && _data.Row("SkillConfig", (long)extraId) is { } extra)
         {
             state = PetState(s);
             state.FuryReadyMs = now + (long)(desc.ElementAtOrDefault(6) * 1000);
@@ -135,7 +135,7 @@ public sealed partial class CombatService
     private Task PetBuffKilledAsync(GameSession s, MonsterUnit monster)
     {
         if (s.Role == null || LivePetBuff(s, EvilCurseGroup) is not { } curse
-            || Numbers(curse.Row, "_kLogicData") is not [var id, ..] || data.Row("SkillConfig", (long)id) is not { } row)
+            || Numbers(curse.Row, "_kLogicData") is not [var id, ..] || _data.Row("SkillConfig", (long)id) is not { } row)
             return Task.CompletedTask;
         var state = PetState(s);
         if (state.CurseGuid != curse.Buff.Guid)
@@ -188,23 +188,23 @@ public sealed partial class CombatService
             case DrainKind.Allies:
                 float radius = (float)desc.ElementAtOrDefault(2);
                 int cap = Math.Max(1, (int)desc.ElementAtOrDefault(3));
-                recipients.AddRange(world.PlayersIn(s.WorldScene).Where(p => p != s && !p.Dead && p.Role != null && p.Progress != null
+                recipients.AddRange(_world.PlayersIn(s.WorldScene).Where(p => p != s && !p.Dead && p.Role != null && p.Progress != null
                         && Distance(p.Position, s.Position) <= radius)
                     .OrderBy(p => Distance(p.Position, s.Position)).Take(cap - 1));
                 break;
         }
         if (percent <= 0) return;
-        var stats = character.Stats(s);
+        var stats = _character.Stats(s);
         var healer = PlayerAttacker(s, stats);
         var hit = new SkillHitInfo { SrcID = s.Role.Id, SkillId = (int)GameData.Int(row, "_iID"), SessionId = ++_sessionIds };
         foreach (var recipient in recipients)
         {
-            var before = character.Stats(recipient);
+            var before = _character.Stats(recipient);
             long amount = (long)Math.Max(0, Math.Round(Math.Max(stats[103], stats[104]) * percent / 100
                 * HealFactor(healer, PlayerDefender(recipient, before))));
             long actual = Math.Min(amount, Math.Max(0, before[101] - before[2000]));
             if (amount <= 0) continue;
-            await character.SetHpSpAsync(recipient, before[2000] + actual, null);
+            await _character.SetHpSpAsync(recipient, before[2000] + actual, null);
             hit.Dsts.Add(new DamageInfo { DstID = recipient.Role!.Id, Damage = actual, DamageType = DamageType.Heal, DstElement = 1 });
             foreach (var handler in Healed) handler(s, actual);
             foreach (var handler in HealedAsync) await handler(s, actual);

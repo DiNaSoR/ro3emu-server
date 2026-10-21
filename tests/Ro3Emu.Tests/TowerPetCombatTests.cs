@@ -14,36 +14,36 @@ namespace Ro3Emu.Tests;
 /// <summary>Actual tower start/AOI/cast/hit/buff wire regression for the supplied floor-2 Bobo case.</summary>
 public sealed class TowerPetCombatTests : IAsyncLifetime
 {
-    private readonly string dataDir = Path.Combine(Path.GetTempPath(), "ro3emu-pet-combat-" + Guid.NewGuid().ToString("N"));
-    private WebApplication app = null!;
-    private string http = "";
-    private T Service<T>() where T : notnull => app.Services.GetRequiredService<T>();
+    private readonly string _dataDir = Path.Combine(Path.GetTempPath(), "ro3emu-pet-combat-" + Guid.NewGuid().ToString("N"));
+    private WebApplication _app = null!;
+    private string _http = "";
+    private T Service<T>() where T : notnull => _app.Services.GetRequiredService<T>();
     private Task Run(Func<Task> action) => Service<GameLoop>().InvokeAsync(action);
     private static readonly TimeSpan Wait = TimeSpan.FromSeconds(10);
 
     public async Task InitializeAsync()
     {
         var (httpPort, microPort, gamePort) = TestPorts.FreePorts();
-        app = ServerHost.Create([], o =>
+        _app = ServerHost.Create([], o =>
         {
-            o.DataDir = dataDir; o.GameDataDir = Path.Combine(RepoRoot(), "data");
+            o.DataDir = _dataDir; o.GameDataDir = Path.Combine(RepoRoot(), "data");
             o.HttpPort = httpPort; o.MicroGatePort = microPort; o.GameGatePort = gamePort;
         });
         Service<SeasonService>().SetPlayBook(101);
-        await app.StartAsync();
-        http = $"http://127.0.0.1:{httpPort}";
+        await _app.StartAsync();
+        _http = $"http://127.0.0.1:{httpPort}";
     }
 
     public async Task DisposeAsync()
     {
-        await app.StopAsync(); await app.DisposeAsync();
+        await _app.StopAsync(); await _app.DisposeAsync();
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
-        try { Directory.Delete(dataDir, true); } catch (IOException) { }
+        try { Directory.Delete(_dataDir, true); } catch (IOException) { }
     }
 
     private async Task<BotClient> InTower()
     {
-        var bot = new BotClient(http, File.ReadAllText(Path.Combine(dataDir, "gate_rsa_public.pem")));
+        var bot = new BotClient(_http, File.ReadAllText(Path.Combine(_dataDir, "gate_rsa_public.pem")));
         await bot.LoginAsync("petcombat", "pw"); await bot.EnterGateAsync();
         long id = (await bot.CreateRoleAsync("Petcombat")).RoleBaseInfo.Id;
         var roster = new DBPetInfo { Inited = true, IncubationLv = 1, OnOpenUIRoomLv = 1 };
@@ -58,7 +58,7 @@ public sealed class TowerPetCombatTests : IAsyncLifetime
         await bot.EnterWorldAsync(id);
         using var client = new HttpClient();
         foreach (string command in new[] { "!lvl 99", "!quest done 10105020", "!quest done 10104330" })
-            (await client.PostAsync($"{http}/ro3emu/gm?account=petcombat", new StringContent(command))).EnsureSuccessStatusCode();
+            (await client.PostAsync($"{_http}/ro3emu/gm?account=petcombat", new StringContent(command))).EnsureSuccessStatusCode();
         await bot.SendGameAsync(TowerService.SetPets, new SetClimTowerPetsReq { Pets = { 13001, 0, 0, 0 } });
         Assert.Equal(0, (await Next(bot, TowerService.SetPets, SetClimTowerPetsRes.Parser)).Result);
         await bot.SendGameAsync(TowerService.Start, new ClimTowerStartReq { Layer = 2 });

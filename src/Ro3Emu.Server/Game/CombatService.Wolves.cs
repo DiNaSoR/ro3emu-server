@@ -33,7 +33,7 @@ public sealed partial class CombatService
         double reach = Numbers(row, "_kDescData").ElementAtOrDefault(4);
         if (reach <= 0) reach = 5;
         bool far = Distance(s.Position, target.Pos) > reach;
-        if (data.Row("SkillConfig", (long)(far ? farId : nearId)) is not { } form) return false;
+        if (_data.Row("SkillConfig", (long)(far ? farId : nearId)) is not { } form) return false;
         if (far)
         {
             var request = action.Request.Clone();
@@ -49,8 +49,8 @@ public sealed partial class CombatService
     /// skill reaches Lv. @{1}, ..." and the Lv2 row (_iMaxLevel 2) states it as its own effect (inferred: @{1} is 2).</summary>
     private void ArmSwiftWarg(GameSession s)
     {
-        if (s.Progress == null || skills.Level(s.Progress, SwiftWargGroup) is not (var level and > 0)
-            || data.Row("SkillConfig", skills.RealId(SwiftWargGroup, level)) is not { } row
+        if (s.Progress == null || _skills.Level(s.Progress, SwiftWargGroup) is not (var level and > 0)
+            || _data.Row("SkillConfig", _skills.RealId(SwiftWargGroup, level)) is not { } row
             || level < GameData.Int(row, "_iMaxLevel")) return;
         s.SwiftWargArmedMs = Now + SwiftWargArmMs;
     }
@@ -62,13 +62,13 @@ public sealed partial class CombatService
         if (Now > s.SwiftWargArmedMs || s.Dead || s.Progress == null) { s.SwiftWargArmedMs = 0; return; }
         if (s.SkillCast is { Cancelled: false } live && Now < live.StartMs + live.ChantMs + live.ActionMs) return;
         s.SwiftWargArmedMs = 0;
-        int level = skills.Level(s.Progress, SwiftWargGroup);
-        if (level <= 0 || data.Row("SkillConfig", skills.RealId(SwiftWargGroup, level)) is not { } row
+        int level = _skills.Level(s.Progress, SwiftWargGroup);
+        if (level <= 0 || _data.Row("SkillConfig", _skills.RealId(SwiftWargGroup, level)) is not { } row
             || !SkillConditionMet(s, row) || s.SkillCds.GetValueOrDefault(SwiftWargGroup) > Now) return;
         var request = new CastSkillReq
         {
             SkillId = (int)GameData.Int(row, "_iID"), Face = s.Face, TargetPos = s.Position.Clone(), IsAutoCast = true,
         };
-        loop.TrackRuntimeDetached("swift warg", () => CastAsync(s, request));
+        _loop.TrackRuntimeDetached("swift warg", () => CastAsync(s, request));
     }
 }

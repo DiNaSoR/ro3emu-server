@@ -85,17 +85,17 @@ public sealed partial class DungeonService
         if (a.Riders.TryGetValue(s, out var ride))
         {
             if (ride.Vehicle == actor && interaction == GameData.Int(ride.Seat, "_iExitNpcAction")) await DismountAsync(a, s, false);
-            return interaction == GameData.Int(ride.Seat, "_iExitNpcAction") || catalog.VehicleSeat(actor.NpcId, interaction) != null;
+            return interaction == GameData.Int(ride.Seat, "_iExitNpcAction") || _catalog.VehicleSeat(actor.NpcId, interaction) != null;
         }
-        if (catalog.VehicleSeat(actor.NpcId, interaction) is not { } seat) return false;
+        if (_catalog.VehicleSeat(actor.NpcId, interaction) is not { } seat) return false;
         // One driver seat, and only while the step opens the ride: the actor carries the buff its condition asks for,
         // as the client checks before it offers the button.
         if (a.Riders.Values.Any(r => r.Vehicle == actor)
-            || !catalog.BuffGates(interaction).All(group => actor.Buffs.Any(b => data.Row("BuffConfig", b.ConfigId) is { } buff
+            || !_catalog.BuffGates(interaction).All(group => actor.Buffs.Any(b => _data.Row("BuffConfig", b.ConfigId) is { } buff
                 && GameData.Int(buff, "_iBuffID") == group))) return true;
         ride = new Ride(actor, interaction, seat.StatusId, seat.SeatRow);
         a.Riders[s] = ride;
-        log.LogInformation("{Role} rides scene actor {Npc} in scene {Scene} step {Step}", s.Role?.Id, actor.NpcId,
+        _log.LogInformation("{Role} rides scene actor {Npc} in scene {Scene} step {Step}", s.Role?.Id, actor.NpcId,
             a.Plan.SceneEntry, a.Wave + 1);
         await BroadcastAsync(a, WorldInteractionService.Change, new InteractChangeNtf
         {
@@ -137,22 +137,22 @@ public sealed partial class DungeonService
     public async Task<bool> TrySyncVehicleAsync(GameSession s, SyncVehicleReq req)
     {
         if (s.DungeonAttempt is not { } a || !a.Riders.ContainsKey(s)) return false;
-        if (float.IsFinite(req.Face) && req.Face >= 0 && req.Face <= 360) await world.TurnAsync(s, req.Face);
+        if (float.IsFinite(req.Face) && req.Face >= 0 && req.Face <= 360) await _world.TurnAsync(s, req.Face);
         return true;
     }
 
     private void ScheduleFallback(Attempt a, ReconstructedDungeons.StepFallback fallback)
     {
         int wave = a.Wave;
-        loop.ScheduleLegacy(TimeSpan.FromMilliseconds(fallback.Ms), async () =>
+        _loop.ScheduleLegacy(TimeSpan.FromMilliseconds(fallback.Ms), async () =>
         {
             if (a.Wave != wave || a.StepDone || a.Settled || a.Room.Closed || Step(a) is not { } step) return;
             if (Present(a).FirstOrDefault(a.Loaded.Contains) is not { } s) return;
-            log.LogInformation("Scripted scene {Scene} step {Step}: fallback after {Ms} ms", a.Plan.SceneEntry, wave + 1, fallback.Ms);
+            _log.LogInformation("Scripted scene {Scene} step {Step}: fallback after {Ms} ms", a.Plan.SceneEntry, wave + 1, fallback.Ms);
             await EndStepMovementAsync(a);
-            if (fallback.Teleport != 0 && catalog.ScenePoint(a.Plan.SceneEntry, fallback.Teleport) is { } to)
+            if (fallback.Teleport != 0 && _catalog.ScenePoint(a.Plan.SceneEntry, fallback.Teleport) is { } to)
                 foreach (var member in Present(a).Where(m => a.Loaded.Contains(m) && !m.SceneLoading))
-                    await scenes.TeleportInMapAsync(member, to);
+                    await _scenes.TeleportInMapAsync(member, to);
             var t = step.Complete[0];
             await StepEventAsync(a, s, [(t.Kind, t.Id)]);
         });
@@ -164,23 +164,23 @@ public sealed partial class DungeonService
     /// </summary>
     private bool TryContinue(Attempt a)
     {
-        if (reconstructed?.Scripted(a.Plan.SceneEntry) is not { Next: > 0 } scene || a.Plan.Multi != null) return false;
+        if (_reconstructed?.Scripted(a.Plan.SceneEntry) is not { Next: > 0 } scene || a.Plan.Multi != null) return false;
         var members = Present(a).Where(a.Loaded.Contains).ToArray();
         var leader = members.FirstOrDefault(m => m.Role?.Id == a.Leader) ?? members.FirstOrDefault();
         var req = new EnterDungeonReq { SceneEntry = scene.Next };
-        if (leader == null || catalog.Resolve(req) is not { } plan || members.Any(m => Admission(m, plan, continuation: true) != 0))
+        if (leader == null || _catalog.Resolve(req) is not { } plan || members.Any(m => Admission(m, plan, continuation: true) != 0))
             return false;
-        loop.ScheduleLegacy(ContinueDelay, async () =>
+        _loop.ScheduleLegacy(ContinueDelay, async () =>
         {
             if (!ReferenceEquals(leader.DungeonAttempt, a) || leader.InstanceId != a.Room.Id || leader.SceneLoading || leader.Role == null) return;
-            log.LogInformation("Scripted scene {Scene} won: {Role} goes on to {Next}", a.Plan.SceneEntry, leader.Role.Id, scene.Next);
+            _log.LogInformation("Scripted scene {Scene} won: {Role} goes on to {Next}", a.Plan.SceneEntry, leader.Role.Id, scene.Next);
             try { await EnterAsync(leader, req); }
-            catch (Exception e) { log.LogWarning(e, "Scripted scene {Scene}: going on to {Next} failed", a.Plan.SceneEntry, scene.Next); }
+            catch (Exception e) { _log.LogWarning(e, "Scripted scene {Scene}: going on to {Next} failed", a.Plan.SceneEntry, scene.Next); }
             // Anyone still in this room (the entry was refused after all) is sent out as usual.
             foreach (var s in members)
                 if (ReferenceEquals(s.DungeonAttempt, a) && s.InstanceId == a.Room.Id && !s.SceneLoading && s.Role != null)
                     try { await LeaveAsync(s); }
-                    catch (Exception e) { log.LogWarning(e, "Dungeon leave after a refused continuation failed for {Role}", s.Role?.Id); }
+                    catch (Exception e) { _log.LogWarning(e, "Dungeon leave after a refused continuation failed for {Role}", s.Role?.Id); }
         });
         return true;
     }

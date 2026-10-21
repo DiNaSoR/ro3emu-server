@@ -68,7 +68,7 @@ public sealed partial class TimedBattleService
         if (me.Watching == target) return;
         if (me.Watching == null) me.FellAt = (player.Position.Clone(), player.Face);
         me.Watching = target;
-        await world.SetHiddenAsync(player, true);
+        await _world.SetHiddenAsync(player, true);
         await ViewFromAsync(player, target.Position);
         await SendCameraBindAsync(match, player, match.Participants[target].Id);
     }
@@ -86,7 +86,7 @@ public sealed partial class TimedBattleService
             player.Face = face;
             await ViewFromAsync(player, at);
         }
-        await world.SetHiddenAsync(player, false);
+        await _world.SetHiddenAsync(player, false);
     }
 
     /// <summary>Moves only the server's view point: the spectator's client keeps its own unit where it fell.</summary>
@@ -94,7 +94,7 @@ public sealed partial class TimedBattleService
     {
         player.PreviousPosition = player.Position;
         player.Position = at.Clone();
-        await world.MoveAsync(player, new WalkReq { Pos = at.Clone(), Face = player.Face, BStop = true, SpeedRate = 1 }, forceTeleport: true);
+        await _world.MoveAsync(player, new WalkReq { Pos = at.Clone(), Face = player.Face, BStop = true, SpeedRate = 1 }, forceTeleport: true);
     }
 
     private static Task SendCameraBindAsync(Match match, GameSession player, long target)

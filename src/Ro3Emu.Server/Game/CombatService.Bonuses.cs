@@ -81,7 +81,7 @@ public sealed partial class CombatService
     {
         var tuples = Tuples(row, "_kBuff1").ToArray();
         if (script == "Inspiration" && tuples.Length == 2)
-            return [tuples[skills.Weapon(s).SubType == TwoHandedSpear ? 1 : 0]];
+            return [tuples[_skills.Weapon(s).SubType == TwoHandedSpear ? 1 : 0]];
         // King's Grace's two auras are the Crusader's own; Devotion's "Self-Link" marks the Crusader, not the ally.
         if (script == "KingsGrace" && recipient != null && recipient != s) return [];
         if (script == "Sacrifice" && tuples.Length == 2) return [tuples[recipient == null || recipient == s ? 1 : 0]];
@@ -133,7 +133,7 @@ public sealed partial class CombatService
     private const int AspersioGroup = 14113, HolyElement = 7;
 
     private bool HasBuffGroup(GameSession s, int group) => s.Buffs.Any(b => b.ExpireMs > MonsterService.NowMs
-        && data.Row("BuffConfig", b.ConfigId) is { } row && GameData.Int(row, "_iBuffID") == group);
+        && _data.Row("BuffConfig", b.ConfigId) is { } row && GameData.Int(row, "_iBuffID") == group);
 
     private Func<int, double>? Covered(GameSession s) => CoveredBonus is { } covered ? id => covered(s, id) : null;
 
@@ -154,14 +154,14 @@ public sealed partial class CombatService
     internal bool IsBoss(int npcId)
     {
         if (_bosses.TryGetValue(npcId, out bool boss)) return boss;
-        return _bosses[npcId] = data.Row("NPCConfig", npcId) is { } row && GameData.Int(row, "_iMonsterHPBarDisplay") != 0;
+        return _bosses[npcId] = _data.Row("NPCConfig", npcId) is { } row && GameData.Int(row, "_iMonsterHPBarDisplay") != 0;
     }
 
     /// <summary>A monster's live buff attributes as a stat sheet (Lex Aeterna-style taken% debuffs and the like).</summary>
     private StatSheet? UnitSheet(WorldUnit unit)
     {
         StatSheet? sheet = null;
-        foreach (var (id, value) in buffs.UnitAttributes(unit))
+        foreach (var (id, value) in _buffs.UnitAttributes(unit))
         {
             sheet ??= new StatSheet();
             sheet[(int)id] += (long)Math.Round(value);

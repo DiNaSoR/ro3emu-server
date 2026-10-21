@@ -20,7 +20,7 @@ public sealed partial class TradeService
     private const long SystemPassMs = 60_000;
     private static readonly EconomyOwner SystemOwner = new(EconomyOwnerKind.System, "trade-exchange");
 
-    private long nextSystemPassMs, nextRestockMs;
+    private long _nextSystemPassMs, _nextRestockMs;
     internal int SystemPasses { get; private set; }
 
     private ExchangeOptions Exchange => options.Value.Exchange;
@@ -32,9 +32,9 @@ public sealed partial class TradeService
         long now = NowMs;
         var o = Exchange;
         // With both aids off, one pass still retires stock left from a run that had the seller on.
-        if (!force && (now < nextSystemPassMs || !o.SystemSeller && !o.BuyBack && SystemPasses > 0)) return;
-        nextSystemPassMs = now + SystemPassMs;
-        bool restock = force || now >= nextRestockMs;
+        if (!force && (now < _nextSystemPassMs || !o.SystemSeller && !o.BuyBack && SystemPasses > 0)) return;
+        _nextSystemPassMs = now + SystemPassMs;
+        bool restock = force || now >= _nextRestockMs;
         int code = await market.RunMaintenanceAsync(tx =>
         {
             var all = Active(tx);
@@ -47,7 +47,7 @@ public sealed partial class TradeService
         });
         if (code != 0) return;
         SystemPasses++;
-        if (restock) nextRestockMs = now + Math.Clamp(o.RestockMinutes, 1, 24 * 60) * 60_000L;
+        if (restock) _nextRestockMs = now + Math.Clamp(o.RestockMinutes, 1, 24 * 60) * 60_000L;
     }
 
     private long SystemShowMs => Math.Max(1, Public("TradeListingsGeneralShowTime", 24)) * 3_600_000;
