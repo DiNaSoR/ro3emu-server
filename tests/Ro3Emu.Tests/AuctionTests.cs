@@ -318,13 +318,16 @@ public sealed partial class AuctionTests : AuctionTestsHost
             await bot.SendGameAsync(AuctionService.Quit, new QuitAuctionReq { AuctionId = row.Id });
             Assert.Equal(0, (await Next(bot, AuctionService.Quit, QuitAuctionRes.Parser)).Result);
         }
-        for (int i = 0; i < 100 && Service<AuctionStore>().Get(row.Id)!.State != AuctionState.Settled; i++)
+        // The row is read from SQL and the mailboxes through the login-snapshot cache, which is cleared only after the
+        // commit returns (#236), so wait for both: the row can read Settled a moment before the letter is visible.
+        int Letters() => new[] { alice, bob, carol }.Select(Mailbox).SelectMany(m => m.Letters)
+            .Count(m => m.DeliveryKey == $"auction:{row.Id}:unsold");
+        for (int i = 0; i < 100 && (Service<AuctionStore>().Get(row.Id)!.State != AuctionState.Settled || Letters() == 0); i++)
             await Task.Delay(50);
         var settled = Service<AuctionStore>().Get(row.Id)!;
         Assert.Equal(AuctionState.Settled, settled.State);
         Assert.Contains(settled.Winner, row.Eligible);
-        Assert.Single(new[] { alice, bob, carol }.Select(Mailbox).SelectMany(m => m.Letters),
-            m => m.DeliveryKey == $"auction:{row.Id}:unsold");
+        Assert.Equal(1, Letters());
     }
 
     [Fact]
