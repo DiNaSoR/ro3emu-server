@@ -238,6 +238,14 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
     /// <summary>The last accepted walk was a move, not a stop: the client is somewhere along it now.</summary>
     public bool Walking { get; set; }
 
+    /// <summary>
+    /// How far a walking client can have moved since its last walk report, counting at most
+    /// <paramref name="maxSeconds"/>: the client reports a walk when it starts, turns or stops, not along a straight
+    /// stretch, so <see cref="Position"/> trails a walking player.
+    /// </summary>
+    public float WalkReportLag(double maxSeconds) => !Walking ? 0
+        : (float)(Speed / 100.0 * Math.Clamp((DateTime.UtcNow - LastWalkUtc).TotalSeconds, 0, maxSeconds));
+
     /// <summary>Level, exp, stats, currencies of the role in play (CharacterService).</summary>
     public RoleProgress? Progress { get; set; }
 

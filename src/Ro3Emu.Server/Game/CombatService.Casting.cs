@@ -356,8 +356,7 @@ public sealed partial class CombatService
     // The client casts on reaching range while it still walks; its stop arrives just after the cast (in-game 11.10:
     // 13 ms later, refused 3024 "invalid skill distance" on most approaches). The cast carries no caster position, so
     // a walking caster's range allows the distance it can have covered since its last walk, at most 0.75 s of it.
-    private static float WalkSlack(GameSession s) => !s.Walking ? 0
-        : (float)(s.Speed / 100.0 * Math.Clamp((DateTime.UtcNow - s.LastWalkUtc).TotalSeconds, 0, 0.75));
+    private static float WalkSlack(GameSession s) => s.WalkReportLag(0.75);
 
     private int ValidateTarget(GameSession s, JsonElement row, CastSkillReq req, Vec3 origin, float slack = 0)
     {

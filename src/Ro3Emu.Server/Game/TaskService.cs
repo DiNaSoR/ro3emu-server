@@ -206,16 +206,13 @@ public sealed partial class TaskService
 
     /// <summary>
     /// 31209 CLIENT_ENTERAREA: target 104003 [map, area]. When the scene editor export has the region, the player must
-    /// stand near it, with the same reach as SceneService.ServerHostedRegion; a region missing from the export is
+    /// stand near it (SceneService.NearRegion, as for a server-hosted region); a region missing from the export is
     /// trusted to the client.
     /// </summary>
     public Task OnAreaAsync(GameSession session, ClientEnterAreaReq req)
     {
-        if (_worldData.Map(session.SceneEntry)?.Regions.TryGetValue(req.AreaId, out var region) == true)
-        {
-            float dx = session.Position.X - region!.X, dz = session.Position.Z - region.Z, reach = Math.Max(region.Width, region.Length) + 5;
-            if (!(dx * dx + dz * dz <= reach * reach)) return Task.CompletedTask;
-        }
+        if (_worldData.Map(session.SceneEntry)?.Regions.TryGetValue(req.AreaId, out var region) == true
+            && !SceneService.NearRegion(session, region!)) return Task.CompletedTask;
         // A PlotInterpretation _kTrigger [map, area, task] story plays on this entry while its task runs
         // (LC_CutSceneManager._onEnterAreaTrigger), before the area target below can finish that task.
         if (AreaStoryTasks().TryGetValue((session.SceneEntry, req.AreaId), out var storyTasks)

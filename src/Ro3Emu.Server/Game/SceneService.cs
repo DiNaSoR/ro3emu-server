@@ -161,6 +161,8 @@ public sealed partial class SceneService(IOptions<ServerOptions> options, World 
             s.Position = new Vec3 { X = arrival.X, Y = arrival.Y, Z = arrival.Z };
             s.PreviousPosition = s.Position;
             s.Face = arrival.Face;
+            s.LastWalkUtc = DateTime.UtcNow; // the walk before the switch is over (GameSession.WalkReportLag)
+            s.Walking = false;
             s.SceneLoading = true;
             if (instanceId == 0)
             {
