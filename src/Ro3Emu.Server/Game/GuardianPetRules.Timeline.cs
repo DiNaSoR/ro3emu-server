@@ -17,7 +17,7 @@ internal static partial class GuardianPetRules
     {
         var template = data.SkillTemplate(GameData.Int(skill.Effect, "_iScriptShow"));
         var points = template is { } row ? Numbers(row, "m_kAtkPoints").Distinct().Order().ToArray() : [];
-        double first = points.FirstOrDefault(0.4);
+        double first = points.FirstOrDefault(0.4); // (inferred) a show without attack points lands after 0.4 s
         var coefficients = Numbers(skill.Effect, "_kDamageParam1");
         var description = Numbers(skill.Active, "_kDescData");
         var literals = DescriptionLiterals(skill.Active);

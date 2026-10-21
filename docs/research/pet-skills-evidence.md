@@ -12,16 +12,11 @@ Client exports and decompiled files stay outside Git.
 | `MG_SkillGrowth.proto`, `Logic/Asset/Systems/LC_System_Skill._onJoystickSkillListChange` | `SkillWheelPet` is slot 11. The reader copies `skillWheel.whellSkills`; the separate `petSkill` field is not copied into that map. | No unsupported claim of original-server parity. |
 | `Logic/Asset/LC_DAL_SkillDevelop._refreshEquipSkillList` | Both skill wheels flow from the synchronized skill data to the joystick list. 5025 uses the increment wrapper on the wire. | Publication timing relative to other updates. |
 | `UI/Pet/Controllers/UI_Sys_Pet_LineUp_List_CellWidgetCtrl._initSkillWidget` | Lineup index 1 selects Protect; other ordinary lineup indexes select Reactive. | Effect execution order. |
-| `UI/Pet/Controllers/UI_Sys_Pet_SkillTipsPanelCtrl_BottomTips._buildBottomTipsPresent`, localization 40042/40285/40286 | Primary skills can be used from the primary battle slot. Reactive is active in utility positions and inactive in the main position. The live formation UI confirms this distinction. | Passive stacking and internal trigger timing. |
+| `UI/Pet/Controllers/UI_Sys_Pet_SkillTipsPanelCtrl_BottomTips._buildBottomTipsPresent`, localization 40042/40285/40286 | Primary skills can be used from the primary battle slot. Reactive is active in utility positions and inactive in the main position. | Passive stacking and internal trigger timing. |
 | `Logic/Actor/AutoAttack/LC_AutoAttackSkillHelper` | Pet slot participates in the default automatic skill list, subject to slot and skill eligibility. | No evidence for a separate 250-ms server polling caster. |
 | `BehaviorTree/trees/normalpet`, `LC_AutoAttack_BtCtx`, `LC_AutoAttackHelper` | The tree selects targets in the player's auto-battle context. Follow target comes from the team data router. | This is not evidence of autonomous pet-model combat AI. |
 | `LC_AutoAttack_AttackSubState._performCastSkillCall`, `LC_Skill_ActionPreCheck.CheckSkillSendServer` | The selected skill goes through the ordinary client use-skill request path. | Server-only activation policies. |
 | `Logic/Scene/LC_Scene_Sync._useExtraSkill` | A nonzero `petConfigId` and GuardianSkill type 41 select the temporary guardian-model presentation, with the owner in `srcID`. | Authoritative timing, damage, and receiver selection. |
-
-The current decoded `LC_System_Skill` bytecode (SHA-256
-`4a35fcbee578caab16a533803f13ff0ce0d6a28749c97daa4c936bc8925eb406`) was executed with stubbed data services.
-A standalone `petSkill` produced no slot; an entry in `whellSkills[11]` populated the slot and base mapping.
-That proves the reader behavior, not end-to-end combat parity.
 
 ## Named family execution
 
@@ -62,7 +57,7 @@ primary caster or a passive on every deployed King.
 |---|---|
 | Owl Reactive | Description and auxiliary coefficient disagree. Use the reactive description, auxiliary element/type. |
 | Aliot heal | Primary description and the heal-looking auxiliary coefficient disagree. Use the description. |
-| Angeling | Heal description and linked halo radius differ. Keep each subsystem's explicit radius; infer one-second heal ticks. |
+| Angeling | Heal description and linked halo radius differ. The heal uses the description's radius; one-second heal ticks are inferred. |
 | Incubus | Aura description and auxiliary range differ. Keep the auxiliary's range. |
 | Butterfly / Sarah | Hit subdivision or exact extra-hit timing is not established by a recovered server script. Named policy is inferred. |
 | Bobo / Fairy / other Reactive buffs | Family-specific candidate links, checked against full attribute payload; never a global same-ID join. |

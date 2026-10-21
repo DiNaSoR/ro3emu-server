@@ -382,8 +382,9 @@ public sealed partial class BuffService : IGameTicker
     }
 
     public bool HasForbidden(GameSession p, int ordinal) => p.ForbiddenOrdinals.Contains(ordinal)
-        || (p.ImmuneDeathOffer != null && ordinal == 9)
-        || (p.ImmuneRecoveryUntilMs > MonsterService.NowMs && ordinal is 3 or 4 or 5 or 9);
+        || (p.ImmuneDeathOffer != null && ordinal == ForbiddenState.Damage)
+        || (p.ImmuneRecoveryUntilMs > MonsterService.NowMs
+            && ordinal is ForbiddenState.Walk or ForbiddenState.CastSkill or ForbiddenState.NormalAttack or ForbiddenState.Damage);
 
     private async Task RefreshControlAsync(GameSession p)
     {

@@ -70,6 +70,7 @@ public sealed partial class CombatService
     {
         var proc = GuardianProcAction(source, pet, action, effect);
         // Description explicitly says members of the enemy team, so monsters do not grant this reactive shield.
+        // (inferred) The configured shield amount counts once per enemy player in the area, up to the description's cap.
         int count = Math.Min((int)GuardianPetRules.Description(pet, 2), EventAreaTargets(source, proc.Row).Length);
         if (count <= 0) return;
         foreach (var tuple in Tuples(effect, "_kBuff1"))

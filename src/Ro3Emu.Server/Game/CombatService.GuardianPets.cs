@@ -50,6 +50,8 @@ public sealed partial class CombatService
         if (!_pets.GuardianEquipped(s, skill)) return ErrorCodes.SkillNotLearned;
         if (req.OpUnitId != 0 && req.OpUnitId != s.Role.Id) return ErrorCodes.SkillRequirements;
         if (!float.IsFinite(req.Face) || req.TargetPos is { } pos && !Finite(pos)) return ErrorCodes.Parameter;
+        // (inferred) A family whose effect removes control, or Shinobi with a control to cleanse, may still be cast while
+        // controlled: otherwise its cleanse could never be used when it is needed.
         if ((_buffs.HasForbidden(s, ForbiddenState.CastSkill) || _buffs.HasForbidden(s, ForbiddenState.NormalAttack)) && !GuardianPetRules.DispelsControl(skill)
             && !GuardianShinobiDispel(s, skill).Any()
             || MatchSkillRule?.Invoke(s, skill.Id) == false) return ErrorCodes.SkillBadState;
@@ -195,6 +197,8 @@ public sealed partial class CombatService
         if (CurrentCastMap(s, action)) await GuardianHitReactionsAsync(s, skill, action, hit);
         if (CurrentCastMap(s, action) && hit.GuardianDamage.Count > 0 && GuardianPetRules.Script(skill.Effect) == "JingZhunShouShu")
         {
+            // Aliot: the heal-looking auxiliary's coefficient disagrees with the description; (inferred) the description's
+            // radius, target count and coefficient are used.
             var desc = Numbers(skill.Active, "_kDescData");
             if (desc.Length >= 5) await GuardianAreaHealAsync(s, skill, action, (float)desc[2], (int)desc[3], desc[4]);
         }

@@ -78,23 +78,13 @@ public sealed partial class CombatService
             var target = FindMonster(s.WorldScene, action.Request.TargetId);
             return target != null && target.Hp > 0 && CanHitMonster(s, target) && Relation(row, false, race: target.Template.Race) ? [target] : [];
         }
-        int release = (int)GameData.Int(row, "_iRelease");
-        if (release is not (1 or 7 or 8) && radiusOverride == null) center = action.Origin;
-        var range = Numbers(row, "_kRange");
-        float radius = radiusOverride ?? (float)(range.FirstOrDefault(300) / 100);
+        if (radiusOverride == null && GameData.Int(row, "_iRelease") is not (SkillRelease.Lock or SkillRelease.DragRect
+            or SkillRelease.DragCircle)) center = action.Origin;
         float height = GameData.Int(row, "_iAreaHeightRange") / 100f;
-        bool InShape(MonsterUnit m)
-        {
-            if (radiusOverride == null && IsGuardianEffect(row)) return GuardianAreaContains(row, action.Origin, center, action.Request.Face, m.Pos);
-            if (height > 0 && MathF.Abs(m.Y - center.Y) > height) return false;
-            float dx = m.X - center.X, dz = m.Z - center.Z;
-            double radians = action.Request.Face * Math.PI / 180;
-            double forward = dx * Math.Sin(radians) + dz * Math.Cos(radians), side = dx * Math.Cos(radians) - dz * Math.Sin(radians);
-            if (radiusOverride == null && release is 3 or 5 or 6 or 7)
-                return Math.Abs(side) <= radius / 2 && Math.Abs(forward) <= (range.Length > 1 ? range[1] / 200 : radius);
-            if (Distance(center, m.Pos) > radius + 0.1f) return false;
-            return radiusOverride != null || release != 4 || Math.Atan2(Math.Abs(side), forward) <= (range.Length > 1 ? range[1] : 90) * Math.PI / 360;
-        }
+        // A radius override is a plain circle around the given center; otherwise the row's own area.
+        bool InShape(MonsterUnit m) => radiusOverride is { } radius
+            ? (height <= 0 || MathF.Abs(m.Y - center.Y) <= height) && Distance(center, m.Pos) <= radius + 0.1f
+            : SkillAreaContains(row, action.Origin, center, action.Request.Face, m.Pos);
         return _world.Map(s.WorldScene).Units.OfType<MonsterUnit>().Where(m => m.Hp > 0 && CanHitMonster(s, m) && Relation(row, false, race: m.Template.Race) && InShape(m))
             .OrderBy(m => Distance(center, m.Pos)).ThenBy(m => m.Uid).Take(max).ToList();
     }
@@ -120,10 +110,7 @@ public sealed partial class CombatService
             && _sessions.All().Contains(s);
         string script = Script(row);
         var targets = SelectEnemies(s, action, center, field?.Trap == true ? field.Radius : null);
-        var playerTargets = GameData.Int(row, "_iRangeType") == 2
-            ? IsGuardianEffect(row) ? GuardianPlayerTargets(s, action, center) : EventAreaTargets(s, row)
-            : EventTarget(s, action.Request.TargetId) is { } eventTarget
-                && PlayerDistance(s, eventTarget) <= Range(row) + 1.5f ? new[] { eventTarget } : [];
+        var playerTargets = EffectPlayerTargets(s, action, center);
         var alreadySlowed = GuardianPreviouslySlowed(row, targets, playerTargets);
         if (playerTargets.Length > 0)
         {
@@ -534,6 +521,13 @@ public sealed partial class CombatService
         if (--field.Charges == 0) await RemoveSkillObjectAsync(field);
         return true;
     }
+
+    /// <summary>The event players a cast can hit: its area's, a guardian's own area selection, or its locked target.</summary>
+    private GameSession[] EffectPlayerTargets(GameSession s, ActiveSkillCast action, Vec3 center) =>
+        GameData.Int(action.Row, "_iRangeType") == SkillRelease.Area
+            ? IsGuardianEffect(action.Row) ? GuardianPlayerTargets(s, action, center) : EventAreaTargets(s, action.Row)
+            : EventTarget(s, action.Request.TargetId) is { } eventTarget
+                && PlayerDistance(s, eventTarget) <= Range(action.Row) + 1.5f ? [eventTarget] : [];
 
     /// <summary>One monster's damage from a player's cast: the hit, the guardian factors, the shared adjusters and a
     /// guardian's resistance changes. A guardian's fixed hit takes only its direct-damage factor.</summary>

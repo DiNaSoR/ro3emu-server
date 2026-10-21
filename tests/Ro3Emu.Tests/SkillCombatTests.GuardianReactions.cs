@@ -125,16 +125,17 @@ public sealed partial class SkillCombatTests
         await EquipGuardian(alice, 11001, 1611001);
         await EquipGuardian(alice, 21001, 1621001, slot: 2, pieces: 40);
         var s = Session("alice");
-        var data = _app.Services.GetRequiredService<GameData>();
+        var combat = _app.Services.GetRequiredService<CombatService>();
         var row = JsonSerializer.SerializeToElement(new { _iChantFix = 100, _iChantVar = 2000 });
-        int before = CombatService.ChantMilliseconds(data, row, Character.Stats(s));
+        Task<int> Chant() => Loop.InvokeAsync(() => Task.FromResult(combat.ChantMs(s, row)));
+        Assert.Equal(2100, await Chant()); // no guardian buff: the configured fixed plus variable time
         await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 2356201 });
         Assert.Equal(0, (await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
         await Next(alice, BuffService.BuffUpdate, BuffUpdateNotify.Parser, b => b.Buffs.Any(x => x.ConfigId == 2348301));
-        Assert.Equal(10000, Assert.Single(s.Buffs, b => b.ConfigId == 2348301).DurationMs);
-        Assert.True(CombatService.ChantMilliseconds(data, row, Character.Stats(s)) < before);
+        Assert.Equal(10000, await Loop.InvokeAsync(() => Task.FromResult(Assert.Single(s.Buffs, b => b.ConfigId == 2348301).DurationMs)));
+        Assert.True(await Chant() < 2100);
         await Loop.InvokeAsync(() => _app.Services.GetRequiredService<BuffService>().RemoveAsync(s, s.Buffs.Single(b => b.ConfigId == 2348301)));
-        Assert.Equal(before, CombatService.ChantMilliseconds(data, row, Character.Stats(s)));
+        Assert.Equal(2100, await Chant());
     }
 
     [ClientDataFact]

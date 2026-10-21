@@ -38,6 +38,12 @@ public sealed class GuardianPetTests
 
     private const int Wrapper = 99001, Child = 99002, OtherChild = 99003, Buff = 99004, Pet = 99, Passive = 99005;
     private const int SecondWrapper = 99101, SecondChild = 99102, SecondPet = 100;
+    private const int Petrify = 902101, Blind = 902501, BornImmunity = 900901, Slow = 99007, CastSpeedBuff = 99008;
+    private static readonly int[] ControlTag = [37];
+    private static readonly int[] ControlImmunityCategory = [20];
+    private static readonly int[] PetrifyForbids = [ForbiddenState.Walk, ForbiddenState.CastSkill, ForbiddenState.NormalAttack];
+    private static readonly int[] SlowerChange = [AttributeId.Speed, -125];
+    private static readonly int[] CastSpeedChange = [AttributeId.CastSpeed, 500];
 
     [Theory]
     [InlineData("SenLinCiFu")]
@@ -57,7 +63,7 @@ public sealed class GuardianPetTests
         Assert.Equal(0, GuardianPetRules.ReactiveBuff(data, skill));
     }
 
-    private sealed class Fixture(string reaction = "Buff") : IAsyncDisposable
+    private sealed class Fixture(string reaction = "Buff", Action<JsonObject>? wrapper = null) : IAsyncDisposable
     {
         private readonly string _root = Path.Combine(Path.GetTempPath(), "ro3emu-guardian-" + Guid.NewGuid().ToString("N"));
         public SyntheticHost Host { get; private set; } = null!;
@@ -110,7 +116,34 @@ public sealed class GuardianPetTests
             Write("BuffConfig", new Dictionary<string, object>
             {
                 [Buff.ToString(CultureInfo.InvariantCulture)] = new { _iID = Buff, _iBuffID = 399, _iTime = 5000, _kChangeAttri = new[] { BuffAttackChange } },
+                [Petrify.ToString(CultureInfo.InvariantCulture)] = new
+                {
+                    _iID = Petrify, _iBuffID = BuffService.PetrifyGroup, _iType = 2, _iTime = 5000, _kBuffCategory = ControlTag,
+                },
+                [Blind.ToString(CultureInfo.InvariantCulture)] = new { _iID = Blind, _iBuffID = BuffService.BlindGroup, _iType = 2, _iTime = 5000 },
+                [BornImmunity.ToString(CultureInfo.InvariantCulture)] = new
+                {
+                    _iID = BornImmunity, _iBuffID = 9009, _iType = 1, _iTime = 60000, _kBuffCategory = ControlImmunityCategory,
+                },
+                [Slow.ToString(CultureInfo.InvariantCulture)] = new
+                {
+                    _iID = Slow, _iBuffID = 993, _iType = 2, _iTime = 5000, _kChangeAttri = new[] { SlowerChange },
+                },
+                [CastSpeedBuff.ToString(CultureInfo.InvariantCulture)] = new
+                {
+                    _iID = CastSpeedBuff, _iBuffID = 994, _iType = 1, _iTime = 5000, _kChangeAttri = new[] { CastSpeedChange },
+                },
             });
+            Write("SpecialStatusConfig", new Dictionary<string, object>
+            {
+                ["12"] = new { _iID = 12, _kForbidden = PetrifyForbids }, // Petrify
+            });
+            var parameters = JsonNode.Parse(File.ReadAllText(Path.Combine(_root, "config", "PublicParamConfig.json")))?.AsObject()
+                ?? throw new InvalidOperationException("Missing synthetic parameters.");
+            parameters["VariableChantPerParamA"] = 1;
+            parameters["VariableChantPerParamB"] = 1000;
+            parameters["VariableChantPerParamC"] = 1;
+            File.WriteAllText(Path.Combine(_root, "config", "PublicParamConfig.json"), parameters.ToJsonString());
             Write("PetBaseConfig", new Dictionary<string, object>
             {
                 [Pet.ToString(CultureInfo.InvariantCulture)] = new { _iID = Pet }, [SecondPet.ToString(CultureInfo.InvariantCulture)] = new { _iID = SecondPet },
@@ -140,6 +173,7 @@ public sealed class GuardianPetTests
                 ["1"] = new { m_kSubConditionList = new[] { new { m_kData = UnlockCondition } } },
             });
             ConfigureReaction();
+            ConfigureWrapper();
             Host = await SyntheticHost.StartAsync(o => o.GameDataDir = _root);
         }
 
@@ -177,6 +211,29 @@ public sealed class GuardianPetTests
             File.WriteAllText(Path.Combine(_root, "config", "BuffConfig.json"), buffs.ToJsonString());
         }
 
+        private void ConfigureWrapper()
+        {
+            if (wrapper == null) return;
+            string path = Path.Combine(_root, "config", "SkillConfig.json");
+            var skills = JsonNode.Parse(File.ReadAllText(path))?.AsObject() ?? throw new InvalidOperationException("Missing synthetic skills.");
+            wrapper(skills[Wrapper.ToString(CultureInfo.InvariantCulture)]?.AsObject() ?? throw new InvalidOperationException("Missing synthetic wrapper."));
+            File.WriteAllText(path, skills.ToJsonString());
+        }
+
+        /// <summary>A monster of the synthetic map beside the player, standing still at 2.5 m/s.</summary>
+        public async Task<MonsterUnit> SpawnMonsterAsync()
+        {
+            var monsters = Host.Service<MonsterService>();
+            var template = monsters.Template(16320001) ?? throw new InvalidOperationException("Missing synthetic monster.");
+            return await monsters.SpawnSingleAsync(Session.SceneEntry, 16320001,
+                new MapPoint(Session.Position.X, Session.Position.Y, Session.Position.Z, 0), Session.InstanceId,
+                customTemplate: template with { SpeedCm = 250, RoamDistance = 0 })
+                ?? throw new InvalidOperationException("Synthetic monster could not spawn.");
+        }
+
+        /// <summary>Read game state on the loop that owns it.</summary>
+        public Task<T> Read<T>(Func<T> read) => Loop.InvokeAsync(() => Task.FromResult(read()));
+
         private void Write(string name, object value) =>
             File.WriteAllText(Path.Combine(_root, "config", name + ".json"), JsonSerializer.Serialize(value));
 
@@ -210,7 +267,7 @@ public sealed class GuardianPetTests
         await f.Start();
         await using var bot = await f.Host.InWorldAsync("Guardian");
         await f.Equip();
-        long before = f.Character.Stats(f.Session)[103];
+        long before = await f.Read(() => f.Character.Stats(f.Session)[AttributeId.Atk]);
         var request = new CastSkillReq { SkillId = Wrapper, TargetId = f.Session.Role!.Id };
         await bot.SendGameAsync(CombatService.UseSkill, request);
         await bot.SendGameAsync(CombatService.UseSkill, request);
@@ -222,10 +279,13 @@ public sealed class GuardianPetTests
         Assert.Equal(Child, extra.SkillID);
         Assert.Equal(Pet, extra.PetConfigId);
         await bot.Inbox.WaitAsync(e => e.IsGame(BuffService.BuffUpdate), TimeSpan.FromSeconds(5));
-        Assert.Single(f.Session.Buffs, b => b.ConfigId == Buff);
-        Assert.Equal(5000, Assert.Single(f.Session.Buffs, b => b.ConfigId == Buff).DurationMs); // primary does not activate its reactive passive
-        Assert.Equal(before + 17, f.Character.Stats(f.Session)[103]);
-        Assert.Null(f.Session.SkillCast);
+        await f.Loop.InvokeAsync(() =>
+        {
+            Assert.Equal(5000, Assert.Single(f.Session.Buffs, b => b.ConfigId == Buff).DurationMs); // primary does not activate its reactive passive
+            Assert.Equal(before + 17, f.Character.Stats(f.Session)[AttributeId.Atk]);
+            Assert.Null(f.Session.SkillCast);
+            return Task.CompletedTask;
+        });
     }
 
     [Fact]
@@ -235,7 +295,7 @@ public sealed class GuardianPetTests
         await f.Start();
         await using var bot = await f.Host.InWorldAsync("Guardian");
         await f.Equip();
-        long deployed = f.Character.Stats(f.Session)[103];
+        long deployed = await f.Read(() => f.Character.Stats(f.Session)[AttributeId.Atk]);
         async Task Refused(int id = Wrapper)
         {
             await bot.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = id, TargetId = f.Session.Role!.Id });
@@ -257,7 +317,7 @@ public sealed class GuardianPetTests
             plan.SupportPets[1] = Pet;
             await f.Character.RefreshStatsAsync(f.Session);
         });
-        Assert.Equal(deployed - 13 + 7, f.Character.Stats(f.Session)[103]);
+        Assert.Equal(deployed - 13 + 7, await f.Read(() => f.Character.Stats(f.Session)[AttributeId.Atk]));
         await Refused();
         await f.Loop.InvokeAsync(async () =>
         {
@@ -266,7 +326,7 @@ public sealed class GuardianPetTests
             plan.SetUpPets[99] = Pet; // invalid persisted slot must not grant bonuses or guardian admission
             await f.Character.RefreshStatsAsync(f.Session);
         });
-        Assert.Equal(deployed - 13, f.Character.Stats(f.Session)[103]);
+        Assert.Equal(deployed - 13, await f.Read(() => f.Character.Stats(f.Session)[AttributeId.Atk]));
         await Refused();
         await f.Loop.InvokeAsync(() =>
         {
@@ -336,7 +396,7 @@ public sealed class GuardianPetTests
         await bot.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = SecondWrapper });
         Assert.Equal(0, (await Reply(bot)).Result);
         await bot.Inbox.WaitAsync(e => e.IsGame(BuffService.BuffUpdate), TimeSpan.FromSeconds(5));
-        Assert.Equal(expectedMs, Assert.Single(f.Session.Buffs, b => b.ConfigId == Buff).DurationMs);
+        Assert.Equal(expectedMs, await f.Read(() => Assert.Single(f.Session.Buffs, b => b.ConfigId == Buff).DurationMs));
     }
 
     [Theory]
@@ -367,7 +427,7 @@ public sealed class GuardianPetTests
         {
             await bot.Inbox.WaitAsync(e => e.IsGame(BuffService.BuffUpdate)
                 && BuffUpdateNotify.Parser.ParseFrom(e.Body).Buffs.Any(b => b.ConfigId == 99006), TimeSpan.FromSeconds(5));
-            Assert.Equal(4000, Assert.Single(f.Session.Buffs, b => b.ConfigId == 99006).DurationMs);
+            Assert.Equal(4000, await f.Read(() => Assert.Single(f.Session.Buffs, b => b.ConfigId == 99006).DurationMs));
         }
     }
 
@@ -382,12 +442,7 @@ public sealed class GuardianPetTests
         {
             f.Session.Pets!.SetupPlans[0].SetUpPets.Remove(1);
             f.Session.Pets.SetupPlans[0].SetUpPets[2] = Pet;
-            var monsters = f.Host.Service<MonsterService>();
-            var template = monsters.Template(16320001) ?? throw new InvalidOperationException("Missing synthetic monster.");
-            var target = await monsters.SpawnSingleAsync(f.Session.SceneEntry, 16320001,
-                new MapPoint(f.Session.Position.X, f.Session.Position.Y, f.Session.Position.Z, 0), f.Session.InstanceId,
-                customTemplate: template with { SpeedCm = 250, RoamDistance = 0 })
-                ?? throw new InvalidOperationException("Synthetic monster could not spawn.");
+            var target = await f.SpawnMonsterAsync();
             // Exercise the shared positive-hit callback used by ordinary guardian damage.
             var row = JsonSerializer.SerializeToElement(new { _iID = SecondChild, _iSystemType = 41, _kSkillCategory = DamageCategory });
             foreach (var handler in f.Combat.DealtAsync) await handler(f.Session, target, row, 19);
@@ -398,6 +453,7 @@ public sealed class GuardianPetTests
     }
 
     [Theory]
+    [InlineData("none")]
     [InlineData("plan")]
     [InlineData("unequip")]
     [InlineData("star")]
@@ -429,11 +485,143 @@ public sealed class GuardianPetTests
             }
         });
         Assert.Equal(0, (await Reply(bot)).Result);
-        await Task.Delay(600);
+        await Task.Delay(600); // past the child's 300 ms action time; "none" proves the effect lands within it
+        Assert.Equal(change == "none", await f.Read(() => f.Session.Buffs.Any(b => b.ConfigId == Buff)));
+    }
+
+    [Theory]
+    [InlineData("dead", ErrorCodes.SkillBadState)]
+    [InlineData("other-unit", ErrorCodes.SkillRequirements)]
+    [InlineData("nan-face", ErrorCodes.Parameter)]
+    [InlineData("forbidden", ErrorCodes.SkillBadState)]
+    [InlineData("cost", ErrorCodes.SkillRequirements)]
+    [InlineData("passive", ErrorCodes.SkillPassive)]
+    [InlineData("bad-target", ErrorCodes.SkillTargetInvalid)]
+    public async Task GuardianCastRefusesAnInvalidRequestWithoutSpendingIt(string fault, int expected)
+    {
+        Action<JsonObject>? wrapper = fault switch
+        {
+            "cost" => row => row["_kCost"] = new JsonArray(new JsonArray(2001, 10)),
+            "passive" => row => row["_iBasicType"] = 0,
+            "bad-target" => row => row["_iRelease"] = SkillRelease.Lock,
+            _ => null,
+        };
+        await using var f = new Fixture(fault == "bad-target" ? "Damage" : "Buff", wrapper);
+        await f.Start();
+        await using var bot = await f.Host.InWorldAsync("Guardian");
+        await f.Equip();
+        long self = f.Session.Role!.Id;
+        var request = new CastSkillReq { SkillId = Wrapper, TargetId = self };
+        if (fault == "other-unit") request.OpUnitId = self + 1;
+        if (fault == "nan-face") request.Face = float.NaN;
+        if (fault == "bad-target") request.TargetId = self + 1000;
         await f.Loop.InvokeAsync(() =>
         {
+            if (fault == "dead") f.Session.Dead = true;
+            if (fault == "forbidden") f.Session.ForbiddenOrdinals.Add(ForbiddenState.CastSkill);
+            return Task.CompletedTask;
+        });
+        await bot.SendGameAsync(CombatService.UseSkill, request);
+        Assert.Equal(expected, (await Reply(bot)).Result);
+        await f.Loop.InvokeAsync(() =>
+        {
+            Assert.False(f.Session.SkillCds.ContainsKey(99)); // the wrapper's _iSkillID keeps no cooldown
             Assert.DoesNotContain(f.Session.Buffs, b => b.ConfigId == Buff);
             return Task.CompletedTask;
+        });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task OnlyAGuardiansControlBuffStopsAMonster(bool guardian)
+    {
+        await using var f = new Fixture();
+        await f.Start();
+        await using var bot = await f.Host.InWorldAsync("Guardian");
+        var buffs = f.Host.Service<BuffService>();
+        await f.Loop.InvokeAsync(async () =>
+        {
+            var monster = await f.SpawnMonsterAsync();
+            if (guardian) await buffs.AddGuardianAsync(monster, Petrify, 5000, f.Session.Role!.Id);
+            else await buffs.AddSupportAsync(monster, Petrify, 5000, f.Session.Role!.Id);
+            Assert.True(buffs.UnitHasGroup(monster, BuffService.PetrifyGroup));
+            Assert.Equal(guardian, buffs.UnitForbidden(monster, ForbiddenState.Walk));
+            Assert.Equal(guardian ? 1UL << 11 : 0, buffs.UnitStatus(monster)); // SpecialStatusConfig 12, Petrify
+        });
+    }
+
+    [Fact]
+    public async Task ABornControlImmunityRefusesAGuardiansControlBuff()
+    {
+        await using var f = new Fixture();
+        await f.Start();
+        await using var bot = await f.Host.InWorldAsync("Guardian");
+        var buffs = f.Host.Service<BuffService>();
+        await f.Loop.InvokeAsync(async () =>
+        {
+            var monster = await f.SpawnMonsterAsync();
+            await buffs.AddSupportAsync(monster, BornImmunity, 60000, monster.Uid);
+            await buffs.AddGuardianAsync(monster, Petrify, 5000, f.Session.Role!.Id);
+            Assert.False(buffs.UnitHasGroup(monster, BuffService.PetrifyGroup));
+            Assert.False(buffs.UnitForbidden(monster, ForbiddenState.Walk));
+        });
+    }
+
+    [Theory]
+    [InlineData(false, 250)]
+    [InlineData(true, 125)]
+    public async Task OnlyAGuardiansDebuffChangesAMonstersSpeed(bool guardian, int expectedCm)
+    {
+        await using var f = new Fixture();
+        await f.Start();
+        await using var bot = await f.Host.InWorldAsync("Guardian");
+        var buffs = f.Host.Service<BuffService>();
+        await f.Loop.InvokeAsync(async () =>
+        {
+            var monster = await f.SpawnMonsterAsync();
+            if (guardian) await buffs.AddGuardianAsync(monster, Slow, 5000, f.Session.Role!.Id);
+            else await buffs.AddSupportAsync(monster, Slow, 5000, f.Session.Role!.Id);
+            Assert.Equal(expectedCm, monster.SpeedCm(MonsterService.NowMs));
+        });
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task OnlyAGuardiansBlindLimitsThePlayersSight(bool guardian)
+    {
+        await using var f = new Fixture();
+        await f.Start();
+        await using var bot = await f.Host.InWorldAsync("Guardian");
+        var buffs = f.Host.Service<BuffService>();
+        await f.Loop.InvokeAsync(async () =>
+        {
+            var far = f.Session.Position.Clone();
+            far.X += BuffService.BlindRadiusCm / 100f + 5;
+            if (guardian) await buffs.AddGuardianAsync(f.Session, Blind, 5000, f.Session.Role!.Id);
+            else await buffs.AddAsync(f.Session, Blind, 5000, f.Session.Role!.Id);
+            Assert.Equal(guardian, buffs.Blinded(f.Session));
+            Assert.Equal(!guardian, buffs.CanSeePosition(f.Session, far));
+            Assert.True(buffs.CanSeePosition(f.Session, f.Session.Position));
+        });
+    }
+
+    [Theory]
+    [InlineData(false, 3500)]
+    [InlineData(true, 2500)]
+    public async Task OnlyAGuardiansCastSpeedShortensTheVariableChant(bool guardian, int expectedMs)
+    {
+        await using var f = new Fixture();
+        await f.Start();
+        await using var bot = await f.Host.InWorldAsync("Guardian");
+        var buffs = f.Host.Service<BuffService>();
+        var row = JsonSerializer.SerializeToElement(new { _iID = 1, _iChantFix = 500, _iChantVar = 3000 });
+        await f.Loop.InvokeAsync(async () =>
+        {
+            if (guardian) await buffs.AddGuardianAsync(f.Session, CastSpeedBuff, 5000, f.Session.Role!.Id);
+            else await buffs.AddAsync(f.Session, CastSpeedBuff, 5000, f.Session.Role!.Id);
+            Assert.Equal(expectedMs, f.Combat.ChantMs(f.Session, row));
         });
     }
 }

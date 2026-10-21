@@ -29,11 +29,14 @@ public sealed partial class CombatService
                     ScheduleRuntime(action.WorldScene, TimeSpan.FromSeconds(second), () => Current()
                         ? GuardianHealAsync(source, source, pet.EffectId, action.Id, (long)desc[0], Current) : Task.CompletedTask);
                 break;
+            // Angeling: (inferred) one heal a second over the description's radius, not the linked halo's.
             case "ShengGuangJiangLin" when desc.Length >= 7:
                 for (int second = 1; second <= desc[6]; second++)
                     ScheduleRuntime(action.WorldScene, TimeSpan.FromSeconds(second), () =>
                         GuardianAreaHealAsync(source, pet, action, (float)desc[3], (int)GameData.Int(pet.Effect, "_iTargetMax"), desc[5]));
                 break;
+            // Incubus: the aura hits with the linked emodiyu auxiliary, so its range is that row's _kRange, which differs from
+            // the description's.
             case "moqihuanrao" when desc.Length >= 7:
                 if (GuardianLinkedAuxiliary(pet.Active, pet.Star, "emodiyu") is { } damage)
                     ScheduleGuardianAura(source, pet, action, damage, desc[6], desc[1]);
@@ -57,7 +60,7 @@ public sealed partial class CombatService
     private void ScheduleGuardianAura(GameSession source, GuardianPetRules.Skill pet, ActiveSkillCast parent,
         JsonElement effect, double interval, double duration)
     {
-        if (interval <= 0 || duration <= 0 || duration / interval > 100) return;
+        if (interval <= 0 || duration <= 0 || duration / interval > GuardianPetRules.MaxAuraPulses) return;
         for (double second = interval; second <= duration + .000001; second += interval)
             ScheduleRuntime(parent.WorldScene, TimeSpan.FromSeconds(second), async () =>
             {

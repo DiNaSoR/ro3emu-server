@@ -209,6 +209,8 @@ public sealed partial class CombatService
         return (long)Math.Clamp(Math.Floor(damage * Math.Max(0, 1 + percent / 100)), 0, long.MaxValue);
     }
 
+    // (inferred) Medusa's "controlled" enemy: petrified, or slowed below its own speed (a player: under a negative
+    // movement-speed change). The description does not list the states it counts.
     private bool GuardianControlTarget(MonsterUnit target) => _buffs.UnitHasGroup(target, BuffService.PetrifyGroup)
         || target.SpeedCm(Now) < target.Template.SpeedCm;
 

@@ -608,6 +608,7 @@ public sealed partial class CombatService : IGameTicker
         double dmg = BaseDamage(a, b, skill, branch, out bool magic);
         dmg *= 0.97 + Rolls.DamageFloat() * 0.06; // DamageFloat [9700, 10300]
         var result = DamageHitResult.Normal;
+        // (inferred) Miguel's guardian crit bonus (bonusCrit/forceCrit) also lets a magic hit crit; nothing else changes.
         if (forceCrit || (!magic || bonusCrit > 0) && Rolls.Crit() < CritRate(a, b, skill) + bonusCrit)
         {
             dmg *= 1.5; // FormulaParamCriDmg 15000

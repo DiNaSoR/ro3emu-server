@@ -154,7 +154,7 @@ internal static partial class GuardianPetRules
     {
         var row = GuardianPetRules.CopyObject(skill.Active);
         if (skill.Kind == Kind.Damage && GameData.Int(skill.Effect, "_iRangeType") == SkillRelease.SingleTarget)
-            row["_iRelease"] = SkillRelease.Lock; // Owl locks a target despite the wrapper's FixCircle marker.
+            row["_iRelease"] = SkillRelease.Lock; // (inferred) Owl locks a target despite the wrapper's FixCircle marker.
         return JsonSerializer.SerializeToElement(row);
     }
 
@@ -205,7 +205,7 @@ internal static partial class GuardianPetRules
 
     // (inferred) Bounds on description-driven repeats and multipliers. They are not client rules: they only stop a
     // malformed description from scheduling unbounded work.
-    internal const int MaxRepeats = 50, MaxCoreHits = 20;
+    internal const int MaxRepeats = 50, MaxCoreHits = 20, MaxAuraPulses = 100;
     internal const double MaxBuffMultiplier = 10;
 
     internal static int BuffAtStar(GameData data, int group, int star)

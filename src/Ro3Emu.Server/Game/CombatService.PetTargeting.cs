@@ -10,11 +10,12 @@ public sealed partial class CombatService
     private static bool IsGuardianEffect(JsonElement row) => GameData.Int(row, "_iSystemType") == GuardianPetRules.EffectType
         || row.TryGetProperty("_ro3GuardianProc", out _);
 
-    /// <summary>Guardian monster/player selectors share range, height, face and targeted center. The rectangle
-    /// interpretation for Eve's final throw is inferred from its "ahead" description; other shapes retain shared combat rules.
+    /// <summary>Whether a point is inside a skill row's area: monster selection for every skill, and a guardian's player
+    /// targets. Guardian rows alone may carry the forward rectangle, inferred for Eve's final throw from its "ahead"
+    /// description.
     /// (inferred) A missing _kRange is 3 m and a fan without an angle 90 degrees; a rectangle is centred on its anchor and,
     /// without a length, reaches its width ahead and behind.</summary>
-    private static bool GuardianAreaContains(JsonElement row, Vec3 origin, Vec3 requested, float face, Vec3 point)
+    private static bool SkillAreaContains(JsonElement row, Vec3 origin, Vec3 requested, float face, Vec3 point)
     {
         int release = (int)GameData.Int(row, "_iRelease");
         Vec3 center = release is SkillRelease.Lock or SkillRelease.DragRect or SkillRelease.DragCircle ? requested : origin;
@@ -32,7 +33,7 @@ public sealed partial class CombatService
     }
 
     private GameSession[] GuardianPlayerTargets(GameSession source, ActiveSkillCast cast, Vec3 center) => [.. _sessions.All()
-        .Where(p => CanPlayerHit(source, p) && GuardianAreaContains(cast.Row, cast.Origin, center, cast.Request.Face, p.Position))];
+        .Where(p => CanPlayerHit(source, p) && SkillAreaContains(cast.Row, cast.Origin, center, cast.Request.Face, p.Position))];
 
     private long GuardianOwlTarget(GameSession source, GuardianPetRules.Skill pet, ActiveSkillCast cast)
     {
