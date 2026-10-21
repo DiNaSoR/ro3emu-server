@@ -160,13 +160,20 @@ namespace Ro3Emu.ClientHooks
                 if (clone != null && clone.gameObject.activeSelf) clone.gameObject.SetActive(false);
                 return;
             }
-            if (clone == null) Clones[cooldown] = clone = Copy(cooldown);
+            if (clone == null) { Prune(); Clones[cooldown] = clone = Copy(cooldown); }
             var label = clone.GetComponent<TMP_Text>();
             if (label == null) return;
             if (!clone.gameObject.activeSelf) clone.gameObject.SetActive(true);
             label.text = line;
             Place(clone, cooldown, cell);
             if (cooldown.GetComponent<TMP_Text>() is { } source) Copies[label] = source;
+        }
+
+        /// <summary>Drops the copies of tooltips that were destroyed (Unity's == null).</summary>
+        private static void Prune()
+        {
+            foreach (var dead in Clones.Where(pair => pair.Key == null || pair.Value == null).Select(pair => pair.Key).ToList())
+                Clones.Remove(dead);
         }
 
         /// <summary>A copy of the cooldown label without the component that re-applies its language key.</summary>
@@ -182,14 +189,16 @@ namespace Ro3Emu.ClientHooks
         /// <summary>
         /// A line of its own under the cooldown's row. In game, cast time and cooldown share one row, so a copy that
         /// stays beside the cooldown label lands on the same line. The row is the cooldown's ancestor, up to the
-        /// info block (Layout_Cell), that sits in a vertical layout group: the copy goes into that group right after
-        /// the row. Without such a group, the copy goes one row height below the row.
+        /// info block (Layout_Cell), that sits in a vertical layout group inside the block: the copy goes into that group
+        /// right after the row. Without such a group, the copy goes one row height below the row.
         /// </summary>
         private static void Place(Transform clone, Transform cooldown, Transform cell)
         {
+            // Only groups inside the info block count: without the block, or above it, the copy would leave the tooltip.
             var row = cooldown;
-            while (row.parent != null && row.parent.GetComponent<VerticalLayoutGroup>() == null && row != cell) row = row.parent;
-            if (row.parent != null && row.parent.GetComponent<VerticalLayoutGroup>() != null)
+            while (cell != null && row != cell && row.parent != null && row.parent.GetComponent<VerticalLayoutGroup>() == null)
+                row = row.parent;
+            if (cell != null && row != cell && row.parent != null && row.parent.GetComponent<VerticalLayoutGroup>() != null)
             {
                 if (clone.parent != row.parent) clone.SetParent(row.parent, false);
                 int index = row.GetSiblingIndex() + 1;
