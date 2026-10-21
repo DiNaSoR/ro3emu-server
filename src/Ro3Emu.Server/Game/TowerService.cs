@@ -22,6 +22,7 @@ public sealed partial class TowerService
     public const uint FirstPassRange = 32807, ClaimFirstPass = 32808, DungeonInfo = 30401, LeaveDungeon = 30402;
 
     private readonly GameData _data;
+    private long _nextPetUid = TowerPetUnit.UidBase;
     private readonly RoleStore _roles;
     private readonly AccountStore _accounts;
     private readonly CharacterService _character;
@@ -267,7 +268,8 @@ public sealed partial class TowerService
         {
             if (a.Pets.Any(p => p.PetId == id)) continue;
             int position = Array.IndexOf(desired, id);
-            var actor = TowerPetUnit.Create(_data, s.Pets, s, _world, _monsters, _combat, id, a.InstanceId,
+            var actor = TowerPetUnit.Create(_data, s.Pets, s, _world, _monsters, _combat,
+                Interlocked.Increment(ref _nextPetUid), id, a.InstanceId,
                 s.Position.X + (position == 0 ? -2f : 2f), s.Position.Y, s.Position.Z + 1f);
             if (actor == null) continue; // Saved roster may predate the current pet table; validation is at 32803.
             a.Pets.Add(actor);

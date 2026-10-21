@@ -34,7 +34,7 @@ public sealed class GuildHuntingService : IGameTicker
     /// <summary>(inferred) The server top kept and rewarded: GuildHuntRewardConfig group 2 ends at rank 20 (row 1009).</summary>
     private const int TopSize = 20;
     /// <summary>(inferred) Commander skills reroll every 60 s; the client only shows nextSkillMs (HC:229-315).</summary>
-    internal static long SkillRefreshMs { get; set; } = 60_000;
+    private const long SkillRefreshMs = 60_000;
 
     private readonly GameData _data;
     private readonly AccountStore _accounts;

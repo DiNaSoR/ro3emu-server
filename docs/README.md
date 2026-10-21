@@ -15,6 +15,7 @@
 - [Launcher and patch repository](guide/launcher.md): hosting the client for your players (`RO3EmuDesktop.exe` in the release zip needs no repository)
 - [Development mode](guide/development-mode.md): what `server.sh --dev` (`ASPNETCORE_ENVIRONMENT=Development`) turns on
 - [Tests](guide/testing.md): content tests on your exported data, rule tests on the invented fixture that CI runs
+- [Security model](systems/security.md): what the server exposes, what it trusts, and how to report a vulnerability
 
 ## Systems: how each part is implemented
 

@@ -214,9 +214,8 @@ public sealed partial class NewActivityTests : IAsyncLifetime
         await bot.SendGameAsync(MsgId.Logout, new LogoutReq());
         await Next(bot, MsgId.Logout, LogoutResp.Parser);
         Assert.False(session.ActivitiesReady);
-        Assert.Equal(ErrorCodes.FeatureUnavailable, (await Common(bot, request)).Result);
-        await bot.SendGameAsync(NewActivityService.GetReward, new NewActivityGetRewardCommonReq { ActivityID = 113, Index = 1 });
-        Assert.Equal(ErrorCodes.FeatureUnavailable, (await Next(bot, NewActivityService.GetReward, NewActivityGetRewardCommonResp.Parser)).Result);
+        await StageGate.AssertUnansweredAsync(bot, NewActivityService.Common, request);
+        await StageGate.AssertUnansweredAsync(bot, NewActivityService.GetReward, new NewActivityGetRewardCommonReq { ActivityID = 113, Index = 1 });
         Assert.False(session.NewActivities.ActivityInfo[103].ActivityParam.LevelAward.AwardData.ContainsKey(1));
         Assert.Empty(session.NewActivities.ActivityInfo[113].ActivityParam.SevenDay.RewardStatus);
         await bot.EnterWorldAsync(roleId);

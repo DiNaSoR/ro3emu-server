@@ -14,7 +14,7 @@ public sealed class PetFollowerService(World world, GameData data, FunctionServi
 {
     private readonly bool _enabled = options?.Value.Pets.WorldFollower ?? true;
 
-    private static long _nextActorId = 1L << 52; // Separate from role IDs and monster IDs (1L << 41).
+    private long _nextActorId = 1L << 52; // Separate from role IDs and monster IDs (1L << 41).
 
     /// <summary>Refresh after login or a successful lineup/growth change; pre-world login only prepares the actor.</summary>
     public Task RefreshAsync(GameSession session)

@@ -11,8 +11,9 @@ namespace Ro3Emu.Server.Game;
 /// </summary>
 public sealed class TowerPetUnit : WorldUnit
 {
-    // Separate from monsters (2^41) and passive followers (2^52); remain exact in the Lua number range.
-    private static long _nextUid = 1L << 51;
+    /// <summary>Uids above this one: separate from monsters (2^41) and passive followers (2^52), exact in the Lua
+    /// number range.</summary>
+    internal const long UidBase = 1L << 51;
     private readonly GameSession _owner;
     private readonly World _world;
     private readonly MonsterService _monsters;
@@ -59,13 +60,13 @@ public sealed class TowerPetUnit : WorldUnit
     public static bool CanSpawn(GameData data, DBPetInfo owned, int id) => Build(data, owned, id) != null;
 
     public static TowerPetUnit? Create(GameData data, DBPetInfo owned, GameSession owner, World world,
-        MonsterService monsters, CombatService combat, int id, long instance, float x, float y, float z)
+        MonsterService monsters, CombatService combat, long uid, int id, long instance, float x, float y, float z)
     {
         var t = Build(data, owned, id);
         if (t == null) return null;
         return new TowerPetUnit(owner, world, monsters, combat)
         {
-            Uid = Interlocked.Increment(ref _nextUid), SceneEntry = owner.SceneEntry, InstanceId = instance,
+            Uid = uid, SceneEntry = owner.SceneEntry, InstanceId = instance,
             RuntimeMap = owner.RuntimeMap,
             X = x, Y = y, Z = z, Face = owner.Face,
             PetId = id, NpcTemplateId = t.Value.Npc, Level = t.Value.Level,

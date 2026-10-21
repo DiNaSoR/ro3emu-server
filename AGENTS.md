@@ -27,6 +27,8 @@ client cannot establish is marked `(inferred)` where it is implemented. Never pr
 
 - Game state changes only on the game loop (`GameLoop`). Persist first, then change the in-memory state from the
   commit callback.
+- The field names of a `DbPlan` and of the values it holds are written into receipts. Don't rename or move them:
+  `ReceiptFieldNamesTests` fails, and an operation recorded before the change would refuse its replay.
 - Validate every client request against the configuration and refuse it with an `ErrorCodes` value.
 - Read configuration through `GameData` (`Table`, `Row`, `GameData.Int(row, "_iField")`) and maps through
   `WorldData`, with the client's own table and field names. Don't copy config values into code.
@@ -35,11 +37,12 @@ client cannot establish is marked `(inferred)` where it is implemented. Never pr
   - a message id shared across services goes in `MsgId`, one that only its service handles is a `public const uint`
     of that service (`GatheringService.Interaction`);
   - result codes go in `ErrorCodes`, with the client's text in a comment;
-  - a function, activity or condition id is a named `const` of the service that owns it (`AdventureGroupService.Function`).
+  - a function, activity or condition id is a named `const` of the service that owns it
+    (`AdventureGroupService.Function`).
 - Keep a method under about 40 lines and split it along the steps it performs; a longer one needs a reason.
 - Style: private fields are `_camelCase`, `const` and `static readonly` fields are PascalCase, collections are
-  created with `[]`, and a class whose constructor only stores its parameters uses a primary constructor. The build
-  enforces these (`.editorconfig`). Match the surrounding file's comment style.
+  created with `[]`, and a class whose constructor only stores its parameters uses a primary constructor. CI
+  enforces these (`.editorconfig` and its baseline). Match the surrounding file's comment style.
 
 ## Tests
 

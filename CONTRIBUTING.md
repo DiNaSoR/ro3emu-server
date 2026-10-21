@@ -41,6 +41,9 @@ CachyOS package (`global.json` asks for 10.0.100 or later). CI formats with the 
 unrelated files. Run `dotnet format` with a 10.0.4xx SDK, for example one from
 [dotnet-install](https://learn.microsoft.com/dotnet/core/tools/dotnet-install-script) next to the distribution's, or
 leave the layout check to CI.
+CI checks the analyzer baseline in `.editorconfig` with `dotnet run --project tools/AnalyzerBaseline -c Release` on
+that band, which also counts some rules differently from other bands; when an SDK update changes a count, the check
+prints the new numbers to write.
 
 Package versions live in `Directory.Packages.props`: a `PackageReference` names the package without a version.
 
