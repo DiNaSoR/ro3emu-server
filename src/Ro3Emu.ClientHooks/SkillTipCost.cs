@@ -38,6 +38,8 @@ namespace Ro3Emu.ClientHooks
         private static readonly Dictionary<Obf_R.Obf_ff, string> Pending = new Dictionary<Obf_R.Obf_ff, string>();
         // Each copy follows its cooldown label's colour (the tooltip fades in by vertex colour).
         private static readonly Dictionary<TMP_Text, TMP_Text> Copies = new Dictionary<TMP_Text, TMP_Text>();
+        // The copy made for each cooldown label (it can move out of the cooldown's parent, so Find cannot see it).
+        private static readonly Dictionary<Transform, Transform> Clones = new Dictionary<Transform, Transform>();
         private static bool _diagnosed;
 
         /// <summary>From LuaPatches.Tick, once per LuaEnv.</summary>
@@ -148,21 +150,22 @@ namespace Ro3Emu.ClientHooks
             var view = self.Obf_RuA<Obf_R.Obf_ff>("View");
             var cooldown = TransformOf(view?.Obf_RuA<Obf_R.Obf_ff>("m_kTTXT_CDName"));
             var original = TransformOf(view?.Obf_RuA<Obf_R.Obf_ff>("m_kTTXT_CostItemsName"));
+            var cell = TransformOf(view?.Obf_RuA<Obf_R.Obf_ff>("m_kRTRANSFORM_Layout_Cell"));
             if (cooldown == null || cooldown.parent == null) { Once("cooldown label not found"); return; }
-            if (!_diagnosed) { _diagnosed = true; Diagnose(original, cooldown, line); }
+            if (!_diagnosed) { _diagnosed = true; Diagnose(original, cooldown, cell, line); }
             if (original != null && original.gameObject.activeSelf) original.gameObject.SetActive(false);
-            var clone = cooldown.parent.Find(CloneName);
+            Clones.TryGetValue(cooldown, out var clone);
             if (line == null || !cooldown.gameObject.activeInHierarchy)
             {
                 if (clone != null && clone.gameObject.activeSelf) clone.gameObject.SetActive(false);
                 return;
             }
-            if (clone == null) clone = Copy(cooldown);
+            if (clone == null) Clones[cooldown] = clone = Copy(cooldown);
             var label = clone.GetComponent<TMP_Text>();
             if (label == null) return;
             if (!clone.gameObject.activeSelf) clone.gameObject.SetActive(true);
             label.text = line;
-            Place(clone, cooldown);
+            Place(clone, cooldown, cell);
             if (cooldown.GetComponent<TMP_Text>() is { } source) Copies[label] = source;
         }
 
@@ -176,27 +179,41 @@ namespace Ro3Emu.ClientHooks
             return copy.transform;
         }
 
-        /// <summary>Right after the cooldown line: next in a layout group, else one line lower.</summary>
-        private static void Place(Transform clone, Transform cooldown)
+        /// <summary>
+        /// A line of its own under the cooldown's row. In game, cast time and cooldown share one row, so a copy that
+        /// stays beside the cooldown label lands on the same line. The row is the cooldown's ancestor, up to the
+        /// info block (Layout_Cell), that sits in a vertical layout group: the copy goes into that group right after
+        /// the row. Without such a group, the copy goes one row height below the row.
+        /// </summary>
+        private static void Place(Transform clone, Transform cooldown, Transform cell)
         {
-            var parent = cooldown.parent;
-            if (parent.GetComponent<LayoutGroup>() != null)
+            var row = cooldown;
+            while (row.parent != null && row.parent.GetComponent<VerticalLayoutGroup>() == null && row != cell) row = row.parent;
+            if (row.parent != null && row.parent.GetComponent<VerticalLayoutGroup>() != null)
             {
-                int index = cooldown.GetSiblingIndex() + 1;
+                if (clone.parent != row.parent) clone.SetParent(row.parent, false);
+                int index = row.GetSiblingIndex() + 1;
                 if (clone.GetSiblingIndex() != index) clone.SetSiblingIndex(index);
-                if (parent is RectTransform rect) LayoutRebuilder.MarkLayoutForRebuild(rect);
+                if (row.parent is RectTransform group) LayoutRebuilder.MarkLayoutForRebuild(group);
                 return;
             }
-            if (clone is RectTransform to && cooldown is RectTransform from)
-                to.anchoredPosition = from.anchoredPosition - new Vector2(0f, from.rect.height);
+            // No vertical group: below the cooldown's own row (its parent when that lays labels out side by side).
+            var line = cooldown.parent.GetComponent<HorizontalLayoutGroup>() != null ? cooldown.parent : cooldown;
+            if (clone.parent != line.parent) clone.SetParent(line.parent, false);
+            if (line is RectTransform from)
+                clone.position = cooldown.position - line.up * (from.rect.height * line.lossyScale.y);
         }
 
         /// <summary>Once: why the original label does not show, for a report from the player's log.</summary>
-        private static void Diagnose(Transform original, Transform cooldown, string line)
+        private static void Diagnose(Transform original, Transform cooldown, Transform cell, string line)
         {
             var sb = new StringBuilder("[Ro3Emu.SkillTipCost] line=\"").Append(line).Append("\"; cooldown ")
-                .Append(Diagnostics.PathOf(cooldown)).Append(" parent layout=")
-                .Append(cooldown.parent.GetComponent<LayoutGroup>()?.GetType().Name ?? "none");
+                .Append(Diagnostics.PathOf(cooldown)).Append(" layouts up to the info block:");
+            for (var t = cooldown.parent; t != null; t = t.parent)
+            {
+                sb.Append(' ').Append(t.name).Append('=').Append(t.GetComponent<LayoutGroup>()?.GetType().Name ?? "none");
+                if (t == cell) break;
+            }
             if (original == null) sb.Append("; cost label not found");
             for (var t = original; t != null && t != cooldown.parent.parent; t = t.parent)
             {
