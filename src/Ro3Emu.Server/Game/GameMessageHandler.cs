@@ -4,7 +4,7 @@ namespace Ro3Emu.Server.Game;
 /// The game-gate dispatcher: admits each romsg message under its reservation and runs its route. The routes come from
 /// the message modules (Game/Messages), mapped once in registration order (ServerHost).
 /// </summary>
-public sealed class GameMessageHandler(MsgCatalog catalog, IEnumerable<Messaging.IMessageModule> modules, ILogger<GameMessageHandler> log)
+public sealed partial class GameMessageHandler(MsgCatalog catalog, IEnumerable<Messaging.IMessageModule> modules, ILogger<GameMessageHandler> log)
 {
     private Messaging.MessageRoutes? _routes;
     /// <summary>Every game message's single owner; built once, duplicates fail.</summary>
@@ -45,10 +45,14 @@ public sealed class GameMessageHandler(MsgCatalog catalog, IEnumerable<Messaging
     {
         if (session.EarlyMessageRefused) return;
         session.EarlyMessageRefused = true;
-        log.LogWarning("Game msg {MsgId} {Name} from {Remote} ({Account}) refused at stage {Stage}; later ones not logged",
-            msgId, catalog.Name(msgId), session.Channel.Remote, session.Account ?? "not signed in",
+        LogEarlyMessage(log, msgId, catalog.Name(msgId), session.Channel.Remote, session.Account ?? "not signed in",
             Messaging.SessionStages.Of(session));
     }
+
+    [LoggerMessage(Level = LogLevel.Warning,
+        Message = "Game msg {MsgId} {Name} from {Remote} ({Account}) refused at stage {Stage}; later ones not logged")]
+    private static partial void LogEarlyMessage(ILogger logger, uint msgId, string name, string remote,
+        string account, Messaging.SessionStage stage);
 
     /// <summary>How a message is admitted before its handler runs.</summary>
     internal Messaging.Admission Admit(GameSession session, uint msgId, ReadOnlyMemory<byte> body) =>
