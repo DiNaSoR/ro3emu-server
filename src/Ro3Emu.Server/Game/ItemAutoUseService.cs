@@ -22,8 +22,9 @@ namespace Ro3Emu.Server.Game;
 /// mail, trade, auction, crafting, GM grant) without each path calling this. The client sees a new item only through
 /// 5009, so no path can skip it. The use runs the normal 31323 path after the sync, so cooldowns, level checks and the
 /// mount/box owners apply unchanged. Only the item's bag pack counts: a cart or storage copy is the player's to move.
-/// A refused use is silent and the item stays usable by hand; it is retried at login, when the level changes, and by
-/// the first sync a minute after the refusal. A second unit on the item's _iCD waits out the cooldown.
+/// A refused use is silent and the item stays usable by hand. A passing refusal (dead, a use-forbidding buff, a map
+/// limit) is tried again a minute later; any other waits for login or a level change. A second unit on the item's
+/// cooldown waits it out.
 /// </summary>
 public sealed class ItemAutoUseService
 {
@@ -36,15 +37,18 @@ public sealed class ItemAutoUseService
     private readonly ConditionalWeakTable<GameSession, State> states = new();
     private Dictionary<int, bool>? autoUse;
 
-    /// <summary>How long a refused use is left alone before a later 5009 tries it again (inferred): a refusal can be
-    /// passing (dead, a use-forbidding buff, a map limit) or lasting (the look is owned).</summary>
+    /// <summary>When a use refused for a passing reason is tried again (inferred).</summary>
     internal static TimeSpan RefusalRetry { get; set; } = TimeSpan.FromSeconds(60);
+
+    /// <summary>Refusals that pass on their own: dead, a use-forbidding buff, a map that forbids the item. Any other
+    /// refusal (owned look or mount, level, job, use count) lasts until login or a level change.</summary>
+    private static readonly HashSet<int> Passing = [ErrorCodes.UseWhileDead, ErrorCodes.ItemUseForbidden, ErrorCodes.ItemUseAreaForbidden];
 
     private sealed class State
     {
-        /// <summary>GUID -> when a refused use may be tried again; login and a level change clear it.</summary>
-        internal readonly Dictionary<long, DateTimeOffset> Refused = new();
-        /// <summary>GUIDs waiting out the item's _iCD; their timer takes them out and looks at the bag again.</summary>
+        /// <summary>GUIDs refused for a lasting reason; login and a level change clear it.</summary>
+        internal readonly HashSet<long> Refused = new();
+        /// <summary>GUIDs waiting on a timer (a cooldown or a passing refusal), which takes them out and looks again.</summary>
         internal readonly HashSet<long> Waiting = new();
         internal bool Scheduled;
     }
@@ -109,14 +113,36 @@ public sealed class ItemAutoUseService
         SeeBag(session);
     }
 
-    /// <summary>Auto-use items in their bag pack (not the cart or storage), minus those refused or on cooldown.</summary>
-    private IEnumerable<InvItem> Held(GameSession session, State? state)
-    {
-        var now = DateTimeOffset.UtcNow;
-        return session.Items.Where(i => i.Grid == 0 && i.Guid > 0 && IsAutoUse(i.Entry)
+    /// <summary>Auto-use items in their bag pack (not the cart or storage), minus those refused or waiting.</summary>
+    private IEnumerable<InvItem> Held(GameSession session, State? state) =>
+        session.Items.Where(i => i.Grid == 0 && i.Guid > 0 && IsAutoUse(i.Entry)
             && data.Row("ItemConfig", i.Entry) is { } row && i.Pack == CharacterService.ConfigPack(row)
-            && state?.Waiting.Contains(i.Guid) != true
-            && !(state != null && state.Refused.TryGetValue(i.Guid, out var until) && until > now));
+            && state?.Waiting.Contains(i.Guid) != true && state?.Refused.Contains(i.Guid) != true);
+
+    /// <summary>Leaves a GUID alone for <paramref name="wait"/>, then looks at the bag again if the same role is still
+    /// on the same connection.</summary>
+    private void RetryLater(GameSession session, State? state, long guid, TimeSpan wait)
+    {
+        if (state == null || !state.Waiting.Add(guid)) return;
+        long role = session.Role?.Id ?? 0;
+        var attachment = session.Attachment;
+        loop.Schedule(wait, () =>
+        {
+            state.Waiting.Remove(guid);
+            if (session.Role?.Id == role && ReferenceEquals(session.Attachment, attachment) && attachment?.Cancelled != true)
+                SeeBag(session);
+            return Task.CompletedTask;
+        });
+    }
+
+    /// <summary>When the item's own _iCD or its _kCDGroup cooldown ends (Unix ms), whichever is later.</summary>
+    private long CooldownEnd(GameSession session, int entry)
+    {
+        long end = session.ItemCds.GetValueOrDefault(entry);
+        if (data.Row("ItemConfig", entry) is { } row && row.TryGetProperty("_kCDGroup", out var g)
+            && g.ValueKind == JsonValueKind.Array && g.GetArrayLength() > 0 && GameData.Number(g[0]) is { } group and > 0)
+            end = Math.Max(end, session.ItemGroupCds.GetValueOrDefault((int)group));
+        return end;
     }
 
     private void SeeBag(GameSession session)
@@ -148,17 +174,21 @@ public sealed class ItemAutoUseService
             {
                 Interlocked.Increment(ref attempts);
                 int result = await character.AutoUseItemAsync(session, guid, count);
-                if (result == ErrorCodes.Cooldown && session.ItemCds.GetValueOrDefault(entry) is var end and > 0)
+                if (result == ErrorCodes.Cooldown
+                    && CooldownEnd(session, entry) - DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() is var left and > 0)
                 {
-                    // A second unit of the same entry waits out the item's _iCD instead of staying in the bag.
-                    var wait = TimeSpan.FromMilliseconds(Math.Max(1, end - DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()));
-                    if (state == null || state.Waiting.Add(guid))
-                        loop.Schedule(wait, () => { state?.Waiting.Remove(guid); SeeBag(session); return Task.CompletedTask; });
+                    // A second unit of the same entry waits out the cooldown instead of staying in the bag.
+                    RetryLater(session, state, guid, TimeSpan.FromMilliseconds(left));
+                    break;
+                }
+                if (result == ErrorCodes.Cooldown || Passing.Contains(result))
+                {
+                    RetryLater(session, state, guid, RefusalRetry);
                     break;
                 }
                 if (result != 0)
                 {
-                    if (state != null) state.Refused[guid] = DateTimeOffset.UtcNow + RefusalRetry;
+                    state?.Refused.Add(guid);
                     log.LogInformation("{Name} keeps auto-use item {Item}: use refused ({Result})", session.Role?.Name, entry, result);
                     break;
                 }
