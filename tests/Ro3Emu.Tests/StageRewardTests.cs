@@ -134,9 +134,13 @@ public sealed class StageRewardTests : IAsyncLifetime
     private async Task UseAppearanceItem(BotClient bot, string account, int item)
     {
         await Gm(account, $"!item {item} 1");
-        long guid = await State(s => s.Items.Single(i => i.Entry == item).Guid);
-        await bot.SendGameAsync(CharacterService.ItemUse, new ItemUseReq { ItemGuid = guid, ItemCount = 1 });
-        Assert.Equal(0, (await Next(bot, CharacterService.ItemUse, ItemUseResp.Parser, r => r.ItemGuid == guid)).Result);
+        // An untradable voucher (e.g. 3045403) is used by the server on receipt (ItemAutoUseService).
+        if (!app.Services.GetRequiredService<ItemAutoUseService>().IsAutoUse(item))
+        {
+            long guid = await State(s => s.Items.Single(i => i.Entry == item).Guid);
+            await bot.SendGameAsync(CharacterService.ItemUse, new ItemUseReq { ItemGuid = guid, ItemCount = 1 });
+        }
+        Assert.Equal(0, (await Next(bot, CharacterService.ItemUse, ItemUseResp.Parser, r => r.ItemId == item)).Result);
     }
 
     [ClientDataFact]

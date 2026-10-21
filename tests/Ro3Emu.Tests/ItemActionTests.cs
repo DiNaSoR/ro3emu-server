@@ -270,15 +270,12 @@ public sealed class ItemActionTests : IAsyncLifetime
         await Gm("alice", "!quest done 10104330");
         await Gm("alice", "!lvl 1");
         await Gm("alice", "!quest done 10105010");
-        await Gm("alice", "!item 1250725 2"); // Pale Sediment [603,5]
         long exp = await Read("alice", s => s.Pets!.IncubationExp);
         Assert.Equal(1, await Read("alice", s => s.Pets!.IncubationLv));
-        Assert.Equal(0, await Use(alice, 1250725));
+        // Pale Sediment [603,5] is _QuickUse [3, 0] and untradable: the server uses both on receipt (ItemAutoUseService).
+        await Gm("alice", "!item 1250725 2");
         await Next(alice, PetService.PetSync, DBPetInfoIncrement.Parser, m => m.IncubationExp == exp + 5);
-        Assert.Equal(1, Count(alice, 1250725));
-        Assert.Equal(exp + 5, DBPetInfo.Parser.ParseFrom(Roles.LoadPets(RoleId(alice))!).IncubationExp);
         // Room 1 needs 10 EXP and costs nothing: the second use levels it (as a collect would).
-        Assert.Equal(0, await Use(alice, 1250725));
         await WaitUntil(() => Session("alice").Pets!.IncubationLv == 2, "room level 2");
         Assert.Equal(2, DBPetInfo.Parser.ParseFrom(Roles.LoadPets(RoleId(alice))!).IncubationLv);
         Assert.Equal(0, Count(alice, 1250725));

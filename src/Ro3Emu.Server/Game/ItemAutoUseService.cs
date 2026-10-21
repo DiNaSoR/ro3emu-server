@@ -13,13 +13,18 @@ namespace Ro3Emu.Server.Game;
 /// (DropGroup 1216, e.g. 1501014 "[201,0,60030020]") is followed on PC by GuideConfig 1811-1821 (task 10101251), which
 /// start at the wardrobe with the mount already unlocked; the guides that walk the player through using the item
 /// (42-47) are closed (_iIsOpen 0). Using it on receipt is inferred from that.
-/// In the client data that is every look voucher (action 200), mount voucher (201) and pet hatchery EXP item (603),
-/// e.g. a Fashion suit's bonus vouchers 3016101, 3016701 and 3025101.
+/// A voucher that can be traded or sold stays in the bag for its owner to use, trade or list (a project rule, Steven
+/// 2026-10-21): ItemConfig._iTrade or TradeConfig._iTrade nonzero. That leaves 50 of the 159 [3, 0] items with a use
+/// effect: 12 look vouchers (action 200, e.g. the Silverwing piece 3045501), 31 mount vouchers (201) and 7 pet hatchery
+/// EXP items (603). The other 109 look vouchers, a Fashion suit's bonus vouchers 3016101, 3016701 and 3025101 among
+/// them, are _iTrade 2.
 /// Receipt is any 5009 bag sync that shows such an item, so every way into the bag counts (award, shop, gift claim,
 /// mail, trade, auction, crafting, GM grant) without each path calling this. The client sees a new item only through
 /// 5009, so no path can skip it. The use runs the normal 31323 path after the sync, so cooldowns, level checks and the
-/// mount/box owners apply unchanged. A refused use is silent and the item stays usable by hand; it is retried only at
-/// login and when the level changes, not on every later sync.
+/// mount/box owners apply unchanged. Only the item's bag pack counts: a cart or storage copy is the player's to move.
+/// A refused use is silent and the item stays usable by hand. A passing refusal (dead, a use-forbidding buff, a map
+/// limit) is tried again a minute later; any other waits for login or a level change. A second unit on the item's
+/// cooldown waits it out.
 /// </summary>
 public sealed class ItemAutoUseService
 {
@@ -32,10 +37,19 @@ public sealed class ItemAutoUseService
     private readonly ConditionalWeakTable<GameSession, State> states = new();
     private Dictionary<int, bool>? autoUse;
 
+    /// <summary>When a use refused for a passing reason is tried again (inferred).</summary>
+    internal static TimeSpan RefusalRetry { get; set; } = TimeSpan.FromSeconds(60);
+
+    /// <summary>Refusals that pass on their own: dead, a use-forbidding buff, a map that forbids the item. Any other
+    /// refusal (owned look or mount, level, job, use count) lasts until login or a level change.</summary>
+    private static readonly HashSet<int> Passing = [ErrorCodes.UseWhileDead, ErrorCodes.ItemUseForbidden, ErrorCodes.ItemUseAreaForbidden];
+
     private sealed class State
     {
-        /// <summary>GUIDs whose use was refused: left alone until login or a level change.</summary>
+        /// <summary>GUIDs refused for a lasting reason; login and a level change clear it.</summary>
         internal readonly HashSet<long> Refused = new();
+        /// <summary>GUIDs waiting on a timer (a cooldown or a passing refusal), which takes them out and looks again.</summary>
+        internal readonly HashSet<long> Waiting = new();
         internal bool Scheduled;
     }
 
@@ -52,6 +66,10 @@ public sealed class ItemAutoUseService
     /// <summary>Tests of the manual 31323 path (MountTests) keep auto-use items in the bag.</summary>
     internal bool Paused { get; set; }
 
+    /// <summary>Uses tried so far (tests check that a cooldown is waited out, not polled).</summary>
+    internal int Attempts => attempts;
+    private int attempts;
+
     /// <summary>At the end of login, after every owner snapshot (a use may sync mounts, wardrobe and rewards) and after
     /// GearPromptService.Attach, which replaces the session's BeforeGameSend: watch every 5009 from now on.</summary>
     internal void Attach(GameSession session)
@@ -66,9 +84,13 @@ public sealed class ItemAutoUseService
         autoUse ??= data.Table("ItemConfig").Values
             .Where(r => GameData.Int(r, "_iID") > 0)
             .GroupBy(r => (int)GameData.Int(r, "_iID"))
-            .ToDictionary(g => g.Key, g => Qualifies(g.First()));
+            .ToDictionary(g => g.Key, g => Qualifies(g.First()) && !Tradable(g.First()));
         return autoUse.GetValueOrDefault(entry);
     }
+
+    /// <summary>Tradable or stall-sellable: ItemConfig._iTrade, or the TradeConfig row the trade and stall checks read.</summary>
+    private bool Tradable(JsonElement row) => GameData.Int(row, "_iTrade") != 0
+        || data.Row("TradeConfig", GameData.Int(row, "_iID")) is { } trade && GameData.Int(trade, "_iTrade") != 0;
 
     private static bool Qualifies(JsonElement row)
     {
@@ -91,8 +113,37 @@ public sealed class ItemAutoUseService
         SeeBag(session);
     }
 
+    /// <summary>Auto-use items in their bag pack (not the cart or storage), minus those refused or waiting.</summary>
     private IEnumerable<InvItem> Held(GameSession session, State? state) =>
-        session.Items.Where(i => i.Grid == 0 && i.Guid > 0 && IsAutoUse(i.Entry) && state?.Refused.Contains(i.Guid) != true);
+        session.Items.Where(i => i.Grid == 0 && i.Guid > 0 && IsAutoUse(i.Entry)
+            && data.Row("ItemConfig", i.Entry) is { } row && i.Pack == CharacterService.ConfigPack(row)
+            && state?.Waiting.Contains(i.Guid) != true && state?.Refused.Contains(i.Guid) != true);
+
+    /// <summary>Leaves a GUID alone for <paramref name="wait"/>, then looks at the bag again if the same role is still
+    /// on the same connection.</summary>
+    private void RetryLater(GameSession session, State? state, long guid, TimeSpan wait)
+    {
+        if (state == null || !state.Waiting.Add(guid)) return;
+        long role = session.Role?.Id ?? 0;
+        var attachment = session.Attachment;
+        loop.Schedule(wait, () =>
+        {
+            state.Waiting.Remove(guid);
+            if (session.Role?.Id == role && ReferenceEquals(session.Attachment, attachment) && attachment?.Cancelled != true)
+                SeeBag(session);
+            return Task.CompletedTask;
+        });
+    }
+
+    /// <summary>When the item's own _iCD or its _kCDGroup cooldown ends (Unix ms), whichever is later.</summary>
+    private long CooldownEnd(GameSession session, int entry)
+    {
+        long end = session.ItemCds.GetValueOrDefault(entry);
+        if (data.Row("ItemConfig", entry) is { } row && row.TryGetProperty("_kCDGroup", out var g)
+            && g.ValueKind == JsonValueKind.Array && g.GetArrayLength() > 0 && GameData.Number(g[0]) is { } group and > 0)
+            end = Math.Max(end, session.ItemGroupCds.GetValueOrDefault((int)group));
+        return end;
+    }
 
     private void SeeBag(GameSession session)
     {
@@ -121,12 +172,18 @@ public sealed class ItemAutoUseService
             int uses = group ? 1 : stack, count = group ? Math.Min(stack, 999) : 1;
             for (int n = 0; n < uses; n++)
             {
+                Interlocked.Increment(ref attempts);
                 int result = await character.AutoUseItemAsync(session, guid, count);
-                if (result == ErrorCodes.Cooldown && session.ItemCds.GetValueOrDefault(entry) is var end and > 0)
+                if (result == ErrorCodes.Cooldown
+                    && CooldownEnd(session, entry) - DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() is var left and > 0)
                 {
-                    // A second unit of the same entry waits out the item's _iCD instead of staying in the bag.
-                    var wait = TimeSpan.FromMilliseconds(Math.Max(1, end - DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()));
-                    loop.Schedule(wait, () => { SeeBag(session); return Task.CompletedTask; });
+                    // A second unit of the same entry waits out the cooldown instead of staying in the bag.
+                    RetryLater(session, state, guid, TimeSpan.FromMilliseconds(left));
+                    break;
+                }
+                if (result == ErrorCodes.Cooldown || Passing.Contains(result))
+                {
+                    RetryLater(session, state, guid, RefusalRetry);
                     break;
                 }
                 if (result != 0)
