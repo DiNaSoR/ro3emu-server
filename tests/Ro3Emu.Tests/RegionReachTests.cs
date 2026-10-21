@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using Romsg;
 using Ro3Emu.Server.Game;
 using Ro3Emu.Server.Maps;
@@ -38,5 +39,21 @@ public sealed class RegionReachTests
         // 2 s at most: 3 + 5 + 14 = 22 m.
         Assert.True(SceneService.NearRegion(At(21f, walking: true, secondsSinceWalk: 60), Circle));
         Assert.False(SceneService.NearRegion(At(23f, walking: true, secondsSinceWalk: 60), Circle));
+    }
+
+    [Fact]
+    public async Task AMapChangeEndsTheWalkBeforeIt()
+    {
+        await using var host = await SyntheticHost.StartAsync();
+        await using var bot = await host.InWorldAsync("Walker");
+        var session = host.Service<SessionRegistry>().All().Single(s => s.Role != null);
+        await host.Service<GameLoop>().InvokeAsync(async () =>
+        {
+            session.Walking = true;
+            session.LastWalkUtc = DateTime.UtcNow - TimeSpan.FromSeconds(10);
+            Assert.True(await host.Service<SceneService>().EnterSceneAsync(session, SyntheticData.Town));
+            Assert.False(session.Walking);
+            Assert.Equal(0, session.WalkReportLag(2));
+        });
     }
 }
