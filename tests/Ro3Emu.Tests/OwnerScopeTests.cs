@@ -375,9 +375,9 @@ public sealed class OwnerScopeTests : IAsyncLifetime
         var entered = Signal(); var release = Signal();
         var router = new Ro3Emu.Server.Micro.MicroServiceRouter([new BlockingLogin(entered, release.Task)],
             Microsoft.Extensions.Logging.Abstractions.NullLogger<Ro3Emu.Server.Micro.MicroServiceRouter>.Instance, _loop, _owners);
-        var first = router.InvokeAsync(new Ro3Emu.Server.Micro.MicroSession(null!), "LoginService", "verifySdk", default).AsTask();
+        var first = router.InvokeAsync(new Ro3Emu.Server.Micro.MicroSession(null!, 1), "LoginService", "verifySdk", default).AsTask();
         await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        await router.InvokeAsync(new Ro3Emu.Server.Micro.MicroSession(null!), "LoginService", "verifySdk", default)
+        await router.InvokeAsync(new Ro3Emu.Server.Micro.MicroSession(null!, 2), "LoginService", "verifySdk", default)
             .AsTask().WaitAsync(TimeSpan.FromSeconds(5));
         Assert.False(first.IsCompleted);
         release.SetResult();

@@ -33,6 +33,7 @@ public sealed partial class StallsService
     private readonly GameLoop _loop;
     private readonly int _nameMaxLength;
     private readonly Dictionary<(string Key, int Line), StallActor> _actors = new();
+    private long _nextProjectionId = StallActor.ProjectionIdBase;
     private readonly HashSet<RuntimeMapKey> _activeLines = new();
     private readonly Dictionary<RuntimeMapKey, int> _pendingProjections = new();
     private readonly Dictionary<RuntimeMapKey, int> _openingClaims = new();
@@ -349,7 +350,8 @@ public sealed partial class StallsService
                 }
                 else if (!_actors.TryGetValue(key, out var actor))
                 {
-                    actor = new StallActor(row, runtime, Param("StallsModelId", 25000002));
+                    actor = new StallActor(row, runtime, Param("StallsModelId", 25000002),
+                        () => Interlocked.Increment(ref _nextProjectionId));
                     _actors.Add(key, actor);
                     await _world.AddUnitAsync(actor);
                     if (!_activeLines.Contains(runtime) && _actors.Remove(key)) await _world.RemoveUnitAsync(actor);
@@ -394,14 +396,13 @@ public sealed partial class StallsService
     {
         /// <summary>Below 2^53: the client keeps unit ids in a double array (see DungeonService.SceneActorUidBase).</summary>
         internal const long ProjectionIdBase = 1L << 49;
-        private static long _nextProjectionId = ProjectionIdBase;
         public StallRow Row { get; set; }
         private readonly long _template;
-        public StallActor(StallRow row, RuntimeMapKey runtime, long template)
+        public StallActor(StallRow row, RuntimeMapKey runtime, long template, Func<long> nextProjectionId)
         {
             Row = row; this._template = template;
             // Stable separate AOI IDs and StallsID=owner are (inferred); DAL compares StallsID with its role UUID.
-            Uid = row.SystemId != 0 && runtime.LineNumber > 1 ? Interlocked.Increment(ref _nextProjectionId)
+            Uid = row.SystemId != 0 && runtime.LineNumber > 1 ? nextProjectionId()
                 : row.SystemId != 0 ? 7_100_000_000_000L + row.SystemId : 7_000_000_000_000L + row.Owner;
             SceneEntry = row.Scene; RuntimeMap = runtime; X = row.X; Y = row.Y; Z = row.Z;
         }
