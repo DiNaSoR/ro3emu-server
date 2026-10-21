@@ -66,7 +66,10 @@ dotnet publish src/Ro3Emu.Server -c Release -o server-bin -v q -nologo -clp:Erro
 
 # 4. Settings: the address players reach, GM accounts, open content and the battle pass.
 if [ -z "$host" ]; then
-  host=$(hostname -I 2>/dev/null | awk '{print $1}')
+  # "|| true": with pipefail a failed lookup would end the script here (set -e) before the fallbacks run.
+  host=$(hostname -I 2>/dev/null | awk '{print $1}' || true)
+  # A hostname without -I (inetutils on Arch and CachyOS): the source address of the default route. Sends nothing.
+  [ -n "$host" ] || host=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for (i = 1; i < NF; i++) if ($i == "src") { print $(i + 1); exit }}' || true)
   [ -n "$host" ] || host=127.0.0.1
 fi
 case "$host" in
