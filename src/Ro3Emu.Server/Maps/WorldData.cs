@@ -102,6 +102,28 @@ public sealed class MapWorld
     public MapPoint? Landing(MapPoint p) => Nav == null ? p : Nav.WalkHeight(p.X, p.Z, p.Y) is { } h ? p with { Y = h } : null;
 
     public bool IsWalkable(float x, float y, float z) => Nav?.IsWalkable(x, y, z) ?? true;
+
+    private IReadOnlyList<MapPoint>? _randomSpots;
+
+    /// <summary>
+    /// The spots a Fly Wing picks from (inferred): the map's authored points and monster spawn points on walkable ground
+    /// that can be walked to from where players arrive (born, revive, Kafra and portal arrivals). Field maps carry
+    /// points on walkable strips cut off from the play area, such as Payon Forest's (10220) northern edge at z 398-399;
+    /// landing there strands the player. Without a nav grid, or with no arrival on walkable ground, every spot counts.
+    /// </summary>
+    public IReadOnlyList<MapPoint> RandomSpots => _randomSpots ??= FindRandomSpots();
+
+    private List<MapPoint> FindRandomSpots()
+    {
+        var spots = Points.Values.Concat(SpawnGroups.SelectMany(g => g.Points).Select(p => new MapPoint(p.X, p.Y, p.Z, p.Face)))
+            .Select(Grounded).Where(p => IsWalkable(p.X, p.Y, p.Z)).ToList();
+        if (Nav is not { } nav) return spots;
+        var arrivals = new[] { Born, Revive }.OfType<MapPoint>()
+            .Concat(Npcs.Where(n => n.Kind is WorldNpcKind.Kafra or WorldNpcKind.Portal).Select(n => n.Arrival))
+            .Select(Grounded);
+        var reach = nav.Reachable(arrivals.Select(p => (p.X, p.Y, p.Z)));
+        return reach.IsEmpty ? spots : spots.Where(p => reach.Contains(p.X, p.Y, p.Z)).ToList();
+    }
 }
 
 /// <summary>
