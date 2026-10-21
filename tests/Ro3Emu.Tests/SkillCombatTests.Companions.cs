@@ -11,7 +11,7 @@ public sealed partial class SkillCombatTests
 {
     private const int FalconLease = 1500100, MadogearLease = 1500300, WolfLease = 1500400;
 
-    private SkillService Skills => app.Services.GetRequiredService<SkillService>();
+    private SkillService Skills => _app.Services.GetRequiredService<SkillService>();
 
     private static async Task Lease(BotClient bot, int id)
     {

@@ -40,7 +40,7 @@ public sealed partial class CombatService
         float radius = (float)desc.ElementAtOrDefault(3);
         if (seconds <= 0 || total <= perWave) return;
         // (inferred) A cast with no enemy selected locks the nearest one in range.
-        target ??= world.Map(s.WorldScene).Units.OfType<MonsterUnit>()
+        target ??= _world.Map(s.WorldScene).Units.OfType<MonsterUnit>()
             .Where(m => m.Hp > 0 && !m.Dead && CanHitMonster(s, m) && MonsterService.Distance(m, s) <= lockMeters + 0.5f)
             .OrderBy(m => MonsterService.Distance(m, s)).ThenBy(m => m.Uid).FirstOrDefault();
         if (target == null) return;
@@ -55,9 +55,9 @@ public sealed partial class CombatService
         ScheduleRuntime(scene, TimeSpan.FromMilliseconds(Math.Max(0, intervalMs - GameLoop.TickInterval.TotalMilliseconds)), async () =>
         {
             if (!ReferenceEquals(s.Role, role) || s.Dead || s.SceneLoading || s.WorldScene != scene
-                || s.SceneGeneration != generation || !sessions.Contains(s)) return;
+                || s.SceneGeneration != generation || !_sessions.Contains(s)) return;
             if (!locked.Dead && locked.Hp > 0) center = locked.Pos.Clone();
-            var pool = world.Map(scene).Units.OfType<MonsterUnit>()
+            var pool = _world.Map(scene).Units.OfType<MonsterUnit>()
                 .Where(m => m.Hp > 0 && !m.Dead && CanHitMonster(s, m) && Distance(center, m.Pos) <= radius + 0.1f).ToList();
             int wave = Math.Min(perWave, left);
             for (int i = 0; i < wave && pool.Count > 0; i++)
@@ -85,7 +85,7 @@ public sealed partial class CombatService
         {
             var buff = s.Buffs.FirstOrDefault(b => b.Guid == guid);
             if (!ReferenceEquals(s.Role, role) || s.Dead || s.SceneLoading || buff == null
-                || buff.ExpireMs + GameLoop.TickInterval.TotalMilliseconds < due || data.Row("BuffConfig", buff.ConfigId) is not { } ring)
+                || buff.ExpireMs + GameLoop.TickInterval.TotalMilliseconds < due || _data.Row("BuffConfig", buff.ConfigId) is not { } ring)
             {
                 _petHealLoops.Remove(guid);
                 return;
@@ -98,14 +98,14 @@ public sealed partial class CombatService
 
     private async Task RadiantRingTickAsync(GameSession s, JsonElement ring)
     {
-        if (Numbers(ring, "_kLogicData") is not [_, var healId, ..] || data.Row("BuffConfig", (long)healId) is not { } heal) return;
+        if (Numbers(ring, "_kLogicData") is not [_, var healId, ..] || _data.Row("BuffConfig", (long)healId) is not { } heal) return;
         float radius = (float)MainSkillDesc(s).ElementAtOrDefault(3);
         if (radius <= 0) radius = 7;
         double ratio = Numbers(heal, "_kData1").FirstOrDefault();
         var recipients = new List<GameSession> { s };
-        recipients.AddRange(world.PlayersIn(s.WorldScene).Where(p => p != s && !p.Dead && p.Role != null && p.Progress != null
+        recipients.AddRange(_world.PlayersIn(s.WorldScene).Where(p => p != s && !p.Dead && p.Role != null && p.Progress != null
             && Distance(p.Position, s.Position) <= radius));
-        var stats = character.Stats(s);
+        var stats = _character.Stats(s);
         var healer = PlayerAttacker(s, stats);
         var hit = new SkillHitInfo { SrcID = s.Role!.Id, SkillId = (int)GameData.Int(heal, "_iID"), SessionId = ++_sessionIds };
         foreach (var recipient in recipients)
@@ -113,12 +113,12 @@ public sealed partial class CombatService
             // The healing-received buff lands first, so this tick already counts it; it outlasts the next tick.
             await GrantSkillBuffAsync(s, recipient, (int)healId, 1500);
             if (ratio <= 0 || recipient.Dead || recipient.Role == null) continue;
-            var before = character.Stats(recipient);
+            var before = _character.Stats(recipient);
             long amount = (long)Math.Max(0, Math.Round(Math.Max(stats[103], stats[104]) * ratio / 10000
                 * HealFactor(healer, PlayerDefender(recipient, before))));
             long actual = Math.Min(amount, Math.Max(0, before[101] - before[2000]));
             if (amount <= 0) continue;
-            await character.SetHpSpAsync(recipient, before[2000] + actual, null);
+            await _character.SetHpSpAsync(recipient, before[2000] + actual, null);
             hit.Dsts.Add(new DamageInfo { DstID = recipient.Role.Id, Damage = actual, DamageType = DamageType.Heal, DstElement = 1 });
             foreach (var handler in Healed) handler(s, actual);
             foreach (var handler in HealedAsync) await handler(s, actual);
@@ -135,6 +135,6 @@ public sealed partial class CombatService
     {
         long now = MonsterService.NowMs;
         return target.SlowMovementExpireMs > now && target.SlowMovementBp > 0
-            || buffs.UnitBuffs(target).Any(b => b.ExpireMs > now && b.Changes.Any(c => c.Attr is 113 or 1131 && c.Value < 0));
+            || _buffs.UnitBuffs(target).Any(b => b.ExpireMs > now && b.Changes.Any(c => c.Attr is 113 or 1131 && c.Value < 0));
     }
 }

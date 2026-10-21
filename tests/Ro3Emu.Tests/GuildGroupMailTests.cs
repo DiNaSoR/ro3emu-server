@@ -14,44 +14,44 @@ namespace Ro3Emu.Tests;
 public sealed class GuildGroupMailTests : IAsyncLifetime
 {
     private static readonly TimeSpan Wait = TimeSpan.FromSeconds(10);
-    private readonly string dataDir = Path.Combine(Path.GetTempPath(), "ro3emu-guildmail-" + Guid.NewGuid().ToString("N"));
-    private readonly Clock clock = new();
-    private WebApplication app = null!;
-    private string http = "";
+    private readonly string _dataDir = Path.Combine(Path.GetTempPath(), "ro3emu-guildmail-" + Guid.NewGuid().ToString("N"));
+    private readonly Clock _clock = new();
+    private WebApplication _app = null!;
+    private string _http = "";
 
     private sealed class Clock : TimeProvider
     {
-        private long seconds = new DateTimeOffset(2026, 10, 15, 14, 0, 0, TimeSpan.Zero).ToUnixTimeSeconds();
-        public override DateTimeOffset GetUtcNow() => DateTimeOffset.FromUnixTimeSeconds(Interlocked.Read(ref seconds));
+        private long _seconds = new DateTimeOffset(2026, 10, 15, 14, 0, 0, TimeSpan.Zero).ToUnixTimeSeconds();
+        public override DateTimeOffset GetUtcNow() => DateTimeOffset.FromUnixTimeSeconds(Interlocked.Read(ref _seconds));
         public override TimeZoneInfo LocalTimeZone => TimeZoneInfo.Utc;
-        public void Advance(long by) => Interlocked.Add(ref seconds, by);
+        public void Advance(long by) => Interlocked.Add(ref _seconds, by);
     }
 
-    private T Service<T>() where T : notnull => app.Services.GetRequiredService<T>();
+    private T Service<T>() where T : notnull => _app.Services.GetRequiredService<T>();
     private Task<T> Read<T>(Func<T> read) => Service<GameLoop>().InvokeAsync(() => Task.FromResult(read()));
 
     public async Task InitializeAsync()
     {
         var (web, micro, gate) = TestPorts.FreePorts();
-        app = ServerHost.Create([], o =>
+        _app = ServerHost.Create([], o =>
         {
-            o.DataDir = dataDir; o.GameDataDir = Path.Combine(ClientData.RepoRoot, "data");
+            o.DataDir = _dataDir; o.GameDataDir = Path.Combine(ClientData.RepoRoot, "data");
             o.HttpPort = web; o.MicroGatePort = micro; o.GameGatePort = gate;
-        }, clock);
-        await app.StartAsync();
-        http = $"http://127.0.0.1:{web}";
+        }, _clock);
+        await _app.StartAsync();
+        _http = $"http://127.0.0.1:{web}";
     }
 
     public async Task DisposeAsync()
     {
-        await app.StopAsync(); await app.DisposeAsync();
+        await _app.StopAsync(); await _app.DisposeAsync();
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
-        try { Directory.Delete(dataDir, true); } catch (IOException) { }
+        try { Directory.Delete(_dataDir, true); } catch (IOException) { }
     }
 
     private async Task<BotClient> InWorld(string name)
     {
-        var bot = new BotClient(http, File.ReadAllText(Path.Combine(dataDir, "gate_rsa_public.pem")));
+        var bot = new BotClient(_http, File.ReadAllText(Path.Combine(_dataDir, "gate_rsa_public.pem")));
         await bot.LoginAsync(name.ToLowerInvariant(), "pw"); await bot.EnterGateAsync();
         await bot.EnterWorldAsync((await bot.CreateRoleAsync(name)).RoleBaseInfo.Id);
         return bot;
@@ -67,7 +67,7 @@ public sealed class GuildGroupMailTests : IAsyncLifetime
     private async Task Gm(BotClient bot, string command)
     {
         using var client = new HttpClient();
-        (await client.PostAsync($"{http}/ro3emu/gm?account={bot.Account}", new StringContent(command))).EnsureSuccessStatusCode();
+        (await client.PostAsync($"{_http}/ro3emu/gm?account={bot.Account}", new StringContent(command))).EnsureSuccessStatusCode();
     }
 
     private long RoleId(BotClient bot) => Service<SessionRegistry>().All().Single(s => s.Account == bot.Account && s.Role != null).Role!.Id;
@@ -118,7 +118,7 @@ public sealed class GuildGroupMailTests : IAsyncLifetime
         Assert.Empty(await GuildLetters(alice, aliceId));
 
         // Sent: the answer and the 32231 tp=6 push carry the next time (ms) and the count used today.
-        long now = clock.GetUtcNow().ToUnixTimeMilliseconds();
+        long now = _clock.GetUtcNow().ToUnixTimeMilliseconds();
         var sent = await Send(alice, "  Guild war at nine  ");
         Assert.Equal(0, sent.Result);
         Assert.Equal(now + 3600_000, sent.NextBroadEmailTime);
@@ -140,21 +140,21 @@ public sealed class GuildGroupMailTests : IAsyncLifetime
 
         // The cooldown, then the next letter an hour later.
         Assert.Equal(ErrorCodes.Cooldown, (await Send(alice, "again")).Result);
-        clock.Advance(3600);
+        _clock.Advance(3600);
         Assert.Equal(2, (await Send(alice, "again")).BroadEmailLimit);
 
         // The tenth letter of the day is the last; the count starts over at the next 05:00.
         // (The clock starts at 14:00, so ten hours stay inside the guild day.)
-        for (int n = 3; n <= 10; n++) { clock.Advance(3600); Assert.Equal(n, (await Send(alice, $"letter {n}")).BroadEmailLimit); }
-        clock.Advance(3600);
+        for (int n = 3; n <= 10; n++) { _clock.Advance(3600); Assert.Equal(n, (await Send(alice, $"letter {n}")).BroadEmailLimit); }
+        _clock.Advance(3600);
         Assert.Equal(ErrorCodes.GuildMailDailyLimit, (await Send(alice, "more")).Result);
-        clock.Advance(86400);
+        _clock.Advance(86400);
         Assert.Equal(1, (await Send(alice, "a new day")).BroadEmailLimit);
 
         // Every letter reached the member; the saved state is what the 32213 full info carries.
         Assert.Equal(11, (await GuildLetters(bob, bobId)).Length);
         var full = await Read(() => Guild());
         Assert.Equal(1, full.BroadEmailCount);
-        Assert.Equal(clock.GetUtcNow().ToUnixTimeMilliseconds() + 3600_000, full.NextBroadEmailMs);
+        Assert.Equal(_clock.GetUtcNow().ToUnixTimeMilliseconds() + 3600_000, full.NextBroadEmailMs);
     }
 }

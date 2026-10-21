@@ -13,22 +13,22 @@ namespace Ro3Emu.Server.Game;
 /// </summary>
 public sealed class SeasonTalentEffects
 {
-    private readonly SeasonTalentService talents;
-    private readonly CharacterService character;
-    private readonly BuffService buffs;
-    private readonly CombatService combat;
-    private readonly SkillService skills;
-    private readonly Data.GameData data;
+    private readonly SeasonTalentService _talents;
+    private readonly CharacterService _character;
+    private readonly BuffService _buffs;
+    private readonly CombatService _combat;
+    private readonly SkillService _skills;
+    private readonly Data.GameData _data;
 
     public SeasonTalentEffects(Data.GameData data, SeasonTalentService talents, CharacterService character, BuffService buffs,
         CombatService combat, SkillService skills, SceneService scenes)
     {
-        this.data = data;
-        this.talents = talents;
-        this.character = character;
-        this.buffs = buffs;
-        this.combat = combat;
-        this.skills = skills;
+        this._data = data;
+        this._talents = talents;
+        this._character = character;
+        this._buffs = buffs;
+        this._combat = combat;
+        this._skills = skills;
         talents.Changed.Add(RefreshAsync);
         scenes.Loaded.Add(RefreshAsync); // a scene change clears _iSceneClear passives
         combat.PlayerRevived.Add(RefreshAsync); // and death clears _iDeadClear ones
@@ -37,18 +37,18 @@ public sealed class SeasonTalentEffects
     }
 
     /// <summary>The talent-owned passives the session should hold: (talent node, BuffConfig id).</summary>
-    internal HashSet<(long Node, int Buff)> WantedPassives(GameSession s) => talents.SpecialEffects(s)
-        .Where(e => e.Op is [2, var buff] && data.Row("BuffConfig", buff) != null)
+    internal HashSet<(long Node, int Buff)> WantedPassives(GameSession s) => _talents.SpecialEffects(s)
+        .Where(e => e.Op is [2, var buff] && _data.Row("BuffConfig", buff) != null)
         .Select(e => (e.Node, (int)e.Op[1])).ToHashSet();
 
     internal List<SkillParameterRules.Modifier> WantedModifiers(GameSession s)
     {
         var result = new List<SkillParameterRules.Modifier>();
         int? weapon = null;
-        foreach (var (_, op) in talents.SpecialEffects(s))
+        foreach (var (_, op) in _talents.SpecialEffects(s))
         {
             if (op.Length < 7 || op[0] != 21 || op[2] != 0 || op[3] <= 0) continue;
-            if (op[1] != 0 && (weapon ??= skills.Weapon(s).SubType) != op[1]) continue;
+            if (op[1] != 0 && (weapon ??= _skills.Weapon(s).SubType) != op[1]) continue;
             result.Add(new SkillParameterRules.Modifier((int)op[3], (int)op[4], (int)op[5], op[6], op.Length > 7 ? (int)op[7] : 0));
         }
         return result;
@@ -64,12 +64,12 @@ public sealed class SeasonTalentEffects
         {
             statsChanged |= stale.Changes.Count > 0;
             changed = true;
-            await buffs.RemoveAsync(s, stale);
+            await _buffs.RemoveAsync(s, stale);
         }
         foreach (var (node, id) in wanted)
         {
             if (s.Buffs.Any(b => b.IsPassive && b.IsTalentOwned && b.SourceId == node && b.ConfigId == id)) continue;
-            await buffs.AddPassiveAsync(s, id, node, totemOwned: false, talentOwned: true);
+            await _buffs.AddPassiveAsync(s, id, node, totemOwned: false, talentOwned: true);
             changed = true;
             statsChanged |= s.Buffs.FirstOrDefault(b => b.IsPassive && b.IsTalentOwned && b.SourceId == node && b.ConfigId == id)
                 is { Changes.Count: > 0 };
@@ -83,10 +83,10 @@ public sealed class SeasonTalentEffects
         }
         if (statsChanged)
         {
-            if (s.SceneLoading) character.Refresh(s);
-            else await character.RefreshStatsAsync(s);
+            if (s.SceneLoading) _character.Refresh(s);
+            else await _character.RefreshStatsAsync(s);
         }
         // AddPassiveAsync does not run BuffService.Changed, so publish the skill parameters (31132) here.
-        if (changed && !s.SceneLoading) await combat.RefreshSkillParametersAsync(s);
+        if (changed && !s.SceneLoading) await _combat.RefreshSkillParametersAsync(s);
     }
 }

@@ -15,13 +15,13 @@ namespace Ro3Emu.Server.Game;
 public sealed partial class DungeonService
 {
     internal int AutoLeaveSeconds => (int)Math.Clamp(
-        data.Table("PublicParamConfig").TryGetValue("FiveGamePlay_CloseTime", out var v) ? GameData.Number(v) ?? 15 : 15, 3, 120);
+        _data.Table("PublicParamConfig").TryGetValue("FiveGamePlay_CloseTime", out var v) ? GameData.Number(v) ?? 15 : 15, 3, 120);
 
     private async Task ScheduleAutoLeaveAsync(Attempt a)
     {
         if (a.Plan.Multi != null || a.GuildChallenge != null || a.Dracula != null || a.Room.Closed) return;
         int seconds = AutoLeaveSeconds;
-        long leaveAt = clock.GetUtcNow().ToUnixTimeSeconds() + seconds;
+        long leaveAt = _clock.GetUtcNow().ToUnixTimeSeconds() + seconds;
         var members = Present(a).Where(a.Loaded.Contains).ToArray();
         await BroadcastAsync(a, Event, new DungeonEventNotify
         {
@@ -30,8 +30,8 @@ public sealed partial class DungeonService
         });
         foreach (var s in members)
             try { await GmCommands.ReplyAsync(s, $"Leave the dungeon in {seconds} sec."); }
-            catch (Exception e) { log.LogWarning(e, "Dungeon leave notice failed for {Role}", s.Role?.Id); }
-        loop.ScheduleLegacy(TimeSpan.FromSeconds(seconds), async () =>
+            catch (Exception e) { _log.LogWarning(e, "Dungeon leave notice failed for {Role}", s.Role?.Id); }
+        _loop.ScheduleLegacy(TimeSpan.FromSeconds(seconds), async () =>
         {
             foreach (var s in members)
             {
@@ -39,7 +39,7 @@ public sealed partial class DungeonService
                 // pressing the exit button).
                 if (!ReferenceEquals(s.DungeonAttempt, a) || s.InstanceId != a.Room.Id || s.SceneLoading || s.Role == null) continue;
                 try { await LeaveAsync(s); }
-                catch (Exception e) { log.LogWarning(e, "Dungeon auto leave failed for {Role}, instance {Instance}", s.Role?.Id, a.Room.Id); }
+                catch (Exception e) { _log.LogWarning(e, "Dungeon auto leave failed for {Role}, instance {Instance}", s.Role?.Id, a.Room.Id); }
             }
         });
     }

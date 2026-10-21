@@ -36,7 +36,7 @@ public sealed partial class CombatService
             var lease = p.Attachment;
             bool Current() => ReferenceEquals(p.Role, targetRole) && p.WorldScene == scene && p.SceneGeneration == generation
                 && ReferenceEquals(p.Attachment, lease) && lease?.Cancelled != true;
-            var stats = character.Stats(p);
+            var stats = _character.Stats(p);
             var defender = PlayerDefender(p, stats);
             var (damage, result) = Damage(attacker, defender, row);
             damage = ScaleMonsterDamage(damage, caster.DamageRatio);
@@ -58,8 +58,8 @@ public sealed partial class CombatService
                         DstElement = 1, IsDead = hp == 0 } },
                 };
                 await p.SendGameAsync(SkillHit, hit);
-                await PreparedMessage.SendToAsync(world.Viewers(p).Where(v => v != p), SkillHit, hit);
-                await character.SetHpSpAsync(p, null, null);
+                await PreparedMessage.SendToAsync(_world.Viewers(p).Where(v => v != p), SkillHit, hit);
+                await _character.SetHpSpAsync(p, null, null);
                 foreach (var handler in TakenAsync) await handler(caster, p, damage);
                 await FightingAsync(p);
                 if (hp == 0)
@@ -69,7 +69,7 @@ public sealed partial class CombatService
                 }
                 if (Current()) await ReactToMonsterHitAsync(caster, p, row, damage);
                 foreach (var tuple in Tuples(row, "_kBuff2"))
-                    if (Current() && (!bossDebuffsOnly || BossDebuff(tuple)) && RollHostileBuff(tuple, null, caster, p, null, out int buff, out int ms)) await buffs.AddAsync(p, buff, ms, caster.Uid);
+                    if (Current() && (!bossDebuffsOnly || BossDebuff(tuple)) && RollHostileBuff(tuple, null, caster, p, null, out int buff, out int ms)) await _buffs.AddAsync(p, buff, ms, caster.Uid);
             }
             finally { if (hp == 0) ReleaseDeathPublication(p); }
         }
@@ -77,5 +77,5 @@ public sealed partial class CombatService
     }
 
     private bool BossDebuff(JsonElement tuple) => tuple.GetArrayLength() >= 3 && GameData.Number(tuple[2]) > 0
-        && GameData.Number(tuple[0]) is double id && !(data.Row("BuffConfig", (long)id) is { } buff && GameData.Int(buff, "_iType") == 1);
+        && GameData.Number(tuple[0]) is double id && !(_data.Row("BuffConfig", (long)id) is { } buff && GameData.Int(buff, "_iType") == 1);
 }

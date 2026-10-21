@@ -22,7 +22,7 @@ public sealed partial class CombatService
     /// <summary>The normal swing of one monster on another (MonsterService.AttackMonster).</summary>
     private async Task MonsterAttackMonsterAsync(MonsterUnit m, MonsterUnit target)
     {
-        if (m.Dead || m.Hp <= 0 || target.Dead || target.Hp <= 0 || data.Row("SkillConfig", m.Template.NormalSkill) is not { } row) return;
+        if (m.Dead || m.Hp <= 0 || target.Dead || target.Hp <= 0 || _data.Row("SkillConfig", m.Template.NormalSkill) is not { } row) return;
         long castId = ++_sessionIds;
         await SendMonsterTimelineAsync(m, new UseInSkillInfo
         {
@@ -56,7 +56,7 @@ public sealed partial class CombatService
         var (damage, result) = Damage(attacker, defender, row);
         damage = ScaleMonsterDamage(damage, source.DamageRatio);
         if (scaleBp != 10000 && damage > 0) damage = Math.Max(1, damage * scaleBp / 10000);
-        if (!ally) damage = await buffs.AbsorbAsync(target, damage);
+        if (!ally) damage = await _buffs.AbsorbAsync(target, damage);
         var hit = new SkillHitInfo
         {
             SrcID = source.Uid, SkillId = (int)GameData.Int(row, "_iID"), ShowPoint = HitEffect(GameData.Int(row, "_iScriptShow")),
@@ -67,8 +67,8 @@ public sealed partial class CombatService
         {
             target.Hp = Math.Max(1, target.Hp - damage);
             hit.Dsts.Add(new DamageInfo { DstID = target.Uid, Damage = damage, HitResult = result, DstElement = target.Template.Element });
-            await world.ToUnitViewersAsync(target, SkillHit, hit);
-            await world.ToUnitViewersAsync(target, AoiAttrChange, MonsterService.Hp(target));
+            await _world.ToUnitViewersAsync(target, SkillHit, hit);
+            await _world.ToUnitViewersAsync(target, AoiAttrChange, MonsterService.Hp(target));
             await FightingAsync(target);
             return damage;
         }
@@ -77,8 +77,8 @@ public sealed partial class CombatService
         {
             target.Hp = Math.Max(1, target.HpAfter(target.Hp, damage)); // nobody to settle a kill for
             hit.Dsts.Add(new DamageInfo { DstID = target.Uid, Damage = damage, HitResult = result, DstElement = target.Template.Element });
-            await world.ToUnitViewersAsync(target, SkillHit, hit);
-            await world.ToUnitViewersAsync(target, AoiAttrChange, MonsterService.Hp(target));
+            await _world.ToUnitViewersAsync(target, SkillHit, hit);
+            await _world.ToUnitViewersAsync(target, AoiAttrChange, MonsterService.Hp(target));
             return damage;
         }
         var role = credit.Role;
@@ -94,7 +94,7 @@ public sealed partial class CombatService
         }
         catch (OperationCanceledException e)
         {
-            log.LogInformation("Companion hit on {Uid} not settled: {Reason}", target.Uid, e.Message);
+            _log.LogInformation("Companion hit on {Uid} not settled: {Reason}", target.Uid, e.Message);
             return 0;
         }
         hit.Dsts.Add(new DamageInfo
@@ -102,8 +102,8 @@ public sealed partial class CombatService
             DstID = target.Uid, Damage = damage, HitResult = result,
             DstElement = target.Template.Element, IsDead = target.Hp == 0
         });
-        await world.ToUnitViewersAsync(target, SkillHit, hit);
-        await world.ToUnitViewersAsync(target, AoiAttrChange, MonsterService.Hp(target));
+        await _world.ToUnitViewersAsync(target, SkillHit, hit);
+        await _world.ToUnitViewersAsync(target, AoiAttrChange, MonsterService.Hp(target));
         if (!lethal)
         {
             await FightingAsync(target);
@@ -112,8 +112,8 @@ public sealed partial class CombatService
         if (!target.DeathDurable) return damage;
         try
         {
-            await monsters.KillAsync(target);
-            foreach (var other in sessions.All().Where(o => o.Attack?.Target == target))
+            await _monsters.KillAsync(target);
+            foreach (var other in _sessions.All().Where(o => o.Attack?.Target == target))
             {
                 other.Attack = null;
                 await other.SendGameAsync(SkillEnd, new SkillEndNotify
@@ -154,7 +154,7 @@ public sealed partial class CombatService
             long actual = Math.Min(amount, Math.Max(0, unit.Template.MaxHp - unit.Hp));
             unit.Hp += actual;
             hit.Dsts.Add(new DamageInfo { DstID = unit.Uid, Damage = actual, DamageType = DamageType.Heal });
-            await world.ToUnitViewersAsync(unit, AoiAttrChange, MonsterService.Hp(unit));
+            await _world.ToUnitViewersAsync(unit, AoiAttrChange, MonsterService.Hp(unit));
         }
         foreach (var p in players)
         {
@@ -164,13 +164,13 @@ public sealed partial class CombatService
             using (await CharacterService.Lock(p))
             {
                 if (p.Dead || p.SceneLoading || !ReferenceEquals(role, p.Role)) continue;
-                var stats = character.Stats(p);
+                var stats = _character.Stats(p);
                 actual = Math.Min(amount, Math.Max(0, stats[101] - stats[2000]));
-                await character.SetHpSpAsync(p, stats[2000] + actual, null);
+                await _character.SetHpSpAsync(p, stats[2000] + actual, null);
             }
             hit.Dsts.Add(new DamageInfo { DstID = role.Id, Damage = actual, DamageType = DamageType.Heal });
         }
-        if (hit.Dsts.Count > 0) await world.ToUnitViewersAsync(source, SkillHit, hit);
+        if (hit.Dsts.Count > 0) await _world.ToUnitViewersAsync(source, SkillHit, hit);
     }
 
     /// <summary>A skill row's _kBuff1 tuples [buff, chance, ms] on each player and unit given (ms -1: permanent on a unit).</summary>
@@ -181,12 +181,12 @@ public sealed partial class CombatService
         {
             if (source.Dead || !RollBuff(tuple, out int id, out int duration)) continue;
             foreach (var p in players.Where(p => p.Role != null && !p.Dead && !p.SceneLoading))
-                await buffs.AddSupportAsync(p, id, Math.Max(0, duration), source.Uid);
+                await _buffs.AddSupportAsync(p, id, Math.Max(0, duration), source.Uid);
             foreach (var unit in units)
             {
                 if (unit is MonsterUnit { Dead: true }) continue;
-                if (duration < 0) await buffs.AddPermanentAsync(unit, id, source.Uid);
-                else await buffs.AddSupportAsync(unit, id, duration, source.Uid);
+                if (duration < 0) await _buffs.AddPermanentAsync(unit, id, source.Uid);
+                else await _buffs.AddSupportAsync(unit, id, duration, source.Uid);
             }
         }
     }

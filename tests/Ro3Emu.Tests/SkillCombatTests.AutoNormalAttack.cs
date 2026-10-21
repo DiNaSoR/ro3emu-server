@@ -19,7 +19,7 @@ public sealed partial class SkillCombatTests
         const int bladeSmash = 1509901; // group 15099, _iIfAutoAtk 2, _iIsNormalAtk 0, _iCD 7000
         await using var alice = await InWorld("Alice");
         await Gm("alice", "!job 5100"); await Teach("alice", 15099);
-        int normal = app.Services.GetRequiredService<SkillService>().NormalAttack(5100);
+        int normal = _app.Services.GetRequiredService<SkillService>().NormalAttack(5100);
         Assert.NotEqual(bladeSmash, normal);
         var target = await Target("alice", stationary: true);
         await Loop.InvokeAsync(() => { target.Hp = 1_000_000_000; return Task.CompletedTask; });
@@ -57,7 +57,7 @@ public sealed partial class SkillCombatTests
         var target = await Target("alice", stationary: true);
         await Loop.InvokeAsync(() => { target.Hp = 1_000_000_000; return Task.CompletedTask; });
         var start = Session("alice").Position.Clone();
-        var nav = app.Services.GetRequiredService<WorldData>().Map(Session("alice").SceneEntry)!.Nav!;
+        var nav = _app.Services.GetRequiredService<WorldData>().Map(Session("alice").SceneEntry)!.Nav!;
         var away = new[] { (5f, 0f), (-5f, 0f), (0f, 5f), (0f, -5f), (3.6f, 3.6f), (-3.6f, -3.6f) }
             .Select(o => new Vec3 { X = start.X + o.Item1, Y = start.Y, Z = start.Z + o.Item2 })
             .First(p => nav.IsWalkable(p.X, p.Y, p.Z) && nav.CanWalk(p.X, p.Y, p.Z, start.X, start.Z));

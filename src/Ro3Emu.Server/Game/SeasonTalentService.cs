@@ -30,13 +30,13 @@ public sealed partial class SeasonTalentService
     // (inferred) server-side limits: five zero-based plans, eight Unicode scalars, three-second switch cooldown.
     private const int PlanCount = 5, NameMaxRunes = 8, SwitchCooldownSeconds = 3;
     private const int PvpNodeType = 4, BranchPointType = 5, BranchType = 6, BranchPassiveType = 7;
-    private readonly GameData data;
-    private readonly CharacterService character;
-    private readonly FunctionService functions;
-    private readonly SeasonService seasons;
-    private readonly SkillService skills;
-    private readonly RoleStore roles;
-    private readonly ILogger<SeasonTalentService> log;
+    private readonly GameData _data;
+    private readonly CharacterService _character;
+    private readonly FunctionService _functions;
+    private readonly SeasonService _seasons;
+    private readonly SkillService _skills;
+    private readonly RoleStore _roles;
+    private readonly ILogger<SeasonTalentService> _log;
 
     /// <summary>Run after the role's effective talents may have changed (purchase, plan switch, unlock change),
     /// outside the role lock. SeasonTalentEffects reconciles job node buffs and skill modifiers here.</summary>
@@ -45,13 +45,13 @@ public sealed partial class SeasonTalentService
     public SeasonTalentService(GameData data, CharacterService character, FunctionService functions,
         SeasonService seasons, SkillService skills, RoleStore roles, ILogger<SeasonTalentService> log)
     {
-        this.data = data;
-        this.character = character;
-        this.functions = functions;
-        this.seasons = seasons;
-        this.skills = skills;
-        this.roles = roles;
-        this.log = log;
+        this._data = data;
+        this._character = character;
+        this._functions = functions;
+        this._seasons = seasons;
+        this._skills = skills;
+        this._roles = roles;
+        this._log = log;
         character.TalentAttributes = Attributes;
     }
 
@@ -63,7 +63,7 @@ public sealed partial class SeasonTalentService
     /// <summary>Called before the first login stat snapshot; (inferred) saved plans carry across seasons without reset.</summary>
     public void Load(GameSession session)
     {
-        session.SeasonTalent = roles.LoadSeasonTalent(session.Role!.Id) is { } bytes
+        session.SeasonTalent = _roles.LoadSeasonTalent(session.Role!.Id) is { } bytes
             ? DBSeasonTalent.Parser.ParseFrom(bytes) : new DBSeasonTalent();
         session.TalentEffectsEnabled = false; // TaskService has not loaded this role's quest state yet.
         session.TalentPlanSwitchUtc = default;
@@ -87,7 +87,7 @@ public sealed partial class SeasonTalentService
             && (!Same(oldTrees, session.SeasonTalent.UnlockedTrees)
                 || !Same(oldNodes, session.SeasonTalent.UnlockedNode))))
         {
-            await character.RefreshStatsAsync(session);
+            await _character.RefreshStatsAsync(session);
             await ChangedAsync(session);
         }
     }
@@ -98,7 +98,7 @@ public sealed partial class SeasonTalentService
     private bool Available(GameSession s) => s.Role != null && s.Progress != null && s.Tasks != null
         && HasTalentGraph()
         && TaskService.IsDelivered(s, ParentTask) && TaskService.IsDelivered(s, TalentTask)
-        && functions.IsOpen(s, ParentFunction) && functions.IsOpen(s, TalentFunction)
+        && _functions.IsOpen(s, ParentFunction) && _functions.IsOpen(s, TalentFunction)
         && Trees().Any(Applies);
 
     /// <summary>Use 83552's unlock and cooldown policy when Genre changes the active talent plan.</summary>
@@ -123,8 +123,8 @@ public sealed partial class SeasonTalentService
 
     private bool Applies(JsonElement row) => row.TryGetProperty("_kMultiverseArray", out var books)
         && books.ValueKind == JsonValueKind.Array
-        && books.EnumerateArray().Any(v => GameData.Number(v) == seasons.PlayBook);
-    private bool Applies(TalentTree tree) => tree.Books.Any(book => book == seasons.PlayBook);
+        && books.EnumerateArray().Any(v => GameData.Number(v) == _seasons.PlayBook);
+    private bool Applies(TalentTree tree) => tree.Books.Any(book => book == _seasons.PlayBook);
 
     private void Seed(DBSeasonTalent state)
     {
@@ -151,7 +151,7 @@ public sealed partial class SeasonTalentService
         {
             if (tree.Id <= 0) continue;
             bool unlocked = s.TalentEffectsEnabled && Applies(tree)
-                && functions.ConditionMet(s, tree.Condition) && total >= tree.NeedLevel;
+                && _functions.ConditionMet(s, tree.Condition) && total >= tree.NeedLevel;
             state.UnlockedTrees[tree.Id] = unlocked;
             // (inferred) the oath cap is the largest cap marker on an eligible, unlocked tree.
             if (unlocked) oathMax = Math.Max(oathMax ?? long.MinValue, tree.PvpLimit);
@@ -219,7 +219,7 @@ public sealed partial class SeasonTalentService
 
     /// <summary>SeasonTalentTreeConfig's rows (table order), read once: a login rebuilt the unlocks several times,
     /// each time looking every field up in the JSON rows (stage G).</summary>
-    private IReadOnlyList<TalentTree> Trees() => _trees ??= data.Table("SeasonTalentTreeConfig").Values.Select(row =>
+    private IReadOnlyList<TalentTree> Trees() => _trees ??= _data.Table("SeasonTalentTreeConfig").Values.Select(row =>
         new TalentTree(GameData.Int(row, "_iId"),
             row.TryGetProperty("_kMultiverseArray", out var books) && books.ValueKind == JsonValueKind.Array
                 ? books.EnumerateArray().Select(GameData.Number).ToArray() : [],
@@ -231,7 +231,7 @@ public sealed partial class SeasonTalentService
     private IReadOnlyList<TalentNode> Nodes()
     {
         if (_nodes != null) return _nodes;
-        var rows = data.Table("SeasonTalentConfig").Values.ToArray();
+        var rows = _data.Table("SeasonTalentConfig").Values.ToArray();
         var parents = new Dictionary<(long Node, long Tree), List<(long Parent, long Max)>>();
         foreach (var candidate in rows)
         {
@@ -291,7 +291,7 @@ public sealed partial class SeasonTalentService
     private JsonElement? Effect(long group, long level, int career)
     {
         JsonElement? generic = null;
-        _effects ??= data.Table("SeasonTalentEffectConfig").Values
+        _effects ??= _data.Table("SeasonTalentEffectConfig").Values
             .GroupBy(row => (GameData.Int(row, "_iGroup"), GameData.Int(row, "_iLevel")))
             .ToDictionary(g => g.Key, g => g.ToArray());
         foreach (var row in _effects.GetValueOrDefault((group, level)) ?? [])
@@ -326,7 +326,7 @@ public sealed partial class SeasonTalentService
         foreach (var (id, amount) in GameData.Pairs(effect, "_kCosts"))
         {
             if (id <= 0 || id > int.MaxValue || amount <= 0 || amount != Math.Truncate(amount)
-                || amount > long.MaxValue || data.Row("ItemConfig", id) == null) return null;
+                || amount > long.MaxValue || _data.Row("ItemConfig", id) == null) return null;
             costs.Add(((int)id, (long)amount));
         }
         return costs.Count > 0 ? costs : null;
@@ -335,7 +335,7 @@ public sealed partial class SeasonTalentService
     /// <summary>83550: lock validation, payment, plan/oath mutation and durable save as one role operation.</summary>
     public async Task UpgradeAsync(GameSession s, SeasonTalentUpgradeReq req)
     {
-        if (data.Row("SeasonTalentConfig", req.TalentId) is { } requested
+        if (_data.Row("SeasonTalentConfig", req.TalentId) is { } requested
             && GameData.Int(requested, "_iType") is BranchType or BranchPassiveType)
         {
             await SelectProfessionAsync(s, req);
@@ -359,33 +359,33 @@ public sealed partial class SeasonTalentService
                     List<InvItem>? paid = null;
                     try
                     {
-                        var economy = character.ProgressionEconomy(s, "cd13c/season-talent-upgrade", cost, [],
+                        var economy = _character.ProgressionEconomy(s, "cd13c/season-talent-upgrade", cost, [],
                             new
                             {
                                 Node = node, Oath = isOath, Level = isOath ? next.BattleOathLevel
                                 : next.Plan[next.CurPlanId].TalentNodes[node].CurrentLevel, Plan = next.CurPlanId
                             });
-                        paid = await character.ExchangeLockedAsync(s, cost, [], popup: false, sync: false,
+                        paid = await _character.ExchangeLockedAsync(s, cost, [], popup: false, sync: false,
                             persist: tx => { tx.RoleBlob(s.Role!.Id, "season_talent", next.ToByteArray()); tx.WithEconomy(economy); },
                             committed: () => s.SeasonTalent = next, asyncCommit: true);
                     }
                     catch (Exception e) when (e is SqliteException or InvalidOperationException)
                     {
-                        log.LogError(e, "Talent purchase {Node} for role {Role} rolled back", node, s.Role!.Id);
+                        _log.LogError(e, "Talent purchase {Node} for role {Role} rolled back", node, s.Role!.Id);
                         result = ErrorCodes.Unknown;
                     }
-                    if (result == 0 && paid == null) result = character.ShortageOf(s, cost);
+                    if (result == 0 && paid == null) result = _character.ShortageOf(s, cost);
                     if (paid != null)
                     {
-                        await character.ItemsChangedAsync(s, stats: false); // 5009 before 5050 and the reply
+                        await _character.ItemsChangedAsync(s, stats: false); // 5009 before 5050 and the reply
                         await CharacterService.SyncAsync(s, TalentSync, next.Clone());
-                        await character.RefreshStatsAsync(s);
+                        await _character.RefreshStatsAsync(s);
                     }
                 }
                 changed = result == 0;
             }
         }
-        log.LogInformation("{Name} talent {Node}: {Result}", s.Role?.Name, req.TalentId, result);
+        _log.LogInformation("{Name} talent {Node}: {Result}", s.Role?.Name, req.TalentId, result);
         await s.SendGameAsync(Upgrade, new SeasonTalentUpgradeResp { Result = result, TalentId = req.TalentId });
         if (changed) await ChangedAsync(s);
     }
@@ -395,17 +395,17 @@ public sealed partial class SeasonTalentService
     {
         try
         {
-            var transaction = roles.NewTransaction();
+            var transaction = _roles.NewTransaction();
             transaction.RoleBlob(s.Role!.Id, "season_talent", next.ToByteArray());
-            await roles.CommitAsync(transaction, "season-talent/choose-branch", _ => s.SeasonTalent = next);
+            await _roles.CommitAsync(transaction, "season-talent/choose-branch", _ => s.SeasonTalent = next);
         }
         catch (Exception e) when (e is SqliteException or InvalidOperationException)
         {
-            log.LogError(e, "Talent branch {Node} for role {Role} failed", node, s.Role!.Id);
+            _log.LogError(e, "Talent branch {Node} for role {Role} failed", node, s.Role!.Id);
             return ErrorCodes.Unknown;
         }
         await CharacterService.SyncAsync(s, TalentSync, next.Clone());
-        await character.RefreshStatsAsync(s);
+        await _character.RefreshStatsAsync(s);
         return 0;
     }
 
@@ -413,7 +413,7 @@ public sealed partial class SeasonTalentService
     {
         cost = null; node = id; oath = false;
         if (s.SeasonTalent == null || s.Progress == null || !Available(s)) return ErrorCodes.FeatureUnavailable;
-        if (data.Row("SeasonTalentConfig", id) is not { } row || !_byId!.TryGetValue(id, out var config)) return ErrorCodes.TalentInvalid;
+        if (_data.Row("SeasonTalentConfig", id) is not { } row || !_byId!.TryGetValue(id, out var config)) return ErrorCodes.TalentInvalid;
         if (config.Type == BranchPointType) return ErrorCodes.Parameter; // chosen through a job node, never bought itself
         BuildUnlocks(s);
         var state = s.SeasonTalent;
@@ -428,8 +428,8 @@ public sealed partial class SeasonTalentService
             return ErrorCodes.FeatureUnavailable; // no invented connector or missing group
         cost = Costs(effect);
         if (cost == null) return ErrorCodes.FeatureUnavailable;
-        return cost.GroupBy(c => c.Entry).Any(g => character.CountOf(s, g.Key) < g.Sum(c => c.Count))
-            ? character.ShortageOf(s, cost) : 0;
+        return cost.GroupBy(c => c.Entry).Any(g => _character.CountOf(s, g.Key) < g.Sum(c => c.Count))
+            ? _character.ShortageOf(s, cost) : 0;
     }
 
     /// <summary>A job node's level-1 row for this job (the export has no generic rows for them).</summary>
@@ -452,19 +452,19 @@ public sealed partial class SeasonTalentService
                 BuildUnlocks(s, next);
                 try
                 {
-                    var transaction = roles.NewTransaction();
+                    var transaction = _roles.NewTransaction();
                     transaction.RoleBlob(s.Role!.Id, "season_talent", next.ToByteArray());
-                    await roles.CommitAsync(transaction, "season-talent/set-plan", _ =>
+                    await _roles.CommitAsync(transaction, "season-talent/set-plan", _ =>
                     {
                         s.SeasonTalent = next;
                         s.TalentPlanSwitchUtc = DateTime.UtcNow;
                     });
                     await CharacterService.SyncAsync(s, TalentSync, next.Clone());
-                    await character.RefreshStatsAsync(s);
+                    await _character.RefreshStatsAsync(s);
                 }
                 catch (Exception e) when (e is SqliteException or InvalidOperationException)
                 {
-                    log.LogError(e, "Talent plan switch for role {Role} failed", s.Role!.Id);
+                    _log.LogError(e, "Talent plan switch for role {Role} failed", s.Role!.Id);
                     result = ErrorCodes.Unknown;
                 }
             }
@@ -489,14 +489,14 @@ public sealed partial class SeasonTalentService
                 next.Plan[req.PlanId].PlanName = name;
                 try
                 {
-                    var transaction = roles.NewTransaction();
+                    var transaction = _roles.NewTransaction();
                     transaction.RoleBlob(s.Role!.Id, "season_talent", next.ToByteArray());
-                    await roles.CommitAsync(transaction, "season-talent/rename", _ => s.SeasonTalent = next);
+                    await _roles.CommitAsync(transaction, "season-talent/rename", _ => s.SeasonTalent = next);
                     await CharacterService.SyncAsync(s, TalentSync, next.Clone());
                 }
                 catch (Exception e) when (e is SqliteException or InvalidOperationException)
                 {
-                    log.LogError(e, "Talent plan rename for role {Role} failed", s.Role!.Id);
+                    _log.LogError(e, "Talent plan rename for role {Role} failed", s.Role!.Id);
                     result = ErrorCodes.Unknown;
                 }
             }
@@ -522,7 +522,7 @@ public sealed partial class SeasonTalentService
             var effect = IsJobNode(node.Type) ? JobRow(node, s.Progress.Career) : Effect(node.Group, saved.CurrentLevel, s.Progress.Career);
             if (effect is { } row && (IsJobNode(node.Type) || Supported(row))) yield return (id, row);
         }
-        if (state.BattleOathLevel > 0 && data.Row("SeasonTalentConfig", 10100000) is { } oath
+        if (state.BattleOathLevel > 0 && _data.Row("SeasonTalentConfig", 10100000) is { } oath
             && TreeEligible(s, GameData.Int(oath, "_iTalentTreeID"), total))
         {
             var effect = Effect(GameData.Int(oath, "_iLevelGroupId"), state.BattleOathLevel, s.Progress.Career);
@@ -539,7 +539,7 @@ public sealed partial class SeasonTalentService
         {
             if (!row.TryGetProperty("_kSpecialEffectList", out var list) || list.ValueKind != JsonValueKind.Array) continue;
             foreach (var id in list.EnumerateArray())
-                if (GameData.Number(id) is { } effectId && data.Row("SpecialEffectConfig", (long)effectId) is { } effect)
+                if (GameData.Number(id) is { } effectId && _data.Row("SpecialEffectConfig", (long)effectId) is { } effect)
                     foreach (var op in EquipmentAffixes.Rows(effect, "_kSpecialEffect")) yield return (node, op);
         }
     }
@@ -563,26 +563,26 @@ public sealed partial class SeasonTalentService
                 // (inferred) [16, weapon subtype, attribute, value]: "When a dagger or katar is equipped, PATK +20"
                 // is one tuple per subtype; the main hand's ItemConfig._iSubType decides (SkillService.Weapon).
                 case [16, var sub, var attr, var value]:
-                    weapon ??= skills.Weapon(s);
+                    weapon ??= _skills.Weapon(s);
                     if (weapon.Value.SubType == sub) yield return (attr, value);
                     break;
                 // (inferred) [19, skill group, level, attribute, value]: "When Mace Mastery reaches Lv. 10, STR +5".
                 case [19, var group, var level, var attr, var value]:
-                    if (skills.Level(s.Progress, (int)group) >= Math.Max(1, level)) yield return (attr, value);
+                    if (_skills.Level(s.Progress, (int)group) >= Math.Max(1, level)) yield return (attr, value);
                     break;
                 // (inferred) [22, weapon subtype, attribute, per level, skill group]: "When a sword-type weapon is
                 // equipped, PATK +2 for each learned level of Sword Quicken".
                 case [22, var sub, var attr, var per, var group]:
-                    weapon ??= skills.Weapon(s);
-                    if (weapon.Value.SubType == sub) yield return (attr, per * skills.Level(s.Progress, (int)group));
+                    weapon ??= _skills.Weapon(s);
+                    if (weapon.Value.SubType == sub) yield return (attr, per * _skills.Level(s.Progress, (int)group));
                     break;
             }
         }
     }
 
     private bool TreeEligible(GameSession s, long treeId, long total) =>
-        data.Row("SeasonTalentTreeConfig", treeId) is { } tree && Applies(tree)
-        && functions.ConditionMet(s, GameData.Int(tree, "_iTreeCondition"))
+        _data.Row("SeasonTalentTreeConfig", treeId) is { } tree && Applies(tree)
+        && _functions.ConditionMet(s, GameData.Int(tree, "_iTreeCondition"))
         && total >= GameData.Int(tree, "_iNeedLevel");
 
 }

@@ -93,3 +93,15 @@ such as `CombatService` or `GameData`, search the tests for the type name.
   walk.
 - A few tests depend on timing and can fail when the machine is busy. Re-run a failing test on its own before you
   chase it.
+
+## Snapshot tests
+
+Some tests compare what the server does with a checked-in list in `tests/Ro3Emu.Tests/Snapshots/`:
+
+- `dispatcher-admission.txt`: how the dispatcher admits every message of the client's table (client data).
+- `receipt-field-names.txt`: the field and property names that `EventPlanFingerprint` and `EconomyChildIntent`
+  write into receipts for a `DbPlan` and the values it holds. A rename makes an operation recorded before it refuse
+  its replay, so this one runs without client data, in CI too.
+
+A failing snapshot test lists what changed. Regenerate the file with `RO3EMU_UPDATE_SNAPSHOTS=1` only for an intended
+change, and say in the pull request why it is safe.

@@ -71,7 +71,7 @@ public sealed partial class CombatService
         var main = landed.FirstOrDefault(l => l.Target.Uid == action.Request.TargetId).Target ?? landed[0].Target;
         var row = action.Row;
         if (FollowUpScripts.Contains(Script(row)) && Numbers(row, "_kLogicData") is [var followId]
-            && data.Row("SkillConfig", (long)followId) is { } follow && current())
+            && _data.Row("SkillConfig", (long)followId) is { } follow && current())
             await ProcCastAsync(s, follow, main);
         foreach (var proc in OutgoingProcs(s, row).ToArray())
         {
@@ -103,33 +103,33 @@ public sealed partial class CombatService
         long now = MonsterService.NowMs;
         foreach (var buff in s.Buffs.Where(b => b.ExpireMs > now).ToArray())
         {
-            if (data.Row("BuffConfig", buff.ConfigId) is not { } config) continue;
+            if (_data.Row("BuffConfig", buff.ConfigId) is not { } config) continue;
             switch ((int)GameData.Int(config, "_iBuffID"))
             {
                 case EnvenomBuffGroup when normal:
                 case DeadlyPoisonGroup:
                     foreach (var pair in LogicPairs(config)) yield return pair;
                     break;
-                case FearBreezeBuffGroup when !normal && GameData.Int(row, "_iRangeType") != 2 && skills.Weapon(s).SubType == BowSubType:
+                case FearBreezeBuffGroup when !normal && GameData.Int(row, "_iRangeType") != 2 && _skills.Weapon(s).SubType == BowSubType:
                     if (Numbers(config, "_kLogicData") is [var chance, ..]
-                        && data.Row("SkillConfig", skills.RealId(FearBreezeHitGroup, (int)Math.Max(1, GameData.Int(config, "_iLevel")))) is { } hit)
+                        && _data.Row("SkillConfig", _skills.RealId(FearBreezeHitGroup, (int)Math.Max(1, GameData.Int(config, "_iLevel")))) is { } hit)
                         yield return ((int)chance, hit);
                     break;
             }
         }
         foreach (var learned in LearnedProcs(s, row, normal)) yield return learned;
         if (s.Progress is not { } progress) yield break;
-        if (group == JudexGroup && skills.Level(progress, DoubleHolyLightGroup) is var holy and > 0
-            && data.Row("BuffConfig", skills.RealId(DoubleHolyLightGroup, holy)) is { } light)
+        if (group == JudexGroup && _skills.Level(progress, DoubleHolyLightGroup) is var holy and > 0
+            && _data.Row("BuffConfig", _skills.RealId(DoubleHolyLightGroup, holy)) is { } light)
         {
-            int? surge = s.Buffs.Where(b => b.ExpireMs > now).Select(b => data.Row("BuffConfig", b.ConfigId))
+            int? surge = s.Buffs.Where(b => b.ExpireMs > now).Select(b => _data.Row("BuffConfig", b.ConfigId))
                 .Where(r => r is { } c && GameData.Int(c, "_iBuffID") == HolySpiritSurgeGroup)
                 .Select(r => Numbers(r!.Value, "_kLogicData").FirstOrDefault() is var v and > 0 ? (int?)v : null).FirstOrDefault(v => v != null);
             foreach (var (chance, hit) in LogicPairs(light)) yield return (surge ?? chance, hit);
         }
-        if (group == FocusedArrowStrikeGroup && skills.Level(progress, WargStrikeGroup) is var warg and > 0
-            && data.Row("SkillConfig", skills.RealId(WargStrikeGroup, warg)) is { } strike
-            && Numbers(strike, "_kAutoLearnSkill") is [var trigger, ..] && data.Row("BuffConfig", (long)trigger) is { } wargTrigger
+        if (group == FocusedArrowStrikeGroup && _skills.Level(progress, WargStrikeGroup) is var warg and > 0
+            && _data.Row("SkillConfig", _skills.RealId(WargStrikeGroup, warg)) is { } strike
+            && Numbers(strike, "_kAutoLearnSkill") is [var trigger, ..] && _data.Row("BuffConfig", (long)trigger) is { } wargTrigger
             && now >= s.ProcState.GetValueOrDefault(WargStrikeGroup))
         {
             var desc = Numbers(strike, "_kDescData");
@@ -143,7 +143,7 @@ public sealed partial class CombatService
     {
         var logic = Numbers(buff, "_kLogicData");
         for (int i = 0; i + 1 < logic.Length; i += 2)
-            if (logic[i] > 0 && data.Row("SkillConfig", (long)logic[i + 1]) is { } row) yield return ((int)logic[i], row);
+            if (logic[i] > 0 && _data.Row("SkillConfig", (long)logic[i + 1]) is { } row) yield return ((int)logic[i], row);
     }
 
     /// <summary>Envenom 15111: "While active, Basic Attack becomes Poison-property".</summary>
@@ -155,10 +155,10 @@ public sealed partial class CombatService
     /// </summary>
     private async Task ConsumeOnHitDebuffsAsync(MonsterUnit target)
     {
-        foreach (var buff in buffs.UnitBuffs(target).Where(b => data.Row("BuffConfig", b.ConfigId) is { } row
+        foreach (var buff in _buffs.UnitBuffs(target).Where(b => _data.Row("BuffConfig", b.ConfigId) is { } row
                      && row.TryGetProperty("_kBuffScript", out var script) && script.ValueKind == JsonValueKind.String
                      && script.GetString() == "Buff_Lex_Aeterna").Select(b => b.ConfigId).Distinct().ToArray())
-            await buffs.RemoveUnitConfigAsync(target, buff);
+            await _buffs.RemoveUnitConfigAsync(target, buff);
     }
 
     /// <summary>
@@ -170,8 +170,8 @@ public sealed partial class CombatService
     {
         var parry = Tuples(action.Row, "_kBuff1").FirstOrDefault();
         if (parry.ValueKind != JsonValueKind.Array || parry.GetArrayLength() < 3
-            || data.Row("BuffConfig", (long)(GameData.Number(parry[0]) ?? 0)) is not { } buff
-            || Numbers(buff, "_kLogicData") is not [var counterId] || data.Row("SkillConfig", (long)counterId) is not { } counter) return;
+            || _data.Row("BuffConfig", (long)(GameData.Number(parry[0]) ?? 0)) is not { } buff
+            || Numbers(buff, "_kLogicData") is not [var counterId] || _data.Row("SkillConfig", (long)counterId) is not { } counter) return;
         long duration = (long)(GameData.Number(parry[2]) ?? 1000);
         var desc = Numbers(action.Row, "_kDescData");
         double bonus = desc.Length > 3 ? desc[3] / 100 : 0;
@@ -218,7 +218,7 @@ public sealed partial class CombatService
         await ReactWithTriggersAsync(attacker, p, now);
         foreach (var buff in p.Buffs.Where(b => b.ExpireMs > now).ToArray())
         {
-            if (p.Dead || data.Row("BuffConfig", buff.ConfigId) is not { } config) continue;
+            if (p.Dead || _data.Row("BuffConfig", buff.ConfigId) is not { } config) continue;
             int group = (int)GameData.Int(config, "_iBuffID");
             if (group is ShieldReflectGroup or ReflectDamageGroup or CastingShieldGroup)
             {
@@ -229,11 +229,11 @@ public sealed partial class CombatService
             if (group == AutoCounterGroup && physical) p.ProcState[AutoCounterHitKey] = 1;
             if (group is not (ParryGroup or DeathBoundGroup) || group == ParryGroup && !physical
                 || now < p.ProcState.GetValueOrDefault(group)
-                || Numbers(config, "_kLogicData") is not [var answerId] || data.Row("SkillConfig", (long)answerId) is not { } answer) continue;
+                || Numbers(config, "_kLogicData") is not [var answerId] || _data.Row("SkillConfig", (long)answerId) is not { } answer) continue;
             int level = (int)Math.Max(1, GameData.Int(config, "_iLevel"));
             if (group == ParryGroup)
             {
-                var desc = data.Row("SkillConfig", skills.RealId(ParryGroup, level)) is { } skill ? Numbers(skill, "_kDescData") : [];
+                var desc = _data.Row("SkillConfig", _skills.RealId(ParryGroup, level)) is { } skill ? Numbers(skill, "_kDescData") : [];
                 p.ProcState[group] = now + (long)((desc.Length > 2 ? desc[2] : 1) * 1000);
                 if (!attacker.Dead && attacker.Hp > 0) await ProcCastAsync(p, answer, attacker);
             }
@@ -251,23 +251,23 @@ public sealed partial class CombatService
         if (now < p.ProcState.GetValueOrDefault(group)) return;
         if (group == ShieldReflectGroup)
         {
-            int level = skills.Level(p.Progress!, ShieldReflectSkill);
+            int level = _skills.Level(p.Progress!, ShieldReflectSkill);
             if (!meleePhysical || attacker.Dead || attacker.Hp <= 0 || level <= 0
-                || data.Row("SkillConfig", skills.RealId(ShieldReflectSkill, level)) is not { } skill
-                || data.Row("SkillConfig", skills.RealId(11419, level)) is not { } answer) return;
+                || _data.Row("SkillConfig", _skills.RealId(ShieldReflectSkill, level)) is not { } skill
+                || _data.Row("SkillConfig", _skills.RealId(11419, level)) is not { } answer) return;
             var desc = Numbers(skill, "_kDescData");
             if (desc.Length > 4 && MonsterService.Distance(p.Position.X, p.Position.Z, attacker.X, attacker.Z) > desc[4]) return;
             p.ProcState[group] = now + (long)(1000 / Math.Max(1, desc.Length > 3 ? desc[3] : 1));
             await ProcCastAsync(p, answer, attacker);
             return;
         }
-        int reflectLevel = skills.Level(p.Progress!, ReflectDamageSkill);
-        if (reflectLevel <= 0 || data.Row("SkillConfig", skills.RealId(ReflectDamageSkill, reflectLevel)) is not { } reflect) return;
+        int reflectLevel = _skills.Level(p.Progress!, ReflectDamageSkill);
+        if (reflectLevel <= 0 || _data.Row("SkillConfig", _skills.RealId(ReflectDamageSkill, reflectLevel)) is not { } reflect) return;
         var rdesc = Numbers(reflect, "_kDescData");
         double every = rdesc.Length > 3 ? rdesc[3] : 0.5, times = Math.Max(1, rdesc.Length > 4 ? rdesc[4] : 1);
         // Thorn 1161801-1161805 (mode 0) for Reflect Damage, its mode-1 copy 1161811-1161815 for Casting Shield.
         long thornId = 1161800 + (group == CastingShieldGroup ? 10 : 0) + reflectLevel;
-        if (data.Row("SkillConfig", thornId) is not { } thorn) return;
+        if (_data.Row("SkillConfig", thornId) is not { } thorn) return;
         p.ProcState[group] = now + (long)(every * 1000 / times);
         await ProcCastAsync(p, thorn, null, p.Face, area: true);
     }

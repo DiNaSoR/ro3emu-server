@@ -39,7 +39,7 @@ public sealed partial class BuffService
     {
         long now = MonsterService.NowMs;
         foreach (var buff in p.Buffs)
-            if (buff.ExpireMs > now && !buff.IsPassive && data.Row("BuffConfig", buff.ConfigId) is { } row && StealthRule(row) is { } rule)
+            if (buff.ExpireMs > now && !buff.IsPassive && _data.Row("BuffConfig", buff.ConfigId) is { } row && StealthRule(row) is { } rule)
                 return (buff, rule.BreakOnDeal, rule.Hits);
         return null;
     }
@@ -51,7 +51,7 @@ public sealed partial class BuffService
         if (hidden == p.Stealthed) return;
         p.Stealthed = hidden;
         p.StealthHits = default;
-        if (p.Role != null) await character.RefreshStatsAsync(p);
+        if (p.Role != null) await _character.RefreshStatsAsync(p);
     }
 
     /// <summary>A monster's hit on a hidden player counts toward the reveal.</summary>
@@ -79,9 +79,9 @@ public sealed partial class BuffService
     /// speed buff 1500702 [15007, 1, 1] beside 【Camouflage】 1500602 [15007, 1, 1]) (inferred: they end together).</summary>
     private async Task RevealAsync(GameSession p, ActiveBuff stealth)
     {
-        double? tag = data.Row("BuffConfig", stealth.ConfigId) is { } row && row.TryGetProperty("_kLogicData", out var l)
+        double? tag = _data.Row("BuffConfig", stealth.ConfigId) is { } row && row.TryGetProperty("_kLogicData", out var l)
             && l.ValueKind == JsonValueKind.Array && l.GetArrayLength() > 0 ? GameData.Number(l[0]) : null;
-        var ending = p.Buffs.Where(b => b == stealth || tag is > 0 && !b.IsPassive && data.Row("BuffConfig", b.ConfigId) is { } r
+        var ending = p.Buffs.Where(b => b == stealth || tag is > 0 && !b.IsPassive && _data.Row("BuffConfig", b.ConfigId) is { } r
             && r.TryGetProperty("_kLogicData", out var rl) && rl.ValueKind == JsonValueKind.Array && rl.GetArrayLength() > 0
             && GameData.Number(rl[0]) == tag).ToArray();
         foreach (var buff in ending) await RemoveAsync(p, buff);

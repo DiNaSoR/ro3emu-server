@@ -29,6 +29,9 @@ public sealed class ActivitiesMessages(PraiseService praise, CasualBattleService
         routes.AdmitEconomic(id => id is MonsterHuntService.GainAreaAward or MonsterHuntService.GainMonsterAward);
         // Seven-Day Goal task and score claims pay their awards.
         routes.AdmitEconomic(id => id is FirstHeartService.GetTaskReward or FirstHeartService.GetScoreReward);
+        // The client asks for the tower first-pass records (floors 1-230) on the role screen (Steven's traffic log,
+        // 2026-10-20), so the query is accepted there; TowerService.FirstPassRangeAsync answers it without a role.
+        routes.AllowFrom(Messaging.SessionStage.RoleScreen, id => id == TowerService.FirstPassRange);
         routes.AdmitRole(id => id is TowerService.Info or TowerService.SetPets or TowerService.FirstPassRange
             or TowerService.ClaimFirstPass or TowerService.Sweep or TowerService.End or TowerService.Start);
         routes.AdmitRole(id => id is DungeonService.SetJobPosition or DungeonService.SetGuide or DungeonService.ClaimFirstPass

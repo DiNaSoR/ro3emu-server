@@ -35,19 +35,19 @@ public sealed class ParagonService
 
     private sealed record Talent(int Id, int Group, int Type, int Max, int[] Children, int[] Attrs, int[] Power);
 
-    private readonly GameData data;
-    private readonly RoleStore roles;
-    private readonly CharacterService character;
-    private readonly FunctionService functions;
-    private Dictionary<int, Talent>? talents;
-    private List<int[]>? groups;
+    private readonly GameData _data;
+    private readonly RoleStore _roles;
+    private readonly CharacterService _character;
+    private readonly FunctionService _functions;
+    private Dictionary<int, Talent>? _talents;
+    private List<int[]>? _groups;
 
     public ParagonService(GameData data, RoleStore roles, CharacterService character, FunctionService functions)
     {
-        this.data = data;
-        this.roles = roles;
-        this.character = character;
-        this.functions = functions;
+        this._data = data;
+        this._roles = roles;
+        this._character = character;
+        this._functions = functions;
         character.ExtraAttributes.Add(Attributes);
         character.CapExpGained = CreditAsync;
         character.ProgressHandlers.Add(OnProgressAsync);
@@ -57,15 +57,15 @@ public sealed class ParagonService
         row.TryGetProperty(field, out var v) && v.ValueKind == JsonValueKind.Array
             ? v.EnumerateArray().Where(e => e.ValueKind == JsonValueKind.Number).Select(e => e.GetInt32()).ToArray() : [];
 
-    private List<int[]> Groups => groups ??= data.Table("PatronTalentGroupConfig").Values
+    private List<int[]> Groups => _groups ??= _data.Table("PatronTalentGroupConfig").Values
         .OrderBy(r => GameData.Int(r, "_iID")).Select(r => Ints(r, "_kTanlentPoints")).ToList();
 
-    private Dictionary<int, Talent> Talents => talents ??= BuildTalents();
+    private Dictionary<int, Talent> Talents => _talents ??= BuildTalents();
 
     private Dictionary<int, Talent> BuildTalents()
     {
         var result = new Dictionary<int, Talent>();
-        foreach (var row in data.Table("PatronTalentConfig").Values)
+        foreach (var row in _data.Table("PatronTalentConfig").Values)
         {
             int id = (int)GameData.Int(row, "_iID");
             int group = Groups.FindIndex(g => g.Contains(id)) + 1;
@@ -77,12 +77,12 @@ public sealed class ParagonService
 
     private IEnumerable<Talent> Parents(int id) => Talents.Values.Where(t => t.Children.Contains(id));
 
-    private int MaxLv => data.Table("PatronLevelConfig").Values.Select(r => (int)GameData.Int(r, "_iPatronLv")).DefaultIfEmpty(1).Max();
+    private int MaxLv => _data.Table("PatronLevelConfig").Values.Select(r => (int)GameData.Int(r, "_iPatronLv")).DefaultIfEmpty(1).Max();
 
-    private long Need(int lv) => data.Row("PatronLevelConfig", lv) is { } row ? GameData.Int(row, "_iPatronExp") : 0;
+    private long Need(int lv) => _data.Row("PatronLevelConfig", lv) is { } row ? GameData.Int(row, "_iPatronExp") : 0;
 
     /// <summary>Astral Points earned: every reached row's _iStatusPoint (inferred: a level's point comes on reaching it).</summary>
-    private long Earned(int lv) => data.Table("PatronLevelConfig").Values
+    private long Earned(int lv) => _data.Table("PatronLevelConfig").Values
         .Where(r => GameData.Int(r, "_iPatronLv") <= lv).Sum(r => GameData.Int(r, "_iStatusPoint"));
 
     private static long Spent(State st) => st.Points.Values.Sum(v => (long)v);
@@ -102,9 +102,9 @@ public sealed class ParagonService
 
     public static State Parse(byte[]? blob) => blob is { Length: > 0 } ? JsonSerializer.Deserialize<State>(blob) ?? new State() : new State();
 
-    public void Load(GameSession s) => s.Paragon = Parse(roles.LoadParagon(s.Role!.Id));
+    public void Load(GameSession s) => s.Paragon = Parse(_roles.LoadParagon(s.Role!.Id));
 
-    public bool Open(GameSession s) => s.Progress != null && functions.IsOpen(s, Function);
+    public bool Open(GameSession s) => s.Progress != null && _functions.IsOpen(s, Function);
 
     public Task LoginAsync(GameSession s) => Open(s) ? SyncAsync(s) : Task.CompletedTask;
 
@@ -117,13 +117,13 @@ public sealed class ParagonService
     /// extraAdd / 10000 as a percent, so 100000 is +10% (inferred unit 1/1,000,000 of the EXP).</summary>
     private double ExtraAdd(int lv)
     {
-        int day = character.ServerDay?.Invoke() ?? 1;
-        var world = data.Table("PatronWordLvConfig").Values.OrderBy(r => GameData.Int(r, "_iDay"))
+        int day = _character.ServerDay?.Invoke() ?? 1;
+        var world = _data.Table("PatronWordLvConfig").Values.OrderBy(r => GameData.Int(r, "_iDay"))
             .Select(r => (Day: GameData.Int(r, "_iDay"), Lv: GameData.Int(r, "_iServerPatronLv"))).ToList();
         if (world.Count == 0) return 0;
         long worldLv = world.LastOrDefault(w => w.Day <= day) is { Lv: > 0 } hit ? hit.Lv : world[^1].Lv;
         long gap = lv - worldLv;
-        return data.Table("PatronExpAddConfig").Values.Where(r => gap <= GameData.Int(r, "_iBaseLvGap"))
+        return _data.Table("PatronExpAddConfig").Values.Where(r => gap <= GameData.Int(r, "_iBaseLvGap"))
             .Select(r => (double)GameData.Int(r, "_iPursueExpAdditionPercent")).DefaultIfEmpty(0).Max();
     }
 
@@ -141,7 +141,7 @@ public sealed class ParagonService
             info.Runegroup[t.Id] = new ParagonLevelRune
             {
                 Points = st.Points.GetValueOrDefault(t.Id),
-                Rune = st.Cores.TryGetValue(t.Id, out int core) ? character.ItemInfoOf(new InvItem { Guid = t.Id, Entry = core, Stack = 1 }) : new ItemBaseInfo(),
+                Rune = st.Cores.TryGetValue(t.Id, out int core) ? _character.ItemInfoOf(new InvItem { Guid = t.Id, Entry = core, Stack = 1 }) : new ItemBaseInfo(),
             };
         // OverviewWidget walks ipairs(activeGroup): the contiguous run 1..n.
         for (int g = 1; g <= ActiveGroups(st); g++) info.ActiveGroup[g] = g;
@@ -157,7 +157,7 @@ public sealed class ParagonService
             if (points > 0 && Talents.TryGetValue(id, out var t) && Counted(st, t) && t.Power.Length > 0)
                 total += t.Power[Math.Min(points, t.Power.Length) - 1];
         foreach (var (id, core) in st.Cores)
-            if (Talents.TryGetValue(id, out var t) && Counted(st, t) && data.Row("PatronRuneConfig", core) is { } row)
+            if (Talents.TryGetValue(id, out var t) && Counted(st, t) && _data.Row("PatronRuneConfig", core) is { } row)
                 total += GameData.Int(row, "_iSeasonPower");
         return total;
     }
@@ -168,11 +168,11 @@ public sealed class ParagonService
         foreach (var (id, points) in st.Points)
         {
             if (points <= 0 || !Talents.TryGetValue(id, out var t) || !Counted(st, t) || t.Type != AttrType || t.Attrs.Length == 0) continue;
-            if (data.Row("PatronTalentAttrConfig", t.Attrs[Math.Min(points, t.Attrs.Length) - 1]) is { } row)
+            if (_data.Row("PatronTalentAttrConfig", t.Attrs[Math.Min(points, t.Attrs.Length) - 1]) is { } row)
                 foreach (var pair in GameData.Pairs(row, "_kAttrs")) yield return pair;
         }
         foreach (var (id, core) in st.Cores)
-            if (Talents.TryGetValue(id, out var t) && Counted(st, t) && data.Row("PatronRuneConfig", core) is { } row)
+            if (Talents.TryGetValue(id, out var t) && Counted(st, t) && _data.Row("PatronRuneConfig", core) is { } row)
                 foreach (var pair in GameData.Pairs(row, "_kAttrs")) yield return pair;
     }
 
@@ -186,9 +186,9 @@ public sealed class ParagonService
 
     private async Task SaveAsync(GameSession s, State next, string label)
     {
-        var tx = roles.NewTransaction();
+        var tx = _roles.NewTransaction();
         Persist(tx, s, next);
-        await roles.CommitAsync(tx, label, _ => s.Paragon = next);
+        await _roles.CommitAsync(tx, label, _ => s.Paragon = next);
     }
 
     /// <summary>
@@ -270,14 +270,14 @@ public sealed class ParagonService
             if (result != 0) { }
             else if (t.Type == AttrType) result = ErrSlot;
             else if (st.Points.GetValueOrDefault(t.Id) <= 0) result = ErrSlotInactive;
-            else if (item == null || data.Row("PatronRuneConfig", item.Entry) == null) result = ErrRuneMissing;
-            else if (data.Row("ItemConfig", item.Entry) is not { } config || GameData.Int(config, "_iSubType") != t.Type) result = ErrRuneType;
+            else if (item == null || _data.Row("PatronRuneConfig", item.Entry) == null) result = ErrRuneMissing;
+            else if (_data.Row("ItemConfig", item.Entry) is not { } config || GameData.Int(config, "_iSubType") != t.Type) result = ErrRuneType;
             else
             {
                 var next = Copy(st);
                 next.Cores[t.Id] = item.Entry;
                 var back = st.Cores.TryGetValue(t.Id, out int old) ? new List<(int, int)> { (old, 1) } : [];
-                var paid = await character.ExchangeLockedAsync(s, [], back, new Dictionary<long, int> { [item.Guid] = 1 },
+                var paid = await _character.ExchangeLockedAsync(s, [], back, new Dictionary<long, int> { [item.Guid] = 1 },
                     popup: false, persist: tx => Persist(tx, s, next), committed: () => s.Paragon = next);
                 if (paid == null) result = ErrRuneMissing;
                 else await ChangedAsync(s);
@@ -345,7 +345,7 @@ public sealed class ParagonService
         foreach (int id in cores)
             if (next.Cores.Remove(id, out int core)) back.Add((core, 1));
         if (back.Count == 0) await SaveAsync(s, next, label);
-        else if (await character.ExchangeLockedAsync(s, [], back, popup: false,
+        else if (await _character.ExchangeLockedAsync(s, [], back, popup: false,
             persist: tx => Persist(tx, s, next), committed: () => s.Paragon = next) == null) return false;
         await ChangedAsync(s);
         return true;
@@ -354,6 +354,6 @@ public sealed class ParagonService
     private async Task ChangedAsync(GameSession s)
     {
         await SyncAsync(s);
-        await character.RefreshStatsAsync(s);
+        await _character.RefreshStatsAsync(s);
     }
 }

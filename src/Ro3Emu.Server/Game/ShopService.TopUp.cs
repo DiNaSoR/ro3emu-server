@@ -31,14 +31,14 @@ public sealed partial class ShopService
         ItemExchange = 2005;
     private const int ChargeRecharge = 1, ChargeProduct = 2;
 
-    private readonly bool freeTopUp;
+    private readonly bool _freeTopUp = options?.Value.TopUp.Free ?? false;
 
     /// <summary>2003: the tiers this role has not bought yet (all platforms; the client keeps its own platform's).</summary>
     public Task FirstRechargeAwardAsync(GameSession session)
     {
-        var resp = new GetRechargeFirstAwardResp { Result = freeTopUp ? 0 : ErrorCodes.FeatureUnavailable };
-        if (freeTopUp)
-            foreach (var row in data.Table("RechargeConfig").Values)
+        var resp = new GetRechargeFirstAwardResp { Result = _freeTopUp ? 0 : ErrorCodes.FeatureUnavailable };
+        if (_freeTopUp)
+            foreach (var row in _data.Table("RechargeConfig").Values)
                 if ((int)GameData.Int(row, "_iID") is var id and > 0 && session.Shop!.Recharged.GetValueOrDefault(id) == 0)
                     resp.IdList.Add(id);
         return session.SendGameAsync(FirstRechargeAward, resp);
@@ -49,7 +49,7 @@ public sealed partial class ShopService
     {
         var resp = new CreateOrderResp { ChargeType = req.ChargeType, ChargeId = req.ChargeId };
         bool first = false;
-        if (!freeTopUp) resp.Result = ErrorCodes.FeatureUnavailable;
+        if (!_freeTopUp) resp.Result = ErrorCodes.FeatureUnavailable;
         else if (req.ChargeType == ChargeRecharge) (resp.Result, first) = await RechargeAsync(session, req.ChargeId);
         else if (req.ChargeType == ChargeProduct) resp.Result = await ProductAsync(session, req.ChargeId);
         else resp.Result = ErrorCodes.Parameter;
@@ -61,12 +61,12 @@ public sealed partial class ShopService
 
     /// <summary>2002: nothing is pending here; every order was settled by 2001. A client report never grants anything.</summary>
     public Task PayResultAsync(GameSession session, PayResultReq req) =>
-        session.SendGameAsync(PayResult, new PayResultResp { Result = freeTopUp ? 0 : ErrorCodes.FeatureUnavailable, OrderId = req.OrderId });
+        session.SendGameAsync(PayResult, new PayResultResp { Result = _freeTopUp ? 0 : ErrorCodes.FeatureUnavailable, OrderId = req.OrderId });
 
     private async Task<(int Result, bool First)> RechargeAsync(GameSession session, long chargeId)
     {
         using var guard = await CharacterService.Lock(session);
-        if (chargeId is <= 0 or > int.MaxValue || data.Row("RechargeConfig", chargeId) is not { } row) return (ErrorCodes.Parameter, false);
+        if (chargeId is <= 0 or > int.MaxValue || _data.Row("RechargeConfig", chargeId) is not { } row) return (ErrorCodes.Parameter, false);
         int id = (int)chargeId;
         bool first = session.Shop!.Recharged.GetValueOrDefault(id) == 0;
         var goods = new List<(int Entry, int Count)>();
@@ -77,33 +77,33 @@ public sealed partial class ShopService
         next.Recharged[id] = next.Recharged.GetValueOrDefault(id) + 1;
         int code = await GrantChargeAsync(session, "cd13a/shop-topup", goods, next,
             new { Recharge = id, First = first, Goods = goods.Select(g => new[] { g.Entry, g.Count }) });
-        log.LogInformation("{Name} tops up tier {Id} (first {First}): {Result}", session.Role!.Name, id, first, code == 0 ? "ok" : code);
+        _log.LogInformation("{Name} tops up tier {Id} (first {First}): {Result}", session.Role!.Name, id, first, code == 0 ? "ok" : code);
         return (code, code == 0 && first);
     }
 
     private async Task<int> ProductAsync(GameSession session, long chargeId)
     {
         using var guard = await CharacterService.Lock(session);
-        if (data.Row("ProductConfig", chargeId) is not { } row) return ErrorCodes.Parameter;
+        if (_data.Row("ProductConfig", chargeId) is not { } row) return ErrorCodes.Parameter;
         long award = GameData.Int(row, "_iAward");
         AwardPlan plan;
         try
         {
-            plan = data.Row("MultiverseGroupConfig", award) != null
-                ? awards.Resolve(session, award, (int)(session.SeasonState?.PlayBookId ?? seasons.PlayBook))
-                : awards.ResolveDirect(session, award);
+            plan = _data.Row("MultiverseGroupConfig", award) != null
+                ? _awards.Resolve(session, award, (int)(session.SeasonState?.PlayBookId ?? _seasons.PlayBook))
+                : _awards.ResolveDirect(session, award);
         }
         catch (Exception e) when (e is AwardResolutionException or OverflowException)
         {
-            log.LogWarning("Product {Id}: award {Award} unresolved: {Why}", chargeId, award, e.Message);
+            _log.LogWarning("Product {Id}: award {Award} unresolved: {Why}", chargeId, award, e.Message);
             return ErrorCodes.ShopRewardMissing;
         }
-        var goods = plan.Grants.Where(g => g.Count > 0 && data.Row("ItemConfig", g.Entry) != null)
+        var goods = plan.Grants.Where(g => g.Count > 0 && _data.Row("ItemConfig", g.Entry) != null)
             .GroupBy(g => g.Entry).Select(g => (g.Key, g.Sum(x => x.Count))).ToList();
         if (goods.Count == 0) return ErrorCodes.ShopRewardMissing;
         int code = await GrantChargeAsync(session, "cd13a/shop-product", goods, Copy(session.Shop!),
             new { Product = chargeId, Award = award, Goods = goods.Select(g => new[] { g.Item1, g.Item2 }) });
-        log.LogInformation("{Name} gets product {Id} (award {Award}): {Result}", session.Role!.Name, chargeId, award, code == 0 ? "ok" : code);
+        _log.LogInformation("{Name} gets product {Id} (award {Award}): {Result}", session.Role!.Name, chargeId, award, code == 0 ? "ok" : code);
         return code;
     }
 
@@ -111,8 +111,8 @@ public sealed partial class ShopService
     private async Task<int> GrantChargeAsync(GameSession session, string kind, List<(int Entry, int Count)> goods,
         ShopState next, object outcome)
     {
-        var economy = character.FamilyEconomy(session, kind, [], goods, outcome);
-        var done = await character.ExchangeLockedAsync(session, [], goods,
+        var economy = _character.FamilyEconomy(session, kind, [], goods, outcome);
+        var done = await _character.ExchangeLockedAsync(session, [], goods,
             persist: tx =>
             {
                 tx.RoleBlob(session.Role!.Id, "shop", JsonSerializer.SerializeToUtf8Bytes(next));
@@ -127,7 +127,7 @@ public sealed partial class ShopService
     {
         if (!row.TryGetProperty(field, out var pair) || pair.ValueKind != JsonValueKind.Array || pair.GetArrayLength() < 2) return false;
         long entry = (long)(GameData.Number(pair[0]) ?? 0), count = (long)(GameData.Number(pair[1]) ?? 0);
-        if (entry is <= 0 or > int.MaxValue || count is <= 0 or > int.MaxValue || data.Row("ItemConfig", entry) == null) return false;
+        if (entry is <= 0 or > int.MaxValue || count is <= 0 or > int.MaxValue || _data.Row("ItemConfig", entry) == null) return false;
         goods.Add(((int)entry, (int)count));
         return true;
     }
@@ -138,23 +138,23 @@ public sealed partial class ShopService
         int code;
         using (await CharacterService.Lock(session))
         {
-            var row = req.ItemId is > 0 and <= int.MaxValue ? data.Row("ItemExchangeConfig", req.ItemId) : null;
+            var row = req.ItemId is > 0 and <= int.MaxValue ? _data.Row("ItemExchangeConfig", req.ItemId) : null;
             long rate = row is { } r ? GameData.Int(r, "_iRate") : 0, limit = row is { } l ? GameData.Int(l, "_iSingleLimit") : 0;
             int target = row is { } t ? (int)GameData.Int(t, "_iTargetID") : 0;
             long function = row is { } f ? GameData.Int(f, "_iFunction") : 0;
-            if (row == null || rate <= 0 || target <= 0 || data.Row("ItemConfig", target) == null) code = ErrorCodes.Parameter;
-            else if (function > 0 && !functions.IsOpen(session, function)) code = ErrorCodes.FunctionLocked;
+            if (row == null || rate <= 0 || target <= 0 || _data.Row("ItemConfig", target) == null) code = ErrorCodes.Parameter;
+            else if (function > 0 && !_functions.IsOpen(session, function)) code = ErrorCodes.FunctionLocked;
             else if (req.Count < 1 || (limit > 0 && req.Count > limit) || req.Count * rate > int.MaxValue) code = ErrorCodes.Parameter;
             else
             {
                 var cost = Payment(session, (int)req.ItemId, req.Count); // crystals: bound ones first
                 (int Entry, int Count)[] goods = [(target, (int)(req.Count * rate))];
-                var economy = character.FamilyEconomy(session, "cd13a/shop-exchange", cost, goods,
+                var economy = _character.FamilyEconomy(session, "cd13a/shop-exchange", cost, goods,
                     new { Paid = req.ItemId, req.Count, Target = target, Rate = rate });
-                code = await character.ExchangeLockedAsync(session, cost, goods, persist: tx => tx.WithEconomy(economy)) == null
-                    ? character.ShortageOf(session, cost) : 0;
+                code = await _character.ExchangeLockedAsync(session, cost, goods, persist: tx => tx.WithEconomy(economy)) == null
+                    ? _character.ShortageOf(session, cost) : 0;
             }
-            log.LogInformation("{Name} exchanges {Count}x {Item}: {Result}", session.Role!.Name, req.Count, req.ItemId, code == 0 ? "ok" : code);
+            _log.LogInformation("{Name} exchanges {Count}x {Item}: {Result}", session.Role!.Name, req.Count, req.ItemId, code == 0 ? "ok" : code);
         }
         await session.SendGameAsync(ItemExchange, new ItemExchangeResp { Result = code });
     }

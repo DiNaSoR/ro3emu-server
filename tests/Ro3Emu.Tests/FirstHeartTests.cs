@@ -10,45 +10,46 @@ using Ro3Emu.Server.Game;
 namespace Ro3Emu.Tests;
 
 /// <summary>
-/// Seven-Day Goal (FirstHeartService): 5049 starts at base level 10 (NewActivityConfig 114, condition 21000012) with day 1
-/// open; 83500 pays a completed task once and scores its point, 83501 a score reward once the score reaches it; the state
+/// Seven-Day Goal (FirstHeartService): 5049 starts at base level 30 (NewActivityConfig 114, condition 21000012; level 10
+/// before the 20 Oct 2026 client) with day 1 open; 83500 pays a completed task once and scores its point, 83501 a score reward once the score reaches it; the state
 /// survives a relogin. Day 1 tasks: 100100200 (level 10), 101101100 (1 login day), 102101110 (a quality-3 card).
 /// </summary>
 public sealed class FirstHeartTests : IAsyncLifetime
 {
     private const long LevelTen = 100100200, LevelTwenty = 100100201, LevelFifty = 100100206, LoginOne = 101101100,
         LoginSeven = 101101106, CardTask = 102101110;
+    private const int OpenLevel = 30; // condition 21000012
     private const int Zeny = 1;
     private static readonly TimeSpan Wait = TimeSpan.FromSeconds(15);
-    private readonly string dataDir = Path.Combine(Path.GetTempPath(), "ro3emu-firstheart-" + Guid.NewGuid().ToString("N"));
-    private WebApplication app = null!;
-    private string http = "";
+    private readonly string _dataDir = Path.Combine(Path.GetTempPath(), "ro3emu-firstheart-" + Guid.NewGuid().ToString("N"));
+    private WebApplication _app = null!;
+    private string _http = "";
 
-    private T Service<T>() where T : notnull => app.Services.GetRequiredService<T>();
+    private T Service<T>() where T : notnull => _app.Services.GetRequiredService<T>();
     private Task<T> Read<T>(Func<T> read) => Service<GameLoop>().InvokeAsync(() => Task.FromResult(read()));
 
     public async Task InitializeAsync()
     {
         var (httpPort, microPort, gamePort) = TestPorts.FreePorts();
-        app = ServerHost.Create([], o =>
+        _app = ServerHost.Create([], o =>
         {
-            o.DataDir = dataDir; o.GameDataDir = Path.Combine(ClientData.RepoRoot, "data");
+            o.DataDir = _dataDir; o.GameDataDir = Path.Combine(ClientData.RepoRoot, "data");
             o.HttpPort = httpPort; o.MicroGatePort = microPort; o.GameGatePort = gamePort;
         });
-        await app.StartAsync();
-        http = $"http://127.0.0.1:{httpPort}";
+        await _app.StartAsync();
+        _http = $"http://127.0.0.1:{httpPort}";
     }
 
     public async Task DisposeAsync()
     {
-        await app.StopAsync(); await app.DisposeAsync();
+        await _app.StopAsync(); await _app.DisposeAsync();
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
-        try { Directory.Delete(dataDir, true); } catch (IOException) { }
+        try { Directory.Delete(_dataDir, true); } catch (IOException) { }
     }
 
     private async Task<BotClient> InWorld(string name, bool create = true)
     {
-        var bot = new BotClient(http, File.ReadAllText(Path.Combine(dataDir, "gate_rsa_public.pem")));
+        var bot = new BotClient(_http, File.ReadAllText(Path.Combine(_dataDir, "gate_rsa_public.pem")));
         await bot.LoginAsync(name.ToLowerInvariant(), "pw"); await bot.EnterGateAsync();
         long id = create ? (await bot.CreateRoleAsync(name)).RoleBaseInfo.Id : bot.Roles.Single().Id;
         await bot.EnterWorldAsync(id);
@@ -65,7 +66,7 @@ public sealed class FirstHeartTests : IAsyncLifetime
     private async Task Gm(BotClient bot, string command)
     {
         using var client = new HttpClient();
-        (await client.PostAsync($"{http}/ro3emu/gm?account={bot.Account}", new StringContent(command))).EnsureSuccessStatusCode();
+        (await client.PostAsync($"{_http}/ro3emu/gm?account={bot.Account}", new StringContent(command))).EnsureSuccessStatusCode();
     }
 
     private GameSession Session(BotClient bot) => Service<SessionRegistry>().All().Single(s => s.Account == bot.Account && s.Role != null);
@@ -111,7 +112,7 @@ public sealed class FirstHeartTests : IAsyncLifetime
     }
 
     [ClientDataFact]
-    public async Task SyncStartsAtLevelTenWithDayOneOpenAndAnInitializedRewardMap()
+    public async Task SyncStartsAtItsOpenLevelWithDayOneOpenAndAnInitializedRewardMap()
     {
         await using var alice = await InWorld("Alice");
         var s = Session(alice);
@@ -119,8 +120,10 @@ public sealed class FirstHeartTests : IAsyncLifetime
         Assert.Null(await Cfg(s));
         Assert.False(await Read(() => s.Synced.ContainsKey(FirstHeartService.Sync)));
         Assert.Equal(ErrorCodes.ActivityClosed, await ClaimTask(alice, LevelTen));
+        await Gm(alice, $"!lvl {OpenLevel - 1}");
+        Assert.Equal(ErrorCodes.ActivityClosed, await ClaimTask(alice, LevelTen));
 
-        await Gm(alice, "!lvl 10");
+        await Gm(alice, $"!lvl {OpenLevel}");
         var full = await Next(alice, FirstHeartService.Sync, DBFirstHeartTaskActivityDataIncrement.Parser, m => m.SyncAllMark);
         var all = full.ActivityData[1].All;
         Assert.Equal(1, all.CfgData[1001]);
@@ -147,7 +150,7 @@ public sealed class FirstHeartTests : IAsyncLifetime
     {
         await using var alice = await InWorld("Alice");
         var s = Session(alice);
-        await Gm(alice, "!lvl 10");
+        await Gm(alice, $"!lvl {OpenLevel}");
         await Until(s, cfg => Status(cfg, LevelTen) == FirstHeartTaskState.Accept, "level 10 task completed");
 
         Assert.Equal(ErrorCodes.TaskRequirements, await ClaimTask(alice, CardTask));   // not completed
@@ -176,7 +179,7 @@ public sealed class FirstHeartTests : IAsyncLifetime
     {
         await using var alice = await InWorld("Alice");
         var s = Session(alice);
-        await Gm(alice, "!lvl 20");
+        await Gm(alice, $"!lvl {OpenLevel}");
         await Until(s, cfg => Status(cfg, LoginOne) == FirstHeartTaskState.Accept, "day 1 tasks completed");
         Assert.Equal(0, await ClaimTask(alice, LevelTen));
         Assert.Equal(0, await ClaimTask(alice, LoginOne));

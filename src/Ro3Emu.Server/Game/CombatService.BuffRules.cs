@@ -14,11 +14,11 @@ public sealed partial class CombatService
 {
     private void WireBuffRules()
     {
-        buffs.ResolvePeriodicSource = ResolvePeriodicSource;
-        buffs.PeriodicTick = PeriodicTickAsync;
-        buffs.HaloHostilePlayer = (carrier, other) => PlayerHostile?.Invoke(carrier, other) == true;
-        buffs.HaloEnemyMonster = CanHitMonster;
-        buffs.UnitControlChanged.Add(monsters.OnControlChangedAsync);
+        _buffs.ResolvePeriodicSource = ResolvePeriodicSource;
+        _buffs.PeriodicTick = PeriodicTickAsync;
+        _buffs.HaloHostilePlayer = (carrier, other) => PlayerHostile?.Invoke(carrier, other) == true;
+        _buffs.HaloEnemyMonster = CanHitMonster;
+        _buffs.UnitControlChanged.Add(_monsters.OnControlChangedAsync);
     }
 
     /// <summary>
@@ -37,10 +37,10 @@ public sealed partial class CombatService
         duration = (int)(GameData.Number(tuple[2]) ?? 0);
         double chance = GameData.Number(tuple[1]) ?? 0;
         if (id <= 0) return false;
-        if (BuffRuleTables.For(data).TagsByBuff.TryGetValue(id, out var tags))
+        if (BuffRuleTables.For(_data).TagsByBuff.TryGetValue(id, out var tags))
         {
             double lasting = 1;
-            using var reuse = character.ReuseStats(); // each tag reads both sides' sheets; nothing changes in between
+            using var reuse = _character.ReuseStats(); // each tag reads both sides' sheets; nothing changes in between
             foreach (var tag in tags)
             {
                 double factor = BuffRuleTables.TagFactor(TagAttribute(sourcePlayer, sourceUnit, tag.AttackAttr),
@@ -50,7 +50,7 @@ public sealed partial class CombatService
             }
             if (lasting != 1)
             {
-                int baseMs = duration > 0 ? duration : data.Row("BuffConfig", id) is { } row ? (int)GameData.Int(row, "_iTime") : 0;
+                int baseMs = duration > 0 ? duration : _data.Row("BuffConfig", id) is { } row ? (int)GameData.Int(row, "_iTime") : 0;
                 if (baseMs > 0) duration = (int)Math.Round(baseMs * lasting);
                 if (baseMs > 0 && duration <= 0) return false;
             }
@@ -62,10 +62,10 @@ public sealed partial class CombatService
     /// templates carry none of 701-728).</summary>
     private long TagAttribute(GameSession? player, WorldUnit? unit, int attr)
     {
-        if (player?.Role != null && player.Progress != null) return character.Stats(player)[attr];
+        if (player?.Role != null && player.Progress != null) return _character.Stats(player)[attr];
         if (unit == null) return 0;
         double sum = 0;
-        foreach (var (id, value) in buffs.UnitAttributes(unit)) if (id == attr) sum += value;
+        foreach (var (id, value) in _buffs.UnitAttributes(unit)) if (id == attr) sum += value;
         return (long)sum;
     }
 
@@ -74,13 +74,13 @@ public sealed partial class CombatService
     /// <summary>The applier of a buff: a player by role id, else a monster of that world scene by uid.</summary>
     private BuffService.PeriodicSource? ResolvePeriodicSource(long sourceId, long worldScene)
     {
-        foreach (var s in sessions.All())
+        foreach (var s in _sessions.All())
             if (s.Role?.Id == sourceId && s.Progress != null)
             {
-                var stats = character.Stats(s);
+                var stats = _character.Stats(s);
                 return new(sourceId, stats[103], stats[104], s.Progress.Level, 1, s);
             }
-        var units = world.Map(worldScene).Units;
+        var units = _world.Map(worldScene).Units;
         for (int i = 0; i < units.Count; i++)
             if (units[i] is MonsterUnit m && m.Uid == sourceId)
                 return new(m.Uid, m.Template.Atk, m.Template.Matk, m.Template.Level, m.Template.Element, null);
@@ -111,7 +111,7 @@ public sealed partial class CombatService
         var role = p.Role;
         if (role == null || role.Id != effect.TargetId || p.Dead || p.SceneLoading || p.Progress == null) return;
         long scene = p.WorldScene, generation = p.SceneGeneration;
-        var stats = character.Stats(p);
+        var stats = _character.Stats(p);
         var defender = PlayerDefender(p, stats);
         var rule = effect.Rule;
         long damage = PeriodicAmount(attacker, defender, rule, buff.PileCount);
@@ -126,7 +126,7 @@ public sealed partial class CombatService
                 SrcID = effect.Source!.Uid, SessionId = ++_sessionIds, SrcElement = rule.Element,
                 Dsts = { new DamageInfo { DstID = role.Id, Damage = damage, SheildDamage = shieldDamage, DstElement = 1, IsDead = hp == 0 } },
             });
-            await character.SetHpSpAsync(p, null, null);
+            await _character.SetHpSpAsync(p, null, null);
             if (effect.Source.Player is { } applier && applier.Role?.Id == effect.Source.Uid)
                 await RecordDamageStatisticAsync(applier, new Romsg.DamageStatistics
                 {
@@ -151,7 +151,7 @@ public sealed partial class CombatService
         var attachment = s.Attachment;
         long generation = s.SceneGeneration, scene = s.WorldScene;
         bool Current() => ReferenceEquals(s.Role, role) && ReferenceEquals(s.Attachment, attachment) && !s.SceneLoading
-            && s.SceneGeneration == generation && s.WorldScene == scene && sessions.Contains(s);
+            && s.SceneGeneration == generation && s.WorldScene == scene && _sessions.Contains(s);
         var rule = effect.Rule;
         var defender = AsDefender(m);
         long amount = PeriodicAmount(attacker, defender, rule, buff.PileCount);
@@ -163,7 +163,7 @@ public sealed partial class CombatService
             try { await SettleMonsterHitAsync(s, m, before, amount); }
             catch (Exception e) when (e is not EventSettlementOutcomeUnknownException)
             {
-                log.LogDebug(e, "Periodic tick of {Buff} on {Uid} not settled", buff.ConfigId, m.Uid);
+                _log.LogDebug(e, "Periodic tick of {Buff} on {Uid} not settled", buff.ConfigId, m.Uid);
                 return;
             }
             var hit = new SkillHitInfo
@@ -177,17 +177,17 @@ public sealed partial class CombatService
                 DamageSourceId = role.Id, DamageTargetId = m.Uid, DamageValue = amount, BuffId = buff.ConfigId,
             });
             if (m.Hp == 0 && !m.DeathDurable) return; // another hit is still committing that death
-            await world.ToUnitViewersAsync(m, AoiAttrChange, MonsterService.Hp(m));
+            await _world.ToUnitViewersAsync(m, AoiAttrChange, MonsterService.Hp(m));
             await FightingAsync(m);
             if (m.Hp > 0)
             {
-                if (Current()) monsters.Engage(m, s);
+                if (Current()) _monsters.Engage(m, s);
                 return;
             }
             if (!lethal) return;
-            log.LogDebug("{Name} killed {Monster} ({Npc}) with {Buff}", role.Name, m.Uid, m.Template.NpcId, buff.ConfigId);
-            await monsters.KillAsync(m);
-            foreach (var other in sessions.All().Where(o => o.Attack?.Target == m))
+            _log.LogDebug("{Name} killed {Monster} ({Npc}) with {Buff}", role.Name, m.Uid, m.Template.NpcId, buff.ConfigId);
+            await _monsters.KillAsync(m);
+            foreach (var other in _sessions.All().Where(o => o.Attack?.Target == m))
             {
                 other.Attack = null;
                 await other.SendGameAsync(SkillEnd, new SkillEndNotify
@@ -203,8 +203,8 @@ public sealed partial class CombatService
             if (lethal && m.Hp == 0 && m.DeathDurable)
             {
                 if (!m.Dead)
-                    try { await monsters.KillAsync(m); }
-                    catch (Exception e) { log.LogError(e, "Could not finalize periodic kill of {Uid}", m.Uid); }
+                    try { await _monsters.KillAsync(m); }
+                    catch (Exception e) { _log.LogError(e, "Could not finalize periodic kill of {Uid}", m.Uid); }
                 await PublishDurableKillAsync(s, m, Current);
                 await FinalizeLethalPublicationAsync(m);
             }
@@ -218,13 +218,13 @@ public sealed partial class CombatService
         using var held = await CharacterService.Lock(p);
         if (p.Role == null || p.Role.Id != effect.TargetId || p.Dead || p.SceneLoading) return;
         var rule = effect.Rule;
-        var stats = character.Stats(p);
+        var stats = _character.Stats(p);
         long amount = rule.HealFlat + (rule.HealRatioBp != 0 && rule.HealAttr > 0 ? stats[rule.HealAttr] * rule.HealRatioBp / 10000 : 0);
         if (rule.RatioBp > 0 && effect.Source is { } source) amount += (rule.Magic ? source.Matk : source.Atk) * rule.RatioBp / 10000;
         amount *= Math.Max(1, buff.PileCount);
         long actual = Math.Min(amount, Math.Max(0, stats[101] - stats[2000]));
         if (actual <= 0) return;
-        await character.SetHpSpAsync(p, stats[2000] + actual, null);
+        await _character.SetHpSpAsync(p, stats[2000] + actual, null);
         await ToPlayerAndViewersAsync(p, SkillHit, new SkillHitInfo
         {
             SrcID = p.Role.Id, SessionId = ++_sessionIds,

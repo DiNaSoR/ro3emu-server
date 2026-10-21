@@ -31,7 +31,7 @@ public sealed partial class DungeonTests
         Assert.Equal(53, connect.Length);
         foreach (long id in connect)
         {
-            var info = await QuestProbe.ReadAsync(app, "alice", id);
+            var info = await QuestProbe.ReadAsync(_app, "alice", id);
             Assert.True(info is { Status: TaskState.Running }, $"Connect Quest {id}: {info}");
         }
 
@@ -52,7 +52,7 @@ public sealed partial class DungeonTests
                 Assert.True(DateTime.UtcNow < deadline, $"{bot.Account} did not deliver {PartyGoldenThiefBug}");
                 await Task.Delay(25);
             }
-            await QuestProbe.AtAsync(app, bot.Account!, PartyGoldenThiefBug, 0); // re-armed
+            await QuestProbe.AtAsync(_app, bot.Account!, PartyGoldenThiefBug, 0); // re-armed
         }
         var until = DateTime.UtcNow + Wait;
         while (await friends.IntimacyAsync(a, b) != 10)

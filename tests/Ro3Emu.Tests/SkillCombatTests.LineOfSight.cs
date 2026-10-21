@@ -18,7 +18,7 @@ public sealed partial class SkillCombatTests
     {
         await using var alice = await InWorld("Alice");
         var s = Session("alice");
-        var nav = app.Services.GetRequiredService<WorldData>().Map(s.SceneEntry)!.Nav!;
+        var nav = _app.Services.GetRequiredService<WorldData>().Map(s.SceneEntry)!.Nav!;
         var (from, to) = BlockedPair(nav, s.Position);
         Assert.False(nav.CanWalk(from.X, from.Y, from.Z, to.X, to.Z));
         Assert.True(nav.CanPass(from.X, from.Z, to.X, to.Z, 2));
@@ -26,8 +26,8 @@ public sealed partial class SkillCombatTests
 
         var target = await Loop.InvokeAsync(async () =>
         {
-            await app.Services.GetRequiredService<SceneService>().TeleportInMapAsync(s, new MapPoint(from.X, from.Y, from.Z, 0));
-            var monsters = app.Services.GetRequiredService<MonsterService>();
+            await _app.Services.GetRequiredService<SceneService>().TeleportInMapAsync(s, new MapPoint(from.X, from.Y, from.Z, 0));
+            var monsters = _app.Services.GetRequiredService<MonsterService>();
             var template = monsters.Template(5000001)! with { RoamDistance = 0 };
             var spawned = await monsters.SpawnSingleAsync(s.SceneEntry, 5000001, new MapPoint(to.X, to.Y, to.Z, 0),
                 s.InstanceId, customTemplate: template);

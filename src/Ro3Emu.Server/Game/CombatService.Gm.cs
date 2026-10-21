@@ -27,7 +27,7 @@ public sealed partial class CombatService
         var attachment = s.Attachment;
         long generation = s.SceneGeneration, scene = s.WorldScene;
         bool Current() => ReferenceEquals(s.Role, role) && ReferenceEquals(s.Attachment, attachment) && !s.SceneLoading
-            && s.SceneGeneration == generation && s.WorldScene == scene && sessions.Contains(s);
+            && s.SceneGeneration == generation && s.WorldScene == scene && _sessions.Contains(s);
         long before = m.Hp;
         m.Hp = m.HpAfter(before, amount);
         long dealt = before - m.Hp;
@@ -37,7 +37,7 @@ public sealed partial class CombatService
             try { await SettleMonsterHitAsync(s, m, before, dealt); }
             catch (Exception e) when (e is not EventSettlementOutcomeUnknownException)
             {
-                log.LogDebug(e, "GM hit on {Uid} not settled", m.Uid);
+                _log.LogDebug(e, "GM hit on {Uid} not settled", m.Uid);
                 return null;
             }
             var hit = new SkillHitInfo
@@ -47,17 +47,17 @@ public sealed partial class CombatService
             };
             foreach (var viewer in m.Viewers.Append(s).Distinct().ToArray()) await viewer.SendGameAsync(SkillHit, hit);
             if (m.Hp == 0 && !m.DeathDurable) return 0; // another hit is still committing that death
-            await world.ToUnitViewersAsync(m, AoiAttrChange, MonsterService.Hp(m));
+            await _world.ToUnitViewersAsync(m, AoiAttrChange, MonsterService.Hp(m));
             await FightingAsync(m);
             if (m.Hp > 0)
             {
-                if (Current()) monsters.Engage(m, s);
+                if (Current()) _monsters.Engage(m, s);
                 return m.Hp;
             }
             if (!lethal) return 0;
-            log.LogInformation("GM {Name} killed {Monster} ({Npc})", role.Name, m.Uid, m.Template.NpcId);
-            await monsters.KillAsync(m);
-            foreach (var other in sessions.All().Where(o => o.Attack?.Target == m))
+            _log.LogInformation("GM {Name} killed {Monster} ({Npc})", role.Name, m.Uid, m.Template.NpcId);
+            await _monsters.KillAsync(m);
+            foreach (var other in _sessions.All().Where(o => o.Attack?.Target == m))
             {
                 other.Attack = null;
                 await other.SendGameAsync(SkillEnd, new SkillEndNotify
@@ -74,8 +74,8 @@ public sealed partial class CombatService
             if (lethal && m.Hp == 0 && m.DeathDurable)
             {
                 if (!m.Dead)
-                    try { await monsters.KillAsync(m); }
-                    catch (Exception e) { log.LogError(e, "Could not finalize GM kill of {Uid}", m.Uid); }
+                    try { await _monsters.KillAsync(m); }
+                    catch (Exception e) { _log.LogError(e, "Could not finalize GM kill of {Uid}", m.Uid); }
                 await PublishDurableKillAsync(s, m, Current);
                 await FinalizeLethalPublicationAsync(m);
             }
@@ -87,7 +87,7 @@ public sealed partial class CombatService
     {
         if (m.Dead || m.Hp <= 0 || amount <= 0) return null;
         m.Hp = Math.Min(m.Template.MaxHp, m.Hp + amount);
-        await world.ToUnitViewersAsync(m, AoiAttrChange, MonsterService.Hp(m));
+        await _world.ToUnitViewersAsync(m, AoiAttrChange, MonsterService.Hp(m));
         return m.Hp;
     }
 

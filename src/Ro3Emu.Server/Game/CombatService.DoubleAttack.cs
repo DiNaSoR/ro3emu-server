@@ -21,13 +21,13 @@ public sealed partial class CombatService
     private long DoubleAttackDamage(GameSession s, MonsterUnit target, JsonElement row, long amount)
     {
         if (GameData.Int(row, "_iIsNormalAtk") != 1 || s.Progress is not { } p) return 0;
-        int level = skills.Level(p, DoubleAttackGroup);
-        if (level <= 0 || skills.Weapon(s).SubType != DaggerSubType
-            || data.Row("SkillConfig", skills.RealId(DoubleAttackGroup, level)) is not { } skill) return 0;
+        int level = _skills.Level(p, DoubleAttackGroup);
+        if (level <= 0 || _skills.Weapon(s).SubType != DaggerSubType
+            || _data.Row("SkillConfig", _skills.RealId(DoubleAttackGroup, level)) is not { } skill) return 0;
         var desc = skill.TryGetProperty("_kDescData", out var d) && d.ValueKind == JsonValueKind.Array
             ? d.EnumerateArray().Select(v => GameData.Number(v) ?? 0).ToArray() : [];
         if (desc.Length < 3 || desc[0] <= 0 || desc[1] <= 0 || Rolls.Proc(100) >= desc[0]) return 0;
-        var stats = character.Stats(s);
+        var stats = _character.Stats(s);
         var defender = AsDefender(target);
         double one = Mitigated(defender, stats[103] * desc[2] / 100.0, magic: false, element: 1);
         _doubleAttackHits = (int)desc[1];

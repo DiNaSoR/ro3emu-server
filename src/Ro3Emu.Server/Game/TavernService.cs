@@ -29,7 +29,8 @@ namespace Ro3Emu.Server.Game;
 /// Leaving the world leaves the room (inferred: the client never re-enters on login, and an offline member could not
 /// be removed or talk).
 /// </summary>
-public sealed partial class TavernService : IGameTicker
+public sealed partial class TavernService(GameData data, RoleStore roles, CharacterService character, SessionRegistry sessions, GameLoop loop,
+    IOptions<ServerOptions> options, TimeProvider clock, ILogger<TavernService> log) : IGameTicker
 {
     public const uint Create = 82481, Enter = 82482, Exit = 82483, Invite = 82484, InviteNotify = 82485, InviteResponse = 82486,
         ApplyMic = 82487, DownMic = 82488, Transfer = 82489, MicMode = 82490, Gift = 82491, HandleMic = 82492, MicOrder = 82493,
@@ -52,14 +53,14 @@ public sealed partial class TavernService : IGameTicker
     /// _iUseEffect 110 is the room's Popularity, 111 the recipient's Star Power, per gift (item texts 12390100369/70).</summary>
     private const int GiftType = 2, GiftSubType = 213, EffectPopularity = 110, EffectStar = 111;
 
-    private readonly GameData data;
-    private readonly RoleStore roles;
-    private readonly CharacterService character;
-    private readonly SessionRegistry sessions;
-    private readonly GameLoop loop;
-    private readonly IOptions<ServerOptions> options;
-    private readonly TimeProvider clock;
-    private readonly ILogger<TavernService> log;
+    private readonly GameData _data = data;
+    private readonly RoleStore _roles = roles;
+    private readonly CharacterService _character = character;
+    private readonly SessionRegistry _sessions = sessions;
+    private readonly GameLoop _loop = loop;
+    private readonly IOptions<ServerOptions> _options = options;
+    private readonly TimeProvider _clock = clock;
+    private readonly ILogger<TavernService> _log = log;
 
     internal sealed class Room
     {
@@ -95,18 +96,11 @@ public sealed partial class TavernService : IGameTicker
     /// <summary>Seconds a role spent in a room since the last count (quest target 106010, TaskService).</summary>
     public List<Action<GameSession, int>> TimeSpent { get; } = new();
 
-    public TavernService(GameData data, RoleStore roles, CharacterService character, SessionRegistry sessions, GameLoop loop,
-        IOptions<ServerOptions> options, TimeProvider clock, ILogger<TavernService> log)
-    {
-        this.data = data; this.roles = roles; this.character = character; this.sessions = sessions; this.loop = loop;
-        this.options = options; this.clock = clock; this.log = log;
-    }
-
-    private long Now => clock.GetUtcNow().ToUnixTimeSeconds();
+    private long Now => _clock.GetUtcNow().ToUnixTimeSeconds();
 
     private long Param(string key, int index = -1, long fallback = 0)
     {
-        if (!data.Table("PublicParamConfig").TryGetValue(key, out var value)) return fallback;
+        if (!_data.Table("PublicParamConfig").TryGetValue(key, out var value)) return fallback;
         if (index >= 0)
             return value.ValueKind == JsonValueKind.Array && value.GetArrayLength() > index && GameData.Number(value[index]) is { } n
                 ? (long)n : fallback;
@@ -119,7 +113,7 @@ public sealed partial class TavernService : IGameTicker
     private long InfoCooldown => Param("BarRoomSetInfoCd", fallback: 5);
     private long TransferCooldown => Param("BarRoomTransferRoomCd", fallback: 30);
 
-    private GameSession? Online(long role) => sessions.All().FirstOrDefault(s => s.Role?.Id == role && s.Tavern != null);
+    private GameSession? Online(long role) => _sessions.All().FirstOrDefault(s => s.Role?.Id == role && s.Tavern != null);
 
     // ------------------------------------------------------------------ queries for chat, voice and the directory
 
@@ -210,7 +204,7 @@ public sealed partial class TavernService : IGameTicker
 
     public async Task LoginAsync(GameSession s)
     {
-        var bytes = roles.LoadTavern(s.Role!.Id);
+        var bytes = _roles.LoadTavern(s.Role!.Id);
         var info = bytes is { Length: > 0 } ? DBBarRoomInfo.Parser.ParseFrom(bytes) : new DBBarRoomInfo();
         RollDay(info, Now);
         // Rooms live in memory: whatever room the blob names is gone, unless the role is still listed in one.
@@ -236,9 +230,9 @@ public sealed partial class TavernService : IGameTicker
         if (s.Role == null || s.Tavern == null) return Task.CompletedTask;
         var stored = s.Tavern.Clone();
         stored.BarRoomId = 0;
-        var transaction = roles.NewTransaction();
+        var transaction = _roles.NewTransaction();
         transaction.RoleBlob(s.Role.Id, "barroom", stored.ToByteArray());
-        return roles.CommitAsync(transaction, "tavern/save");
+        return _roles.CommitAsync(transaction, "tavern/save");
     }
 
     /// <summary>The counters of a new day (05:00 realm time) and week (Monday 05:00, as Popularity), inferred.
@@ -248,7 +242,7 @@ public sealed partial class TavernService : IGameTicker
         long day = DayStart(now);
         if (info.BeginBarRoomTime != day)
         {
-            if (info.BeginBarRoomTime < PersonalService.WeekStartMs(clock) / 1000) info.WeekPopularity = 0;
+            if (info.BeginBarRoomTime < PersonalService.WeekStartMs(_clock) / 1000) info.WeekPopularity = 0;
             info.BeginBarRoomTime = day;
             info.InBarRoomTime = 0;
             info.IsToDayActComplete = false;
@@ -257,7 +251,7 @@ public sealed partial class TavernService : IGameTicker
 
     private long DayStart(long now)
     {
-        var local = DateTimeOffset.FromUnixTimeSeconds(now).ToOffset(clock.GetLocalNow().Offset);
+        var local = DateTimeOffset.FromUnixTimeSeconds(now).ToOffset(_clock.GetLocalNow().Offset);
         var day = local.AddHours(-5).Date.AddHours(5);
         return new DateTimeOffset(day, local.Offset).ToUnixTimeSeconds();
     }
@@ -267,7 +261,7 @@ public sealed partial class TavernService : IGameTicker
     private long DailySeconds()
     {
         long task = Param("BarroomTaskID", fallback: 2000);
-        if (data.Row("TaskConfig", task) is { } row && row.TryGetProperty("_kProgressTarget", out var targets)
+        if (_data.Row("TaskConfig", task) is { } row && row.TryGetProperty("_kProgressTarget", out var targets)
             && targets.ValueKind == JsonValueKind.Array)
             foreach (var target in targets.EnumerateArray())
                 if (target.ValueKind == JsonValueKind.Array && target.GetArrayLength() == 2
@@ -296,7 +290,7 @@ public sealed partial class TavernService : IGameTicker
         _sinceCount = TimeSpan.Zero;
         foreach (var room in _rooms.Values.ToArray())
             foreach (var (role, _, _) in room.Members.ToArray())
-                if (Online(role) is { } member) loop.PostOwned(member, () => CountAsync(member), "tavern time");
+                if (Online(role) is { } member) _loop.PostOwned(member, () => CountAsync(member), "tavern time");
     }
 
     private async Task CountAsync(GameSession s)

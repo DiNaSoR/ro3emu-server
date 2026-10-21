@@ -30,12 +30,12 @@ public sealed class ItemAutoUseService
 {
     private const int AutoUse = 3;
 
-    private readonly CharacterService character;
-    private readonly GameData data;
-    private readonly GameLoop loop;
-    private readonly ILogger<ItemAutoUseService> log;
-    private readonly ConditionalWeakTable<GameSession, State> states = new();
-    private Dictionary<int, bool>? autoUse;
+    private readonly CharacterService _character;
+    private readonly GameData _data;
+    private readonly GameLoop _loop;
+    private readonly ILogger<ItemAutoUseService> _log;
+    private readonly ConditionalWeakTable<GameSession, State> _states = new();
+    private Dictionary<int, bool>? _autoUse;
 
     /// <summary>When a use refused for a passing reason is tried again (inferred).</summary>
     internal static TimeSpan RefusalRetry { get; set; } = TimeSpan.FromSeconds(60);
@@ -55,10 +55,10 @@ public sealed class ItemAutoUseService
 
     public ItemAutoUseService(CharacterService character, GameData data, GameLoop loop, ILogger<ItemAutoUseService> log)
     {
-        this.character = character;
-        this.data = data;
-        this.loop = loop;
-        this.log = log;
+        this._character = character;
+        this._data = data;
+        this._loop = loop;
+        this._log = log;
         // A use refused below the item's _iLevelNeed is retried when the level changes.
         character.ProgressHandlers.Add(session => { Retry(session); return Task.CompletedTask; });
     }
@@ -67,30 +67,30 @@ public sealed class ItemAutoUseService
     internal bool Paused { get; set; }
 
     /// <summary>Uses tried so far (tests check that a cooldown is waited out, not polled).</summary>
-    internal int Attempts => attempts;
-    private int attempts;
+    internal int Attempts => _attempts;
+    private int _attempts;
 
     /// <summary>At the end of login, after every owner snapshot (a use may sync mounts, wardrobe and rewards) and after
     /// GearPromptService.Attach, which replaces the session's BeforeGameSend: watch every 5009 from now on.</summary>
     internal void Attach(GameSession session)
     {
-        states.AddOrUpdate(session, new State());
+        _states.AddOrUpdate(session, new State());
         session.BeforeGameSend += (msgId, _) => { if (msgId == CharacterService.ItemsSync) SeeBag(session); };
     }
 
     /// <summary>True for an item the server uses on receipt: _QuickUse [3, 0] with a server-side use effect.</summary>
     internal bool IsAutoUse(int entry)
     {
-        autoUse ??= data.Table("ItemConfig").Values
+        _autoUse ??= _data.Table("ItemConfig").Values
             .Where(r => GameData.Int(r, "_iID") > 0)
             .GroupBy(r => (int)GameData.Int(r, "_iID"))
             .ToDictionary(g => g.Key, g => Qualifies(g.First()) && !Tradable(g.First()));
-        return autoUse.GetValueOrDefault(entry);
+        return _autoUse.GetValueOrDefault(entry);
     }
 
     /// <summary>Tradable or stall-sellable: ItemConfig._iTrade, or the TradeConfig row the trade and stall checks read.</summary>
     private bool Tradable(JsonElement row) => GameData.Int(row, "_iTrade") != 0
-        || data.Row("TradeConfig", GameData.Int(row, "_iID")) is { } trade && GameData.Int(trade, "_iTrade") != 0;
+        || _data.Row("TradeConfig", GameData.Int(row, "_iID")) is { } trade && GameData.Int(trade, "_iTrade") != 0;
 
     private static bool Qualifies(JsonElement row)
     {
@@ -109,14 +109,14 @@ public sealed class ItemAutoUseService
 
     private void Retry(GameSession session)
     {
-        if (states.TryGetValue(session, out var state)) state.Refused.Clear();
+        if (_states.TryGetValue(session, out var state)) state.Refused.Clear();
         SeeBag(session);
     }
 
     /// <summary>Auto-use items in their bag pack (not the cart or storage), minus those refused or waiting.</summary>
     private IEnumerable<InvItem> Held(GameSession session, State? state) =>
         session.Items.Where(i => i.Grid == 0 && i.Guid > 0 && IsAutoUse(i.Entry)
-            && data.Row("ItemConfig", i.Entry) is { } row && i.Pack == CharacterService.ConfigPack(row)
+            && _data.Row("ItemConfig", i.Entry) is { } row && i.Pack == CharacterService.ConfigPack(row)
             && state?.Waiting.Contains(i.Guid) != true && state?.Refused.Contains(i.Guid) != true);
 
     /// <summary>Leaves a GUID alone for <paramref name="wait"/>, then looks at the bag again if the same role is still
@@ -126,7 +126,7 @@ public sealed class ItemAutoUseService
         if (state == null || !state.Waiting.Add(guid)) return;
         long role = session.Role?.Id ?? 0;
         var attachment = session.Attachment;
-        loop.Schedule(wait, () =>
+        _loop.Schedule(wait, () =>
         {
             state.Waiting.Remove(guid);
             if (session.Role?.Id == role && ReferenceEquals(session.Attachment, attachment) && attachment?.Cancelled != true)
@@ -139,7 +139,7 @@ public sealed class ItemAutoUseService
     private long CooldownEnd(GameSession session, int entry)
     {
         long end = session.ItemCds.GetValueOrDefault(entry);
-        if (data.Row("ItemConfig", entry) is { } row && row.TryGetProperty("_kCDGroup", out var g)
+        if (_data.Row("ItemConfig", entry) is { } row && row.TryGetProperty("_kCDGroup", out var g)
             && g.ValueKind == JsonValueKind.Array && g.GetArrayLength() > 0 && GameData.Number(g[0]) is { } group and > 0)
             end = Math.Max(end, session.ItemGroupCds.GetValueOrDefault((int)group));
         return end;
@@ -147,14 +147,14 @@ public sealed class ItemAutoUseService
 
     private void SeeBag(GameSession session)
     {
-        states.TryGetValue(session, out var state);
+        _states.TryGetValue(session, out var state);
         if (Paused || state?.Scheduled == true || !Held(session, state).Any()) return;
         long role = session.Role?.Id ?? 0;
         var attachment = session.Attachment;
         if (role == 0) return;
         if (state != null) state.Scheduled = true;
         // Runs after the sending operation releases the role, on the same reservation the 31323 route uses.
-        loop.TrackLegacyDetached("item auto use", async () =>
+        _loop.TrackLegacyDetached("item auto use", async () =>
         {
             bool live() => session.Role?.Id == role && ReferenceEquals(session.Attachment, attachment) && attachment?.Cancelled != true;
             try { if (live()) await UseHeldAsync(session, state); }
@@ -168,12 +168,12 @@ public sealed class ItemAutoUseService
         var pending = Held(session, state).Select(i => (i.Guid, i.Entry, i.Stack)).ToList();
         foreach (var (guid, entry, stack) in pending)
         {
-            bool group = data.Row("ItemConfig", entry) is { } row && GameData.Int(row, "_iGroupUse") != 0;
+            bool group = _data.Row("ItemConfig", entry) is { } row && GameData.Int(row, "_iGroupUse") != 0;
             int uses = group ? 1 : stack, count = group ? Math.Min(stack, 999) : 1;
             for (int n = 0; n < uses; n++)
             {
-                Interlocked.Increment(ref attempts);
-                int result = await character.AutoUseItemAsync(session, guid, count);
+                Interlocked.Increment(ref _attempts);
+                int result = await _character.AutoUseItemAsync(session, guid, count);
                 if (result == ErrorCodes.Cooldown
                     && CooldownEnd(session, entry) - DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() is var left and > 0)
                 {
@@ -189,10 +189,10 @@ public sealed class ItemAutoUseService
                 if (result != 0)
                 {
                     state?.Refused.Add(guid);
-                    log.LogInformation("{Name} keeps auto-use item {Item}: use refused ({Result})", session.Role?.Name, entry, result);
+                    _log.LogInformation("{Name} keeps auto-use item {Item}: use refused ({Result})", session.Role?.Name, entry, result);
                     break;
                 }
-                log.LogInformation("{Name} auto-used item {Item} x{Count}", session.Role?.Name, entry, count);
+                _log.LogInformation("{Name} auto-used item {Item} x{Count}", session.Role?.Name, entry, count);
             }
         }
     }

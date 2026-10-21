@@ -41,8 +41,8 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
     /// <summary>Guild-owned goods supplied by the territory escort ledger for the 32213 full snapshot.</summary>
     public Func<long, GuildItemData>? ItemDataOf { get; set; }
 
-    private readonly Dictionary<long, Invitation> invites = new();
-    private long nextToken = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+    private readonly Dictionary<long, Invitation> _invites = new();
+    private long _nextToken = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
     private sealed record Invitation(long GuildId, long Recipient, long Inviter, long ExpiresMs);
     // Guild times read the injected clock, so join and creation times agree with the weekly reset (WeekStart).
     private long NowMs() => clock.GetUtcNow().ToUnixTimeMilliseconds();
@@ -625,8 +625,8 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
             if (code == 0 && (target!.Guild?.CantBeInvited ?? Personal(id).CantBeInvited)) code = ErrorCodes.GuildInviteRefused;
             if (code == 0)
             {
-                long token = ++nextToken;
-                invites[token] = new Invitation(g!.Id, id, s.Role!.Id, NowMs() + Setting("GuildInvitationTime", 30)[0] * 1000);
+                long token = ++_nextToken;
+                _invites[token] = new Invitation(g!.Id, id, s.Role!.Id, NowMs() + Setting("GuildInvitationTime", 30)[0] * 1000);
                 await target!.SendGameAsync(InviteNtf, new GuildInviteNtf { Info = Snapshot(g), Token = token, PlayerId = s.Role.Id });
             }
             resp.InviteResult.Add(new GuildInviteResp.Types.InviteResult { TargetPlayerId = id, Result = code });
@@ -639,7 +639,7 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
     private async Task InviteAckCoreAsync(GameSession s, GuildInviteAckReq req)
     {
         Invitation? invite = null;
-        int code = s.Role == null || !invites.TryGetValue(req.Token, out invite) || invite.Recipient != s.Role.Id
+        int code = s.Role == null || !_invites.TryGetValue(req.Token, out invite) || invite.Recipient != s.Role.Id
             || invite.GuildId != req.GuildID || invite.ExpiresMs < NowMs() ? ErrorCodes.GuildInviteInvalid : 0;
         // Stage without consuming the token; a failed membership commit can be retried.
         var g = code == 0 ? store.Get(req.GuildID) : null;
@@ -647,7 +647,7 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
             code = g == null || !g.Members.ContainsKey(invite!.Inviter) ? ErrorCodes.GuildInviteInvalid : CanJoin(s, g);
         await s.SendGameAsync(InviteAck, new GuildInviteAckResp { GuildID = req.GuildID, Accept = req.Accept, Result = code });
         if (code == 0 && req.Accept) await JoinAsync(s.Role!.Id, g!);
-        if (invite?.Recipient == s.Role?.Id) invites.Remove(req.Token);
+        if (invite?.Recipient == s.Role?.Id) _invites.Remove(req.Token);
     }
 
     private async Task ChangeOfficialCoreAsync(GameSession s, GuildChangeOfficialReq req)
@@ -868,7 +868,7 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
                                 {
                                     code = ErrorCodes.GuildNameTaken;
                                 }
-                                catch (InvalidOperationException ex) when (ex.Message == "guild disappeared during rename")
+                                catch (RowMissingException ex) when (ex.Is(GuildStore.Table, g.Id))
                                 {
                                     code = ErrorCodes.GuildMissing;
                                 }
@@ -1081,15 +1081,15 @@ public sealed partial class GuildService(GameData data, GuildStore store, RoleSt
     }
 
     /// <summary>Persisted end times finish on login, heartbeat or next guild operation; restart does not lose progress.</summary>
-    private long lastReconcileMs = long.MinValue;
+    private long _lastReconcileMs = long.MinValue;
 
     /// <summary>The heartbeat trigger of <see cref="ReconcileAsync"/>, at most once per second realm-wide: every
     /// player's ping ran the full scan of every guild (100 scans a second at 500 players).</summary>
     public Task ReconcileOnHeartbeatAsync()
     {
         long nowMs = NowMs();
-        if (nowMs - lastReconcileMs < 1000) return Task.CompletedTask;
-        lastReconcileMs = nowMs;
+        if (nowMs - _lastReconcileMs < 1000) return Task.CompletedTask;
+        _lastReconcileMs = nowMs;
         return ReconcileAsync();
     }
 

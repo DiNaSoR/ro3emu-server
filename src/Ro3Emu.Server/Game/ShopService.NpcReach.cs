@@ -30,7 +30,7 @@ public sealed partial class ShopService
         long shopId = GameData.Int(shop, "_iShopId");
         var openers = ShopOpeners().GetValueOrDefault(shopId);
         if (openers == null) return new(ErrorCodes.NpcTooFar, $"no NPC opens shop {shopId}");
-        foreach (var npc in world.Map(session.SceneEntry)?.Npcs ?? [])
+        foreach (var npc in _world.Map(session.SceneEntry)?.Npcs ?? [])
             if (openers.Contains(npc.NpcId)
                 && MonsterService.Distance(npc.X, npc.Z, session.Position.X, session.Position.Z) <= ShopNpcReach) return null;
         return new(ErrorCodes.NpcTooFar, $"no NPC of shop {shopId} ({string.Join('/', openers)}) near scene "
@@ -60,10 +60,10 @@ public sealed partial class ShopService
             Array.IndexOf(action, NpcShopPanel) is var i and >= 0 && i + 1 < action.Length
             && long.TryParse(action[i + 1], NumberStyles.Integer, CultureInfo.InvariantCulture, out long id) ? id : 0;
 
-        foreach (var row in data.Table("ShopConfig").Values)
+        foreach (var row in _data.Table("ShopConfig").Values)
             if (GameData.Int(row, "_iShopType") == NpcShopType) Add(GameData.Int(row, "_iShopId"), GameData.Int(row, "_iNpcId"));
 
-        foreach (var entry in data.Table("DialogueConfig").Values)
+        foreach (var entry in _data.Table("DialogueConfig").Values)
             foreach (var row in entry.ValueKind == JsonValueKind.Array ? entry.EnumerateArray() : Enumerable.Repeat(entry, 1))
                 foreach (var action in Slots(row, "_iEXECAction"))
                     Add(ShopOf(action), GameData.Int(row, "_iNPCID"));

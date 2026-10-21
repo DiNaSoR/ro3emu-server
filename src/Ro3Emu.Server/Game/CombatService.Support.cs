@@ -28,14 +28,14 @@ public sealed partial class CombatService
 
     private void WireSupportSkills()
     {
-        buffs.LethalSavers.Add(WoodSpiritAsync);
+        _buffs.LethalSavers.Add(WoodSpiritAsync);
         TakenAsync.Add(EmergencyTreatmentAsync);
         DamageAdjusters.Add(PassiveSkillDamage);
     }
 
     private double[] LearnedDesc(GameSession s, int group) =>
-        s.Progress != null && skills.Level(s.Progress, group) is var level and > 0
-        && data.Row("SkillConfig", skills.RealId(group, level)) is { } row ? Numbers(row, "_kDescData") : [];
+        s.Progress != null && _skills.Level(s.Progress, group) is var level and > 0
+        && _data.Row("SkillConfig", _skills.RealId(group, level)) is { } row ? Numbers(row, "_kDescData") : [];
 
     // ------------------------------------------------------------------ Wood Spirit's Blessing
 
@@ -51,13 +51,13 @@ public sealed partial class CombatService
         long lockout = desc.Length > 2 && desc[2] > 0 ? (long)(desc[2] * 60000) : 240000;
         p.WoodSpiritReadyMs = now + lockout;
         p.InvincibleUntilMs = now + invincible;
-        var stats = character.Stats(p);
-        await character.SetHpSpAsync(p, Math.Max(1, (long)(stats[101] * percent / 100)), null);
-        if (data.Row("SkillConfig", skills.RealId(SpiritGuardGroup, 1)) is { } respawn
+        var stats = _character.Stats(p);
+        await _character.SetHpSpAsync(p, Math.Max(1, (long)(stats[101] * percent / 100)), null);
+        if (_data.Row("SkillConfig", _skills.RealId(SpiritGuardGroup, 1)) is { } respawn
             && Tuples(respawn, "_kBuff1").FirstOrDefault() is { ValueKind: JsonValueKind.Array } grant && grant.GetArrayLength() > 0)
-            await buffs.AddAsync(p, (int)(GameData.Number(grant[0]) ?? 0), invincible, p.Role.Id);
+            await _buffs.AddAsync(p, (int)(GameData.Number(grant[0]) ?? 0), invincible, p.Role.Id);
         // The passive's own buff shows the lockout as its effect cooldown, like the revive choices.
-        if (p.Buffs.FirstOrDefault(b => data.Row("BuffConfig", b.ConfigId) is { } row && GameData.Int(row, "_iBuffID") == WoodSpiritGroup) is { } passive)
+        if (p.Buffs.FirstOrDefault(b => _data.Row("BuffConfig", b.ConfigId) is { } row && GameData.Int(row, "_iBuffID") == WoodSpiritGroup) is { } passive)
         {
             p.BuffEffectCds[passive.Guid] = now + lockout;
             await p.SendGameAsync(BuffService.BuffEffectCd, new BuffEffectCdNotify
@@ -77,16 +77,16 @@ public sealed partial class CombatService
         using var held = await CharacterService.Lock(p);
         long now = Now;
         if (!ReferenceEquals(p.Role, role) || p.Dead || p.SceneLoading || now < p.EmergencyTreatmentReadyMs) return;
-        var stats = character.Stats(p);
+        var stats = _character.Stats(p);
         long max = stats[101], hp = stats[2000];
         if (max <= 0 || hp <= 0 || hp * 100 >= max * desc[0]) return;
         p.EmergencyTreatmentReadyMs = now + (long)(desc[3] * 1000);
         long shield = (long)(max * desc[1] / 100), heal = Math.Min((long)(max * desc[2] / 100), Math.Max(0, max - hp));
         if (EmergencyRow(EmergencyShieldGroup, desc[1]) is { } shieldId && shield > 0)
-            await buffs.AddSupportAsync(p, shieldId, 10000, role.Id, shield);
-        if (EmergencyRow(EmergencyHealGroup, desc[2]) is { } healId) await buffs.AddAsync(p, healId, 1000, role.Id);
+            await _buffs.AddSupportAsync(p, shieldId, 10000, role.Id, shield);
+        if (EmergencyRow(EmergencyHealGroup, desc[2]) is { } healId) await _buffs.AddAsync(p, healId, 1000, role.Id);
         if (heal <= 0) return;
-        await character.SetHpSpAsync(p, hp + heal, null);
+        await _character.SetHpSpAsync(p, hp + heal, null);
         await ToPlayerAndViewersAsync(p, SkillHit, new SkillHitInfo
         {
             SrcID = role.Id, SessionId = ++_sessionIds,
@@ -98,7 +98,7 @@ public sealed partial class CombatService
     private int? EmergencyRow(int group, double percent)
     {
         for (int id = group * 100 + 1; id <= group * 100 + 20; id++)
-            if (data.Row("BuffConfig", id) is { } row && row.TryGetProperty("_kDamageParamExtra", out var extra)
+            if (_data.Row("BuffConfig", id) is { } row && row.TryGetProperty("_kDamageParamExtra", out var extra)
                 && extra.ValueKind == JsonValueKind.Array && extra.GetArrayLength() > 0 && extra[0].ValueKind == JsonValueKind.Array
                 && extra[0].GetArrayLength() > 1 && GameData.Number(extra[0][1]) is { } bp && Math.Abs(bp - percent * 100) < 0.5)
                 return id;

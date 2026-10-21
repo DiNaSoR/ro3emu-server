@@ -23,13 +23,13 @@ public sealed partial class TavernService
         var room = new Room
         {
             Id = _nextId++, Type = req.BarRoomType, Language = req.LanguageType, Name = req.BarRoomName.Trim(),
-            Region = options.Value.ClusterId, Owner = self, Created = now,
+            Region = _options.Value.ClusterId, Owner = self, Created = now,
         };
         _rooms[room.Id] = room;
         Join(s, room, req.AreaId, now);
         await s.SendGameAsync(Create, new CreateBarRoomResp { Result = 0, Info = Detail(room) });
         await SyncAsync(s);
-        log.LogInformation("Role {Role} opened tavern room {Room} \"{Name}\"", self, room.Id, room.Name);
+        _log.LogInformation("Role {Role} opened tavern room {Room} \"{Name}\"", self, room.Id, room.Name);
     }
 
     /// <summary>82482: joins a room from the list (or a random Discover pick).</summary>
@@ -102,7 +102,7 @@ public sealed partial class TavernService
         {
             _rooms.Remove(room.Id);
             foreach (var key in _invites.Keys.Where(k => k.Room == room.Id).ToArray()) _invites.Remove(key);
-            log.LogInformation("Tavern room {Room} closed", room.Id);
+            _log.LogInformation("Tavern room {Room} closed", room.Id);
             return;
         }
         if (room.Owner == role)
@@ -197,9 +197,9 @@ public sealed partial class TavernService
 
     private int CheckInfo(int type, int language, string name)
     {
-        if (data.Row("BarroomTypeConfig", type) is not { } typeRow || GameData.Int(typeRow, "_iType") != 0) return ErrType;
+        if (_data.Row("BarroomTypeConfig", type) is not { } typeRow || GameData.Int(typeRow, "_iType") != 0) return ErrType;
         // Language 0 is "unset" (inferred); a set language must be a BarroomTypeConfig _iType 1 row.
-        if (language != 0 && (data.Row("BarroomTypeConfig", language) is not { } langRow || GameData.Int(langRow, "_iType") != 1)) return ErrLanguage;
+        if (language != 0 && (_data.Row("BarroomTypeConfig", language) is not { } langRow || GameData.Int(langRow, "_iType") != 1)) return ErrLanguage;
         string trimmed = name?.Trim() ?? "";
         if (trimmed.Length == 0 || trimmed.Any(char.IsControl)) return ErrName;
         if (new System.Globalization.StringInfo(trimmed).LengthInTextElements > NameLength) return ErrNameLong;
@@ -257,7 +257,7 @@ public sealed partial class TavernService
     /// <summary>82513: a GM sets a room's Popularity and the "special room" count.</summary>
     public async Task GmSetInfoAsync(GameSession s, SetGmBarRoomInfoReq req)
     {
-        int code = !GmCommands.Allowed(options.Value, s.Account, loopbackTool: false) ? ErrNoPermission
+        int code = !GmCommands.Allowed(_options.Value, s.Account, loopbackTool: false) ? ErrNoPermission
             : RoomById(req.BarRoomGuid) == null ? ErrNoRoom : 0;
         var room = RoomById(req.BarRoomGuid);
         if (code == 0)
@@ -405,7 +405,7 @@ public sealed partial class TavernService
             {
                 Remove(room, req.TargetGuid);
                 if (Online(req.TargetGuid) is { } target)
-                    loop.PostOwned(target, async () =>
+                    _loop.PostOwned(target, async () =>
                     {
                         await CountCoreAsync(target, sync: false);
                         if (!_byMember.ContainsKey(req.TargetGuid)) await DetachAsync(target, notify: true);
@@ -457,7 +457,7 @@ public sealed partial class TavernService
 
     private (int Popularity, int Star)? GiftValues(int item)
     {
-        if (data.Row("ItemConfig", item) is not { } row || GameData.Int(row, "_iType") != GiftType || GameData.Int(row, "_iSubType") != GiftSubType)
+        if (_data.Row("ItemConfig", item) is not { } row || GameData.Int(row, "_iType") != GiftType || GameData.Int(row, "_iSubType") != GiftSubType)
             return null;
         int popularity = 0, star = 0;
         if (row.TryGetProperty("_iUseEffect", out var effects) && effects.ValueKind == JsonValueKind.Array)
@@ -488,13 +488,13 @@ public sealed partial class TavernService
             : req.TargetGuid == self ? ErrGiftSelf
             : !room.Has(req.TargetGuid) ? ErrGiftLeft
             : target == null ? ErrGiftOffline : 0;
-        if (code == 0 && await character.ExchangeAsync(s, [(req.GiftId, (long)req.GiftNum)], [], popup: false) == null)
+        if (code == 0 && await _character.ExchangeAsync(s, [(req.GiftId, (long)req.GiftNum)], [], popup: false) == null)
             code = ErrorCodes.ItemsShort;
         if (code != 0) { await s.SendGameAsync(Gift, new PresentGiftResp { Result = code }); return; }
         int hot = (int)Math.Min(int.MaxValue, (long)values!.Value.Popularity * req.GiftNum);
         int star = (int)Math.Min(int.MaxValue, (long)values.Value.Star * req.GiftNum);
         room!.Hot = (int)Math.Min(int.MaxValue, (long)room.Hot + hot);
-        if (star > 0) loop.PostOwned(target!, () => CreditStarAsync(target!, star), "tavern gift");
+        if (star > 0) _loop.PostOwned(target!, () => CreditStarAsync(target!, star), "tavern gift");
         await s.SendGameAsync(Gift, new PresentGiftResp
         {
             Result = 0, ItemId = req.GiftId, ItemNum = req.GiftNum, GifterUser = s.Role.Name, ReceiveUser = req.TargetGuid,

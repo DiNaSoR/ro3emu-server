@@ -43,10 +43,10 @@ public sealed partial class CombatService
         if (_petAuraRows == null || _petAuraGuardians == null)
         {
             HashSet<long> rows = new(), guardians = new();
-            foreach (var (_, main) in data.Table("SkillConfig"))
+            foreach (var (_, main) in _data.Table("SkillConfig"))
                 if (GameData.Int(main, "_iSystemType") == ActiveGuardSkill && PetAuraTickDesc.ContainsKey((int)GameData.Int(main, "_iSkillID")))
                     foreach (var id in Numbers(main, "_kAutoLearnSkill"))
-                        if (data.Row("SkillConfig", (long)id) is { } extra)
+                        if (_data.Row("SkillConfig", (long)id) is { } extra)
                             (GameData.Int(extra, "_iSystemType") == GuardianSkill ? guardians : rows).Add((long)id);
             (_petAuraRows, _petAuraGuardians) = (rows, guardians);
         }
@@ -62,7 +62,7 @@ public sealed partial class CombatService
         foreach (var tuple in Tuples(guardian, "_kBuff1"))
         {
             if (tuple.GetArrayLength() < 1 || GameData.Number(tuple[0]) is not { } buffId
-                || data.Row("BuffConfig", (long)buffId) is not { } config
+                || _data.Row("BuffConfig", (long)buffId) is not { } config
                 || Numbers(config, "_kLogicData") is not [var group, ..]
                 || ExtraRow(main, (long)group) is not { } extra) continue;
             long now = MonsterService.NowMs;
@@ -75,7 +75,7 @@ public sealed partial class CombatService
     private JsonElement? ExtraRow(JsonElement main, long group)
     {
         foreach (var id in Numbers(main, "_kAutoLearnSkill"))
-            if (data.Row("SkillConfig", (long)id) is { } row && GameData.Int(row, "_iSystemType") != GuardianSkill
+            if (_data.Row("SkillConfig", (long)id) is { } row && GameData.Int(row, "_iSystemType") != GuardianSkill
                 && GameData.Int(row, "_iSkillID") == group) return row;
         return null;
     }
@@ -93,7 +93,7 @@ public sealed partial class CombatService
             // one removed early (dispelled, cleared) stops the aura.
             var buff = s.Buffs.FirstOrDefault(b => b.Guid == guid);
             bool live = ReferenceEquals(s.Role, role) && !s.Dead && !s.SceneLoading && s.WorldScene == scene
-                && s.SceneGeneration == generation && sessions.Contains(s)
+                && s.SceneGeneration == generation && _sessions.Contains(s)
                 && (buff != null ? buff.ExpireMs >= due : due == expire && MonsterService.NowMs >= expire - GameLoop.TickInterval.TotalMilliseconds);
             if (!live)
             {

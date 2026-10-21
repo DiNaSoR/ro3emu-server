@@ -33,24 +33,24 @@ public sealed partial class ShopService
     // Orders of every role. Gift, pick and expiry each await a commit, and other roles' requests may change orders
     // meanwhile, so a commit applies only its own order to the dictionary as it is then (With at commit time), never
     // a copy taken before the await: that copy would put back a picked order as pending (refunded later, look kept).
-    private Dictionary<long, PresentOrderInfo>? presents;
-    private long lastOrderId;
+    private Dictionary<long, PresentOrderInfo>? _presents;
+    private long _lastOrderId;
 
-    private long Param(string name, long fallback) => data.Table("PublicParamConfig").TryGetValue(name, out var v)
+    private long Param(string name, long fallback) => _data.Table("PublicParamConfig").TryGetValue(name, out var v)
         ? (long)(GameData.Number(v) ?? fallback) : fallback;
 
     private long ExpireMs => Param("OrderExpireTime", 86400) * 1000;
 
-    private long NowMs => clock.GetUtcNow().ToUnixTimeMilliseconds();
+    private long NowMs => _clock.GetUtcNow().ToUnixTimeMilliseconds();
 
     /// <summary>Every live order by id: the senders' copies, Picked where the receiver's present_received has it.</summary>
-    internal Dictionary<long, PresentOrderInfo> Presents => presents ??= LoadPresents();
+    internal Dictionary<long, PresentOrderInfo> Presents => _presents ??= LoadPresents();
 
     private Dictionary<long, PresentOrderInfo> LoadPresents()
     {
         var all = new Dictionary<long, PresentOrderInfo>();
         var picked = new HashSet<long>();
-        foreach (var (_, sent, received) in accounts.ReadSync<List<(long Role, byte[]? Sent, byte[]? Received)>>(new PresentOrderReadPlan()))
+        foreach (var (_, sent, received) in _accounts.ReadSync<List<(long Role, byte[]? Sent, byte[]? Received)>>(new PresentOrderReadPlan()))
         {
             if (sent is { Length: > 0 }) foreach (var (id, order) in DBPresentInfo.Parser.ParseFrom(sent).Orders) all[id] = order.Clone();
             if (received is { Length: > 0 }) picked.UnionWith(DBPresentInfo.Parser.ParseFrom(received).Orders.Keys);
@@ -78,16 +78,16 @@ public sealed partial class ShopService
         return next;
     }
 
-    private string NameOf(long role) => sessions.All().FirstOrDefault(s => s.Role?.Id == role)?.Role?.Name ?? roles.Get(role)?.Name ?? "";
+    private string NameOf(long role) => _sessions.All().FirstOrDefault(s => s.Role?.Id == role)?.Role?.Name ?? _roles.Get(role)?.Name ?? "";
 
-    private int CommodityOf(long appearance) => data.Index("ShopCommodityConfig", "_iAppearanceId", r => GameData.Int(r, "_iAppearanceId"))
+    private int CommodityOf(long appearance) => _data.Index("ShopCommodityConfig", "_iAppearanceId", r => GameData.Int(r, "_iAppearanceId"))
         .All(appearance).Where(IsFashion)
         .Select(r => (int)GameData.Int(r, "_iID")).FirstOrDefault();
 
     private bool IsFashion(JsonElement commodity)
     {
         long classId = GameData.Int(commodity, "_iClassID");
-        return data.Index("ShopConfig", "_iClassID", s => GameData.Int(s, "_iClassID")).First(classId) is { ValueKind: JsonValueKind.Object } shop
+        return _data.Index("ShopConfig", "_iClassID", s => GameData.Int(s, "_iClassID")).First(classId) is { ValueKind: JsonValueKind.Object } shop
             && GameData.Int(shop, "_iShopType") == ShopTypeFashion;
     }
 
@@ -127,8 +127,8 @@ public sealed partial class ShopService
     /// <summary>Both lists to whichever of these roles is online, on its own loop turn.</summary>
     private void PushPresentsTo(params long[] roleIds)
     {
-        foreach (var s in sessions.All().Where(s => s.Role != null && roleIds.Contains(s.Role.Id)))
-            loop.PostOwned(s, () => s.Role != null ? PushPresentsAsync(s) : Task.CompletedTask, "present lists");
+        foreach (var s in _sessions.All().Where(s => s.Role != null && roleIds.Contains(s.Role.Id)))
+            _loop.PostOwned(s, () => s.Role != null ? PushPresentsAsync(s) : Task.CompletedTask, "present lists");
     }
 
     // ---- 82335 send ----
@@ -146,7 +146,7 @@ public sealed partial class ShopService
         var resp = new CommodityPresentResp { CommodityId = commodityId, TargetId = req.TargetId, GiftContent = req.GiftContent };
         using (await CharacterService.Lock(session))
             resp.Result = await PresentLockedAsync(session, req, commodityId, resp);
-        log.LogInformation("{Name} gifts commodity {Id} to {Target}: {Result}", session.Role!.Name, commodityId, req.TargetId, resp.Result);
+        _log.LogInformation("{Name} gifts commodity {Id} to {Target}: {Result}", session.Role!.Name, commodityId, req.TargetId, resp.Result);
         await session.SendGameAsync(CommodityPresent, resp);
         if (resp.Result == 0)
         {
@@ -160,8 +160,8 @@ public sealed partial class ShopService
     {
         long me = session.Role!.Id, target = req.TargetId;
         if (target == me) return ErrSelf;
-        if (target <= 0 || roles.Get(target) == null) return ErrNotFriend;
-        if (data.Row("ShopCommodityConfig", commodityId) is not { } row) return ErrorCodes.ShopNoConfig;
+        if (target <= 0 || _roles.Get(target) == null) return ErrNotFriend;
+        if (_data.Row("ShopCommodityConfig", commodityId) is not { } row) return ErrorCodes.ShopNoConfig;
         int appearance = (int)GameData.Int(row, "_iAppearanceId");
         if (appearance <= 0 || !IsFashion(row)) return ErrorCodes.ShopGiftNotAllowed;
         string text = (req.GiftContent ?? "").Trim();
@@ -170,15 +170,15 @@ public sealed partial class ShopService
         int unit = UnitPrice(session, row), currency = PaymentItem(row);
         if (Malformed(row, appearance, 1, unit) is { } bad) return bad.Code;
         if (currency <= 0 || unit <= 0) return ErrorCodes.ShopNoConfig;
-        if (!await friends.AreFriendsAsync(me, target)) return ErrNotFriend;
+        if (!await _friends.AreFriendsAsync(me, target)) return ErrNotFriend;
         if (await TargetOwnsAsync(target, appearance)) return ErrorCodes.ShopAppearanceOwned;
         if (Presents.Values.Any(o => o.ReceiverId == target && o.AppranceId == appearance && o.State == EPresentOrderState.Pending))
             return ErrDuplicateGift;
 
         // Ro3Emu:CashShop:Free pays a crystal price; the order then refunds nothing.
-        var cost = freeCashShop && currency == CrystalItem ? [] : new List<(int Entry, long Count)> { (currency, unit) };
+        var cost = _freeCashShop && currency == CrystalItem ? [] : new List<(int Entry, long Count)> { (currency, unit) };
         // Taken now, before the commit's await: two senders paying at once must not share an id.
-        long orderId = lastOrderId = Math.Max(lastOrderId, Presents.Keys.DefaultIfEmpty(0).Max()) + 1;
+        long orderId = _lastOrderId = Math.Max(_lastOrderId, Presents.Keys.DefaultIfEmpty(0).Max()) + 1;
         var order = new PresentOrderInfo
         {
             OrderId = orderId, SenderId = me, ReceiverId = target, AppranceId = appearance,
@@ -186,12 +186,12 @@ public sealed partial class ShopService
             CreateTime = NowMs, State = EPresentOrderState.Pending, GiftContent = text,
         };
         var next = With(order);
-        var economy = character.FamilyEconomy(session, Economy.CharacterFamilyEconomy.ShopGiftKind, cost, [],
+        var economy = _character.FamilyEconomy(session, Economy.CharacterFamilyEconomy.ShopGiftKind, cost, [],
             new { Version = 1, Order = orderId, Commodity = commodityId, Target = target, Appearance = appearance, Payment = currency, Unit = unit });
-        var paid = await character.ExchangeLockedAsync(session, cost, [],
+        var paid = await _character.ExchangeLockedAsync(session, cost, [],
             persist: tx => { tx.RoleBlob(me, "present_sent", Blob(me, true, next.Values)); tx.WithEconomy(economy); },
-            committed: () => presents = With(order), asyncCommit: true);
-        if (paid == null) return character.ShortageOf(session, cost);
+            committed: () => _presents = With(order), asyncCommit: true);
+        if (paid == null) return _character.ShortageOf(session, cost);
         resp.OrderId = orderId;
         resp.GiftContent = text;
         return 0;
@@ -199,8 +199,8 @@ public sealed partial class ShopService
 
     private async Task<bool> TargetOwnsAsync(long target, int appearance)
     {
-        var online = sessions.All().FirstOrDefault(s => s.Role?.Id == target && s.Wardrobe != null);
-        var info = online?.Wardrobe ?? (await roles.LoadWardrobeAsync(target) is { Length: > 0 } blob ? DBWardRobeInfo.Parser.ParseFrom(blob) : null);
+        var online = _sessions.All().FirstOrDefault(s => s.Role?.Id == target && s.Wardrobe != null);
+        var info = online?.Wardrobe ?? (await _roles.LoadWardrobeAsync(target) is { Length: > 0 } blob ? DBWardRobeInfo.Parser.ParseFrom(blob) : null);
         return info != null && info.AllLightUpAppearances.TryGetValue(appearance, out var owned)
             && (owned.OverdueTimeMs == 0 || owned.OverdueTimeMs > NowMs);
     }
@@ -227,7 +227,7 @@ public sealed partial class ShopService
                 : order.CreateTime + ExpireMs <= NowMs ? ErrPickExpired
                 : await PickLockedAsync(session, order);
         }
-        log.LogInformation("{Name} picks gift order {Order}: {Result}", session.Role!.Name, req.OrderId, result);
+        _log.LogInformation("{Name} picks gift order {Order}: {Result}", session.Role!.Name, req.OrderId, result);
         await session.SendGameAsync(CommodityPick, new CommodityPickResp { Result = result });
         if (result == 0)
         {
@@ -239,16 +239,16 @@ public sealed partial class ShopService
     private async Task<int> PickLockedAsync(GameSession session, PresentOrderInfo order)
     {
         int commodityId = CommodityOf(order.AppranceId);
-        if (commodityId == 0 || data.Row("ShopCommodityConfig", commodityId) is not { } row) return ErrPickAppearance;
+        if (commodityId == 0 || _data.Row("ShopCommodityConfig", commodityId) is not { } row) return ErrPickAppearance;
         AwardPlan bonus;
-        try { bonus = awards.Resolve(session, order.AppranceAwardId, (int)(session.SeasonState?.PlayBookId ?? seasons.PlayBook)); }
+        try { bonus = _awards.Resolve(session, order.AppranceAwardId, (int)(session.SeasonState?.PlayBookId ?? _seasons.PlayBook)); }
         catch (Exception e) when (e is AwardResolutionException or OverflowException) { return ErrorCodes.ShopRewardMissing; }
         var picked = order.Clone();
         picked.State = EPresentOrderState.Picked;
         var next = With(picked);
         long me = session.Role!.Id;
-        return await wardrobe.BuyFromShopLockedAsync(session, (int)order.AppranceId, Parts(row), [], bonus,
-            persistShop: tx => tx.RoleBlob(me, "present_received", Blob(me, false, next.Values)), committedShop: () => presents = With(picked),
+        return await _wardrobe.BuyFromShopLockedAsync(session, (int)order.AppranceId, Parts(row), [], bonus,
+            persistShop: tx => tx.RoleBlob(me, "present_received", Blob(me, false, next.Values)), committedShop: () => _presents = With(picked),
             shopOutcome: new { Gift = order.OrderId, Sender = order.SenderId, Commodity = commodityId, Count = 1, Unit = 0 });
     }
 
@@ -258,9 +258,9 @@ public sealed partial class ShopService
     private void ArmPresentExpiry()
     {
         var pending = Presents.Values.Where(o => o.State == EPresentOrderState.Pending).ToList();
-        if (pending.Count == 0) { deadlines.CancelGlobal(ExpiryDeadline); return; }
+        if (pending.Count == 0) { _deadlines.CancelGlobal(ExpiryDeadline); return; }
         long due = pending.Min(o => o.CreateTime) + ExpireMs;
-        deadlines.SetGlobal(ExpiryDeadline, DateTimeOffset.FromUnixTimeMilliseconds(due), (_, _, _) => ExpirePresentsAsync());
+        _deadlines.SetGlobal(ExpiryDeadline, DateTimeOffset.FromUnixTimeMilliseconds(due), (_, _, _) => ExpirePresentsAsync());
     }
 
     /// <summary>
@@ -280,14 +280,14 @@ public sealed partial class ShopService
             var next = With(refunded);
             try
             {
-                await mail.SendTemplateOnceAsync(order.SenderId, template,
+                await _mail.SendTemplateOnceAsync(order.SenderId, template,
                     order.CurrencyCount > 0 ? [new MailService.Attachment((int)order.CurrencyId, order.CurrencyCount)] : [], $"present-refund:{id}",
-                    tx => tx.RoleBlob(order.SenderId, "present_sent", Blob(order.SenderId, true, next.Values)), loop.Owners?.Current);
-                presents = With(refunded);
-                log.LogInformation("Gift order {Order} expired: {Count}x {Currency} back to {Sender}", id, order.CurrencyCount, order.CurrencyId, order.SenderId);
+                    tx => tx.RoleBlob(order.SenderId, "present_sent", Blob(order.SenderId, true, next.Values)), _loop.Owners?.Current);
+                _presents = With(refunded);
+                _log.LogInformation("Gift order {Order} expired: {Count}x {Currency} back to {Sender}", id, order.CurrencyCount, order.CurrencyId, order.SenderId);
                 PushPresentsTo(order.SenderId, order.ReceiverId);
             }
-            catch (Exception e) { log.LogError(e, "Gift order {Order} refund failed", id); }
+            catch (Exception e) { _log.LogError(e, "Gift order {Order} refund failed", id); }
         }
         ArmPresentExpiry();
     }

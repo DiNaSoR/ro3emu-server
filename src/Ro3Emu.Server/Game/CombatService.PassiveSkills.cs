@@ -51,14 +51,14 @@ public sealed partial class CombatService
     private IEnumerable<(int Group, System.Text.Json.JsonElement Row)> LearnedPassiveRows(GameSession session)
     {
         if (session.Progress == null) yield break;
-        _passiveGroups ??= data.Table("SkillConfig").Values
+        _passiveGroups ??= _data.Table("SkillConfig").Values
             .Where(r => GameData.Int(r, "_iBasicType") == 0 && GameData.Int(r, "_iMode") == 0
                 && GameData.Int(r, "_iInitialLevel") > 0)
             .Select(r => (int)GameData.Int(r, "_iSkillID")).Where(g => g > 0).Distinct().ToArray();
         foreach (int group in session.Progress.Skills.Keys.Concat(_passiveGroups).Distinct())
         {
-            int level = skills.Level(session.Progress, group);
-            if (level <= 0 || data.Row("SkillConfig", skills.RealId(group, level)) is not { } row
+            int level = _skills.Level(session.Progress, group);
+            if (level <= 0 || _data.Row("SkillConfig", _skills.RealId(group, level)) is not { } row
                 || GameData.Int(row, "_iBasicType") != 0) continue;
             yield return (group, row);
         }
@@ -69,7 +69,7 @@ public sealed partial class CombatService
     {
         var p = session.Progress;
         if (p == null) return;
-        long signature = unchecked(p.Career * 1_000_003L + p.Level + skills.Weapon(session).SubType * 7_368_787L);
+        long signature = unchecked(p.Career * 1_000_003L + p.Level + _skills.Weapon(session).SubType * 7_368_787L);
         foreach (var (group, level) in p.Skills) signature = unchecked(signature + (group * 7919L + level) * 104_729L);
         if (session.PassiveSkillSignature == signature) return;
         var result = new List<SkillParameterRules.Modifier>();
@@ -77,14 +77,14 @@ public sealed partial class CombatService
         {
             if (group == KatarMasteryGroup)
             {
-                if (skills.Weapon(session).SubType == KatarSubType) result.AddRange(KatarMasteryModifiers(row));
+                if (_skills.Weapon(session).SubType == KatarSubType) result.AddRange(KatarMasteryModifiers(row));
             }
             else if (!ConditionalPassiveGroups.Contains(group))
-                if (PassiveBuffRow(group, row) is var buff and > 0) result.AddRange(SkillParameterRules.BuffModifiers(data, buff));
+                if (PassiveBuffRow(group, row) is var buff and > 0) result.AddRange(SkillParameterRules.BuffModifiers(_data, buff));
             // [21, weapon subtype or 0, scope 0, group, type, operation, value]: a skill change while that weapon is held
             // (Mace Mastery's Normal Attack crit with a mace), read like a talent's opcode 21 (SeasonTalentEffects).
             foreach (var op in SpecialEffectOps(row))
-                if (op.Length >= 7 && op[0] == 21 && op[2] == 0 && op[3] > 0 && (op[1] == 0 || op[1] == skills.Weapon(session).SubType))
+                if (op.Length >= 7 && op[0] == 21 && op[2] == 0 && op[3] > 0 && (op[1] == 0 || op[1] == _skills.Weapon(session).SubType))
                     result.Add(new SkillParameterRules.Modifier((int)op[3], (int)op[4], (int)op[5], op[6], op.Length > 7 ? (int)op[7] : 0));
         }
         session.PassiveSkillSignature = signature;
@@ -104,16 +104,16 @@ public sealed partial class CombatService
     private IEnumerable<SkillParameterRules.Modifier> KatarMasteryModifiers(System.Text.Json.JsonElement row)
     {
         int level = (int)Math.Max(1, GameData.Int(row, "_iLevel"));
-        var own = SkillParameterRules.BuffModifiers(data, KatarMasteryBuffGroup * 100 + level);
-        return own.Count > 0 ? own : SkillParameterRules.BuffModifiers(data, KatarMasteryBuffGroup * 100 + 5);
+        var own = SkillParameterRules.BuffModifiers(_data, KatarMasteryBuffGroup * 100 + level);
+        return own.Count > 0 ? own : SkillParameterRules.BuffModifiers(_data, KatarMasteryBuffGroup * 100 + 5);
     }
 
     /// <summary>Katar Mastery's PATK (its BuffConfig row's _kChangeAttri) while a katar is held.</summary>
     private IEnumerable<(long Id, double Value)> KatarMasteryAttributes(GameSession session)
     {
-        if (session.Progress is not { } progress || skills.Level(progress, KatarMasteryGroup) is not (var level and > 0)
-            || skills.Weapon(session).SubType != KatarSubType
-            || data.Row("BuffConfig", KatarMasteryBuffGroup * 100 + level) is not { } row) yield break;
+        if (session.Progress is not { } progress || _skills.Level(progress, KatarMasteryGroup) is not (var level and > 0)
+            || _skills.Weapon(session).SubType != KatarSubType
+            || _data.Row("BuffConfig", KatarMasteryBuffGroup * 100 + level) is not { } row) yield break;
         foreach (var (id, value) in GameData.Pairs(row, "_kChangeAttri")) yield return (id, value);
     }
 
@@ -125,7 +125,7 @@ public sealed partial class CombatService
             ? field.EnumerateArray().Select(v => (long)(GameData.Number(v) ?? 0)).ToArray()
             : [(long)(GameData.Number(field) ?? 0)];
         foreach (long id in ids)
-            if (id > 0 && data.Row("SpecialEffectConfig", id) is { } effect)
+            if (id > 0 && _data.Row("SpecialEffectConfig", id) is { } effect)
                 foreach (var op in EquipmentAffixes.Rows(effect, "_kSpecialEffect")) yield return op;
     }
 
@@ -145,7 +145,7 @@ public sealed partial class CombatService
                 switch (op)
                 {
                     case [16, var sub, var attr, var value]:
-                        if ((weapon ??= skills.Weapon(session).SubType) == sub) yield return (attr, value);
+                        if ((weapon ??= _skills.Weapon(session).SubType) == sub) yield return (attr, value);
                         break;
                     case [17, var type, var attr, var value]:
                         if ((mount ??= RiddenMountType(session)) == type) yield return (attr, value);
@@ -155,7 +155,7 @@ public sealed partial class CombatService
 
     /// <summary>The ridden Battle mount's CartRemouldTable _iSubType; 0 on foot or on an ordinary mount.</summary>
     internal int RiddenMountType(GameSession session) =>
-        MountService.Rider(session) is var id and not 0 && data.Row("CartRemouldTable", id) is { } row
+        MountService.Rider(session) is var id and not 0 && _data.Row("CartRemouldTable", id) is { } row
             && GameData.Int(row, "_iType") == 2 ? (int)GameData.Int(row, "_iSubType") : 0;
 
     /// <summary>Weapon subtype 5 (Knight Spear, ItemConfig _iEquipPart 1 two-handed; subtype 4 Halberd is one-handed).</summary>
@@ -173,11 +173,11 @@ public sealed partial class CombatService
 
     internal int MonsterResistanceBp(GameSession session)
     {
-        if (session.Progress == null || !skills.HoldsShield(session)) return 0;
+        if (session.Progress == null || !_skills.HoldsShield(session)) return 0;
         int best = 0;
         foreach (int group in MonsterResistanceGroups)
-            if (skills.Level(session.Progress, group) is var level and > 0
-                && data.Row("SkillConfig", skills.RealId(group, level)) is { } row
+            if (_skills.Level(session.Progress, group) is var level and > 0
+                && _data.Row("SkillConfig", _skills.RealId(group, level)) is { } row
                 && row.TryGetProperty("_kDescData", out var desc) && desc.ValueKind == System.Text.Json.JsonValueKind.Array
                 && desc.GetArrayLength() > 0 && GameData.Number(desc[0]) is { } pct)
                 best = Math.Max(best, (int)Math.Round(pct * 100));
@@ -188,7 +188,7 @@ public sealed partial class CombatService
     private IEnumerable<(long Id, double Value)> PassiveBuffAttributes(GameSession session)
     {
         foreach (var (group, row) in LearnedPassiveRows(session))
-            if (BuffStatGroups.Contains(group) && data.Row("BuffConfig", GameData.Int(row, "_iID")) is { } buff)
+            if (BuffStatGroups.Contains(group) && _data.Row("BuffConfig", GameData.Int(row, "_iID")) is { } buff)
                 foreach (var pair in GameData.Pairs(buff, "_kChangeAttri")) yield return pair;
     }
 }

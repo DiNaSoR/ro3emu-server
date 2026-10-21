@@ -50,7 +50,7 @@ public sealed partial class SkillCombatTests
         await Gm("alice", "!job 2200"); await Teach("alice", 12101);
         Combat.Rolls = new FixedRolls(9999);
         var session = Session("alice");
-        var nav = app.Services.GetRequiredService<WorldData>().Map(session.SceneEntry)!.Nav;
+        var nav = _app.Services.GetRequiredService<WorldData>().Map(session.SceneEntry)!.Nav;
         var start = session.Position.Clone();
         var (dx, dz) = new[] { (1f, 0f), (-1f, 0f), (0f, 1f), (0f, -1f) }.First(o => nav == null
             || nav.CanWalk(start.X, start.Y, start.Z, start.X + o.Item1 * 4, start.Z + o.Item2 * 4));
@@ -71,7 +71,7 @@ public sealed partial class SkillCombatTests
         Combat.Rolls = new FixedRolls(9999);
         var session = Session("alice");
         var start = session.Position.Clone();
-        var nav = app.Services.GetRequiredService<WorldData>().Map(session.SceneEntry)!.Nav;
+        var nav = _app.Services.GetRequiredService<WorldData>().Map(session.SceneEntry)!.Nav;
         var (dx, dz) = new[] { (1f, 0f), (-1f, 0f), (0f, 1f), (0f, -1f) }.First(o => nav == null
             || nav.CanWalk(start.X, start.Y, start.Z, start.X + o.Item1 * 5, start.Z + o.Item2 * 5));
         var main = await Target("alice", stationary: true);

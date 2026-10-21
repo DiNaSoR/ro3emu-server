@@ -125,7 +125,7 @@ public sealed partial class DungeonTests
 
         // The won story run sends the player back out after its countdown (shortened here from the client's 15 s).
         var countdown = await Next(alice, DungeonService.Event, DungeonEventNotify.Parser, e => e.CliFuncname == "SetCountDown");
-        Assert.True(countdown.Params[0].IntParams.Single() > clock.GetUtcNow().ToUnixTimeSeconds());
+        Assert.True(countdown.Params[0].IntParams.Single() > _clock.GetUtcNow().ToUnixTimeSeconds());
         await Next(alice, GmCommands.BroadcastNotify, BroadCastNotify.Parser, n => n.Content.StartsWith("Leave the dungeon in"));
         Assert.Equal(0, (await Next(alice, DungeonService.Leave, LeaveDungeonRsp.Parser)).Result);
         await Next(alice, MsgId.SwitchSceneLine, SwitchSceneLineResp.Parser, m => m.SceneEntry != Eddga); // back where the run began

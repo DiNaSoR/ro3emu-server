@@ -12,9 +12,9 @@ namespace Ro3Emu.Server.Game;
 /// </summary>
 public sealed class PetFollowerService(World world, GameData data, FunctionService functions, IOptions<ServerOptions>? options = null)
 {
-    private readonly bool enabled = options?.Value.Pets.WorldFollower ?? true;
+    private readonly bool _enabled = options?.Value.Pets.WorldFollower ?? true;
 
-    private static long _nextActorId = 1L << 52; // Separate from role IDs and monster IDs (1L << 41).
+    private long _nextActorId = 1L << 52; // Separate from role IDs and monster IDs (1L << 41).
 
     /// <summary>Refresh after login or a successful lineup/growth change; pre-world login only prepares the actor.</summary>
     public Task RefreshAsync(GameSession session)
@@ -23,7 +23,7 @@ public sealed class PetFollowerService(World world, GameData data, FunctionServi
         var pets = session.Pets;
         // (inferred) The tower's separate battle lineup replaces the passive follower projection, otherwise
         // the same pet can appear twice. Its ordinary 5017 plan is preserved and projected again on return.
-        if (enabled && session.TowerAttempt == null && session.Role is { } role && pets != null
+        if (_enabled && session.TowerAttempt == null && session.Role is { } role && pets != null
             && pets.SetupPlans.TryGetValue(pets.CurrentPlan, out var plan))
         {
             // A support slot grants passive effects, not a world combat actor (inferred); the lowest valid owned

@@ -34,7 +34,7 @@ public sealed partial class TimedBattleService
                     case EChickenFollowNotifyType.Invite:
                         {
                             if (req.FollowedRoleId != self || (req.RoleId != 0 && (!Mate(req.RoleId) || req.RoleId == self))) return;
-                            long now = time.GetUtcNow().ToUnixTimeSeconds();
+                            long now = _time.GetUtcNow().ToUnixTimeSeconds();
                             var invited = (req.RoleId == 0 ? mates.Keys.Where(id => id != self) : [req.RoleId])
                                 .Where(id => run.InviteCd.GetValueOrDefault((self, id)) <= now).ToArray();
                             if (invited.Length == 0) { result = ErrorCodes.DungeonBusy; return; }
@@ -77,7 +77,7 @@ public sealed partial class TimedBattleService
         var state = new ChickenSelectFollowResp();
         foreach (var (follower, followed) in run.Follow)
             if (team.Contains(follower)) state.FollowedMap[follower] = followed;
-        long now = time.GetUtcNow().ToUnixTimeSeconds();
+        long now = _time.GetUtcNow().ToUnixTimeSeconds();
         foreach (var ((inviter, invitee), end) in run.InviteCd)
             if (inviter == self && end > now) state.InviteCd[invitee] = end;
         return state;

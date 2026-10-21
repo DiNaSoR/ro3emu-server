@@ -58,7 +58,7 @@ public sealed partial class TaskService
     private IReadOnlyList<long> PartyOthers(GameSession session)
     {
         if (session.Role is not { } role || PartyMembers?.Invoke(role.Id) is not { } members) return [];
-        var online = sessions.All().Where(s => s.Role != null).Select(s => s.Role!.Id).ToHashSet();
+        var online = _sessions.All().Where(s => s.Role != null).Select(s => s.Role!.Id).ToHashSet();
         return members.Where(id => id != role.Id && online.Contains(id)).Distinct().ToArray();
     }
 
@@ -78,7 +78,7 @@ public sealed partial class TaskService
     /// <summary>The SocialRelationsConfig row of a 116 action, null when the action or the row is malformed.</summary>
     private long? SocialityScore(string[] action) =>
         action.Length == 2 && long.TryParse(action[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out long id)
-        && data.Row("SocialRelationsConfig", id) != null ? id : null;
+        && _data.Row("SocialRelationsConfig", id) != null ? id : null;
 
     /// <summary>
     /// SocialRelationsConfig._iFriendValue [[107 GainIntimacy, amount, 1]]: the Intimacy a friend gains. The trailing 1 has
@@ -86,7 +86,7 @@ public sealed partial class TaskService
     /// </summary>
     internal int FriendIntimacyOf(long score)
     {
-        if (data.Row("SocialRelationsConfig", score) is not { } row) return 0;
+        if (_data.Row("SocialRelationsConfig", score) is not { } row) return 0;
         foreach (var action in Actions(row, "_iFriendValue"))
             if (action is ["107", var amount, ..] && int.TryParse(amount, NumberStyles.Integer, CultureInfo.InvariantCulture, out int n) && n > 0)
                 return n;
@@ -102,7 +102,7 @@ public sealed partial class TaskService
         foreach (long score in scores)
             if (FriendIntimacyOf(score) is var amount and > 0)
                 // The friends' rows are written too: their roles are reserved with the role's own (FriendExtraService pins them).
-                loop.PostOwned(session, others.Select(id => Ownership.ReservationKey.Role(id)).ToArray(),
+                _loop.PostOwned(session, others.Select(id => Ownership.ReservationKey.Role(id)).ToArray(),
                     () => scored(session, amount, others), "connect quest intimacy");
     }
 
