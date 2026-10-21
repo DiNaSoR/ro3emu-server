@@ -180,6 +180,14 @@ public sealed class PositionPersistenceTests(ITestOutputHelper output) : IAsyncL
         var loop = Service<GameLoop>();
         var owner = s.Owner!;
         long role = s.Role!.Id;
+        // Handover cleanup first waits for every operation of the role. One still running (post-login work) could need
+        // the writer this test is about to hold, and both would wait out the full timeout on a slow runner.
+        var drained = DateTime.UtcNow + Wait;
+        while (await OnLoop(() => owner.Operations.Count) != 0)
+        {
+            if (DateTime.UtcNow > drained) throw new TimeoutException("role operations did not finish before the writer hold");
+            await Task.Delay(5);
+        }
         var start = await OnLoop(() => s.Position.Clone());
         float lazyX = start.X + 0.5f, finalX = start.X + 1.0f;
         var lazyAtCommit = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);

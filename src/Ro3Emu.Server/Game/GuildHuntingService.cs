@@ -230,8 +230,13 @@ public sealed class GuildHuntingService : IGameTicker
         else _schedule.TestWindows.Remove(Activity);
     }
 
+    /// <summary>
+    /// The current week while it is not settled. Loads the stored weeks first: after a restart a member can load into the
+    /// home (LoadedAsync), deal damage or use a skill before the first tick has loaded them.
+    /// </summary>
     private bool Unsettled([System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out Week? week)
     {
+        if (!_loaded) Load();
         week = _current;
         return week is { Data.IsSettled: false };
     }
