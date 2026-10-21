@@ -3,19 +3,20 @@
 # self-contained). Exports the game data from a game folder on the first run, then runs the server in this terminal
 # or as a systemd service. Players join from Windows with: RO3Emu.exe join <address>
 #
-# usage: ./server.sh [--client DIR | --download DIR] [--host ADDRESS] [--gm ACCOUNT] [--voice-port PORT] [--service] [--reexport]
+# usage: ./server.sh [--client DIR | --download DIR] [--host ADDRESS] [--gm ACCOUNT] [--voice-port PORT] [--dev] [--service] [--reexport]
 #   --client DIR    a game folder copied from Windows (at least its ro3_Data/StreamingAssets); first run only
 #   --download DIR  download only the game files the export needs from the official Genesis servers into DIR
 #   --host ADDRESS  the address players connect to (default: this machine's first address)
 #   --gm ACCOUNT    an account that gets GM commands in game (repeatable)
 #   --voice-port PORT  turn on party voice chat on this TCP port, for example 33101 (off by default)
+#   --dev           run as Development, not Production (docs/guide/development-mode.md): GM for everyone without --gm
 #   --service       install and start a systemd service (needs sudo) instead of running in this terminal
 #   --reexport      export the game data again (after a game update)
 set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")"
 root=$(pwd)
 
-client=""; download=""; host=""; voice=""; service=0; reexport=0; gms=()
+client=""; download=""; host=""; voice=""; dev=0; service=0; reexport=0; gms=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --client) client="$2"; shift 2 ;;
@@ -25,6 +26,7 @@ while [ $# -gt 0 ]; do
     --voice-port)
       [[ "$2" =~ ^[0-9]+$ ]] && [ "$2" -gt 0 ] && [ "$2" -lt 65536 ] || { echo "--voice-port needs a port number"; exit 1; }
       voice="$2"; shift 2 ;;
+    --dev) dev=1; shift ;;
     --service) service=1; shift ;;
     --reexport) reexport=1; shift ;;
     -h|--help) sed -n '2,14p' "$0"; exit 0 ;;
@@ -64,8 +66,10 @@ case "$host" in
   127.*|10.*|192.168.*|172.1[6-9].*|172.2[0-9].*|172.3[01].*)
     echo "  Note: $host is a local network address. Players outside your network need your public address: --host <public IP>." ;;
 esac
+environment=Production
+[ "$dev" = 0 ] || environment=Development
 settings=(
-  "ASPNETCORE_ENVIRONMENT=Production"
+  "ASPNETCORE_ENVIRONMENT=$environment"
   "Ro3Emu__DataDir=$root/data"
   "Ro3Emu__PublicHost=$host"
   "Ro3Emu__OpenContent__Enabled=true"
@@ -76,7 +80,12 @@ settings=(
 )
 for i in "${!gms[@]}"; do settings+=("Ro3Emu__GmAccounts__$i=${gms[$i]}"); done
 [ -z "$voice" ] || settings+=("Ro3Emu__Voice__Port=$voice")
-[ ${#gms[@]} -gt 0 ] || echo '  No --gm account: nobody has GM commands in game.'
+if [ "$dev" = 1 ]; then
+  echo '  Development mode: appsettings.Development.json applies (the Exchange seller and buy-back too).'
+  [ ${#gms[@]} -gt 0 ] || echo '  No --gm account: in Development EVERY account has GM commands in game.'
+else
+  [ ${#gms[@]} -gt 0 ] || echo '  No --gm account: nobody has GM commands in game.'
+fi
 
 ports_note() {
   if [ -n "$voice" ]; then

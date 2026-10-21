@@ -79,6 +79,7 @@ is off unless the host adds `--voice-port 33101` (any free port); then forward t
 ./server.sh --client /path/to/ROO_PC --host <public IP> --gm <your account>     # a game folder copied from Windows
 ./server.sh --download /srv/ro3/ROO_PC --host <public IP> --gm <your account>   # or only the files it needs, from Genesis
 ./server.sh --service ...                                                       # install it as a systemd service
+./server.sh --dev --host 127.0.0.1                                              # Development mode, for testing
 ```
 
 Open TCP `5380`, `20000` and `33100`, and the voice port if you turn voice on with `--voice-port 33101`.
@@ -191,7 +192,8 @@ the one-time ticket over the encrypted game gate, so the relay serves off loopba
 
 You need only the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0). `start.cmd` builds the server, the
 client DLLs and RO3Emu from source and runs RO3Emu with this repository as its home; `join.cmd <address>` does the
-same for joining, and both take any RO3Emu.exe option. On Linux, `./server.sh` builds and runs the server from source.
+same for joining, and both take any RO3Emu.exe option. On Linux, `./server.sh` builds and runs the server from source; `--dev` runs it as Development
+([development mode](docs/guide/development-mode.md)).
 
 The same steps by hand:
 
