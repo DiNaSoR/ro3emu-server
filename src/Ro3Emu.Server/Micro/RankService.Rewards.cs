@@ -17,8 +17,13 @@ namespace Ro3Emu.Server.Micro;
 /// period are saved (server_state "rank_rewards") before any letter goes out; each letter is delivered once per board,
 /// period and role. A period whose letters have not all gone out (a failed letter, a restart) is sent again every
 /// minute until they have, and is finished before the board's next period replaces its winners, so a restart never
-/// ranks a period again. Boundaries missed while the server was down settle once, with the board as it is at the next
-/// check.
+/// ranks a period again.
+/// </para>
+/// <para>
+/// A period is paid only when the server saw it close: it directly follows the saved one and the previous check of
+/// this run came before it. On the first start (nothing saved) or after the server was down across a boundary, the
+/// latest is only recorded, with no winners: such boundaries are never paid, so none can be paid twice (Steven on
+/// PR #225; rank rewards have no claim request, the letter is the only payout).
 /// </para>
 /// </summary>
 public sealed partial class RankService : IGameTicker
@@ -28,6 +33,7 @@ public sealed partial class RankService : IGameTicker
     private static readonly TimeSpan RewardCheckEvery = TimeSpan.FromSeconds(1), RewardRetryEvery = TimeSpan.FromMinutes(1);
 
     private TimeSpan lastRewardCheck, rewardRetryAt;
+    private long? previousCheckUnix;
     private bool rewardChecked, settling;
     private RewardState? rewardState;
 
@@ -48,6 +54,9 @@ public sealed partial class RankService : IGameTicker
         public Dictionary<int, long> Winners { get; set; } = new();
     }
 
+    /// <summary>A board's latest boundary, and whether its winners are paid (false: only recorded).</summary>
+    private readonly record struct DueSettlement(PayingBoard Board, long Period, bool Pay);
+
     private sealed record PayingBoard(int Id, int MailId, IReadOnlyList<(int Min, int Max, long Reward)> Gifts);
 
     public void Tick(GameTime time)
@@ -57,12 +66,17 @@ public sealed partial class RankService : IGameTicker
         lastRewardCheck = time.Now;
         var state = RewardStateNow();
         bool retry = time.Now >= rewardRetryAt;
-        var due = new List<(PayingBoard Board, long Period)>();
+        var now = clock.GetLocalNow();
+        long? previousCheck = previousCheckUnix;
+        previousCheckUnix = now.ToUnixTimeSeconds();
+        var due = new List<DueSettlement>();
         foreach (var board in PayingBoards())
         {
-            if (LatestBoundary(board.Id) is not { } period) continue;
+            if (LatestBoundary(board.Id, now) is not { } period) continue;
             long settled = state.Boards.GetValueOrDefault(board.Id)?.Period ?? 0;
-            if (period > settled || retry && period == settled && unfinished.Contains(board.Id)) due.Add((board, period));
+            if (period > settled)
+                due.Add(new DueSettlement(board, period, settled > 0 && previousCheck < period && PreviousBoundary(board.Id, period) == settled));
+            else if (retry && period == settled && unfinished.Contains(board.Id)) due.Add(new DueSettlement(board, period, true));
         }
         if (due.Count == 0) return;
         settling = true;
@@ -71,15 +85,16 @@ public sealed partial class RankService : IGameTicker
         {
             try
             {
-                foreach (var (board, period) in due) await SettleAsync(board, period);
+                foreach (var settlement in due) await SettleAsync(settlement);
             }
             catch (Exception e) { LogSettlementFailed(log, e); }
             finally { settling = false; }
         }, "rank reward settlement");
     }
 
-    private async Task SettleAsync(PayingBoard board, long period)
+    private async Task SettleAsync(DueSettlement due)
     {
+        var (board, period, pay) = due;
         var saved = RewardStateNow().Boards.GetValueOrDefault(board.Id);
         if (saved != null && saved.Period != period)
         {
@@ -87,15 +102,22 @@ public sealed partial class RankService : IGameTicker
             if (unfinished.Contains(board.Id) && !await DeliverAsync(board, saved)) return;
             saved = null;
         }
-        await DeliverAsync(board, saved ?? await RankAsync(board, period));
+        await DeliverAsync(board, saved ?? await RankAsync(board, period, pay));
     }
 
-    /// <summary>Ranks the board from committed state and saves the period's winners before any letter goes out.</summary>
-    private async Task<BoardSettlement> RankAsync(PayingBoard board, long period)
+    /// <summary>
+    /// Ranks the board from committed state and saves the period's winners before any letter goes out; a period that is
+    /// not paid is saved with no winners.
+    /// </summary>
+    private async Task<BoardSettlement> RankAsync(PayingBoard board, long period, bool pay)
     {
-        Invalidate();
-        var rows = (await BoardsAsync()).Boards.GetValueOrDefault(board.Id)?.Rows ?? [];
         var saved = new BoardSettlement { Period = period };
+        List<Entry> rows = [];
+        if (pay)
+        {
+            Invalidate();
+            rows = (await BoardsAsync()).Boards.GetValueOrDefault(board.Id)?.Rows ?? [];
+        }
         foreach (var (min, max, _) in board.Gifts)
             for (int rank = Math.Max(1, min); rank <= Math.Min(max, rows.Count); rank++) saved.Winners[rank] = rows[rank - 1].Id;
         var next = new RewardState { Boards = new(RewardStateNow().Boards) { [board.Id] = saved } };
@@ -156,12 +178,15 @@ public sealed partial class RankService : IGameTicker
         }
     }
 
-    /// <summary>The latest settlement boundary at or before now in the server's local time, or null without one.</summary>
-    private long? LatestBoundary(int boardId)
+    /// <summary>The boundary before <paramref name="period"/>, Unix seconds, or null without one.</summary>
+    private long? PreviousBoundary(int boardId, long period) =>
+        LatestBoundary(boardId, TimeZoneInfo.ConvertTime(DateTimeOffset.FromUnixTimeSeconds(period - 1), clock.LocalTimeZone));
+
+    /// <summary>The latest settlement boundary at or before <paramref name="now"/> (server local time), or null.</summary>
+    private long? LatestBoundary(int boardId, DateTimeOffset now)
     {
         if (data.Row("LeaderBoardsConfig", boardId) is not { } row || !row.TryGetProperty("_kPrizesTimeNew", out var times)
             || times.ValueKind != JsonValueKind.Array) return null;
-        var now = clock.GetLocalNow();
         long? latest = null;
         foreach (var time in times.EnumerateArray())
         {
