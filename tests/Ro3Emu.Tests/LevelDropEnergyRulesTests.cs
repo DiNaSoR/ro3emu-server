@@ -234,9 +234,7 @@ public sealed class LevelDropEnergyRulesTests : IAsyncLifetime
         var skill = Data.Row("SkillConfig", DragonEnergy)!.Value;
         Assert.False(Service<BuffService>().CanSpendEnergy(session, skill));
         await Gm(bot, "!lvl 10");
-        await Gm(bot, $"!item {DragonWhistle} 1");
-        long guid = session.Items.Single(i => i.Entry == DragonWhistle).Guid;
-        await bot.SendGameAsync(CharacterService.ItemUse, new ItemUseReq { ItemGuid = guid, ItemCount = 1 });
+        await Gm(bot, $"!item {DragonWhistle} 1"); // _QuickUse [3, 0]: the server uses it on receipt.
         var meter = await Next(bot, BuffService.EnergyNotify, PlayerEnergyNotify.Parser, n => n.EnergyConfigId == DragonEnergy);
         Assert.Equal(12, meter.EnergyValue);
         Assert.True(session.Mounts!.Mounts.ContainsKey(DragonMount));

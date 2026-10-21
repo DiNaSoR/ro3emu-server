@@ -125,15 +125,11 @@ public sealed class ParticipationTargetTests : IAsyncLifetime
         await Gm("!item 1 100000"); // the room levels' Zeny
         await Accept(706080); // [306004,10] "Reach Pet Hatching Room Lv. 10" (growth emblem title 6)
         await At(706080, 1);
-        // Hatchery by-product 1250731 [603,160]: 98 of them fill the bars of rooms 1-9 (15610 EXP).
-        long guid = await Give(1250731, 98);
-        for (int i = 0; i < 98; i++) // _iGroupUse 0: one at a time
-        {
-            using var reply = bot.Inbox.Expect(e => e.IsGame(CharacterService.ItemUse));
-            await bot.SendGameAsync(CharacterService.ItemUse, new ItemUseReq { ItemGuid = guid, ItemCount = 1 });
-            Assert.Equal(0, ItemUseResp.Parser.ParseFrom((await reply.WaitAsync(Wait)).Body).Result);
-        }
+        // Hatchery by-product 1250731 [603,160]: 98 of them fill the bars of rooms 1-9 (15610 EXP). It is _QuickUse
+        // [3, 0], so the server uses all 98 on receipt (_iGroupUse 0: one at a time, _iCD 0).
+        await Gm("!item 1250731 98");
         await Done(706080);
+        Assert.Equal(0, await Read(() => Session.Items.Where(i => i.Entry == 1250731).Sum(i => i.Stack)));
         Assert.Equal(10, await Read(() => Session.Pets!.IncubationLv));
 
         bot = await Relog(bot);

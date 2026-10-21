@@ -162,7 +162,8 @@ public sealed class RoleSystems(Maps.World world, ChatService chat, CharacterSer
         checkpoint();
         await worldCore.LoginAsync(session);
         checkpoint();
-        autoUse.Login(session); // after every owner snapshot: a use may sync mounts, wardrobe and rewards
+        autoUse.Attach(session);
+        autoUse.Login(session);
     }
 
     /// <summary>The keys the login steps write besides the role, its account and lifecycle.</summary>
