@@ -8,7 +8,7 @@ namespace Ro3Emu.Server.Game;
 /// <summary>A buff on a player: BuffConfig id, its attribute changes, when it ends (absolute server ms).</summary>
 public sealed record ActiveBuff(long Guid, int ConfigId, long ExpireMs, int DurationMs, IReadOnlyList<(long Attr, double Value)> Changes, long SourceId,
     int PileCount = 1, bool IsPassive = false, bool IsTotemOwned = false, int StateOrdinal = 0, bool ShowIcon = true,
-    long ShieldRemaining = 0);
+    long ShieldRemaining = 0, bool IsGuardianOwned = false, bool ShieldDebuffImmunity = false, int HpFloorBasisPoints = 0);
 
 /// <summary>
 /// Buff lifetime and control state. The explicit state map below is inferred from
@@ -47,6 +47,7 @@ public sealed partial class BuffService : IGameTicker
         character.GiveBuff = (p, buff, ms) => AddAsync(p, buff, ms, p.Role!.Id);
         character.IsItemUseForbidden = p => HasForbidden(p, 12);
         character.DynamicProperties.Add(SupportShieldProperties);
+        character.DynamicProperties.Add(BlindProperties);
         world.UnitRemoved.Add(unit => { _unitBuffs.Remove(unit.Uid); return Task.CompletedTask; });
     }
 
@@ -55,10 +56,17 @@ public sealed partial class BuffService : IGameTicker
     private static int StateFor(int buffGroup) => buffGroup switch
     {
         9016 => 18,
+        9018 => 3, // BuffConfig Knock-Up -> SpecialStatusConfig FlyHit
         9022 => 19,
         9023 => 20,
-        12003 => 11,
+        9020 or 12003 => 11,
+        9021 => 12,
+        9024 => 21,
+        9031 => 22,
+        9032 => 23,
+        9033 => 24,
         9034 => 25,
+        23022 => 2, // Shinobi stealth, SpecialStatusConfig 2
         _ => 0,
     };
 
@@ -76,10 +84,17 @@ public sealed partial class BuffService : IGameTicker
     public Task AddSupportAsync(GameSession p, int configId, int durationMs, long sourceId, long shieldAmount = 0) =>
         AddCoreAsync(p, configId, durationMs, sourceId, null, shieldAmount);
 
+    internal Task AddGuardianAsync(GameSession p, int configId, int durationMs, long sourceId, long shieldAmount = 0,
+        bool shieldDebuffImmunity = false, int hpFloorBasisPoints = 0, double attributeMultiplier = 1) =>
+        AddCoreAsync(p, configId, durationMs, sourceId, null, shieldAmount, guardianOwned: true,
+            shieldDebuffImmunity, hpFloorBasisPoints, attributeMultiplier);
+
     private async Task AddCoreAsync(GameSession p, int configId, int durationMs, long sourceId, int? explicitPileCount,
-        long shieldAmount = 0)
+        long shieldAmount = 0, bool guardianOwned = false, bool shieldDebuffImmunity = false, int hpFloorBasisPoints = 0,
+        double attributeMultiplier = 1)
     {
         if (p.Role == null || _data.Row("BuffConfig", configId) is not { } row || GameData.Int(row, "_iBuffID") <= 0) return;
+        if (await RejectIncomingAsync(p, row)) return;
         if (durationMs <= 0) durationMs = (int)GameData.Int(row, "_iTime");
         if (durationMs <= 0) durationMs = 60000;
         if (sourceId != p.Role.Id && !ApplyDecay(p.Role.Id, p.SceneEntry, configId, ref durationMs)) return;
@@ -93,10 +108,11 @@ public sealed partial class BuffService : IGameTicker
         // Inferred server policy from enum_BuffStackType: named layer types add a pile; others refresh.
         int pile = explicitPileCount ?? (existing != null && stackType is 1 or 2 or 3 or 7
             ? Math.Min(maxStack, existing.PileCount + 1) : 1);
-        var changes = GameData.Pairs(row, "_kChangeAttri").Select(c => (c.Id, c.Value * pile)).ToList();
+        var changes = GameData.Pairs(row, "_kChangeAttri").Select(c => (c.Id, c.Value * pile * attributeMultiplier)).ToList();
         var buff = new ActiveBuff(existing?.Guid ?? Interlocked.Increment(ref _guids), configId,
             now + durationMs, durationMs, changes, sourceId, pile, StateOrdinal: StateFor(group),
-            ShieldRemaining: Math.Max(0, shieldAmount));
+            ShieldRemaining: Math.Max(0, shieldAmount), IsGuardianOwned: guardianOwned,
+            ShieldDebuffImmunity: shieldDebuffImmunity, HpFloorBasisPoints: hpFloorBasisPoints);
         if (existing != null) p.Buffs.Remove(existing);
         p.Buffs.Add(buff);
         TrackPeriodic(p, null, buff);
@@ -109,6 +125,7 @@ public sealed partial class BuffService : IGameTicker
             EntityUuid = (ulong)p.Role.Id, BuffInfo = new AoIBuffInfo { AddBuffs = { info } },
         });
         if (existing?.StateOrdinal != buff.StateOrdinal || buff.StateOrdinal != 0) await RefreshControlAsync(p);
+        if (group == BlindGroup) await PublishBlindAsync(p);
         if (buff.Changes.Count > 0 || existing?.Changes.Count > 0 || buff.ShieldRemaining > 0 || existing?.ShieldRemaining > 0)
             await _character.RefreshStatsAsync(p);
         foreach (var handler in Changed) await handler(p);
@@ -185,9 +202,11 @@ public sealed partial class BuffService : IGameTicker
 
     /// <summary>Apply or refresh a timed WorldUnit buff. BuffConfig._iBuffID, _iMultiSource and _kChangeAttri
     /// are verified data fields; applying player-like stacking and replacing the shield on refresh are inferred.</summary>
-    public async Task AddSupportAsync(WorldUnit unit, int configId, int durationMs, long sourceId, long shieldAmount = 0)
+    public async Task AddSupportAsync(WorldUnit unit, int configId, int durationMs, long sourceId, long shieldAmount = 0,
+        double attributeMultiplier = 1)
     {
         if (_data.Row("BuffConfig", configId) is not { } row || GameData.Int(row, "_iBuffID") <= 0) return;
+        if (_unitBuffs.TryGetValue(unit.Uid, out var live) && ImmuneTo(live, row)) return;
         if (durationMs <= 0) durationMs = (int)GameData.Int(row, "_iTime");
         if (durationMs <= 0) durationMs = 60000;
         if (sourceId != unit.Uid && !ApplyDecay(unit.Uid, unit.SceneEntry, configId, ref durationMs)) return;
@@ -203,8 +222,8 @@ public sealed partial class BuffService : IGameTicker
             ? Math.Min(maxStack, existing.PileCount + 1) : 1;
         var buff = new ActiveBuff(existing?.Guid ?? Interlocked.Increment(ref _guids), configId,
             MonsterService.NowMs + durationMs, durationMs,
-            GameData.Pairs(row, "_kChangeAttri").Select(c => (c.Id, c.Value * pile)).ToArray(), sourceId, pile,
-            ShieldRemaining: Math.Max(0, shieldAmount));
+            GameData.Pairs(row, "_kChangeAttri").Select(c => (c.Id, c.Value * pile * attributeMultiplier)).ToArray(), sourceId, pile,
+            ShieldRemaining: Math.Max(0, shieldAmount), StateOrdinal: StateFor(group));
         if (existing != null) list.Remove(existing);
         list.Add(buff);
         TrackPeriodic(null, unit, buff);
@@ -214,7 +233,7 @@ public sealed partial class BuffService : IGameTicker
         if (buff.ShieldRemaining > 0 || existing?.ShieldRemaining > 0)
             changed.Property.Add(new AoIProperty { Idx = 2003, Data = ShieldAmount(unit) });
         await _world.ToUnitViewersAsync(unit, AoiAttrChange, changed);
-        if (buff.Changes.Count > 0 || existing?.Changes.Count > 0)
+        if (buff.Changes.Count > 0 || existing?.Changes.Count > 0 || buff.StateOrdinal > 0 || existing?.StateOrdinal > 0)
             foreach (var handler in UnitChanged) await handler(unit);
     }
 
@@ -234,6 +253,7 @@ public sealed partial class BuffService : IGameTicker
             EntityUuid = (ulong)p.Role.Id, BuffInfo = new AoIBuffInfo { RemoveBuffs = { buff.Guid } },
         });
         if (buff.StateOrdinal != 0) await RefreshControlAsync(p);
+        if (buff.ConfigId / 100 == BlindGroup) await PublishBlindAsync(p);
         if (buff.Changes.Count > 0 || buff.ShieldRemaining > 0) await _character.RefreshStatsAsync(p);
         foreach (var handler in Changed) await handler(p);
     }

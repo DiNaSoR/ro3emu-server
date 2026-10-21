@@ -1,0 +1,15 @@
+namespace Ro3Emu.Server.Game;
+
+public sealed partial class CombatService
+{
+    /// <summary>AttributeConfig 207/208 and 1207/1208: independent healing done/received inputs.
+    /// (inferred) Multiply the two additive groups, floor once, then clamp to missing HP.</summary>
+    internal static long ModifiedHealing(StatSheet source, StatSheet target, long amount) =>
+        (long)Math.Clamp(Math.Floor(amount * Math.Max(0, 1 + (source[207] + source[1207]) / 10000.0)
+            * Math.Max(0, 1 + (target[208] + target[1208]) / 10000.0)), 0, long.MaxValue);
+
+    /// <summary>AttributeConfig sp_dedution/per_sp_dedution (1231/1232); Marionette increases the latter.
+    /// (inferred) Apply the flat then percent change once to the summed SP cost, rounding up.</summary>
+    internal static long ModifiedSpCost(StatSheet stats, long amount) => amount <= 0 ? 0 :
+        (long)Math.Clamp(Math.Ceiling(Math.Max(0, amount + stats[1231]) * Math.Max(0, 1 + stats[1232] / 10000.0)), 0, long.MaxValue);
+}

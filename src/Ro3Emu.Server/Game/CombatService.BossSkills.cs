@@ -23,10 +23,13 @@ public sealed partial class CombatService
     {
         _monsters.CastBossSkill = CastBossSkillAsync;
         _monsters.BossSkillsEnded = EndBossSkillsAsync;
+        // (inferred) The same configured chant inputs govern monster casts; keep action/show offsets unchanged.
+        _monsters.EffectiveChant = (monster, skill) => ChantMilliseconds(_data, skill.Row, MonsterStats(monster));
     }
 
-    private static bool BossCastCurrent(MonsterUnit boss, long serial) =>
-        !boss.Dead && boss.Hp > 0 && boss.BossSkills is { } rt && rt.CastSerial == serial;
+    private bool BossCastCurrent(MonsterUnit boss, long serial) =>
+        !boss.Dead && boss.Hp > 0 && !_buffs.UnitForbidden(boss, 5)
+            && boss.BossSkills is { } rt && rt.CastSerial == serial;
 
     private async Task CastBossSkillAsync(MonsterUnit boss, GameSession? player, TowerPetUnit? pet, BossSkill skill, long serial)
     {
@@ -35,6 +38,7 @@ public sealed partial class CombatService
         var options = _monsters.BossOptions;
         long now = Now;
         long session = ++_sessionIds;
+        int chant = _monsters.BossChant(boss, skill);
         rt.ActiveSession = session;
         var role = player?.Role;
         bool hasTarget = player != null ? role != null && !player.Dead && player.WorldScene == boss.WorldScene
@@ -54,7 +58,7 @@ public sealed partial class CombatService
         await SendMonsterTimelineAsync(boss, new UseInSkillInfo
         {
             SrcID = boss.Uid, SkillID = skill.Id, TargetId = targetId, TargetPos = hasTarget ? targetPos : origin, Face = face,
-            SessionId = session, ChantMs = skill.ChantMs, SkillMs = skill.ActionMs, StartTime = now,
+            SessionId = session, ChantMs = chant, SkillMs = skill.ActionMs, StartTime = now,
         }, highLevel: skill.HighLevel);
         if (!skill.Once && skill.CdMs > 0) await BossCooldownStartedAsync(boss, skill.Id, now + skill.CdMs);
         await FightingAsync(boss);
@@ -62,7 +66,7 @@ public sealed partial class CombatService
         for (int i = 0; i < skill.HitMs.Length; i++)
         {
             bool first = i == 0;
-            ScheduleRuntime(boss.WorldScene, TimeSpan.FromMilliseconds(skill.HitMs[i]), () =>
+            ScheduleRuntime(boss.WorldScene, TimeSpan.FromMilliseconds(Math.Max(0, skill.HitMs[i] + chant - skill.ChantMs)), () =>
                 BossSkillHitAsync(boss, player, role, pet, skill, serial, session, origin, center, face, show, first, options));
         }
         _log.LogDebug("Boss {Npc} casts {Skill} (phase {Phase})", boss.Template.NpcId, skill.Id, rt.Phase);

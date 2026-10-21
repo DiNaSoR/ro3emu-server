@@ -29,7 +29,7 @@ public sealed partial class CombatService
         CanEventHit(source, target) || CanTerritoryHit(source, target);
 
     private GameSession? EventTarget(GameSession source, long id) => _sessions.All()
-        .FirstOrDefault(target => target.Role?.Id == id && CanPlayerHit(source, target));
+        .FirstOrDefault(target => target.Role?.Id == id && CanPlayerHit(source, target) && GuardianCanObserve(source, target));
 
     private static float PlayerDistance(GameSession a, GameSession b) =>
         MonsterService.Distance(a.Position.X, a.Position.Z, b.Position.X, b.Position.Z);
@@ -45,7 +45,7 @@ public sealed partial class CombatService
     {
         if (source.Role == null || source.Progress == null) return;
         using var held = await CharacterService.Lock(source);
-        if (!CanPlayerHit(source, target) || source.SkillCast is { Cancelled: false }
+        if (!CanPlayerHit(source, target) || !GuardianCanObserve(source, target) || source.SkillCast is { Cancelled: false }
             || EffectiveSkillRow(source, skillId) is not { } row || !Learned(source, row)
             || !SkillModeAllowed(source, row) || _buffs.HasForbidden(source, 5)) return;
         var request = new CastSkillReq
@@ -57,7 +57,7 @@ public sealed partial class CombatService
         await StartCastAsync(source, row, request, session);
     }
     private async Task HitEventPlayersAsync(GameSession source, GameSession[] targets, JsonElement row,
-        int skillId, int show, long session, Func<bool> currentSource)
+        int skillId, int show, long session, Func<bool> currentSource, Action<long, long>? onHit = null)
     {
         if (FirstNumber(row, "_kDamageParam1") is not > 0 && FirstNumber(row, "_kDamageParam2") is not > 0) return;
         foreach (var target in targets)
@@ -72,19 +72,35 @@ public sealed partial class CombatService
             var a = new Fighter(attack[103], attack[104], attack[109], attack[111], source.Progress!.Level, 1);
             var b = new Fighter(0, 0, 0, 0, target.Progress!.Level, 1)
             { Def = defend[105], Mdef = defend[106], Flee = defend[110], ResCri = defend[112] };
-            var (damage, result) = Damage(a, b, row);
+            var (damage, result) = Damage(a, b, row, bonusCrit: GuardianPetRules.CriticalChance(row),
+                forceCrit: GuardianPetRules.CriticalAtHp(row, defend[2000], defend[101]));
+            damage = GuardianPetRules.DirectDamage(row, damage);
+            damage = GuardianOutgoingDamage(source, row, damage);
+            damage = GuardianControlledDamage(source, GuardianControlTarget(target), damage);
             if (result != DamageHitResult.Miss) damage = ApplyPlayerRestraints(source, target, damage);
+            if (row.TryGetProperty("_ro3GuardianFixedHit", out var fixedValue))
+            { damage = fixedValue.GetInt64(); result = DamageHitResult.Normal; }
             var committed = await CommitPlayerDamageAsync(target, damage, row,
                 () => currentSource() && CurrentPlayerHit(source, target, attackerRole, targetRole, sceneId)
                     && CanPlayerHit(source, target));
             if (committed == null) continue;
             (damage, long hp, long effective, long shieldDamage) = committed.Value;
+            onHit?.Invoke(targetRole.Id, damage);
+            if (effective > 0 && hp > 0) await _buffs.BreakHitControlsAsync(target);
             try
             {
                 if (effective > 0 && CurrentPlayerHit(source, target, attackerRole, targetRole, sceneId))
                 {
                     foreach (var handler in PvpDealt) handler(source, target, effective, hp == 0);
                     foreach (var handler in PvpDealtAsync) await handler(source, target, effective, hp == 0);
+                    if (currentSource() && CurrentPlayerHit(source, target, attackerRole, targetRole, sceneId))
+                    {
+                        await GuardianTakenAsync(target, effective);
+                        await GuardianWindowHitAsync(source, targetRole.Id, target.Position, row, effective, hp == 0);
+                    }
+                    if (currentSource() && CurrentPlayerHit(source, target, attackerRole, targetRole, sceneId))
+                        await GuardianPlayerDamageReactionAsync(source, target, row, effective,
+                            () => currentSource() && CurrentPlayerHit(source, target, attackerRole, targetRole, sceneId));
                 }
                 var hit = new SkillHitInfo
                 {
@@ -123,7 +139,7 @@ public sealed partial class CombatService
     {
         foreach (var (source, attack) in _eventAttacks.ToArray())
         {
-            if (!CanPlayerHit(source, attack.Target) || PlayerDistance(source, attack.Target) > 30
+            if (!CanPlayerHit(source, attack.Target) || !GuardianCanObserve(source, attack.Target) || PlayerDistance(source, attack.Target) > 30
                 || MonsterService.Distance(attack.StartX, attack.StartZ, source.Position.X, source.Position.Z) > 1.5f)
             { _eventAttacks.Remove(source); continue; }
             if (now < attack.NextSwing || source.SkillCast is { Cancelled: false } || _data.Row("SkillConfig", attack.SkillId) is not { } row

@@ -25,6 +25,11 @@ public sealed class ActiveSkillCast
     public bool Cancelled { get; set; }
     public bool Resolved { get; set; }
     public SkillObject? Operator { get; init; }
+    /// <summary>Extra effects remain bound to their equipped source after asynchronous publication.</summary>
+    internal Func<bool>? SourceEligible { get; init; }
+    internal Dictionary<long, long>? GuardianDamage { get; init; }
+    internal SemaphoreSlim? GuardianGate { get; init; }
+    internal HashSet<int>? GuardianOnce { get; init; }
     public long SourceId => Operator?.Uid ?? OwnerId;
 }
 
@@ -58,6 +63,12 @@ public sealed partial class CombatService
 
     private async Task CastCoreAsync(GameSession s, CastSkillReq request)
     {
+        if (_data.Row("SkillConfig", request.SkillId) is { } petRow
+            && GameData.Int(petRow, "_iSystemType") is GuardianPetRules.WrapperType or GuardianPetRules.EffectType)
+        {
+            await CastGuardianAsync(s, request.Clone());
+            return;
+        }
         var req = request.Clone();
         var row = EffectiveSkillRow(s, req.SkillId);
         var owned = req.OpUnitId == 0 || req.OpUnitId == s.Role?.Id ? null
@@ -125,14 +136,14 @@ public sealed partial class CombatService
             s.Attack = new AttackLoop
             {
                 Target = target, SkillId = loopSkill,
-                NextSwingMs = Now + SkillMs(s, row.Value) + Math.Max(0, GameData.Int(row.Value, "_iChantFix") + GameData.Int(row.Value, "_iChantVar")) + 1,
+                NextSwingMs = Now + SkillMs(s, row.Value) + ChantMs(s, row.Value) + 1,
                 StartX = s.Position.X, StartZ = s.Position.Z
             };
         }
         else s.Attack = null;
         if (GameData.Int(row.Value, "_iIfAutoAtk") == 2 && owned == null && playerTarget != null)
             _eventAttacks[s] = new EventAttack(playerTarget, loopSkill,
-                Now + SkillMs(s, row.Value) + Math.Max(0, GameData.Int(row.Value, "_iChantFix") + GameData.Int(row.Value, "_iChantVar")) + 1,
+                Now + SkillMs(s, row.Value) + ChantMs(s, row.Value) + 1,
                 s.Position.X, s.Position.Z);
         await StartCooldownAsync(s, row.Value);
         await StartCastAsync(s, row.Value, req, id, owned);
@@ -246,6 +257,7 @@ public sealed partial class CombatService
             targetPosition = req.TargetPos;
         }
         else { req.TargetPos ??= origin.Clone(); return 0; }
+        if (!_buffs.CanSeePosition(s, targetPosition)) return ErrorCodes.SkillTargetInvalid;
         float d = Distance(origin, targetPosition);
         if (d < GameData.Int(row, "_iDistanceMin") / 100f - slack || d > Range(row) + 0.5f + slack) return ErrorCodes.SkillDistance;
         float height = GameData.Int(row, "_iHeightRange") / 100f;
@@ -307,6 +319,7 @@ public sealed partial class CombatService
                 default: result.Invalid = true; break; // reject an unsupported cost rather than grant a free cast.
             }
         }
+        if (result.Attrs.TryGetValue(2001, out long sp)) result.Attrs[2001] = ModifiedSpCost(stats, sp);
         return result;
     }
 
@@ -400,7 +413,7 @@ public sealed partial class CombatService
         {
             Id = id, OwnerId = s.Role!.Id, WorldScene = s.WorldScene, SceneGeneration = s.SceneGeneration,
             Attachment = s.Attachment, Request = req, Row = row, Origin = origin, StartedWalking = actor == null && s.Walking,
-            StartMs = Now, ChantMs = (int)Math.Max(0, GameData.Int(row, "_iChantFix") + GameData.Int(row, "_iChantVar")), ActionMs = SkillMs(s, row), Operator = actor,
+            StartMs = Now, ChantMs = ChantMs(s, row), ActionMs = SkillMs(s, row), Operator = actor,
         };
         s.SkillCast = action;
         s.WorldState.ResurrectionCastId = Script(row) == "Resurrection" ? id : 0;

@@ -134,7 +134,7 @@ public sealed partial class CombatService
 
     /// <summary>
     /// (verified) BuffConfig uses 1216 for Alice's reduction, 1230 for Goat's ranged physical reduction,
-    /// and 315 for Squidgitte's water resistance. (inferred) Apply their live sum multiplicatively before
+    /// 1212/1214 for physical/magic reduction and 311..320 for elemental resistance. (inferred) Apply their live sum before
     /// shields; this is restricted to pet support contributions rather than changing all combat attributes.
     /// </summary>
     private static long ApplyPetSupportResistance(long damage, IEnumerable<(long Id, double Value)> changes,
@@ -142,14 +142,20 @@ public sealed partial class CombatService
     {
         if (damage <= 0) return damage;
         var values = changes.GroupBy(p => p.Id).ToDictionary(g => g.Key, g => g.Sum(p => p.Value));
-        double reduction = values.GetValueOrDefault(1216);
+        const int DamageReduction = 1216, PhysicalReduction = 1212, MagicReduction = 1214,
+            RangedPhysicalReduction = 1230, FirstElementResistance = 311;
+        double reduction = values.GetValueOrDefault(DamageReduction) + values.GetValueOrDefault(216);
+        int element = fallbackElement;
         if (skill is { } row)
         {
-            if (GameData.Int(row, "_iDistanceType") == 2 && GameData.Int(row, "_iDmgType") == 1)
-                reduction += values.GetValueOrDefault(1230);
-            int element = (int)GameData.Int(row, "_iEleType");
-            if ((element > 1 ? element : fallbackElement) == 5) reduction += values.GetValueOrDefault(315);
+            bool physical = GameData.Int(row, "_iDmgType") != 2;
+            reduction += values.GetValueOrDefault(physical ? PhysicalReduction : MagicReduction);
+            if (GameData.Int(row, "_iDistanceType") == 2 && physical)
+                reduction += values.GetValueOrDefault(RangedPhysicalReduction);
+            int configured = (int)GameData.Int(row, "_iEleType");
+            if (configured > 1) element = configured;
         }
+        if (element is >= 1 and <= 10) reduction += values.GetValueOrDefault(FirstElementResistance + element - 1);
         return Math.Max(0, (long)Math.Round(damage * Math.Clamp(1 - reduction / 10000, 0, 10)));
     }
 }

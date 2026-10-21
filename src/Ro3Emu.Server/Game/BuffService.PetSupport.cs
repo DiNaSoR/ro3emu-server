@@ -28,10 +28,29 @@ public sealed partial class BuffService
                 .SelectMany(b => b.Changes.Select(change => (change.Attr, change.Value))).ToArray()
             : [];
 
+    /// <summary>Actual remaining time after hostile-buff decay; movement effects must not outlive their buff.</summary>
+    internal int UnitBuffRemainingMs(WorldUnit unit, int configId, long sourceId) =>
+        _unitBuffs.TryGetValue(unit.Uid, out var buffs)
+            ? (int)Math.Clamp(buffs.Where(b => b.ConfigId == configId && b.SourceId == sourceId)
+                .Select(b => b.ExpireMs - MonsterService.NowMs).DefaultIfEmpty(0).Max(), 0, int.MaxValue) : 0;
+
     /// <summary>Add live buff icons and shield property 2003 to a unit's initial 31037 snapshot.</summary>
     public void PopulateEntity(WorldUnit unit, EntityBase entity)
     {
         if (!_unitBuffs.TryGetValue(unit.Uid, out var buffs)) return;
+        ulong status = UnitStatus(unit), forbidden = UnitForbiddenMask(unit);
+        if (status != 0)
+        {
+            entity.ObjState ??= new AoiObjStateInfo { Data = new CommonBigMask() };
+            if (entity.ObjState.Data.Values.Count == 0) entity.ObjState.Data.Values.Add(0);
+            entity.ObjState.Data.Values[0] |= status;
+        }
+        if (forbidden != 0)
+        {
+            entity.ObjForbid ??= new AoiObjForbidInfo { Data = new CommonBigMask() };
+            if (entity.ObjForbid.Data.Values.Count == 0) entity.ObjForbid.Data.Values.Add(0);
+            entity.ObjForbid.Data.Values[0] |= forbidden;
+        }
         var live = buffs.Where(b => b.ExpireMs > MonsterService.NowMs && (!b.IsPassive || b.ShowIcon)).ToArray();
         if (live.Length > 0)
         {
@@ -116,7 +135,7 @@ public sealed partial class BuffService
         if (buff.ShieldRemaining > 0)
             changed.Property.Add(new AoIProperty { Idx = 2003, Data = ShieldAmount(unit) });
         await _world.ToUnitViewersAsync(unit, AoiAttrChange, changed);
-        if (buff.Changes.Count > 0)
+        if (buff.Changes.Count > 0 || buff.StateOrdinal > 0)
             foreach (var handler in UnitChanged) await handler(unit);
     }
 }
