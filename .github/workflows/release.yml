@@ -93,8 +93,23 @@ jobs:
             args+=(--notes "$(printf '%s\n\nFirst daily release. Everything merged so far:\n\n%s\n' "$notes" "$changes")")
           fi
           gh release create "$TAG" dist/RO3Emu-win-x64.zip dist/RO3Emu-server-linux-x64.tar.gz "${args[@]}"
+
+  # Its own job so that daily and push builds (different concurrency groups above) take turns: each one checks
+  # commit.txt and uploads without the other running in between.
+  launcher:
+    needs: pack
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: launcher-release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          name: ro3emu-release
+          path: dist
       - name: Publish to the launcher release
-        if: github.ref == 'refs/heads/main'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
