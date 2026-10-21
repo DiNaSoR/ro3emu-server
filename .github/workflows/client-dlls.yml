@@ -35,21 +35,51 @@ jobs:
       # cannot change the formatter or analyzers.
       - name: Pin the SDK
         run: dotnet new globaljson --sdk-version ${{ steps.dotnet.outputs.dotnet-version }} --force
+      # The publisher's manifest names the current client release, which keys the cache. When the update server is
+      # down the release stays empty and the newest cached client-managed-* is used instead (#262).
       - name: Current client release
         id: client
         run: |
-          release=$(curl -fsS -A RO3Emu/1.0 --retry 3 https://update.genesis3.is/windows/launcher/v1/channels/ro3_recovery/full/manifest.json | jq -r .release.release_id)
-          echo "release=$release" >> "$GITHUB_OUTPUT"
-          echo "client release: $release"
+          if release=$(curl -fsS -A RO3Emu/1.0 --retry 3 https://update.genesis3.is/windows/launcher/v1/channels/ro3_recovery/full/manifest.json | jq -er .release.release_id); then
+            echo "release=$release" >> "$GITHUB_OUTPUT"
+            echo "client release: $release"
+          else
+            echo "::warning::The client manifest could not be read; falling back to the newest cached client DLLs."
+          fi
       - name: Client managed DLLs (cache)
         id: cache
+        if: steps.client.outputs.release != ''
         uses: actions/cache@v4
         with:
           path: .client
           key: client-managed-${{ steps.client.outputs.release }}
+          enableCrossOsArchive: true
+      # Restore only: nothing is saved under a key without a release.
+      - name: Client managed DLLs (newest cache, update server down)
+        id: fallback
+        if: steps.client.outputs.release == ''
+        uses: actions/cache/restore@v4
+        with:
+          path: .client
+          key: client-managed-
+          restore-keys: client-managed-
+          enableCrossOsArchive: true
       - name: Download the client's managed DLLs
-        if: steps.cache.outputs.cache-hit != 'true'
+        if: steps.client.outputs.release != '' && steps.cache.outputs.cache-hit != 'true'
         run: dotnet run --project src/Ro3Emu.Setup -c Release -- install "$PWD/.client" --only 'ro3_Data/Managed/*' --yes --home "$RUNNER_TEMP/ro3emu-home"
+      - name: Client release used
+        env:
+          RELEASE: ${{ steps.client.outputs.release }}
+          FALLBACK: ${{ steps.fallback.outputs.cache-matched-key }}
+        run: |
+          if [ -n "$RELEASE" ]; then
+            echo "Built against client release $RELEASE." >> "$GITHUB_STEP_SUMMARY"
+          elif [ -n "$FALLBACK" ]; then
+            echo "The update server was down: built against the cached ${FALLBACK#client-managed-} client DLLs." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::error::The update server is down and no client DLLs are cached."
+            exit 1
+          fi
       - name: Build
         shell: pwsh
         run: ./tools/release/client-dlls.ps1 -ClientDir .client -Out client-dlls
