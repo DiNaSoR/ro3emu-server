@@ -13,7 +13,8 @@
 #   --service       install and start a systemd service (needs sudo) instead of running in this terminal
 #   --reexport      export the game data again (after a client update)
 set -euo pipefail
-cd "$(dirname "$(readlink -f "$0")")"
+self=$(readlink -f "$0")  # before the cd: a relative $0 no longer resolves after it
+cd "$(dirname "$self")"
 root=$(pwd)
 
 client=""; host=""; voice=""; dev=0; service=0; reexport=0; gms=()
@@ -28,7 +29,7 @@ while [ $# -gt 0 ]; do
     --dev) dev=1; shift ;;
     --service) service=1; shift ;;
     --reexport) reexport=1; shift ;;
-    -h|--help) sed -n '2,14p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,/^[^#]/{/^#/p}' "$self"; exit 0 ;;  # the header comment, however long
     *) echo "unknown option $1 (see ./server.sh --help)"; exit 1 ;;
   esac
 done
