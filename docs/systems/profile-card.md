@@ -34,9 +34,9 @@ The head icon, frame, chat bubble, title and honor shown on the card are social 
   (the test card 1960003, action 50004) answers 3351; both keep the item.
 - **Editing** (82553) checks what the editor itself enforces: an unlocked theme, background, mood and pose (3357; a
   pose is an unlocked emote or action); at most `PersonalMaxSticker` 20 stickers, each a currency of item subtype 123
-  with one owned per placement (3358 when short); `PersonalMaxCabinet` 3 distinct showcases and `PersonalMaxCharacter`
-  1 figure (3352 beyond); a signature of at most `PersonalSignatureLimit` 30
-  characters (3364) without a blocked word (3365, the guild's blocked-word list). The preset name is kept: 82560
+  with one owned per placement (3358 when short); at most `PersonalMaxCabinet` 3 showcases, each one of types 1-3 and
+  none twice, and at most `PersonalMaxCharacter` 1 figure (3352 for any of these limits or more than 20 stickers); a
+  signature of at most `PersonalSignatureLimit` 30 characters (3364) without a blocked word (3365, the guild's blocked-word list). The preset name is kept: 82560
   renames, capped at `PersonalTemplateLimit` 7 (3366/3367). Every change reaches the client through 5016; the 82553 and
   82560 replies carry nothing the client uses.
 - **Likes** (82554) store the liker in the target's `personal_upvote` list and the time in the liker's `upvoteTimes`.
@@ -64,6 +64,7 @@ The head icon, frame, chat bubble, title and honor shown on the card are social 
   ([#215](https://github.com/akreao/ro3emu-server/issues/215)), the honor showcase needs `SeasonPage`
   ([#216](https://github.com/akreao/ro3emu-server/issues/216)) and the attribute view needs `Extra`
   ([#217](https://github.com/akreao/ro3emu-server/issues/217)). `UserDataService` sends none of them, so these are empty
-  on another player's card.
+  on another player's card. For `Extra`, Steven decided the target's `SettingShowDetailInfo` privacy setting must be
+  respected: the attributes go out only when it is ShowAll.
 - The themes and backgrounds behind 620 items are also listed under `_kImageObtain` (the Fashion Shop, Growth Support
   rewards); the shops do not sell them yet.
