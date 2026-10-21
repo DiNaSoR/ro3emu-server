@@ -8,8 +8,8 @@ name: release
 # RO3Emu.exe or the client DLLs. The server is left out of the push filter on purpose: main changes it many times a
 # day, so a server change reaches the launcher release with the next daily build.
 # CI has no game client: pack.ps1 (tools/release/client-dlls.ps1) takes the client's managed DLLs from the cache that
-# client-dlls.yml fills, or downloads just those from the publisher, and builds the client hooks/loc DLLs against them. Run tools/release/smoke.ps1 locally (it needs the
-# clients) before publishing the draft.
+# client-dlls.yml fills, or downloads just those from the publisher, and builds the client hooks/loc DLLs against them.
+# Run tools/release/smoke.ps1 locally (it needs the clients) before publishing the draft.
 on:
   push:
     tags: ['v*']
