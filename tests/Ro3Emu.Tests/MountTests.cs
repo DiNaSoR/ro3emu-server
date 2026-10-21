@@ -678,9 +678,16 @@ public sealed class MountTests : IAsyncLifetime
         await Next(a, GameAoiSink.MovementChange, MovementChangeNtf.Parser, m => m.Uid == self && m.TransType == MovementTransitionType.MoveTransForceTeleport);
         Assert.Equal(ahead.Y, s.Position.Y); // above the band, put back
 
+        // Off a cliff into a lower band: holding or losing height is taken, climbing further is not.
+        await loop.InvokeAsync(() => { s.Position = new Vec3 { X = x, Y = floor + 60, Z = z }; return Task.CompletedTask; });
+        var down = new Vec3 { X = x, Y = floor + 59, Z = z };
+        await a.SendGameAsync(WorldCoreService.FlyMove, new FlyMoveReq { Pos = down, Dir = new Vec3 { Y = -1 }, Face = 90 });
+        await Task.Delay(300);
+        Assert.Equal(down.Y, s.Position.Y);
+
         await Ready();
         await Cast(Land);
-        Assert.NotEqual(0, (await Next(a, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
+        Assert.Equal(ErrorCodes.SkillRequirements, (await Next(a, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
         Assert.True(s.WorldState.Flying);
 
         await a.SendGameAsync(32745, new PlayerRiderMountReq { Tp = (eRiderType)0 });

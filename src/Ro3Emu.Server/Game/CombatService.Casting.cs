@@ -104,6 +104,7 @@ public sealed partial class CombatService
             if (owned != null ? !owned.Skills.Contains(req.SkillId) : !Learned(s, row!.Value)) error = ErrorCodes.SkillNotLearned;
             else if (!SkillModeAllowed(s, row!.Value)) error = ErrorCodes.SkillRequirements;
             else if (owned == null && !SkillConditionMet(s, row!.Value)) error = ErrorCodes.SkillRequirements; // weapon, mount, pendant
+            else if (owned == null && !LandingAllowed(s, row!.Value)) error = ErrorCodes.SkillRequirements; // over water (inferred)
             else if (GameData.Int(row!.Value, "_iBasicType") != 1) error = ErrorCodes.SkillPassive;
             else if (buffs.HasForbidden(s, GameData.Int(row.Value, "_iIsNormalAtk") == 1 ? 5 : 4)) error = ErrorCodes.SkillBadState;
             // Hymn of the Lamb: "This skill cannot be cast while You are under any control effect" (category 25: Stun,
@@ -312,12 +313,16 @@ public sealed partial class CombatService
         if (skills.NormalGroups(s.Progress!.Career).Contains(group)
             && data.Row("SkillConfig", normal) is { } current && GameData.Int(current, "_iSkillID") != group) return false;
         // The flying mount's take-off on the ground, its landing in the air (MountService.FlySkills, SkillWheelMount1).
-        if (MountService.FlySkills(s, data) is { } fly && GameData.Int(row, "_iID") == (s.WorldState.Flying ? fly.Down : fly.Up))
-            return !s.WorldState.Flying || CanLand?.Invoke(s) != false;
+        if (MountService.FlySkills(s, data) is { } fly && GameData.Int(row, "_iID") == (s.WorldState.Flying ? fly.Down : fly.Up)) return true;
         if (GameData.Int(row, "_iSystemType") == ActiveGuardSkill) return skills.PetMainSkill?.Invoke(s)?.SkillId == GameData.Int(row, "_iID");
         if (ChainOffers(s, row)) return true; // Thousand Shadows, Shadow Loop, Shadow Echo's return (CombatService.Chains)
         return skills.Level(s.Progress, (int)GameData.Int(row, "_iSkillID")) >= GameData.Int(row, "_iLevel");
     }
+
+    /// <summary>A flying mount's landing skill needs walkable ground under the rider (<see cref="CanLand"/>).</summary>
+    private bool LandingAllowed(GameSession s, JsonElement row) =>
+        !s.WorldState.Flying || MountService.FlySkills(s, data) is not { } fly || GameData.Int(row, "_iID") != fly.Down
+        || CanLand?.Invoke(s) != false;
 
     private MonsterUnit? FindMonster(long sceneId, long uid) => world.Map(sceneId).Units.OfType<MonsterUnit>().FirstOrDefault(m => m.Uid == uid && !m.Dead);
     private GameSession? FindPlayer(GameSession s, long uid, bool dead = false) => world.PlayersIn(s.WorldScene).FirstOrDefault(p => p.Role?.Id == uid && p.Dead == dead);

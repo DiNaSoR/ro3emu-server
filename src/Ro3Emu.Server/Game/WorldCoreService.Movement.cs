@@ -65,7 +65,8 @@ public sealed partial class WorldCoreService
     /// free inside the 50 m band over the ground (a mount's take-off skill climbs on its own, 20 m over 3.5 s for the
     /// Starshatter Dragon, while the client already sends 31084), so the speed check is horizontal, and the ground under
     /// a flyer need not be walkable (water, cliffs): the band counts from its nearest layer of any kind, and a cell with no
-    /// layer (off the map's grid) is refused. A move outside these bounds is put back without an error tip: the
+    /// layer (off the map's grid) is refused. Flying off a cliff over the sea may hold or lose height above the new band
+    /// (no invisible wall at the edge), only not climb further. A move outside these bounds is put back without an error tip: the
     /// client sends 31084 many times a second and showed a "parameter error" for each refusal.
     /// </summary>
     public async Task FlyMoveAsync(GameSession s, FlyMoveReq req)
@@ -77,7 +78,7 @@ public sealed partial class WorldCoreService
         var map = worldData.Map(s.SceneEntry);
         var floor = map?.FloorHeight(new MapPoint(req.Pos.X, req.Pos.Y, req.Pos.Z, req.Face));
         if (!s.WorldState.Flying || !CanFly(s) || floor is not { } ground
-            || req.Pos.Y < ground - 1 || req.Pos.Y > ground + 50
+            || req.Pos.Y < ground - 1 || req.Pos.Y > Math.Max(ground + 50, s.Position.Y)
             || MonsterService.Distance(s.Position.X, s.Position.Z, req.Pos.X, req.Pos.Z) > speed * seconds * 1.5 + 1.5)
         { await CorrectFlightAsync(s); return; }
         s.WorldState.LastFlyMs = Now;
@@ -94,7 +95,8 @@ public sealed partial class WorldCoreService
     }
 
     /// <param name="forced">The server ends the flight (the mount or the flight buff is gone): over ground with no walkable
-    /// layer it puts the rider back where it took off (inferred) instead of refusing, or the flight would never end.</param>
+    /// layer it puts the rider back where it took off, else on the map's born point (inferred), instead of refusing, or
+    /// the flight would never end.</param>
     private async Task LandAsync(GameSession s, Vec3 requested, float face, bool forced = false)
     {
         var map = worldData.Map(s.SceneEntry);
@@ -105,7 +107,7 @@ public sealed partial class WorldCoreService
         {
             var origin = s.WorldState.TakeOff ?? requested;
             var back = new MapPoint(origin.X, origin.Y, origin.Z, face);
-            at = map.Landing(back) ?? map.Grounded(back);
+            at = map.Landing(back) ?? (map.Born is { } born ? map.Landing(born) ?? map.Grounded(born) : map.Grounded(back));
             transition = MovementTransitionType.MoveTransForceTeleport;
         }
         if (at is not { } spot) { await ErrorAsync(s, FreeFall, ErrorCodes.Parameter); return; }
