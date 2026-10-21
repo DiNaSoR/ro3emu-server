@@ -68,7 +68,7 @@ public sealed partial class RankService : IGameTicker
             {
                 foreach (var (board, period) in due) await SettleAsync(board, period);
             }
-            catch (Exception e) { log.LogError(e, "Rank reward settlement failed"); }
+            catch (Exception e) { LogSettlementFailed(log, e); }
             finally { settling = false; }
         }, "rank reward settlement");
     }
@@ -86,7 +86,7 @@ public sealed partial class RankService : IGameTicker
             var next = new RewardState { Boards = new(state.Boards) { [board.Id] = saved } };
             await accounts.WriteLegacyAsync<int>(new SeasonStateWritePlan(RewardStateKey, JsonSerializer.Serialize(next)));
             rewardState = next;
-            log.LogInformation("Rank rewards: board {Board} period {Period} pays {Count} roles", board.Id, period, saved.Winners.Count);
+            LogSettled(log, board.Id, period, saved.Winners.Count);
         }
         foreach (var (rank, role) in saved.Winners.OrderBy(w => w.Key))
         {
@@ -96,7 +96,7 @@ public sealed partial class RankService : IGameTicker
                 await mail.SendTemplateOnceAsync(role, board.MailId, mail.FixedGroupAward(gift.Reward),
                     $"rank:{board.Id}:{period}:{role}", _ => { }, loop.Owners?.Current, contentParams: [rank]);
             }
-            catch (Exception e) { log.LogError(e, "Rank reward letter for board {Board} rank {Rank} to {Role} failed", board.Id, rank, role); }
+            catch (Exception e) { LogLetterFailed(log, e, board.Id, rank, role); }
         }
     }
 
@@ -153,6 +153,15 @@ public sealed partial class RankService : IGameTicker
         var boundary = now.Date.AddDays(weekday - today).AddHours(hour);
         return boundary > now ? boundary.AddDays(-7) : boundary;
     }
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Rank reward settlement failed")]
+    private static partial void LogSettlementFailed(ILogger logger, Exception error);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Rank rewards: board {Board} period {Period} pays {Count} roles")]
+    private static partial void LogSettled(ILogger logger, int board, long period, int count);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Rank reward letter for board {Board} rank {Rank} to {Role} failed")]
+    private static partial void LogLetterFailed(ILogger logger, Exception error, int board, int rank, long role);
 
     private static long[] Numbers(JsonElement row, string field) =>
         row.TryGetProperty(field, out var value) && value.ValueKind == JsonValueKind.Array

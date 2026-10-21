@@ -81,7 +81,7 @@ dotnet_diagnostic.CA1841.severity = suggestion
 dotnet_diagnostic.CA1848.severity = suggestion
 # 5: prefer TryGetValue
 dotnet_diagnostic.CA1854.severity = suggestion
-# 77: use concrete types for performance
+# 76: use concrete types for performance
 dotnet_diagnostic.CA1859.severity = suggestion
 # 1: avoid Enumerable.Any()
 dotnet_diagnostic.CA1860.severity = suggestion
