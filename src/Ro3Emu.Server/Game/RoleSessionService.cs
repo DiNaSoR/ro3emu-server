@@ -430,6 +430,14 @@ public sealed class RoleSessionService(RoleStore roles, Data.GameData data, Buff
         return true;
     }
 
+    /// <summary>
+    /// SettingShowDetailInfo (MG_Setting.proto, the player's "show my details" choice): other players get the role's
+    /// attributes (global cache "Extra") and Base.isShowDetail only when it is ShowAll. A role that never set it is
+    /// NoShow, the enum's zero value.
+    /// </summary>
+    internal static bool ShowsDetail(DBSettingInfo? settings)
+        => settings?.ShowDetailInfo?.ShowDetailInfo == ShowDetailInfoType.ShowAll;
+
     private DBSettingInfo LoadSettings(long roleId)
     {
         var settings = roles.LoadSettings(roleId) is { } bytes ? DBSettingInfo.Parser.ParseFrom(bytes) : new DBSettingInfo();

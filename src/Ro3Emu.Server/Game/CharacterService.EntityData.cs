@@ -34,21 +34,32 @@ public sealed partial class CharacterService
     {
         var role = session.Role!;
         var p = session.Progress!;
-        var stats = Stats(session);
         var info = new RoleDetailInfo
         {
             Rolebase = new RolePublicBaseInfo
             {
                 Roleid = role.Id, Name = role.Name, Career = p.Career, BaseLevel = p.Level,
-                JobLevel = p.JobLevel, Gender = role.Sex, Title = TitleService.Current(session)
+                JobLevel = p.JobLevel, Gender = role.Sex, Title = TitleService.Current(session),
+                IsShowDetail = RoleSessionService.ShowsDetail(session.Settings),
             },
             EquipInfo = BuildEquip(session),
-            Selfproperty = new AllProperty { EntityID = role.Id },
+            Selfproperty = PublicProperties(session),
         };
         info.Rolebase.Appearances.Add(session.Wardrobe?.CurUseAppearances.ToDictionary(a => a.Key, a => a.Value) ?? RoleProto.Appearances(role));
-        foreach (var id in PropertyIds(stats))
-            info.Selfproperty.Propertys.Add(new Property { PropertyId = id, Data = stats[id], BaseData = stats.Base.GetValueOrDefault(id, stats[id]), Vd64 = stats[id] });
         return info;
+    }
+
+    /// <summary>
+    /// romsg.AllProperty as other players read it (LC_DAL_RolePublic._parseAllProperty): the full property list of the
+    /// character window. Shared by RoleDetailInfo.selfproperty and the global cache's RoleExpandInfo ("Extra").
+    /// </summary>
+    internal AllProperty PublicProperties(GameSession session)
+    {
+        var stats = Stats(session);
+        var all = new AllProperty { EntityID = session.Role!.Id };
+        foreach (var id in PropertyIds(stats))
+            all.Propertys.Add(new Property { PropertyId = id, Data = stats[id], BaseData = stats.Base.GetValueOrDefault(id, stats[id]), Vd64 = stats[id] });
+        return all;
     }
 
     /// <summary>EntityBase.equipInfo: ItemConfig ids of grids 1..7, 0 for empty.</summary>
