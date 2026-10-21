@@ -263,9 +263,16 @@ public sealed class SkillGrowthTests : IAsyncLifetime
     {
         await using var alice = await InWorld("Alice");
         await Next(alice, SkillService.SkillDataSync, DBSkillDataIncrement.Parser);
+        await alice.SendGameAsync(SkillService.SkillLoad, new SkillLoadReq
+        {
+            OpType = SkillLoadOperation.SkillLoadOpLoad, IsManual = true, SocketNum = 0,
+            Info = new SkillData { SkillId = 10000, SkillLevel = 1 }
+        });
+        Assert.Equal(0, (await Next(alice, SkillService.SkillLoad, SkillLoadResp.Parser)).Result);
         await Gm("alice", "!job 3100");
         await Next(alice, SkillService.SkillDataSync, DBSkillDataIncrement.Parser,
-            m => !m.SyncAllMark && m.SkillList.All.Value.Contains(13006));
+            m => !m.SyncAllMark && m.SkillList?.All?.Value.Contains(13006) == true);
+
         // Arrow Attack 1300001 (group 13000) is the Archer's bow attack in JobAttackConfig.
         await alice.SendGameAsync(SkillService.SkillLoad, new SkillLoadReq
         {
@@ -274,10 +281,14 @@ public sealed class SkillGrowthTests : IAsyncLifetime
         });
         Assert.Equal(0, (await Next(alice, SkillService.SkillLoad, SkillLoadResp.Parser)).Result);
         var alicePlayer = _app.Services.GetRequiredService<SessionRegistry>().All().Single(s => s.Account == "alice" && s.Role != null);
-        Assert.Equal(13000, alicePlayer.SkillPlans!.SkillAssignPlans[0].ManualLoadSkill[2].SkillId);
+        var bar = alicePlayer.SkillPlans!.SkillAssignPlans[0].ManualLoadSkill;
+        Assert.Equal(13000, bar[2].SkillId);
+        // The slot kept from Novice casts the same attack, so the button moves instead of doubling.
+        Assert.Equal(0, bar[0].SkillId);
         int attack = alicePlayer.SkillPlans.CurrentAtkSkillId;
-        Assert.Equal(attack, _app.Services.GetRequiredService<SkillService>().Build(alicePlayer)
-            .SkillWheel.WhellSkills[3].SkillConfigId);
+        var wheel = _app.Services.GetRequiredService<SkillService>().Build(alicePlayer).SkillWheel.WhellSkills;
+        Assert.Equal(attack, wheel[3].SkillConfigId);
+        Assert.Single(wheel.Values, slot => slot.SkillConfigId == attack);
     }
 
     [ClientDataFact]

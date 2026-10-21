@@ -933,7 +933,11 @@ public sealed class SkillService
             if (op == 2) loadList[target] = new SkillData();
             else
             {
-                foreach (var skill in loadList.Where(skill => skill.SkillId == group))
+                // A slot holding the Novice attack or another normal attack casts the current one, so it counts as
+                // the same skill and moves too.
+                int atkGroup = GroupOf(plans.CurrentAtkSkillId);
+                int cast = WheelGroup(p, group, atkGroup);
+                foreach (var skill in loadList.Where(skill => skill.SkillId > 0 && WheelGroup(p, skill.SkillId, atkGroup) == cast))
                 { skill.SkillId = 0; skill.SkillLevel = 0; }
                 loadList[target] = req.Info!.Clone();
             }
