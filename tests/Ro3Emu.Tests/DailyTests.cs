@@ -257,20 +257,14 @@ public sealed class DailyTests : IAsyncLifetime
         await using var bot = new BotClient(_httpUrl, File.ReadAllText(Path.Combine(_dataDir, "gate_rsa_public.pem")));
         await bot.LoginAsync("alice", "pw");
         await bot.EnterGateAsync();
-        await bot.SendGameAsync(DailyActivityService.RingAccept, new CommonDailyActivityReq
+        await StageGate.AssertUnansweredAsync(bot, DailyActivityService.RingAccept, new CommonDailyActivityReq
         { ActivityId = 3302, RunRingTaskAccept = new RunRingTaskAcceptReq() });
-        Assert.Equal(ErrorCodes.FeatureUnavailable,
-            (await Next(bot, DailyActivityService.RingAccept, CommonDailyActivityRes.Parser)).Result);
-        await bot.SendGameAsync(DailyActivityService.StageGain, new StageRewardGainReq { StageId = 7001 });
-        Assert.Equal(ErrorCodes.FeatureUnavailable,
-            (await Next(bot, DailyActivityService.StageGain, StageRewardGainResp.Parser)).Result);
+        await StageGate.AssertUnansweredAsync(bot, DailyActivityService.StageGain, new StageRewardGainReq { StageId = 7001 });
 
         long role = (await bot.CreateRoleAsync("Alice")).RoleBaseInfo.Id;
         await bot.EnterWorldAsync(role);
         await bot.SwitchRoleAsync();
-        await bot.SendGameAsync(DailyActivityService.StageGain, new StageRewardGainReq { StageId = 7001 });
-        Assert.Equal(ErrorCodes.FeatureUnavailable,
-            (await Next(bot, DailyActivityService.StageGain, StageRewardGainResp.Parser)).Result);
+        await StageGate.AssertUnansweredAsync(bot, DailyActivityService.StageGain, new StageRewardGainReq { StageId = 7001 });
     }
 
     [ClientDataFact]

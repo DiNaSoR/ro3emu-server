@@ -86,9 +86,8 @@ public sealed class LifeJobTests : IAsyncLifetime
     {
         await using var b = new BotClient(_http, File.ReadAllText(Path.Combine(_dir, "gate_rsa_public.pem")));
         await b.LoginAsync("alice", "pw"); await b.EnterGateAsync();
-        Assert.Equal(ErrorCodes.FeatureUnavailable, await Switch(b, 1, 1));
-        await b.SendGameAsync(LifeJobService.HealthAll, new GetHealthCostAllReq());
-        Assert.Equal(ErrorCodes.FeatureUnavailable, (await Next(b, LifeJobService.HealthNotify, GetHealthCostNtf.Parser)).Result);
+        await StageGate.AssertUnansweredAsync(b, LifeJobService.SwitchLife, new SwitchLifeJobReq { NewLifejobId = (LifeJobType)1, OpJobType = 1 });
+        await StageGate.AssertUnansweredAsync(b, LifeJobService.HealthAll, new GetHealthCostAllReq(), LifeJobService.HealthNotify);
         long id = (await b.CreateRoleAsync("Alice")).RoleBaseInfo.Id;
         await b.EnterWorldAsync(id);
         Assert.NotEqual(0, await Switch(b, 1, 1)); // no certificate
@@ -100,14 +99,10 @@ public sealed class LifeJobTests : IAsyncLifetime
         var roles = _app.Services.GetRequiredService<RoleStore>();
         byte[] before = roles.LoadLifeJob(id)!;
         await b.SwitchRoleAsync();
-        Assert.Equal(ErrorCodes.FeatureUnavailable, await Switch(b, 5, 2));
-        await b.SendGameAsync(LifeJobService.StudyRecipe, new StudyRecipeReq { FormulaID = 20001 });
-        Assert.Equal(ErrorCodes.FeatureUnavailable, (await Next(b, LifeJobService.StudyRecipe, StudyRecipeResp.Parser)).Result);
+        await StageGate.AssertUnansweredAsync(b, LifeJobService.SwitchLife, new SwitchLifeJobReq { NewLifejobId = (LifeJobType)5, OpJobType = 2 });
+        await StageGate.AssertUnansweredAsync(b, LifeJobService.StudyRecipe, new StudyRecipeReq { FormulaID = 20001 });
         foreach (long guid in consumables)
-        {
-            await b.SendGameAsync(CharacterService.ItemUse, new ItemUseReq { ItemGuid = guid, ItemCount = 1 });
-            Assert.Equal(ErrorCodes.FeatureUnavailable, (await Next(b, CharacterService.ItemUse, ItemUseResp.Parser)).Result);
-        }
+            await StageGate.AssertUnansweredAsync(b, CharacterService.ItemUse, new ItemUseReq { ItemGuid = guid, ItemCount = 1 });
         var savedItems = _app.Services.GetRequiredService<ItemStore>().Load(id).Where(i => consumables.Contains(i.Guid)).ToArray();
         Assert.Equal(2, savedItems.Length); Assert.All(savedItems, i => Assert.Equal(1, i.Stack));
         Assert.Equal(before, roles.LoadLifeJob(id));

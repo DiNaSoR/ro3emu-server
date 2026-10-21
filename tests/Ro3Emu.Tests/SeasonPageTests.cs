@@ -350,14 +350,15 @@ public sealed class SeasonPageTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task PageMessagesBeforeRoleSelectionReturnRefusals()
+    public async Task PageMessagesBeforeRoleSelectionAreRefusedUnanswered()
     {
         await using var bot = new BotClient(_http, File.ReadAllText(Path.Combine(_dataDir, "gate_rsa_public.pem")));
         await bot.LoginAsync("alice", "pw"); await bot.EnterGateAsync();
-        Assert.Equal(ErrorCodes.FeatureUnavailable, (await Page(bot)).Result);
-        Assert.Equal(ErrorCodes.FeatureUnavailable, (await Claim(bot, (2, 17))).Result);
-        await bot.SendGameAsync(SeasonPageService.PutOnHonorBadge, new SeasonPagePutOnHonorBadgeReq { Id = 1300046, IsPutOn = true });
-        Assert.Equal(ErrorCodes.FeatureUnavailable, (await Next(bot, SeasonPageService.PutOnHonorBadge, SeasonPagePutOnHonorBadgeResp.Parser)).Result);
+        await StageGate.AssertUnansweredAsync(bot, SeasonPageService.GetData, new SeasonPageGetDataReq());
+        var claim = new SeasonPageReceiveRankRewardReq();
+        claim.RankReward[2] = 17;
+        await StageGate.AssertUnansweredAsync(bot, SeasonPageService.ReceiveRankReward, claim);
+        await StageGate.AssertUnansweredAsync(bot, SeasonPageService.PutOnHonorBadge, new SeasonPagePutOnHonorBadgeReq { Id = 1300046, IsPutOn = true });
     }
 
     [ClientDataFact]
