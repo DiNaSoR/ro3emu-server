@@ -36,7 +36,8 @@ namespace Ro3Emu.ClientHooks
         // Kept alive here: Lua holds the pushed delegate only weakly through xLua's object pool.
         private static readonly LuaPatches.SelfMethod RefreshWrapper = RefreshView;
         private static readonly Dictionary<Obf_R.Obf_ff, string> Pending = new Dictionary<Obf_R.Obf_ff, string>();
-        private static TMP_Text _clone, _cooldown;
+        // Each copy follows its cooldown label's colour (the tooltip fades in by vertex colour).
+        private static readonly Dictionary<TMP_Text, TMP_Text> Copies = new Dictionary<TMP_Text, TMP_Text>();
         private static bool _diagnosed;
 
         /// <summary>From LuaPatches.Tick, once per LuaEnv.</summary>
@@ -119,7 +120,7 @@ namespace Ro3Emu.ClientHooks
         /// <summary>Per frame (UiTweaks.Tick): puts the lines built last frame into their tooltips.</summary>
         public static void Tick()
         {
-            if (_clone != null && _cooldown != null && _clone.color != _cooldown.color) _clone.color = _cooldown.color;
+            if (Copies.Count > 0) FollowColours();
             if (Pending.Count == 0) return;
             var batch = Pending.ToArray();
             Pending.Clear();
@@ -128,6 +129,18 @@ namespace Ro3Emu.ClientHooks
                 try { Show(item.Key, item.Value); }
                 catch (Exception e) { Once("show: " + e.GetType().Name + ": " + e.Message); }
             }
+        }
+
+        private static void FollowColours()
+        {
+            TMP_Text dead = null;
+            foreach (var pair in Copies)
+            {
+                // Unity's == null: a copy or label destroyed with its tooltip drops out (one per frame).
+                if (pair.Key == null || pair.Value == null) { dead = pair.Key; continue; }
+                if (pair.Key.color != pair.Value.color) pair.Key.color = pair.Value.color;
+            }
+            if (!ReferenceEquals(dead, null)) Copies.Remove(dead);
         }
 
         private static void Show(Obf_R.Obf_ff self, string line)
@@ -150,8 +163,7 @@ namespace Ro3Emu.ClientHooks
             if (!clone.gameObject.activeSelf) clone.gameObject.SetActive(true);
             label.text = line;
             Place(clone, cooldown);
-            _clone = label;
-            _cooldown = cooldown.GetComponent<TMP_Text>();
+            if (cooldown.GetComponent<TMP_Text>() is { } source) Copies[label] = source;
         }
 
         /// <summary>A copy of the cooldown label without the component that re-applies its language key.</summary>
