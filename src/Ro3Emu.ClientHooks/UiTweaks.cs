@@ -30,6 +30,7 @@ namespace Ro3Emu.ClientHooks
             AnimationSounds.Tick();
             CutsceneAudio.Tick();
             TextFit.Tick();
+            SkillTipCost.Tick();
             HitchProfiler.Tick();
             if (++_frame % 10 != 0) return;
             try

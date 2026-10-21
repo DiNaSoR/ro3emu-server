@@ -38,6 +38,7 @@ namespace Ro3Emu.ClientHooks
     /// (CustomContent).</item>
     /// <item>The "Don't just stand there" idle prompt (tutorial guide 199) no longer shows (IdlePrompt).</item>
     /// <item>When RO3Emu.exe logged in for the player, the login and server screens are skipped (AutoLogin).</item>
+    /// <item>Skill tooltips show their SP cost, with SP consumption and buffs applied (SkillTipCost).</item>
     /// </list>
     /// </summary>
     public static class LuaPatches
@@ -124,6 +125,7 @@ namespace Ro3Emu.ClientHooks
                 PayManager.Install(Module(manager, global, "lua_sdk_paymgr"));
                 IdlePrompt.Install(Module(manager, global, "lc_guidemanager")); // the class: GlobalRequire keeps its instance elsewhere
                 AutoLogin.Install(manager, global);
+                SkillTipCost.Install(manager, global);
                 Debug.Log("[Ro3Emu.LuaPatches] lc_itemshowfunc: " + added + " card show-func method(s) added; stall name limit "
                     + (param != null ? StallNameMaxLength.ToString() : "not set (publicparamconfig missing)"));
             }
