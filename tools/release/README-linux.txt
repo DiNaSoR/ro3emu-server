@@ -15,10 +15,10 @@ Options:
   --client DIR      a copied game folder (at least ro3_Data/StreamingAssets)
   --download DIR    get the needed game files from the Genesis update servers into DIR
   --host ADDRESS    the address players connect to (default: this machine's first address)
-  --gm ACCOUNT      an account that gets GM commands in game (repeatable)
+  --gm ACCOUNT      an account that gets GM commands in game (repeatable; without it nobody has GM)
   --voice-port PORT turn on party voice chat on this TCP port, for example 33101 (off by default)
   --dev             run as Development instead of Production, for testing: reads
-                    server/appsettings.Development.json, and without --gm every account has GM
+                    server/appsettings.Development.json (the Exchange seller and buy-back)
   --service         install and start a systemd service (needs sudo)
   --reexport        export the game data again (after a game update)
 

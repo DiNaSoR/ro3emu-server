@@ -79,7 +79,7 @@ is off unless the host adds `--voice-port 33101` (any free port); then forward t
 ./server.sh --client /path/to/ROO_PC --host <public IP> --gm <your account>     # a game folder copied from Windows
 ./server.sh --download /srv/ro3/ROO_PC --host <public IP> --gm <your account>   # or only the files it needs, from Genesis
 ./server.sh --service ...                                                       # install it as a systemd service
-./server.sh --dev --host 127.0.0.1                                              # Development mode, for testing
+./server.sh --dev --host 127.0.0.1 --gm <your account>                         # Development mode, for testing
 ```
 
 Open TCP `5380`, `20000` and `33100`, and the voice port if you turn voice on with `--voice-port 33101`.
