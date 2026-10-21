@@ -7,8 +7,8 @@ name: release
 # installs it) gets the files of every daily release and v* tag, and of every change on main to anything that goes into
 # RO3Emu.exe or the client DLLs. The server is left out of the push filter on purpose: main changes it many times a
 # day, so a server change reaches the launcher release with the next daily build.
-# CI has no game client: pack.ps1 (tools/release/client-dlls.ps1) downloads just the client's managed DLLs from the
-# publisher and builds the client hooks/loc DLLs against them. Run tools/release/smoke.ps1 locally (it needs the
+# CI has no game client: pack.ps1 (tools/release/client-dlls.ps1) takes the client's managed DLLs from the cache that
+# client-dlls.yml fills, or downloads just those from the publisher, and builds the client hooks/loc DLLs against them. Run tools/release/smoke.ps1 locally (it needs the
 # clients) before publishing the draft.
 on:
   push:
@@ -51,10 +51,30 @@ jobs:
         run: dotnet test tests/Ro3Emu.Tests -c Release --filter "Category!=Slow"
       - name: Setup tests
         run: dotnet test tests/Ro3Emu.Setup.Tests -c Release --filter "Category!=Slow"
+      # The client's managed DLLs that client-dlls.yml cached on Linux, for the current release or, with the update
+      # server down, the newest one. Without a cache pack.ps1 downloads them from the publisher as before (#262).
+      - name: Current client release
+        id: client
+        shell: bash
+        run: |
+          if release=$(curl -fsS -A RO3Emu/1.0 --retry 3 https://update.genesis3.is/windows/launcher/v1/channels/ro3_recovery/full/manifest.json | jq -er .release.release_id); then
+            echo "release=$release" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::The client manifest could not be read; using the newest cached client DLLs if there are any."
+          fi
+      - name: Client managed DLLs (cache)
+        id: cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .client
+          key: client-managed-${{ steps.client.outputs.release }}
+          restore-keys: ${{ steps.client.outputs.release == '' && 'client-managed-' || '' }}
+          enableCrossOsArchive: true
       - name: Pack
         shell: pwsh
         env:
           DAILY_TAG: ${{ inputs.tag }}
+          RO3_CLIENT_DIR: ${{ steps.cache.outputs.cache-matched-key != '' && format('{0}/.client', github.workspace) || '' }}
         run: |
           $version = if ($env:DAILY_TAG) { $env:DAILY_TAG.TrimStart('v') } elseif ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME.TrimStart('v') } else { "0.0.$env:GITHUB_RUN_NUMBER" }
           ./tools/release/pack.ps1 -Version $version
