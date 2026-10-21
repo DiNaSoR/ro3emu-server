@@ -14,7 +14,7 @@ public interface IMicroService
     ValueTask<object?> InvokeAsync(MicroSession session, string method, object? args);
 }
 
-public sealed class MicroServiceRouter(IEnumerable<IMicroService> services, ILogger<MicroServiceRouter> log, Game.GameLoop? loop = null, Game.Ownership.OwnerRegistry? owners = null, Game.SessionRegistry? sessions = null)
+public sealed partial class MicroServiceRouter(IEnumerable<IMicroService> services, ILogger<MicroServiceRouter> log, Game.GameLoop? loop = null, Game.Ownership.OwnerRegistry? owners = null, Game.SessionRegistry? sessions = null)
 {
     private readonly Dictionary<string, IMicroService> _services = services.ToDictionary(s => s.Name);
 
@@ -35,6 +35,10 @@ public sealed class MicroServiceRouter(IEnumerable<IMicroService> services, ILog
     private static bool AllowedBeforeSignIn(string service, string method) =>
         (service, method) is ("LoginService", "verifySdk") or ("PhonestGate", "bind");
 
+    [LoggerMessage(Level = LogLevel.Warning,
+        Message = "Micro {Service}.{Method} from session {Id} refused: no account is bound; later ones not logged")]
+    private static partial void LogUnverifiedCall(ILogger logger, string service, string method, long id);
+
     public async ValueTask<byte[]> InvokeAsync(MicroSession session, string service, string method, ReadOnlyMemory<byte> packedArgs)
     {
         if (session.Account == null && !AllowedBeforeSignIn(service, method))
@@ -43,9 +47,7 @@ public sealed class MicroServiceRouter(IEnumerable<IMicroService> services, ILog
             if (!session.RefusalLogged)
             {
                 session.RefusalLogged = true;
-                log.LogWarning(
-                    "Micro {Service}.{Method} from session {Id} refused: no account is bound; later ones not logged",
-                    service, method, session.Id);
+                LogUnverifiedCall(log, service, method, session.Id);
             }
             return MessagePackSerializer.Serialize(Fail("not verified"));
         }
