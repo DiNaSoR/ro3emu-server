@@ -29,7 +29,7 @@ while [ $# -gt 0 ]; do
     --dev) dev=1; shift ;;
     --service) service=1; shift ;;
     --reexport) reexport=1; shift ;;
-    -h|--help) sed -n '2,14p' "$self"; exit 0 ;;
+    -h|--help) sed -n '2,/^[^#]/{/^#/p}' "$self"; exit 0 ;;  # the header comment, however long
     *) echo "unknown option $1 (see ./server.sh --help)"; exit 1 ;;
   esac
 done
