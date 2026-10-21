@@ -66,6 +66,35 @@ public sealed class RankRewardTests
         Assert.Single(Rewards(roles, carol)); // fourth now
     }
 
+    [Fact]
+    public async Task AnInterruptedPeriodIsFinishedBeforeTheNextOneIsRanked()
+    {
+        var clock = new TestClock();
+        await using var host = await SyntheticHost.StartAsync(clock: clock);
+        var roles = host.Service<RoleStore>();
+        long alice = Role(roles, "Alice"), bob = Role(roles, "Bob");
+        long first = new DateTimeOffset(2026, 10, 5, 5, 0, 0, TimeSpan.Zero).ToUnixTimeSeconds();
+        await Until(() => Settled(host)?.Period == first, "the start-up settlement");
+        Climb(roles, alice, 94);
+        Climb(roles, bob, 93);
+        // The 10-05 winners were saved but the server stopped before Bob's letter went out.
+        var interrupted = new RankService.RewardState
+        {
+            Boards = { [1011] = new RankService.BoardSettlement { Period = first, Winners = { [1] = bob } } },
+        };
+        await host.Service<AccountStore>().WriteLegacyAsync<int>(
+            new SeasonStateWritePlan(RankService.RewardStateKey, JsonSerializer.Serialize(interrupted)));
+
+        // It comes back after the next boundary: Bob is paid for 10-05 (rank 1), then 10-06 is ranked (Bob second).
+        clock.Advance(TimeSpan.FromHours(1));
+        await host.RestartAsync();
+        roles = host.Service<RoleStore>();
+        await Until(() => Rewards(roles, bob).Count == 2, "Bob's 10-05 and 10-06 letters");
+        Assert.Equal([5L, 2L], Rewards(roles, bob).Select(l => Amount(l)));
+        Assert.Equal([5L], Rewards(roles, alice).Select(l => Amount(l)));
+        Assert.Equal(first + 86400, Settled(host)!.Period);
+    }
+
     private static RankService.BoardSettlement? Settled(SyntheticHost host) =>
         host.Service<AccountStore>().ReadSync<string?>(new SeasonStateReadPlan(RankService.RewardStateKey)) is { Length: > 0 } saved
             ? JsonSerializer.Deserialize<RankService.RewardState>(saved)!.Boards.GetValueOrDefault(1011) : null;

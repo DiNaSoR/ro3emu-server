@@ -34,6 +34,8 @@ Settlement *(inferred: the original's server side is not in the client)*:
   Its winners for that period are saved to `server_state` `rank_rewards` before any letter goes out.
 - Each letter is delivered once per board, period and role (delivery key `rank:<board>:<period>:<role>`). After a
   restart the saved period's letters are sent again, which only completes an interrupted settlement: the board is not
-  ranked again, so a role that climbed in the meantime waits for the next period.
+  ranked again, so a role that climbed in the meantime waits for the next period. A letter that fails (a database
+  error) is retried every minute until the period's letters have all gone out, and an unfinished period is completed
+  before the board's next period replaces its saved winners.
 - Boundaries missed while the server was down settle once, with the board as it is at the next check.
 - Guild boards and the equipment board (rows are guilds and items) do not pay; none of them has gift rows.

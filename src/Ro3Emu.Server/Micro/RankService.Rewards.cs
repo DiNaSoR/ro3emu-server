@@ -15,19 +15,24 @@ namespace Ro3Emu.Server.Micro;
 /// <para>
 /// (inferred) At the first check after a boundary the board is rebuilt from committed state and its winners for that
 /// period are saved (server_state "rank_rewards") before any letter goes out; each letter is delivered once per board,
-/// period and role, so a restart finishes an interrupted settlement for the saved winners instead of ranking again.
-/// Boundaries missed while the server was down settle once, with the board as it is at the next check.
+/// period and role. A period whose letters have not all gone out (a failed letter, a restart) is sent again every
+/// minute until they have, and is finished before the board's next period replaces its winners, so a restart never
+/// ranks a period again. Boundaries missed while the server was down settle once, with the board as it is at the next
+/// check.
 /// </para>
 /// </summary>
 public sealed partial class RankService : IGameTicker
 {
     internal const string RewardStateKey = "rank_rewards";
     private const int DailyPrize = 1, WeeklyPrize = 2;
-    private static readonly TimeSpan RewardCheckEvery = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan RewardCheckEvery = TimeSpan.FromSeconds(1), RewardRetryEvery = TimeSpan.FromMinutes(1);
 
-    private TimeSpan lastRewardCheck;
-    private bool rewardChecked, rewardResumed, settling;
+    private TimeSpan lastRewardCheck, rewardRetryAt;
+    private bool rewardChecked, settling;
     private RewardState? rewardState;
+
+    /// <summary>Boards whose saved period may still owe letters: every saved board after a start, until delivered.</summary>
+    private readonly HashSet<int> unfinished = [];
 
     /// <summary>The last settled period of each paying board and its winners (rank to role).</summary>
     public sealed class RewardState
@@ -51,17 +56,17 @@ public sealed partial class RankService : IGameTicker
         rewardChecked = true;
         lastRewardCheck = time.Now;
         var state = RewardStateNow();
+        bool retry = time.Now >= rewardRetryAt;
         var due = new List<(PayingBoard Board, long Period)>();
         foreach (var board in PayingBoards())
         {
             if (LatestBoundary(board.Id) is not { } period) continue;
             long settled = state.Boards.GetValueOrDefault(board.Id)?.Period ?? 0;
-            // After a restart the saved period is delivered again (once-only letters) in case it was interrupted.
-            if (period > settled || !rewardResumed && period == settled) due.Add((board, period));
+            if (period > settled || retry && period == settled && unfinished.Contains(board.Id)) due.Add((board, period));
         }
-        rewardResumed = true;
         if (due.Count == 0) return;
         settling = true;
+        rewardRetryAt = time.Now + RewardRetryEvery;
         loop.PostLegacy(async () =>
         {
             try
@@ -75,34 +80,65 @@ public sealed partial class RankService : IGameTicker
 
     private async Task SettleAsync(PayingBoard board, long period)
     {
-        var state = RewardStateNow();
-        if (state.Boards.GetValueOrDefault(board.Id) is not { } saved || saved.Period != period)
+        var saved = RewardStateNow().Boards.GetValueOrDefault(board.Id);
+        if (saved != null && saved.Period != period)
         {
-            Invalidate();
-            var rows = (await BoardsAsync()).Boards.GetValueOrDefault(board.Id)?.Rows ?? [];
-            saved = new BoardSettlement { Period = period };
-            foreach (var (min, max, _) in board.Gifts)
-                for (int rank = Math.Max(1, min); rank <= Math.Min(max, rows.Count); rank++) saved.Winners[rank] = rows[rank - 1].Id;
-            var next = new RewardState { Boards = new(state.Boards) { [board.Id] = saved } };
-            await accounts.WriteLegacyAsync<int>(new SeasonStateWritePlan(RewardStateKey, JsonSerializer.Serialize(next)));
-            rewardState = next;
-            LogSettled(log, board.Id, period, saved.Winners.Count);
+            // An interrupted period is finished before the new one replaces its winners.
+            if (unfinished.Contains(board.Id) && !await DeliverAsync(board, saved)) return;
+            saved = null;
         }
-        foreach (var (rank, role) in saved.Winners.OrderBy(w => w.Key))
-        {
-            var gift = board.Gifts.First(g => rank >= g.Min && rank <= g.Max);
-            try
-            {
-                await mail.SendTemplateOnceAsync(role, board.MailId, mail.FixedGroupAward(gift.Reward),
-                    $"rank:{board.Id}:{period}:{role}", _ => { }, loop.Owners?.Current, contentParams: [rank]);
-            }
-            catch (Exception e) { LogLetterFailed(log, e, board.Id, rank, role); }
-        }
+        await DeliverAsync(board, saved ?? await RankAsync(board, period));
     }
 
-    private RewardState RewardStateNow() => rewardState ??=
-        accounts.ReadSync<string?>(new SeasonStateReadPlan(RewardStateKey)) is { Length: > 0 } saved
+    /// <summary>Ranks the board from committed state and saves the period's winners before any letter goes out.</summary>
+    private async Task<BoardSettlement> RankAsync(PayingBoard board, long period)
+    {
+        Invalidate();
+        var rows = (await BoardsAsync()).Boards.GetValueOrDefault(board.Id)?.Rows ?? [];
+        var saved = new BoardSettlement { Period = period };
+        foreach (var (min, max, _) in board.Gifts)
+            for (int rank = Math.Max(1, min); rank <= Math.Min(max, rows.Count); rank++) saved.Winners[rank] = rows[rank - 1].Id;
+        var next = new RewardState { Boards = new(RewardStateNow().Boards) { [board.Id] = saved } };
+        await accounts.WriteLegacyAsync<int>(new SeasonStateWritePlan(RewardStateKey, JsonSerializer.Serialize(next)));
+        rewardState = next;
+        unfinished.Add(board.Id);
+        LogSettled(log, board.Id, period, saved.Winners.Count);
+        return saved;
+    }
+
+    /// <summary>Sends the saved winners' letters (each once only); true when none failed.</summary>
+    private async Task<bool> DeliverAsync(PayingBoard board, BoardSettlement saved)
+    {
+        bool delivered = true;
+        foreach (var (rank, role) in saved.Winners.OrderBy(w => w.Key))
+        {
+            try
+            {
+                // A rank the gift rows no longer cover (changed config) is owed nothing.
+                var gift = board.Gifts.FirstOrDefault(g => rank >= g.Min && rank <= g.Max);
+                if (gift.Reward <= 0) continue;
+                await mail.SendTemplateOnceAsync(role, board.MailId, mail.FixedGroupAward(gift.Reward),
+                    $"rank:{board.Id}:{saved.Period}:{role}", _ => { }, loop.Owners?.Current, contentParams: [rank]);
+            }
+            catch (Exception e)
+            {
+                delivered = false;
+                LogLetterFailed(log, e, board.Id, rank, role);
+            }
+        }
+        if (delivered) unfinished.Remove(board.Id);
+        return delivered;
+    }
+
+    private RewardState RewardStateNow()
+    {
+        if (rewardState != null) return rewardState;
+        rewardState = accounts.ReadSync<string?>(new SeasonStateReadPlan(RewardStateKey)) is { Length: > 0 } saved
             ? JsonSerializer.Deserialize<RewardState>(saved) ?? new RewardState() : new RewardState();
+        // After a start the saved periods are delivered again (once-only letters) in case they were interrupted.
+        unfinished.UnionWith(rewardState.Boards.Keys);
+        return rewardState;
+    }
 
     /// <summary>Role boards with gift rows and a letter (equipment rows are items, guild rows guilds: neither pays).</summary>
     private IEnumerable<PayingBoard> PayingBoards()
