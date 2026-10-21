@@ -208,8 +208,15 @@ public sealed class PositionPersistenceTests(ITestOutputHelper output) : IAsyncL
                 positions.MarkDirty(s, urgent: true);
                 return Task.CompletedTask;
             });
+            // Where the handover got to, for a timeout's message (#237: the barrier wait below timed out on CI only).
+            var handover = Service<RoleHandover>();
+            var sessions = Service<RoleSessionService>();
+            var progress = new System.Collections.Concurrent.ConcurrentQueue<string>();
+            handover.PhaseForTest = (phase, _) => progress.Enqueue($"phase {phase}");
+            sessions.CleanupFailureForTest = (step, _) => { progress.Enqueue($"step {step}"); return null; };
             accounts.WriteSyncPlanObserved = (plan, onLoop) =>
             {
+                progress.Enqueue($"sync write {plan.Label}");
                 if (plan.Label != "role/Position") return;
                 int attempt = Interlocked.Increment(ref barrierAttempts);
                 if (attempt != 1) return;
@@ -225,7 +232,12 @@ public sealed class PositionPersistenceTests(ITestOutputHelper output) : IAsyncL
                 }
             };
             await bot.DisposeAsync();
-            Task detach = await barrierObserved.Task.WaitAsync(Wait);
+            Task detach;
+            try { detach = await barrierObserved.Task.WaitAsync(Wait); }
+            catch (TimeoutException e)
+            {
+                throw new TimeoutException($"cleanup never reached the position barrier; got to: {string.Join(", ", progress)}", e);
+            }
             await detach.WaitAsync(Wait);
             Assert.Equal(2, Volatile.Read(ref barrierAttempts)); // refused capture, then one fresh retry
             Assert.Equal(RoleOwnerState.Detached, owner.State);
@@ -242,6 +254,8 @@ public sealed class PositionPersistenceTests(ITestOutputHelper output) : IAsyncL
             releaseLazy.Set();
             accounts.BeforeCommitForTest = null;
             accounts.WriteSyncPlanObserved = null;
+            Service<RoleHandover>().PhaseForTest = null;
+            Service<RoleSessionService>().CleanupFailureForTest = null;
             await bot.DisposeAsync();
         }
     }
