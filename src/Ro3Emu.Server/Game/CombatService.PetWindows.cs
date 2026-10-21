@@ -42,57 +42,65 @@ public sealed partial class CombatService
     private void GuardianPrimaryWindows(GameSession source, GuardianPetRules.Skill pet, ActiveSkillCast cast)
     {
         double[] desc = Numbers(pet.Active, "_kDescData");
-        GuardianWindow New(GuardianWindowKind kind, double seconds) => new()
-        { Pet = pet, Cast = cast, Kind = kind, Expires = Now + (long)(seconds * 1000) };
-        GuardianWindow? window = null;
-        switch (GuardianPetRules.Script(pet.Effect))
+        string script = GuardianPetRules.Script(pet.Effect);
+        GuardianWindow Open(GuardianWindowKind kind, double seconds, Action<GuardianWindow> configure)
         {
-            case "BaXiLiSiKe_HuZhu" when desc.Length >= 5:
-                window = New(GuardianWindowKind.DefenceOnHit, desc[0]);
-                window.BuffId = GuardianPetRules.BuffAtStar(_data, 23412, pet.Star); window.BuffDuration = (int)(desc[3] * 1000);
-                break;
-            case "Pet_AncientMummy_23122" when desc.Length >= 6:
-                window = New(GuardianWindowKind.CurseOnKill, desc[4]);
-                window.Effect = GuardianSkillAtStar(23126, pet.Star); window.Remaining = (int)desc[5];
-                break;
-            case "renfamizong" when desc.Length >= 5:
-                window = New(GuardianWindowKind.Stealth, desc[2]); window.Remaining = (int)desc[4];
-                break;
-            case "tutujianglin" when desc.Length >= 4:
-                window = New(GuardianWindowKind.HealLowHp, desc[0]);
-                window.HpThreshold = desc[2]; window.Coefficient = desc[3]; window.Remaining = 1;
-                break;
-            case "WuShiZhiNu" when desc.Length >= 7:
-                window = New(GuardianWindowKind.ExtraHit, desc[4]);
-                window.Effect = GuardianSkillAtStar(23275, pet.Star); window.IntervalMs = (int)(desc[6] * 1000);
-                break;
-            case "NvZhanShiLuoLa_HuZhu" when desc.Length >= 11:
-                window = New(GuardianWindowKind.ExtraHit, desc[6]);
-                window.Effect = GuardianSkillAtStar(23266, pet.Star); window.IntervalMs = (int)(desc[10] * 1000);
-                break;
-            case "Pet_MmSarah_23342" when desc.Length >= 7:
-                window = New(GuardianWindowKind.ExtraHit, desc[4]);
-                window.Effect = GuardianSkillAtStar(23346, pet.Star); window.IntervalMs = (int)(desc[6] * 1000);
-                window.Hits = (int)GuardianPetRules.DescriptionLiterals(pet.Active).ElementAtOrDefault(1);
-                break;
-            case "BlueprintYinYueJiangLin2" when desc.Length >= 9:
-                window = New(GuardianWindowKind.BuffSelf, desc[4]);
-                window.Chance = desc[5]; window.GuaranteedDistance = desc[8];
-                window.BuffId = GuardianPetRules.BuffAtStar(_data, 23033, pet.Star); window.BuffDuration = (int)(desc[6] * 1000);
-                break;
-            case "PetrifyingGaze" when desc.Length >= 8:
-                window = New(GuardianWindowKind.BuffEnemy, desc[4]);
-                window.NormalOnly = true; window.Chance = desc[5]; window.BuffId = 902101;
-                window.BuffDuration = (int)(desc[6] * 1000); window.IntervalMs = (int)(desc[7] * 1000);
-                break;
-            case "xingxingshike" when desc.Length >= 9:
-                window = New(GuardianWindowKind.BuffEnemy, desc[4]);
-                window.Chance = desc[7]; window.BuffId = GuardianPetRules.BuffAtStar(_data, 23362, pet.Star);
-                window.BuffDuration = (int)(desc[8] * 1000);
-                break;
+            var window = new GuardianWindow { Pet = pet, Cast = cast, Kind = kind, Expires = Now + (long)(seconds * 1000) };
+            configure(window);
+            return window;
         }
+        var window = GuardianOwnerWindow(script, desc, pet, Open) ?? GuardianHitWindow(script, desc, pet, Open);
         if (window != null && (window.Kind != GuardianWindowKind.ExtraHit || window.Effect != null)) RegisterGuardianWindow(source, window);
     }
+
+    private delegate GuardianWindow GuardianWindowOpener(GuardianWindowKind kind, double seconds, Action<GuardianWindow> configure);
+
+    /// <summary>Windows that guard or reward the owner: Basilisk's defence, Mummy's kill curse, Shinobi's stealth and
+    /// Tutu's low-HP heal. The _kDescData index of each value follows the primary's localized description.</summary>
+    private GuardianWindow? GuardianOwnerWindow(string script, double[] desc, GuardianPetRules.Skill pet, GuardianWindowOpener open) =>
+        script switch
+        {
+            "BaXiLiSiKe_HuZhu" when desc.Length >= 5 => open(GuardianWindowKind.DefenceOnHit, desc[0], w =>
+                { w.BuffId = GuardianPetRules.BuffAtStar(_data, GuardianGroup.BasiliskDefence, pet.Star); w.BuffDuration = (int)(desc[3] * 1000); }),
+            "Pet_AncientMummy_23122" when desc.Length >= 6 => open(GuardianWindowKind.CurseOnKill, desc[4], w =>
+                { w.Effect = GuardianSkillAtStar(GuardianGroup.MummyKillCurse, pet.Star); w.Remaining = (int)desc[5]; }),
+            "renfamizong" when desc.Length >= 5 => open(GuardianWindowKind.Stealth, desc[2], w => w.Remaining = (int)desc[4]),
+            "tutujianglin" when desc.Length >= 4 => open(GuardianWindowKind.HealLowHp, desc[0], w =>
+                { w.HpThreshold = desc[2]; w.Coefficient = desc[3]; w.Remaining = 1; }),
+            _ => null,
+        };
+
+    /// <summary>Windows that act on the owner's hits: the extra hits of Dullahan, Lola and Sarah, and the buffs of
+    /// YinYueJiangLin, Medusa's PetrifyingGaze and xingxingshike.</summary>
+    private GuardianWindow? GuardianHitWindow(string script, double[] desc, GuardianPetRules.Skill pet, GuardianWindowOpener open) =>
+        script switch
+        {
+            "WuShiZhiNu" when desc.Length >= 7 => open(GuardianWindowKind.ExtraHit, desc[4], w =>
+                { w.Effect = GuardianSkillAtStar(GuardianGroup.DullahanPrimaryHit, pet.Star); w.IntervalMs = (int)(desc[6] * 1000); }),
+            "NvZhanShiLuoLa_HuZhu" when desc.Length >= 11 => open(GuardianWindowKind.ExtraHit, desc[6], w =>
+                { w.Effect = GuardianSkillAtStar(GuardianGroup.LolaPrimaryHit, pet.Star); w.IntervalMs = (int)(desc[10] * 1000); }),
+            "Pet_MmSarah_23342" when desc.Length >= 7 => open(GuardianWindowKind.ExtraHit, desc[4], w =>
+            {
+                w.Effect = GuardianSkillAtStar(GuardianGroup.SarahPrimaryHit, pet.Star); w.IntervalMs = (int)(desc[6] * 1000);
+                w.Hits = (int)GuardianPetRules.DescriptionLiterals(pet.Active).ElementAtOrDefault(1);
+            }),
+            "BlueprintYinYueJiangLin2" when desc.Length >= 9 => open(GuardianWindowKind.BuffSelf, desc[4], w =>
+            {
+                w.Chance = desc[5]; w.GuaranteedDistance = desc[8];
+                w.BuffId = GuardianPetRules.BuffAtStar(_data, GuardianGroup.YinYueJiangLin, pet.Star); w.BuffDuration = (int)(desc[6] * 1000);
+            }),
+            "PetrifyingGaze" when desc.Length >= 8 => open(GuardianWindowKind.BuffEnemy, desc[4], w =>
+            {
+                w.NormalOnly = true; w.Chance = desc[5]; w.BuffId = GuardianPetRules.PetrifyBuff;
+                w.BuffDuration = (int)(desc[6] * 1000); w.IntervalMs = (int)(desc[7] * 1000);
+            }),
+            "xingxingshike" when desc.Length >= 9 => open(GuardianWindowKind.BuffEnemy, desc[4], w =>
+            {
+                w.Chance = desc[7]; w.BuffId = GuardianPetRules.BuffAtStar(_data, GuardianGroup.XingXingShiKeDebuff, pet.Star);
+                w.BuffDuration = (int)(desc[8] * 1000);
+            }),
+            _ => null,
+        };
 
     private JsonElement? GuardianSkillAtStar(int group, int star)
     {
@@ -111,7 +119,7 @@ public sealed partial class CombatService
             Pet = pet, Cast = action, Kind = heal ? GuardianWindowKind.HealOnHit : GuardianWindowKind.ExtraHit,
             Expires = Now + (long)(Desc(0) * 1000), IntervalMs = (int)(Desc(heal || lola ? 4 : 2) * 1000),
             Radius = heal ? Desc(1) : 0, Maximum = heal ? (int)Desc(2) + 1 : 1, Coefficient = heal ? Desc(3) : 0,
-            Effect = heal ? null : GuardianSkillAtStar(lola ? 23267 : 23276, pet.Star),
+            Effect = heal ? null : GuardianSkillAtStar(lola ? GuardianGroup.LolaReactiveHit : GuardianGroup.DullahanReactiveHit, pet.Star),
         };
         if (heal || window.Effect != null) RegisterGuardianWindow(source, window);
     }
@@ -150,7 +158,7 @@ public sealed partial class CombatService
         {
             case GuardianWindowKind.ExtraHit when window.Effect is { } effect:
                 // Sarah's auxiliary coefficient is the TOTAL of the literal hit count, unlike its primary per-hit coefficient.
-                int hits = Math.Clamp(window.Hits, 1, 50);
+                int hits = Math.Clamp(window.Hits, 1, GuardianPetRules.MaxRepeats);
                 var one = hits == 1 ? effect : GuardianPetRules.PulseRow(effect,
                     new(0, Numbers(effect, "_kDamageParam1").FirstOrDefault() / hits));
                 for (int i = 0; i < hits && CurrentCastMap(source, window.Cast); i++)
@@ -177,7 +185,7 @@ public sealed partial class CombatService
     {
         if (damage <= 0 || target.Dead || target.SceneLoading) return;
         await _buffs.BreakHitControlsAsync(target);
-        await _buffs.ConsumeGuardianGroupAsync(target, 23019);
+        await _buffs.ConsumeGuardianGroupAsync(target, GuardianGroup.CatVulnerability);
         foreach (var window in LiveGuardianWindows(target).Where(w => w.Kind is GuardianWindowKind.HealLowHp
             or GuardianWindowKind.DefenceOnHit or GuardianWindowKind.Stealth))
         {
@@ -186,9 +194,9 @@ public sealed partial class CombatService
             if (window.Kind == GuardianWindowKind.Stealth)
             { if (--window.Remaining <= 0) await EndGuardianStealthAsync(target); continue; }
             var stats = _character.Stats(target);
-            if (stats[GuardianPetRules.CurrentHp] >= stats[GuardianPetRules.Hp] * window.HpThreshold / 100 || window.Next > Now) continue;
+            if (stats[AttributeId.Hp] >= stats[AttributeId.MaxHp] * window.HpThreshold / 100 || window.Next > Now) continue;
             window.Remaining--;
-            long amount = (long)Math.Floor(stats[GuardianPetRules.Hp] * window.Coefficient / 100);
+            long amount = (long)Math.Floor(stats[AttributeId.MaxHp] * window.Coefficient / 100);
             await GuardianHealAsync(target, target, window.Pet.EffectId, window.Cast.Id, amount,
                 () => CurrentCastMap(target, window.Cast) && _pets.GuardianEquipped(target, window.Pet));
         }
@@ -201,10 +209,10 @@ public sealed partial class CombatService
         return (long)Math.Clamp(Math.Floor(damage * Math.Max(0, 1 + percent / 100)), 0, long.MaxValue);
     }
 
-    private bool GuardianControlTarget(MonsterUnit target) => _buffs.UnitHasGroup(target, 9021)
+    private bool GuardianControlTarget(MonsterUnit target) => _buffs.UnitHasGroup(target, BuffService.PetrifyGroup)
         || target.SpeedCm(Now) < target.Template.SpeedCm;
 
     private bool GuardianControlTarget(GameSession target) => target.Buffs.Any(b => b.ExpireMs > Now
-        && (_data.Row("BuffConfig", b.ConfigId) is { } row && GameData.Int(row, "_iBuffID") == 9021
-            || b.Changes.Any(c => c.Attr is 1131 or 1132 && c.Value < 0)));
+        && (_data.Row("BuffConfig", b.ConfigId) is { } row && GameData.Int(row, "_iBuffID") == BuffService.PetrifyGroup
+            || b.Changes.Any(c => c.Attr is AttributeId.PerSpeed or AttributeId.BuffPerSpeed && c.Value < 0)));
 }

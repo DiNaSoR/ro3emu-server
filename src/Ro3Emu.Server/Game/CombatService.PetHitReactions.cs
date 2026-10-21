@@ -10,7 +10,7 @@ public sealed partial class CombatService
         if (hit.GuardianDamage is not { Count: > 0 }) return;
         if (GuardianPetRules.Script(primary.Effect) == "xingxingshike" && parent.GuardianOnce?.Add(-primary.PetId) == true)
             foreach (long target in hit.GuardianDamage.Keys.ToArray())
-                await GuardianTargetBuffAsync(source, primary, parent, target, 901801, 100,
+                await GuardianTargetBuffAsync(source, primary, parent, target, GuardianPetRules.KnockUpBuff, 100,
                     (int)(Numbers(primary.Active, "_kDescData").ElementAtOrDefault(6) * 1000));
         foreach (var pet in _pets.Guardians(source).Where(p => !p.IsPrimary).ToArray())
         {
@@ -45,28 +45,28 @@ public sealed partial class CombatService
         switch (pet.Reactive)
         {
             case GuardianPetRules.Reaction.RainbowExtraHit:
-                if (GuardianSkillAtStar(23375, pet.Star) is { } fire)
-                    for (int i = 0; i < (int)Math.Clamp(Desc(0), 0, 50) && CurrentCastMap(source, parent); i++)
+                if (GuardianSkillAtStar(GuardianGroup.RainbowFire, pet.Star) is { } fire)
+                    for (int i = 0; i < (int)Math.Clamp(Desc(0), 0, GuardianPetRules.MaxRepeats) && CurrentCastMap(source, parent); i++)
                         await ApplyEffectsAsync(source, GuardianProcAction(source, pet, parent, fire, targetId), source.Position);
                 break;
             case GuardianPetRules.Reaction.SarahExtraHit:
-                if (GuardianSkillAtStar(23347, pet.Star) is { } fist && pet.Passive is { } passive)
+                if (GuardianSkillAtStar(GuardianGroup.SarahFist, pet.Star) is { } fist && pet.Passive is { } passive)
                     await GuardianAuxiliaryBurstAsync(source, pet, parent, fist, targetId,
                         (int)GuardianPetRules.DescriptionLiterals(passive).FirstOrDefault(1));
                 break;
             case GuardianPetRules.Reaction.MummyCurse:
-                if (GuardianSkillAtStar(23127, pet.Star) is { } curse)
+                if (GuardianSkillAtStar(GuardianGroup.MummyHitCurse, pet.Star) is { } curse)
                 {
                     var center = FindMonster(source.WorldScene, targetId)?.Pos ?? EventTarget(source, targetId)?.Position;
                     if (center != null) await ApplyEffectsAsync(source, GuardianProcAction(source, pet, parent, curse), center);
                 }
                 break;
             case GuardianPetRules.Reaction.NightmareControl:
-                await GuardianTargetBuffAsync(source, pet, parent, targetId, 902401, 100, (int)(Desc(0) * 1000));
-                await GuardianTargetBuffAsync(source, pet, parent, targetId, 902501, 100, (int)(Desc(0) * 1000));
+                await GuardianTargetBuffAsync(source, pet, parent, targetId, GuardianPetRules.RootBuff, 100, (int)(Desc(0) * 1000));
+                await GuardianTargetBuffAsync(source, pet, parent, targetId, GuardianPetRules.BlindBuff, 100, (int)(Desc(0) * 1000));
                 break;
             case GuardianPetRules.Reaction.MedusaPetrify:
-                await GuardianTargetBuffAsync(source, pet, parent, targetId, 902101, Desc(0), (int)(Desc(1) * 1000));
+                await GuardianTargetBuffAsync(source, pet, parent, targetId, GuardianPetRules.PetrifyBuff, Desc(0), (int)(Desc(1) * 1000));
                 RegisterGuardianWindow(source, new GuardianWindow
                 {
                     Pet = pet, Cast = parent, Kind = GuardianWindowKind.ControlledBonus,
@@ -82,7 +82,7 @@ public sealed partial class CombatService
     private async Task GuardianAuxiliaryBurstAsync(GameSession source, GuardianPetRules.Skill pet, ActiveSkillCast parent,
         JsonElement effect, long targetId, int count)
     {
-        count = Math.Clamp(count, 1, 50);
+        count = Math.Clamp(count, 1, GuardianPetRules.MaxRepeats);
         var row = GuardianPetRules.PulseRow(effect, new(0, Numbers(effect, "_kDamageParam1").FirstOrDefault() / count));
         for (int i = 0; i < count && CurrentCastMap(source, parent) && _pets.GuardianEquipped(source, pet); i++)
             await ApplyEffectsAsync(source, GuardianProcAction(source, pet, parent, row, targetId), source.Position);

@@ -7,6 +7,11 @@ namespace Ro3Emu.Server.Game;
 internal static partial class GuardianPetRules
 {
     private const string DamageFactor = "_ro3GuardianDamageFactor", HealFactor = "_ro3GuardianHealFactor";
+    // PBSkillAffectValueType of the _kSkillAttributeList tuples read here, and SkillParameterRules' tag scope and operations.
+    private const int CdFixedType = 0, TargetMaxType = 27, DamageParam1Type = 29;
+    private const int TagScope = 1, AddOperation = 1, BasisPointOperation = 5;
+    // SkillTagConfig 3001-3006 ("main combat": buff, debuff, recovery, shield, control, control immunity), as the fourth
+    // value of a _kBuff1/_kBuff2 entry.
     private const int BuffTag = 3001, DebuffTag = 3002, ShieldTag = 3004, ControlTag = 3005, ImmunityTag = 3006;
 
     /// <summary>Client descriptions select guardian categories, never profession skills or the pet's own utility.
@@ -18,33 +23,56 @@ internal static partial class GuardianPetRules
         var effect = GuardianPetRules.CopyObject(skill.Effect);
         var active = GuardianPetRules.CopyObject(skill.Active);
         ApplyScalarModifiers(data, skill, utility, effect, active);
+        var (damage, healing) = Multipliers(data, skill, utility, effect);
+        effect[DamageFactor] = damage;
+        effect[HealFactor] = healing;
+        ApplyReactionFields(skill, utility, effect);
+        AdjustDurations(skill.Effect, utility, effect, "_kBuff1");
+        AdjustDurations(skill.Effect, utility, effect, "_kBuff2");
+        return skill with { Active = JsonSerializer.SerializeToElement(active), Effect = JsonSerializer.SerializeToElement(effect) };
+    }
+
+    private static (double Damage, double Healing) Multipliers(GameData data, Skill skill, Skill[] utility, JsonObject effect)
+    {
+        bool offense = Category(skill.Effect, OffensiveCategory), recovery = Category(skill.Effect, RecoveryCategory);
         double damage = 1, healing = 1;
         foreach (var passive in utility)
         {
-            bool offense = Category(skill.Effect, OffensiveCategory), recovery = Category(skill.Effect, RecoveryCategory);
             double percent = Description(passive, 0) / 100;
             if (offense && passive.Reactive is Reaction.Damage or Reaction.DirectDamageHeal) damage += percent;
             if (recovery && passive.Reactive is Reaction.DirectHeal or Reaction.DirectDamageHeal) healing += percent;
             if ((offense || recovery) && passive.Reactive == Reaction.PiametteTargets)
             {
-                // The passive's same-ID BuffConfig belongs to a different skill. The named 23322 group contains
-                // explicit target and coefficient modifiers, including the sixth star's missing description value.
-                const int PiametteModifierGroup = 23322;
-                if (data.Row("BuffConfig", BuffAtStar(data, PiametteModifierGroup, passive.Star)) is not { } buff
-                    || !buff.TryGetProperty("_kSkillAttributeList", out var list) || list.ValueKind != JsonValueKind.Array) continue;
-                var mods = list.EnumerateArray().Select(SkillParameterRules.Parse).Where(m => m.HasValue).Select(m => m!.Value).ToArray();
-                var ratio = mods.FirstOrDefault(m => m.Type == 29 && m.Operation == 5);
-                if (ratio.Value < 0) { if (offense) damage += ratio.Value / 10000.0; if (recovery) healing += ratio.Value / 10000.0; }
-                if (GameData.Int(skill.Effect, "_iRangeType") == 2)
-                    effect["_iTargetMax"] = (int)GameData.Int(JsonSerializer.SerializeToElement(effect), "_iTargetMax")
-                        + (int)mods.Where(m => m.Type == 27 && m.Operation == 1).Select(m => m.Value).DefaultIfEmpty(0).Max();
+                double ratio = PiametteModifiers(data, skill, passive, effect);
+                if (offense) damage += ratio;
+                if (recovery) healing += ratio;
             }
             if (offense && passive.Reactive == Reaction.DamageCoefficient && effect["_kDamageParam1"] is JsonArray coefficients)
                 for (int i = 0; i < coefficients.Count; i++)
                     coefficients[i] = (GameData.Number(skill.Effect.GetProperty("_kDamageParam1")[i]) ?? 0) + Description(passive, 0) * 100;
         }
-        effect[DamageFactor] = damage;
-        effect[HealFactor] = healing;
+        return (damage, healing);
+    }
+
+    /// <summary>The passive's same-ID BuffConfig belongs to a different skill. The named Piamette group carries explicit
+    /// target and coefficient modifiers, including the sixth star's missing description value: an area skill gains the
+    /// added targets, and the (negative) damage-ratio change is returned as a multiplier delta.</summary>
+    private static double PiametteModifiers(GameData data, Skill skill, Skill passive, JsonObject effect)
+    {
+        if (data.Row("BuffConfig", BuffAtStar(data, GuardianGroup.PiametteModifier, passive.Star)) is not { } buff
+            || !buff.TryGetProperty("_kSkillAttributeList", out var list) || list.ValueKind != JsonValueKind.Array) return 0;
+        var mods = list.EnumerateArray().Select(SkillParameterRules.Parse).OfType<SkillParameterRules.Modifier>().ToArray();
+        if (GameData.Int(skill.Effect, "_iRangeType") == SkillRelease.Area)
+            effect["_iTargetMax"] = (int)GameData.Int(JsonSerializer.SerializeToElement(effect), "_iTargetMax")
+                + (int)mods.Where(m => m.Type == TargetMaxType && m.Operation == AddOperation).Select(m => m.Value).DefaultIfEmpty(0).Max();
+        var ratio = mods.FirstOrDefault(m => m.Type == DamageParam1Type && m.Operation == BasisPointOperation);
+        return ratio.Value < 0 ? ratio.Value / 10000.0 : 0;
+    }
+
+    /// <summary>Miguel's critical chance and HP threshold on offensive skills, Retribution's player control time on
+    /// control skills; CombatService reads these fields when the effect lands.</summary>
+    private static void ApplyReactionFields(Skill skill, Skill[] utility, JsonObject effect)
+    {
         if (Category(skill.Effect, OffensiveCategory))
         {
             effect["_ro3GuardianCritChance"] = utility.Where(p => p.Reactive == Reaction.MiguelCritical).Sum(p => Description(p, 0) / 100);
@@ -54,9 +82,6 @@ internal static partial class GuardianPetRules
         if (Category(skill.Effect, ControlCategory))
             effect["_ro3GuardianPlayerControlMs"] = (int)utility.Where(p => p.Reactive == Reaction.RetributionControl)
                 .Sum(p => Description(p, 0) * 1000);
-        AdjustDurations(skill.Effect, utility, effect, "_kBuff1");
-        AdjustDurations(skill.Effect, utility, effect, "_kBuff2");
-        return skill with { Active = JsonSerializer.SerializeToElement(active), Effect = JsonSerializer.SerializeToElement(effect) };
     }
 
     private static void ApplyScalarModifiers(GameData data, Skill skill, Skill[] utility, JsonObject effect, JsonObject active)
@@ -67,17 +92,18 @@ internal static partial class GuardianPetRules
             // matching their localized description. No other same-ID buff is admitted by this resolver.
             if (passive.Passive is not { } row || data.Row("BuffConfig", GameData.Int(row, "_iID")) is not { } buff
                 || !buff.TryGetProperty("_kSkillAttributeList", out var list) || list.ValueKind != JsonValueKind.Array) continue;
-            var mods = list.EnumerateArray().Select(SkillParameterRules.Parse).Where(m => m.HasValue).Select(m => m!.Value)
-                .Where(m => m.Scope == 1 && m.Type is 0 or 27 or 29 && m.Operation is 1 or 5).ToArray();
-            var applicable = mods.Where(m => m.Type != 27 || GameData.Int(skill.Effect, "_iRangeType") == 2).ToArray();
+            var mods = list.EnumerateArray().Select(SkillParameterRules.Parse).OfType<SkillParameterRules.Modifier>()
+                .Where(m => m.Scope == TagScope && m.Type is CdFixedType or TargetMaxType or DamageParam1Type
+                    && m.Operation is AddOperation or BasisPointOperation).ToArray();
+            var applicable = mods.Where(m => m.Type != TargetMaxType || GameData.Int(skill.Effect, "_iRangeType") == SkillRelease.Area).ToArray();
             // Fox has one target tuple for each category: a dual-category skill still gets one advertised addition.
             if (passive.Reactive == Reaction.FoxTargets)
-                applicable = [.. applicable.Where(m => m.Type != 27).Concat(applicable.Where(m => m.Type == 27
+                applicable = [.. applicable.Where(m => m.Type != TargetMaxType).Concat(applicable.Where(m => m.Type == TargetMaxType
                     && SkillParameterRules.Matches(m, (int)GameData.Int(skill.Effect, "_iSkillID"),
                         [.. Numbers(skill.Effect, "_kSkillCategory").Select(n => (int)n)])).Take(1))];
             effect = Replace(effect, SkillParameterRules.Effective(JsonSerializer.SerializeToElement(effect), applicable,
                 [.. Numbers(skill.Effect, "_kSkillCategory").Select(n => (int)n)]));
-            active = Replace(active, SkillParameterRules.Effective(JsonSerializer.SerializeToElement(active), [.. mods.Where(m => m.Type == 0)],
+            active = Replace(active, SkillParameterRules.Effective(JsonSerializer.SerializeToElement(active), [.. mods.Where(m => m.Type == CdFixedType)],
                 [.. Numbers(skill.Active, "_kSkillCategory").Select(n => (int)n)]));
         }
         active["_iCD"] = Math.Max(1, GameData.Int(JsonSerializer.SerializeToElement(active), "_iCD"));

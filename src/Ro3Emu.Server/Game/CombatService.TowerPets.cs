@@ -133,8 +133,9 @@ public sealed partial class CombatService
     }
 
     /// <summary>
-    /// (verified) BuffConfig uses 1216 for Alice's reduction, 1230 for Goat's ranged physical reduction,
-    /// 1212/1214 for physical/magic reduction and 311..320 for elemental resistance. (inferred) Apply their live sum before
+    /// (verified) The support buffs change these AttributeConfig rows: per_res_dmg1 and per_res_dmg (Alice's reduction is
+    /// 1216), per_beremote_dmg1 (Goat's ranged physical reduction), per_resatk_dmg1/per_resmatk_dmg1 and
+    /// be_none_ele..be_undead_ele (Squidgitte's water resistance is be_water_ele). (inferred) Apply their live sum before
     /// shields; this is restricted to pet support contributions rather than changing all combat attributes.
     /// </summary>
     private static long ApplyPetSupportResistance(long damage, IEnumerable<(long Id, double Value)> changes,
@@ -142,20 +143,18 @@ public sealed partial class CombatService
     {
         if (damage <= 0) return damage;
         var values = changes.GroupBy(p => p.Id).ToDictionary(g => g.Key, g => g.Sum(p => p.Value));
-        const int DamageReduction = 1216, PhysicalReduction = 1212, MagicReduction = 1214,
-            RangedPhysicalReduction = 1230, FirstElementResistance = 311;
-        double reduction = values.GetValueOrDefault(DamageReduction) + values.GetValueOrDefault(216);
+        double reduction = values.GetValueOrDefault(AttributeId.PerResDmg1) + values.GetValueOrDefault(AttributeId.PerResDmg);
         int element = fallbackElement;
         if (skill is { } row)
         {
             bool physical = GameData.Int(row, "_iDmgType") != 2;
-            reduction += values.GetValueOrDefault(physical ? PhysicalReduction : MagicReduction);
+            reduction += values.GetValueOrDefault(physical ? AttributeId.PerResAtkDmg1 : AttributeId.PerResMatkDmg1);
             if (GameData.Int(row, "_iDistanceType") == 2 && physical)
-                reduction += values.GetValueOrDefault(RangedPhysicalReduction);
+                reduction += values.GetValueOrDefault(AttributeId.PerBeRemoteDmg1);
             int configured = (int)GameData.Int(row, "_iEleType");
             if (configured > 1) element = configured;
         }
-        if (element is >= 1 and <= 10) reduction += values.GetValueOrDefault(FirstElementResistance + element - 1);
+        if (element is >= 1 and <= AttributeId.ElementCount) reduction += values.GetValueOrDefault(AttributeId.BeNoneEle + element - 1);
         return Math.Max(0, (long)Math.Round(damage * Math.Clamp(1 - reduction / 10000, 0, 10)));
     }
 }

@@ -7,7 +7,6 @@ namespace Ro3Emu.Server.Game;
 public sealed partial class BuffService
 {
     private const int ControlBuffTag = 37, NegativeBuffType = 2;
-    private const int KnockBackGroup = 9017, KnockUpGroup = 9018;
     private const int ControlChargeGroup = 9101; // Chimera's three _kBuff1 entries; three applications, capped by BuffConfig._iMaxStack.
 
     // SpecialStatusConfig 22-24 (_kDesc): immunity is implemented through the holder buff's _kBuffCategory. Super Armor

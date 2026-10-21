@@ -124,7 +124,7 @@ public sealed partial class MonsterService : MonsterBrain, IGameTicker
             skill, skillMs, hitPoint, swing, range, (int)Math.Max(500, GameData.Int(npc, "_iBodyRemainTime")))
         {
             Skills = BossBook(npcId, npc, skill),
-            CastSpeed = A(116),
+            CastSpeed = A(AttributeId.CastSpeed),
         };
     }
 

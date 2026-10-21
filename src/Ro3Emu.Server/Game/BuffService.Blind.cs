@@ -6,7 +6,7 @@ namespace Ro3Emu.Server.Game;
 
 public sealed partial class BuffService
 {
-    private const int BlindGroup = 9025, DarkShowState = 2704, DarkRadius = 2705, DarkSelectRadius = 2710;
+    private const int DarkShowState = 2704, DarkRadius = 2705, DarkSelectRadius = 2710;
     // (inferred) The server-only blind radius was not recovered. Use 5 m consistently for render and selection;
     // this is an explicit emulator policy, not a client-derived numeric value or a hit-chance penalty.
     // (inferred scope) Only a guardian's blind limits sight: the same group from ordinary skills keeps its previous,

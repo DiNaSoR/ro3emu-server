@@ -5,16 +5,15 @@ namespace Ro3Emu.Server.Game;
 
 public sealed partial class CombatService
 {
-    private const int ShinobiStealthGroup = 23022, ScoutDetectionGroup = 23414;
     private static bool GuardianStealthed(GameSession player) => player.Buffs.Any(b => b.IsGuardianOwned
-        && b.ExpireMs > Now && b.ConfigId / 100 == ShinobiStealthGroup);
+        && b.ExpireMs > Now && b.ConfigId / 100 == GuardianGroup.ShinobiStealth);
 
     // SpecialStatusConfig 2 is stealth. (inferred) Hide from hostile viewers and monster target selection;
     // friends retain their AOI, while Scout's named detector reveals only to its owner inside its configured radius.
     internal bool GuardianCanObserve(GameSession viewer, GameSession subject)
     {
         if (viewer == subject || !GuardianStealthed(subject) || !CanPlayerHit(viewer, subject) && !CanPlayerHit(subject, viewer)) return true;
-        return viewer.Buffs.Any(b => b.IsGuardianOwned && b.ExpireMs > Now && b.ConfigId / 100 == ScoutDetectionGroup
+        return viewer.Buffs.Any(b => b.IsGuardianOwned && b.ExpireMs > Now && b.ConfigId / 100 == GuardianGroup.ScoutDetection
             && _data.Row("BuffConfig", b.ConfigId) is { } row
             && Distance(viewer.Position, subject.Position) <= Numbers(row, "_kLogicData").FirstOrDefault() / 100);
     }
@@ -23,7 +22,7 @@ public sealed partial class CombatService
 
     private async Task GuardianVisibilityChangedAsync(GameSession player)
     {
-        bool relevant = player.Buffs.Any(b => b.IsGuardianOwned && b.ExpireMs > Now && b.ConfigId / 100 is ShinobiStealthGroup or ScoutDetectionGroup);
+        bool relevant = player.Buffs.Any(b => b.IsGuardianOwned && b.ExpireMs > Now && b.ConfigId / 100 is GuardianGroup.ShinobiStealth or GuardianGroup.ScoutDetection);
         if (!relevant && !_guardianVisibilityOwners.TryGetValue(player, out _)) return;
         if (relevant) _guardianVisibilityOwners.GetOrCreateValue(player);
         else _guardianVisibilityOwners.Remove(player);
@@ -40,7 +39,7 @@ public sealed partial class CombatService
             StateInfo = new AoiObjStateInfo { Data = new CommonBigMask { Values = { (ulong)subject.StatusBits & ~(1UL << 1) } } },
         });
 
-    private Task EndGuardianStealthAsync(GameSession source) => _buffs.ConsumeGuardianGroupAsync(source, ShinobiStealthGroup);
+    private Task EndGuardianStealthAsync(GameSession source) => _buffs.ConsumeGuardianGroupAsync(source, GuardianGroup.ShinobiStealth);
 
     private async Task GuardianShinobiMoveAsync(GameSession source, GuardianPetRules.Skill pet, ActiveSkillCast action)
     {

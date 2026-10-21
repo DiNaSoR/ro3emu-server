@@ -17,11 +17,12 @@ public sealed partial class CombatService
                     await _buffs.AddGuardianAsync(ally, buff, (int)(Desc(0) * 1000), action.OwnerId);
             return;
         }
+        if (pet.Passive is not { } passive) return;
         bool daedre = pet.Reactive == GuardianPetRules.Reaction.DaedreDebuff;
-        if (daedre && !ReserveGuardianReaction(source, (int)GameData.Int(pet.Passive!.Value, "_iID"), (int)(Desc(6) * 1000))) return;
+        if (daedre && !ReserveGuardianReaction(source, (int)GameData.Int(passive, "_iID"), (int)(Desc(6) * 1000))) return;
         var row = JsonSerializer.SerializeToElement(new
         {
-            _iID = GameData.Int(pet.Passive!.Value, "_iID"), _iDmgType = 1, _iRangeType = 2, _iRelease = 2,
+            _iID = GameData.Int(passive, "_iID"), _iDmgType = 1, _iRangeType = SkillRelease.Area, _iRelease = SkillRelease.FixCircle,
             _iTargetMax = (int)Desc(daedre ? 2 : 1), _kRange = new[] { Desc(daedre ? 1 : 0) * 100 },
             _kBuff2 = new[] { new[] { buff, 10000, (int)(Desc(daedre ? 3 : 4) * 1000) } },
         });
@@ -82,11 +83,11 @@ public sealed partial class CombatService
 
     private async Task GuardianIncubusReactiveAsync(GameSession source, GuardianPetRules.Skill pet, ActiveSkillCast action, JsonElement effect)
     {
-        if (_data.Row("BuffConfig", GameData.Int(pet.Passive!.Value, "_iID")) is not { } controller) return;
+        if (pet.Passive is not { } passive || _data.Row("BuffConfig", GameData.Int(passive, "_iID")) is not { } controller) return;
         int buffId = (int)Numbers(controller, "_kLogicData").FirstOrDefault();
         if (_data.Row("BuffConfig", buffId) is not { } buff) return;
         var changes = GameData.Pairs(buff, "_kChangeAttri").ToArray();
-        if (changes.Length != 2 || changes.Any(c => c.Id is not (1212 or 1214)
+        if (changes.Length != 2 || changes.Any(c => c.Id is not (AttributeId.PerResAtkDmg1 or AttributeId.PerResMatkDmg1)
             || c.Value != GuardianPetRules.Description(pet, 1) * 100)) return;
         await _buffs.AddGuardianAsync(source, buffId, (int)(GuardianPetRules.Description(pet, 0) * 1000), action.OwnerId);
         if (CurrentCastMap(source, action)) ScheduleGuardianAura(source, pet, action, effect,
@@ -96,10 +97,10 @@ public sealed partial class CombatService
     private long GuardianNormalAttackResistance(GameSession target, JsonElement skill, long damage)
     {
         if (GameData.Int(skill, "_iIsNormalAtk") != 1 || damage <= 0) return damage;
-        const int SoheeReductionGroup = 23134;
         double reduction = target.Buffs.Where(b => b.IsGuardianOwned && b.ExpireMs > Now)
-            .Select(b => _data.Row("BuffConfig", b.ConfigId)).Where(r => r is { } row && GameData.Int(row, "_iBuffID") == SoheeReductionGroup)
-            .Sum(r => Numbers(r!.Value, "_kLogicData").FirstOrDefault());
+            .Select(b => _data.Row("BuffConfig", b.ConfigId)).OfType<JsonElement>()
+            .Where(row => GameData.Int(row, "_iBuffID") == GuardianGroup.SoheeReduction)
+            .Sum(row => Numbers(row, "_kLogicData").FirstOrDefault());
         return (long)Math.Clamp(Math.Floor(damage * Math.Max(0, 1 - reduction / 10000)), 0, long.MaxValue);
     }
 }

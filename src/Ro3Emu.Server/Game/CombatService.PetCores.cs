@@ -23,26 +23,27 @@ public sealed partial class CombatService
         foreach (var passive in _pets.Guardians(s).Where(g => !g.IsPrimary && g.Core != null
             && g.Reactive == GuardianPetRules.Reaction.DamageBuff).ToArray())
         {
-            var literals = GuardianPetRules.DescriptionLiterals(passive.Core!.Value);
-            if (literals.Length != 2 || literals[0] is <= 0 or > 20 || literals[1] <= 0) continue;
+            if (passive.Core is not { } core) continue;
+            var literals = GuardianPetRules.DescriptionLiterals(core);
+            if (literals.Length != 2 || literals[0] is <= 0 or > GuardianPetRules.MaxCoreHits || literals[1] <= 0) continue;
             foreach (var (targetId, total) in action.GuardianDamage.ToArray())
                 for (int i = 0; i < (int)literals[0]; i++)
                 {
                     if (!CurrentCastMap(s, action) || !_pets.GuardianEquipped(s, passive)) return;
                     long amount = (long)Math.Clamp(Math.Floor(total * literals[1] / 100), 0, long.MaxValue);
-                    var proc = GuardianFixedAction(s, passive, action, targetId, amount);
+                    var proc = GuardianFixedAction(s, passive, core, action, targetId, amount);
                     await ApplyEffectsAsync(s, proc, action.Origin);
                 }
         }
     }
 
-    private ActiveSkillCast GuardianFixedAction(GameSession s, GuardianPetRules.Skill passive, ActiveSkillCast parent, long targetId, long damage)
+    private ActiveSkillCast GuardianFixedAction(GameSession s, GuardianPetRules.Skill passive, JsonElement core, ActiveSkillCast parent,
+        long targetId, long damage)
     {
-        var core = passive.Core!.Value;
         var row = new JsonObject
         {
-            ["_iID"] = GameData.Int(core, "_iID"), ["_iSystemType"] = 4, ["_iRangeType"] = 1,
-            ["_iTargetMax"] = 1, ["_iRelease"] = 1, ["_iDistanceMax"] = 100000,
+            ["_iID"] = GameData.Int(core, "_iID"), ["_iSystemType"] = GuardianPetRules.PetSkillType, ["_iRangeType"] = SkillRelease.SingleTarget,
+            ["_iTargetMax"] = 1, ["_iRelease"] = SkillRelease.Lock, ["_iDistanceMax"] = 100000,
             ["_kDamageParam1"] = new JsonArray(0), ["_kDamageParam2"] = new JsonArray(1),
             ["_ro3GuardianFixedHit"] = damage,
         };
@@ -83,6 +84,6 @@ public sealed partial class CombatService
     {
         int percent = target.Buffs.Where(b => b.IsGuardianOwned && b.ExpireMs > Now)
             .Select(b => b.HpFloorBasisPoints).DefaultIfEmpty(0).Max();
-        return Math.Min(currentHp, (long)Math.Ceiling(_character.Stats(target)[GuardianPetRules.Hp] * percent / 10000.0));
+        return Math.Min(currentHp, (long)Math.Ceiling(_character.Stats(target)[AttributeId.MaxHp] * percent / 10000.0));
     }
 }

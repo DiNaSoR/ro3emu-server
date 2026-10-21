@@ -11,15 +11,13 @@ public sealed partial class CombatService
     internal int ChantMs(GameSession s, JsonElement row)
     {
         long fixedTime = GameData.Int(row, "_iChantFix"), variable = GameData.Int(row, "_iChantVar");
-        long guardianSpeed = _buffs.GuardianAttributes(s)[CastSpeed];
+        long guardianSpeed = _buffs.GuardianAttributes(s)[AttributeId.CastSpeed];
         if (guardianSpeed == 0) return (int)Math.Clamp(fixedTime + variable, 0, int.MaxValue);
-        long speed = _character.Stats(s)[CastSpeed];
+        long speed = _character.Stats(s)[AttributeId.CastSpeed];
         double change = VariableChantReduction(_data, speed) - VariableChantReduction(_data, speed - guardianSpeed);
         return (int)Math.Clamp(Math.Floor(Math.Max(0, fixedTime) + Math.Max(0, variable) * Math.Max(0, 1 - change)),
             0, int.MaxValue);
     }
-
-    private const int CastSpeed = 116;
 
     /// <summary>A*cspd/(B+C*cspd) from PublicParamConfig, cast speed clamped to FinalAtkSpdThdAndCastSpdThd[1].</summary>
     private static double VariableChantReduction(GameData data, double castSpeed)
@@ -39,12 +37,11 @@ public sealed partial class CombatService
     /// A negative factor cannot schedule a hit before acceptance. Absent formula inputs preserve the base timing.</summary>
     internal static int ChantMilliseconds(GameData data, JsonElement row, StatSheet stats)
     {
-        const int Variable = 201, VariablePercent = 202, Fixed = 203, FixedPercent = 204;
-        double reduction = VariableChantReduction(data, stats[CastSpeed]);
-        double variable = Math.Max(0, GameData.Int(row, "_iChantVar") + stats[Variable])
-            * Math.Max(0, 1 + stats[VariablePercent] / 10000.0 - reduction);
-        double fixedTime = Math.Max(0, GameData.Int(row, "_iChantFix") + stats[Fixed])
-            * Math.Max(0, 1 + stats[FixedPercent] / 10000.0);
+        double reduction = VariableChantReduction(data, stats[AttributeId.CastSpeed]);
+        double variable = Math.Max(0, GameData.Int(row, "_iChantVar") + stats[AttributeId.VarChant])
+            * Math.Max(0, 1 + stats[AttributeId.PerVarChant] / 10000.0 - reduction);
+        double fixedTime = Math.Max(0, GameData.Int(row, "_iChantFix") + stats[AttributeId.FixChant])
+            * Math.Max(0, 1 + stats[AttributeId.PerFixChant] / 10000.0);
         return (int)Math.Clamp(Math.Floor(variable + fixedTime), 0, int.MaxValue);
     }
 }

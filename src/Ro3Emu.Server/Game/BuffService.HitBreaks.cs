@@ -5,8 +5,6 @@ namespace Ro3Emu.Server.Game;
 
 public sealed partial class BuffService
 {
-    private const int FreezeGroup = 9020, PetrifyGroup = 9021, SleepGroup = 9022;
-
     /// <summary>(inferred scope) Only a guardian's Freeze/Petrify/Sleep breaks on a hit: the same groups from ordinary
     /// skills keep their previous behaviour until the rule is established and tested for every source.</summary>
     private static bool BreaksOnDamage(ActiveBuff buff) =>

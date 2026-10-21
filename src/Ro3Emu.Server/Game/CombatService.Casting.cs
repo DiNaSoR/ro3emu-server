@@ -319,7 +319,7 @@ public sealed partial class CombatService
                 default: result.Invalid = true; break; // reject an unsupported cost rather than grant a free cast.
             }
         }
-        if (result.Attrs.TryGetValue(2001, out long sp)) result.Attrs[2001] = ModifiedSpCost(_buffs.GuardianAttributes(s), sp);
+        if (result.Attrs.TryGetValue(AttributeId.Sp, out long sp)) result.Attrs[AttributeId.Sp] = ModifiedSpCost(_buffs.GuardianAttributes(s), sp);
         return result;
     }
 

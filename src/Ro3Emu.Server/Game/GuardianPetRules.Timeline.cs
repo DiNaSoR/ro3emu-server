@@ -65,7 +65,7 @@ internal static partial class GuardianPetRules
             var literals = DescriptionLiterals(wrapper);
             if (desc.Length >= 3 && literals.Length >= 2)
             {
-                node["_iRangeType"] = 2; node["_iRelease"] = 3; node["_iTargetMax"] = (int)literals[1];
+                node["_iRangeType"] = SkillRelease.Area; node["_iRelease"] = SkillRelease.FixRect; node["_iTargetMax"] = (int)literals[1];
                 node["_kRange"] = new JsonArray(desc[1] * 100, desc[2] * 100);
                 node["_ro3GuardianForwardRectangle"] = true;
             }

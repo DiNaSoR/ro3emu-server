@@ -107,7 +107,7 @@ public sealed partial class PetService
         await PublishGuardianChangeAsync(session);
     }
 
-    private int Gate(GameSession s, bool incubation = false) => s.Pets == null || !_functions.IsOpen(s, 33)
+    private int Gate(GameSession s, bool incubation = false) => s.Pets == null || !_functions.IsOpen(s, PetFunction)
         || incubation && (!_functions.IsOpen(s, 3301) || !_functions.IsOpen(s, 3302)) ? ErrorCodes.FeatureUnavailable : 0;
 
     private int Owned(GameSession s, int id) => Gate(s) is var gate and not 0 ? gate
@@ -487,7 +487,7 @@ public sealed partial class PetService
     /// </summary>
     private IEnumerable<(long Id, double Value)> Attributes(GameSession s)
     {
-        if (s.Pets == null || !_functions.IsOpen(s, 33)) yield break;
+        if (s.Pets == null || !_functions.IsOpen(s, PetFunction)) yield break;
         foreach (var pet in s.Pets.ListPet.Values.Where(p => p.IsActiveCollect))
             if (StarRow(pet) is { } row)
                 foreach (var attr in GameData.Pairs(row, "_kCollectAttr")) yield return attr;

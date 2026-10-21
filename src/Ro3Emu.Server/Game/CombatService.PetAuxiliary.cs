@@ -21,9 +21,9 @@ public sealed partial class CombatService
         var row = GuardianPetRules.CopyObject(GuardianPetRules.DamageRow(pet with { Effect = effect, Kind = GuardianPetRules.Kind.Damage },
             _character.Stats(source)));
         row["_ro3GuardianProc"] = true;
-        row["_iSystemType"] = 4; // Auxiliary, never another ordinary primary/reaction chain.
+        row["_iSystemType"] = GuardianPetRules.PetSkillType;
         row["_ro3GuardianBuffMultiplier"] = attributeMultiplier;
-        if (target != 0) { row["_iRangeType"] = 1; row["_iTargetMax"] = 1; }
+        if (target != 0) { row["_iRangeType"] = SkillRelease.SingleTarget; row["_iTargetMax"] = 1; }
         return new ActiveSkillCast
         {
             Id = parent.Id, OwnerId = parent.OwnerId, WorldScene = parent.WorldScene, SceneGeneration = parent.SceneGeneration,
@@ -45,8 +45,8 @@ public sealed partial class CombatService
         var area = GuardianProcAction(source, pet, parent, effect);
         var enemies = SelectEnemies(source, area, source.Position).Select(m =>
             (Id: m.Uid, Hp: m.Hp, MaxHp: m.Template.MaxHp, Distance: Distance(source.Position, m.Pos)))
-            .Concat(EventAreaTargets(source, area.Row).Select(p => (Id: p.Role!.Id, Hp: _character.Stats(p)[2000],
-                MaxHp: _character.Stats(p)[101], Distance: Distance(source.Position, p.Position))))
+            .Concat(EventAreaTargets(source, area.Row).Select(p => (Id: p.Role!.Id, Hp: _character.Stats(p)[AttributeId.Hp],
+                MaxHp: _character.Stats(p)[AttributeId.MaxHp], Distance: Distance(source.Position, p.Position))))
             .OrderBy(e => e.Distance).ThenBy(e => e.Id).Take((int)GameData.Int(effect, "_iTargetMax")).ToArray();
         foreach (var enemy in enemies)
         {
@@ -62,7 +62,8 @@ public sealed partial class CombatService
     private async Task GuardianWanderCoreAsync(GameSession source, GuardianPetRules.Skill pet, ActiveSkillCast action,
         long targetId, long beforeHp, long maxHp)
     {
-        var literals = GuardianPetRules.DescriptionLiterals(pet.Core!.Value);
+        if (pet.Core is not { } core) return;
+        var literals = GuardianPetRules.DescriptionLiterals(core);
         if (literals.Length < 3) return;
         var monster = FindMonster(source.WorldScene, targetId);
         var player = EventTarget(source, targetId);
@@ -79,7 +80,7 @@ public sealed partial class CombatService
         }
         if (!CurrentCastMap(source, action)) return;
         bool stunned = monster != null ? _buffs.UnitHasGroup(monster, GuardianPetRules.StunBuff / 100)
-            : player!.Buffs.Any(b => b.ExpireMs > Now && b.ConfigId / 100 == GuardianPetRules.StunBuff / 100);
+            : player?.Buffs.Any(b => b.ExpireMs > Now && b.ConfigId / 100 == GuardianPetRules.StunBuff / 100) == true;
         if (highHp && stunned) return;
         // Auxiliary SkillConfig -> BuffConfig controller -> PATK/MATK payload; validate the core's percentage.
         if (GuardianAuxiliary(pet, "Pet_Wanderman_23176") is not { } effect) return;
@@ -87,7 +88,7 @@ public sealed partial class CombatService
         if (_data.Row("BuffConfig", controllerId) is not { } controller) return;
         int attackId = (int)Numbers(controller, "_kLogicData").ElementAtOrDefault(1);
         if (_data.Row("BuffConfig", attackId) is not { } attack
-            || GameData.Pairs(attack, "_kChangeAttri").Any(c => c.Id is not (1032 or 1042)
+            || GameData.Pairs(attack, "_kChangeAttri").Any(c => c.Id is not (AttributeId.BuffPerAtk or AttributeId.BuffPerMatk)
                 || Math.Abs(c.Value + GuardianPetRules.CoreDescription(pet, 1) * 100) > 0.000001)) return;
         int duration = (int)(GuardianPetRules.CoreDescription(pet, 2) * 1000);
         if (monster != null) await _buffs.AddGuardianAsync(monster, attackId, duration, action.OwnerId);

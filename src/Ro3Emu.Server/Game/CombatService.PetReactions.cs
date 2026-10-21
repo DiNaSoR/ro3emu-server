@@ -6,13 +6,16 @@ namespace Ro3Emu.Server.Game;
 
 public sealed partial class CombatService
 {
+    /// <summary>AttributeConfig per_dmg1 and the bonus of the hit's element (none_ele..undead_ele).</summary>
+    private static bool RaisesDamage(long attribute, int element) => attribute == AttributeId.PerDmg1
+        || element is >= 1 and <= AttributeId.ElementCount && attribute == AttributeId.NoneEle + element - 1;
+
     private static long GuardianOutgoingDamage(GameSession source, JsonElement row, long damage)
     {
-        const int DamageBonus = 1215, FirstElementBonus = 301;
-        int element = (int)Math.Clamp(GameData.Int(row, "_iEleType"), 1, 10);
+        int element = (int)Math.Clamp(GameData.Int(row, "_iEleType"), 1, AttributeId.ElementCount);
         double bonus = source.Buffs.Where(b => b.IsGuardianOwned && b.ExpireMs > Now
-                && (b.ConfigId / 100 != 23014 || !IsGuardianEffect(row) && !row.TryGetProperty("_ro3GuardianFixedHit", out _)))
-            .SelectMany(b => b.Changes).Where(c => c.Attr == DamageBonus || c.Attr == FirstElementBonus + element - 1).Sum(c => c.Value);
+                && (b.ConfigId / 100 != GuardianGroup.WildcatCharge || !IsGuardianEffect(row) && !row.TryGetProperty("_ro3GuardianFixedHit", out _)))
+            .SelectMany(b => b.Changes).Where(c => RaisesDamage(c.Attr, element)).Sum(c => c.Value);
         return damage <= 0 ? 0 : (long)Math.Clamp(Math.Floor(damage * Math.Max(0, 1 + bonus / 10000)), 0, long.MaxValue);
     }
 
@@ -28,7 +31,7 @@ public sealed partial class CombatService
             var stats = _character.Stats(s);
             if (passive.Reactive is GuardianPetRules.Reaction.Heal or GuardianPetRules.Reaction.DispelHeal)
             {
-                long amount = (long)Math.Max(0, Math.Floor(stats[GuardianPetRules.Hp] * GuardianPetRules.Description(passive, 0) / 100));
+                long amount = (long)Math.Max(0, Math.Floor(stats[AttributeId.MaxHp] * GuardianPetRules.Description(passive, 0) / 100));
                 await GuardianHealAsync(s, s, (int)GameData.Int(passive.Passive.Value, "_iID"), action.Id, amount, Current);
             }
             else if (GuardianPetRules.ReactiveBuff(_data, passive) is var buff && buff > 0)
@@ -37,7 +40,7 @@ public sealed partial class CombatService
                     or GuardianPetRules.Reaction.IsisReduction)
                 { await GuardianAreaReactionAsync(s, passive, action, buff); continue; }
                 if (passive.Reactive == GuardianPetRules.Reaction.Defence
-                    && stats[GuardianPetRules.CurrentHp] >= stats[GuardianPetRules.Hp] * GuardianPetRules.Description(passive, 0) / 100) continue;
+                    && stats[AttributeId.Hp] >= stats[AttributeId.MaxHp] * GuardianPetRules.Description(passive, 0) / 100) continue;
                 int durationIndex = passive.Reactive == GuardianPetRules.Reaction.CastSpeed ? 0
                     : passive.Reactive == GuardianPetRules.Reaction.Defence ? 2 : 1;
                 int duration = (int)(GuardianPetRules.Description(passive, durationIndex) * 1000);
@@ -94,7 +97,7 @@ public sealed partial class CombatService
                 && ReferenceEquals(s.Attachment, attachment) && attachment?.Cancelled != true && _pets.GuardianEquipped(s, passive);
             if (!Current() || passive.Passive is not { } effect) continue;
             var stats = _character.Stats(s);
-            long amount = (long)Math.Floor(Math.Max(stats[GuardianPetRules.PhysicalAttack], stats[GuardianPetRules.MagicAttack])
+            long amount = (long)Math.Floor(Math.Max(stats[AttributeId.Atk], stats[AttributeId.Matk])
                 * GuardianPetRules.Description(passive, 0) / 100);
             await GuardianHealAsync(s, s, (int)GameData.Int(effect, "_iID"), ++_sessionIds, amount, Current);
         }
@@ -105,7 +108,7 @@ public sealed partial class CombatService
     private async Task GuardianPlayerDamageReactionAsync(GameSession source, GameSession target, JsonElement row, long damage, Func<bool> current)
     {
         if (damage <= 0 || GameData.Int(row, "_iSystemType") != GuardianPetRules.EffectType) return;
-        if (_character.Stats(target)[GuardianPetRules.CurrentHp] <= 0)
+        if (_character.Stats(target)[AttributeId.Hp] <= 0)
         {
             if (GuardianPetRules.OffensiveOrControl(row) && current()) await GuardianKillHealingAsync(source, row);
             return;

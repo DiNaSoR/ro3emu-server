@@ -10,7 +10,7 @@ public sealed partial class CombatService
 
     private static bool GuardianAllowsHostileBuff(JsonElement row, JsonElement tuple, bool previouslySlowed) =>
         GuardianPetRules.Script(row) != KuangFengXiJuan || tuple.GetArrayLength() == 0
-            || (int)(GameData.Number(tuple[0]) ?? 0) / 100 != 9024 || previouslySlowed;
+            || (int)(GameData.Number(tuple[0]) ?? 0) / 100 != BuffService.RootGroup || previouslySlowed;
 
     /// <summary>Named primary scripts with periodic effects described by their wrapper. Coefficients, range,
     /// duration and interval are read from that star's description/linked auxiliary, never tower support rows.
@@ -73,7 +73,7 @@ public sealed partial class CombatService
         bool Current() => CurrentCastMap(source, action) && _pets.GuardianEquipped(source, pet);
         if (!Current()) return;
         var stats = _character.Stats(source);
-        long amount = (long)Math.Floor(Math.Max(stats[103], stats[104]) * coefficient / 100);
+        long amount = (long)Math.Floor(Math.Max(stats[AttributeId.Atk], stats[AttributeId.Matk]) * coefficient / 100);
         amount = GuardianPetRules.DirectHealing(pet.Effect, amount);
         foreach (var (ally, allyCurrent) in GuardianReactionAllies(source, radius, maximum)
             .Select(ally => (ally, GuardianRecipientCurrent(source, ally, action))).ToArray())

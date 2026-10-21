@@ -17,9 +17,7 @@ public sealed partial class CombatService
 
     private async Task GuardianSupportReactionAsync(GameSession s, GuardianPetRules.Skill passive, ActiveSkillCast action, Func<bool> current)
     {
-        if (!current() || passive.Passive is not { } row) return;
-        int skillId = (int)GameData.Int(row, "_iID");
-        double Desc(int index) => GuardianPetRules.Description(passive, index);
+        if (!current() || passive.Passive == null) return;
         switch (passive.Reactive)
         {
             case GuardianPetRules.Reaction.AliotHealingWindow or GuardianPetRules.Reaction.DullahanWindow or GuardianPetRules.Reaction.LolaWindow:
@@ -37,6 +35,22 @@ public sealed partial class CombatService
             case GuardianPetRules.Reaction.WanderSlash:
                 await GuardianWanderReactionAsync(s, passive, action);
                 break;
+            case GuardianPetRules.Reaction.ControlShield or GuardianPetRules.Reaction.FairyShield:
+                await GuardianReactiveShieldAsync(s, passive, action);
+                break;
+            default:
+                await GuardianProtectionReactionAsync(s, passive, action, current);
+                break;
+        }
+    }
+
+    /// <summary>Control immunity on the owner, Endure on nearby allies and the owner's periodic heal.</summary>
+    private async Task GuardianProtectionReactionAsync(GameSession s, GuardianPetRules.Skill passive, ActiveSkillCast action,
+        Func<bool> current)
+    {
+        double Desc(int index) => GuardianPetRules.Description(passive, index);
+        switch (passive.Reactive)
+        {
             case GuardianPetRules.Reaction.Immunity:
                 await _buffs.AddGuardianAsync(s, GuardianPetRules.ControlImmunityBuff, (int)(Desc(0) * 1000), action.OwnerId);
                 break;
@@ -45,10 +59,8 @@ public sealed partial class CombatService
                     if (current() && !ally.Dead && !ally.SceneLoading && ally.WorldScene == action.WorldScene)
                         await _buffs.AddGuardianAsync(ally, GuardianPetRules.EndureBuff, (int)(Desc(2) * 1000), action.OwnerId);
                 break;
-            case GuardianPetRules.Reaction.ControlShield or GuardianPetRules.Reaction.FairyShield:
-                await GuardianReactiveShieldAsync(s, passive, action);
-                break;
-            case GuardianPetRules.Reaction.PeriodicHeal:
+            case GuardianPetRules.Reaction.PeriodicHeal when passive.Passive is { } row:
+                int skillId = (int)GameData.Int(row, "_iID");
                 if (!ReserveGuardianReaction(s, skillId, (int)(Desc(1) * 1000))) break;
                 // Description: one flat heal every second for the specified duration. First tick after 1 s (inferred).
                 for (int second = 1; second <= (int)Desc(2); second++)
@@ -79,20 +91,19 @@ public sealed partial class CombatService
     {
         // Named candidate links (inferred), validated by T_AXadd0_etc and the exact MaxHP coefficient.
         // Fairy's active shield uses a different group: never use the passive's same-ID active shield.
-        const int FairyReactiveShieldGroup = 23186;
         int buffId = passive.Id;
         if (passive.Reactive == GuardianPetRules.Reaction.FairyShield)
         {
-            var candidates = GuardianTables.Of(_data).Buffs(FairyReactiveShieldGroup, passive.Star);
+            var candidates = GuardianTables.Of(_data).Buffs(GuardianGroup.FairyReactiveShield, passive.Star);
             buffId = candidates.Count == 0 ? 0 : (int)GameData.Int(candidates[0], "_iID");
         }
         if (_data.Row("BuffConfig", buffId) is not { } buff) return;
         var stats = _character.Stats(s);
-        long expected = (long)Math.Floor(stats[GuardianPetRules.Hp] * GuardianPetRules.Description(passive, 0) / 100);
+        long expected = (long)Math.Floor(stats[AttributeId.MaxHp] * GuardianPetRules.Description(passive, 0) / 100);
         long amount = PetCombatRules.AttributeAmount(buff, stats, stats);
         if (amount <= 0 || amount != expected) return;
         bool coreShield = passive.Reactive == GuardianPetRules.Reaction.FairyShield && passive.Core != null;
-        if (coreShield) amount = (long)Math.Floor(stats[GuardianPetRules.Hp] * GuardianPetRules.CoreDescription(passive, 1) / 100);
+        if (coreShield) amount = (long)Math.Floor(stats[AttributeId.MaxHp] * GuardianPetRules.CoreDescription(passive, 1) / 100);
         int durationIndex = passive.Reactive == GuardianPetRules.Reaction.FairyShield ? 2 : 1;
         await _buffs.AddGuardianAsync(s, buffId, (int)(GuardianPetRules.Description(passive, durationIndex) * 1000), action.OwnerId,
             amount, shieldDebuffImmunity: coreShield);

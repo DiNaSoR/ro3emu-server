@@ -150,11 +150,12 @@ public sealed partial class CombatService
     private (long Damage, DamageHitResult Result) PlayerHitDamage(GameSession source, GameSession target, JsonElement row)
     {
         var attack = _character.Stats(source); var defend = _character.Stats(target);
-        var a = new Fighter(attack[103], attack[104], attack[109], attack[111], source.Progress!.Level, 1);
+        var a = new Fighter(attack[AttributeId.Atk], attack[AttributeId.Matk], attack[AttributeId.Hit], attack[AttributeId.Cri],
+            source.Progress!.Level, 1);
         var b = new Fighter(0, 0, 0, 0, target.Progress!.Level, 1)
-        { Def = defend[105], Mdef = defend[106], Flee = defend[110], ResCri = defend[112] };
+        { Def = defend[AttributeId.Def], Mdef = defend[AttributeId.Mdef], Flee = defend[AttributeId.Flee], ResCri = defend[AttributeId.ResCri] };
         var (damage, result) = Damage(a, b, row, bonusCrit: GuardianPetRules.CriticalChance(row),
-            forceCrit: GuardianPetRules.CriticalAtHp(row, defend[2000], defend[101]));
+            forceCrit: GuardianPetRules.CriticalAtHp(row, defend[AttributeId.Hp], defend[AttributeId.MaxHp]));
         damage = GuardianPetRules.DirectDamage(row, damage);
         damage = GuardianOutgoingDamage(source, row, damage);
         damage = GuardianControlledDamage(source, GuardianControlTarget(target), damage);

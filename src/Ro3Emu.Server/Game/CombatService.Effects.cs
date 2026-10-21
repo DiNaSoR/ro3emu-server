@@ -559,10 +559,10 @@ public sealed partial class CombatService
     {
         if (GuardianPetRules.Script(row) != KuangFengXiJuan) return [];
         var slowed = monsters.Where(m => m.SlowMovementExpireMs > Now
-            || _buffs.GuardianUnitAttributes(m).Any(c => c.Id == GuardianPetRules.SpeedPercent && c.Value < 0))
+            || _buffs.GuardianUnitAttributes(m).Any(c => c.Id == AttributeId.PerSpeed && c.Value < 0))
             .Select(m => m.Uid).ToHashSet();
         foreach (var player in players.Where(p => p.Buffs.Any(b => b.ExpireMs > Now
-            && b.Changes.Any(c => c.Attr == GuardianPetRules.SpeedPercent && c.Value < 0)))) slowed.Add(player.Role!.Id);
+            && b.Changes.Any(c => c.Attr == AttributeId.PerSpeed && c.Value < 0)))) slowed.Add(player.Role!.Id);
         return slowed;
     }
 

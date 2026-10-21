@@ -13,12 +13,14 @@ internal static partial class GuardianPetRules
     internal static JsonObject CopyObject(JsonElement row) => JsonNode.Parse(row.GetRawText()) as JsonObject
         ?? throw new InvalidOperationException("Guardian configuration must be an object.");
 
-    internal const int WrapperType = 8, EffectType = 41;
+    // SkillConfig._iSystemType (Lua_GameDefine.enum_SkillSystemType): ActiveGuardSkill wraps the guardian's
+    // GuardianSkill effects; a server-built proc row is a PetSkill, so it never starts another wrapper or reaction chain.
+    internal const int PetSkillType = 4, WrapperType = 8, EffectType = 41;
     internal const int PrimarySlot = 1; // UI_Sys_Pet_LineUp_List_CellWidgetCtrl._initSkillWidget: slot 1 Protect, others Reactive.
+    // SkillTagConfig 3010-3017 ("pet protection effect triggered": output, buff, debuff, recovery, shield, control,
+    // control immunity, control removal), as SkillConfig._kSkillCategory values of the guardian effects.
     internal const int OffensiveCategory = 3010, BuffCategory = 3011, DebuffCategory = 3012, RecoveryCategory = 3013,
         ShieldCategory = 3014, ControlCategory = 3015, ImmunityCategory = 3016, DispelCategory = 3017;
-    internal const int Hp = 101, PhysicalAttack = 103, MagicAttack = 104, CurrentHp = 2000;
-    internal const int SpeedPercent = 1131, PhysicalDefencePercent = 1052, MagicDefencePercent = 1062;
     internal enum Kind { Buff, Heal, Damage, Shield, Debuff, Unsupported }
     internal enum Reaction
     {
@@ -39,66 +41,69 @@ internal static partial class GuardianPetRules
         public int EffectId => (int)GameData.Int(Effect, "_iID");
         public bool IsPrimary => Slot == PrimarySlot;
         public JsonElement? Core { get; init; }
-        public Reaction Reactive => Script(Effect) switch
-        {
-            "PetSkill_2_2_QiaoKeHou" => Reaction.BuffDuration,
-            "YaoGun" => Reaction.Heal,
-            "Pet_WildRose_23552" => Reaction.Slow,
-            "BoLiPaoPao" => Reaction.Defence,
-            "yemanhudun" => Reaction.ShieldDuration,
-            "SenLinCiFu" => Reaction.CastSpeed,
-            "Pet_Salamander_23462" => Reaction.Damage,
-            "Alice_Huzhu" => Reaction.DirectHeal,
-            "xuesefengbao" => Reaction.DirectDamageHeal,
-            "PetSkill_2_2_ShouRenZhanShiZhang" => Reaction.DamageCoefficient,
-            "QingFeng" => Reaction.FoxTargets,
-            "Observation_Huzhu" => Reaction.WatcherTargets,
-            "ShengGuangJiangLin" => Reaction.HealCooldown,
-            "KuangFengXiJuan" or "XieXinLianRen" => Reaction.DebuffDuration,
-            "GarmBaby_Huzhu" => Reaction.ControlDuration,
-            "PetSkill_2_2_GuZhongMo" => Reaction.ImmunityDuration,
-            "ChaoXiSongGe" => Reaction.WaterResistance,
-            "AiLiSe_HuZhu" => Reaction.PhysicalAttackBuff,
-            "yemujuechang" => Reaction.DamageBuff,
-            "PetSkill_2_2_QiWangNvShen" => Reaction.DefenceBuff,
-            "PetSkill_2_2_YaoDao" => Reaction.KillHeal,
-            "Siwanliandao" => Reaction.DispelHeal,
-            "Pet_AncientTree_23452" => Reaction.ControlShield,
-            "GuoShuGui_HuZhu" => Reaction.PeriodicHeal,
-            "Pet_Hodremlin_23052" => Reaction.Immunity,
-            "MiYaBi_Huzhu" => Reaction.Endure,
-            "YaoXianNv_HuZhu" => Reaction.FairyShield,
-            "PetSkill_2_2_BuChongJin" => Reaction.Stun,
-            "Pet_Wanderman_23172" => Reaction.WanderSlash,
-            "Pet_Marionette_23392" => Reaction.MarionetteDebuff,
-            "Pet_Tikbalang_23212" => Reaction.NightmareDebuff,
-            "SerpentGuard" => Reaction.IsisReduction,
-            "MingYingLieXi" => Reaction.DaedreDebuff,
-            "tutujianglin" => Reaction.PiametteTargets,
-            "XieEJiQu2" => Reaction.SuccubusSilence,
-            "shengguanglingyu" => Reaction.ChimeraDebuff,
-            "xianzhenchongfeng" => Reaction.WildcatShield,
-            "GuiNv_HuZhu" => Reaction.SoheeReduction,
-            "renfamizong" => Reaction.ShinobiDispel,
-            "moqihuanrao" => Reaction.IncubusAura,
-            "JingZhunShouShu" => Reaction.AliotHealingWindow,
-            "WuShiZhiNu" => Reaction.DullahanWindow,
-            "NvZhanShiLuoLa_HuZhu" => Reaction.LolaWindow,
-            "Pet_Bolkoba_23292" => Reaction.ElenaBurst,
-            "huxiaolieduan" => Reaction.MiguelCritical,
-            "xingxingshike" => Reaction.RetributionControl,
-            "Deleter_Huzhu" => Reaction.RainbowExtraHit,
-            "Pet_MmSarah_23342" => Reaction.SarahExtraHit,
-            "Pet_AncientMummy_23122" => Reaction.MummyCurse,
-            "PetrifyingGaze" => Reaction.MedusaPetrify,
-            "Pet_NightmareTerror_23302" => Reaction.NightmareControl,
-            "BlueprintYinYueJiangLin2" => Reaction.SilverVulnerability,
-            "BaXiLiSiKe_HuZhu" => Reaction.ScoutDetection,
-            "PetSkill_2_2_EXiaoNanJue" => Reaction.OwlLightning,
-            "PetSkill_2_2_KuangBaoYueYeMao" => Reaction.CatVulnerability,
-            _ => Reaction.None,
-        };
+        public Reaction Reactive => Reactions.GetValueOrDefault(Script(Effect));
     }
+
+    /// <summary>The reactive behaviour of each guardian family, by the _kScriptLogic of its GuardianSkill effect.</summary>
+    private static readonly Dictionary<string, Reaction> Reactions = new()
+    {
+        ["PetSkill_2_2_QiaoKeHou"] = Reaction.BuffDuration,
+        ["YaoGun"] = Reaction.Heal,
+        ["Pet_WildRose_23552"] = Reaction.Slow,
+        ["BoLiPaoPao"] = Reaction.Defence,
+        ["yemanhudun"] = Reaction.ShieldDuration,
+        ["SenLinCiFu"] = Reaction.CastSpeed,
+        ["Pet_Salamander_23462"] = Reaction.Damage,
+        ["Alice_Huzhu"] = Reaction.DirectHeal,
+        ["xuesefengbao"] = Reaction.DirectDamageHeal,
+        ["PetSkill_2_2_ShouRenZhanShiZhang"] = Reaction.DamageCoefficient,
+        ["QingFeng"] = Reaction.FoxTargets,
+        ["Observation_Huzhu"] = Reaction.WatcherTargets,
+        ["ShengGuangJiangLin"] = Reaction.HealCooldown,
+        ["KuangFengXiJuan"] = Reaction.DebuffDuration,
+        ["XieXinLianRen"] = Reaction.DebuffDuration,
+        ["GarmBaby_Huzhu"] = Reaction.ControlDuration,
+        ["PetSkill_2_2_GuZhongMo"] = Reaction.ImmunityDuration,
+        ["ChaoXiSongGe"] = Reaction.WaterResistance,
+        ["AiLiSe_HuZhu"] = Reaction.PhysicalAttackBuff,
+        ["yemujuechang"] = Reaction.DamageBuff,
+        ["PetSkill_2_2_QiWangNvShen"] = Reaction.DefenceBuff,
+        ["PetSkill_2_2_YaoDao"] = Reaction.KillHeal,
+        ["Siwanliandao"] = Reaction.DispelHeal,
+        ["Pet_AncientTree_23452"] = Reaction.ControlShield,
+        ["GuoShuGui_HuZhu"] = Reaction.PeriodicHeal,
+        ["Pet_Hodremlin_23052"] = Reaction.Immunity,
+        ["MiYaBi_Huzhu"] = Reaction.Endure,
+        ["YaoXianNv_HuZhu"] = Reaction.FairyShield,
+        ["PetSkill_2_2_BuChongJin"] = Reaction.Stun,
+        ["Pet_Wanderman_23172"] = Reaction.WanderSlash,
+        ["Pet_Marionette_23392"] = Reaction.MarionetteDebuff,
+        ["Pet_Tikbalang_23212"] = Reaction.NightmareDebuff,
+        ["SerpentGuard"] = Reaction.IsisReduction,
+        ["MingYingLieXi"] = Reaction.DaedreDebuff,
+        ["tutujianglin"] = Reaction.PiametteTargets,
+        ["XieEJiQu2"] = Reaction.SuccubusSilence,
+        ["shengguanglingyu"] = Reaction.ChimeraDebuff,
+        ["xianzhenchongfeng"] = Reaction.WildcatShield,
+        ["GuiNv_HuZhu"] = Reaction.SoheeReduction,
+        ["renfamizong"] = Reaction.ShinobiDispel,
+        ["moqihuanrao"] = Reaction.IncubusAura,
+        ["JingZhunShouShu"] = Reaction.AliotHealingWindow,
+        ["WuShiZhiNu"] = Reaction.DullahanWindow,
+        ["NvZhanShiLuoLa_HuZhu"] = Reaction.LolaWindow,
+        ["Pet_Bolkoba_23292"] = Reaction.ElenaBurst,
+        ["huxiaolieduan"] = Reaction.MiguelCritical,
+        ["xingxingshike"] = Reaction.RetributionControl,
+        ["Deleter_Huzhu"] = Reaction.RainbowExtraHit,
+        ["Pet_MmSarah_23342"] = Reaction.SarahExtraHit,
+        ["Pet_AncientMummy_23122"] = Reaction.MummyCurse,
+        ["PetrifyingGaze"] = Reaction.MedusaPetrify,
+        ["Pet_NightmareTerror_23302"] = Reaction.NightmareControl,
+        ["BlueprintYinYueJiangLin2"] = Reaction.SilverVulnerability,
+        ["BaXiLiSiKe_HuZhu"] = Reaction.ScoutDetection,
+        ["PetSkill_2_2_EXiaoNanJue"] = Reaction.OwlLightning,
+        ["PetSkill_2_2_KuangBaoYueYeMao"] = Reaction.CatVulnerability,
+    };
 
     internal static string Script(JsonElement row) => row.TryGetProperty("_kScriptLogic", out var s) ? s.GetString() ?? "" : "";
     internal static double[] Numbers(JsonElement row, string key) =>
@@ -148,8 +153,8 @@ internal static partial class GuardianPetRules
     internal static JsonElement TargetRow(Skill skill)
     {
         var row = GuardianPetRules.CopyObject(skill.Active);
-        if (skill.Kind == Kind.Damage && GameData.Int(skill.Effect, "_iRangeType") == 1)
-            row["_iRelease"] = 1; // Owl locks a target despite the wrapper's FixCircle marker.
+        if (skill.Kind == Kind.Damage && GameData.Int(skill.Effect, "_iRangeType") == SkillRelease.SingleTarget)
+            row["_iRelease"] = SkillRelease.Lock; // Owl locks a target despite the wrapper's FixCircle marker.
         return JsonSerializer.SerializeToElement(row);
     }
 
@@ -167,7 +172,7 @@ internal static partial class GuardianPetRules
     {
         var node = JsonNode.Parse(skill.Effect.GetRawText()) as JsonObject
             ?? throw new InvalidOperationException("Guardian effect must be a configuration object.");
-        node["_iDmgType"] = stats[MagicAttack] > stats[PhysicalAttack] ? 2 : 1;
+        node["_iDmgType"] = stats[AttributeId.Matk] > stats[AttributeId.Atk] ? 2 : 1;
         if (Script(skill.Effect) is "Pet_AncientMummy_23122" or "Pet_Bolkoba_23292")
             node["_iRelease"] = GameData.Int(skill.Active, "_iRelease"); // explicit targeted wrapper center
         node["_kBuff1"] = new JsonArray(); // Applied once by GuardianSupportAsync, independently of hostile selection.
@@ -179,7 +184,9 @@ internal static partial class GuardianPetRules
         return JsonSerializer.SerializeToElement(node);
     }
 
-    internal const int StunBuff = 901601, ControlImmunityBuff = 903201, EndureBuff = 903101;
+    // BuffConfig._iID of the first level of the SpecialStatusConfig control groups (BuffService.StateFor).
+    internal const int StunBuff = 901601, KnockUpBuff = 901801, PetrifyBuff = 902101, RootBuff = 902401, BlindBuff = 902501,
+        EndureBuff = 903101, ControlImmunityBuff = 903201;
     internal static bool DispelsControl(Skill skill) => Script(skill.Effect) is "PetSkill_2_2_GuZhongMo" or "XieEJiQu2" or "Siwanliandao" or "renfamizong";
 
     internal static double Description(Skill skill, int index) => skill.Passive is { } row
@@ -194,7 +201,12 @@ internal static partial class GuardianPetRules
             .Select(v => GameData.Number(v) ?? 0)] : [];
     internal static bool Category(JsonElement row, int category) => Numbers(row, "_kSkillCategory").Contains(category);
     internal static double BuffMultiplier(JsonElement row) => row.TryGetProperty("_ro3GuardianBuffMultiplier", out var value)
-        ? Math.Clamp(GameData.Number(value) ?? 1, 0, 10) : 1;
+        ? Math.Clamp(GameData.Number(value) ?? 1, 0, MaxBuffMultiplier) : 1;
+
+    // (inferred) Bounds on description-driven repeats and multipliers. They are not client rules: they only stop a
+    // malformed description from scheduling unbounded work.
+    internal const int MaxRepeats = 50, MaxCoreHits = 20;
+    internal const double MaxBuffMultiplier = 10;
 
     internal static int BuffAtStar(GameData data, int group, int star)
     {
@@ -211,7 +223,7 @@ internal static partial class GuardianPetRules
         if (skill.Reactive == Reaction.Slow)
         {
             candidate = skill.Id;
-            expected = [(SpeedPercent, -Description(skill, 0) * 100)];
+            expected = [(AttributeId.PerSpeed, -Description(skill, 0) * 100)];
         }
         else if (skill.Reactive == Reaction.Defence && skill.Passive is { } passive
             && data.Row("BuffConfig", GameData.Int(passive, "_iID")) is { } controller)
@@ -219,7 +231,7 @@ internal static partial class GuardianPetRules
             var logic = Numbers(controller, "_kLogicData");
             if (logic.Length < 3 || logic[0] != Description(skill, 0)) return 0;
             candidate = (int)logic[1];
-            expected = [(PhysicalDefencePercent, Description(skill, 1) * 100), (MagicDefencePercent, Description(skill, 1) * 100)];
+            expected = [(AttributeId.BuffPerDef, Description(skill, 1) * 100), (AttributeId.BuffPerMdef, Description(skill, 1) * 100)];
         }
         else if (ReactionAttributeBuff(data, skill) is { } attributes)
         {
@@ -241,27 +253,28 @@ internal static partial class GuardianPetRules
         int id = (int)GameData.Int(passive, "_iID");
         var controller = data.Row("BuffConfig", id);
         var logic = controller is { } c ? Numbers(c, "_kLogicData") : [];
-        const int CastSpeed = 116, WaterResistance = 315, PhysicalAttackPercent = 1032, DamageBonus = 1215;
         return skill.Reactive switch
         {
             Reaction.CastSpeed when logic.Length == 2 && logic[1] == Description(skill, 0) * 1000
-                => ((int)logic[0], [(CastSpeed, Description(skill, 1))]),
+                => ((int)logic[0], [(AttributeId.CastSpeed, Description(skill, 1))]),
             Reaction.PhysicalAttackBuff when logic.Length == 1
-                => ((int)logic[0], [(PhysicalAttackPercent, Description(skill, 0) * 100)]),
-            Reaction.WaterResistance => (id, [(WaterResistance, Description(skill, 0) * 100)]),
+                => ((int)logic[0], [(AttributeId.BuffPerAtk, Description(skill, 0) * 100)]),
+            Reaction.WaterResistance => (id, [(AttributeId.BeWaterEle, Description(skill, 0) * 100)]),
             Reaction.DamageBuff => (LinkedDescriptionBuff(data, skill.Core ?? passive, skill.Star),
-                [(DamageBonus, (skill.Core != null ? CoreDescription(skill, 0) : Description(skill, 0)) * 100)]),
+                [(AttributeId.PerDmg1, (skill.Core != null ? CoreDescription(skill, 0) : Description(skill, 0)) * 100)]),
             Reaction.DefenceBuff when logic.Length == 2 => ((int)logic[1],
-                [(PhysicalDefencePercent, Description(skill, 0) * 100), (MagicDefencePercent, Description(skill, 0) * 100)]),
-            Reaction.MarionetteDebuff => (BuffAtStar(data, 23392, skill.Star),
-                [(CastSpeed, -Description(skill, 0)), (1232, Description(skill, 1) * 100)]),
-            Reaction.NightmareDebuff => (BuffAtStar(data, 23212, skill.Star),
-                [(SpeedPercent, -Description(skill, 3) * 100), (1032, -Description(skill, 2) * 100), (1042, -Description(skill, 2) * 100)]),
-            Reaction.IsisReduction when logic.Length == 1 => ((int)logic[0], [(216, Description(skill, 3) * 100)]),
-            Reaction.DaedreDebuff => (BuffAtStar(data, 23194, skill.Star),
-                Enumerable.Range(311, 10).Select(id => ((long)id, -Description(skill, 4) * 100))
-                    .Prepend((1132L, -Description(skill, 5) * 100)).ToArray()),
-            Reaction.SilverVulnerability => (BuffAtStar(data, 23035, skill.Star), [(1230, -Description(skill, 1) * 100)]),
+                [(AttributeId.BuffPerDef, Description(skill, 0) * 100), (AttributeId.BuffPerMdef, Description(skill, 0) * 100)]),
+            Reaction.MarionetteDebuff => (BuffAtStar(data, GuardianGroup.MarionetteDebuff, skill.Star),
+                [(AttributeId.CastSpeed, -Description(skill, 0)), (AttributeId.PerSpDedution, Description(skill, 1) * 100)]),
+            Reaction.NightmareDebuff => (BuffAtStar(data, GuardianGroup.NightmareDebuff, skill.Star),
+                [(AttributeId.PerSpeed, -Description(skill, 3) * 100), (AttributeId.BuffPerAtk, -Description(skill, 2) * 100),
+                    (AttributeId.BuffPerMatk, -Description(skill, 2) * 100)]),
+            Reaction.IsisReduction when logic.Length == 1 => ((int)logic[0], [(AttributeId.PerResDmg, Description(skill, 3) * 100)]),
+            Reaction.DaedreDebuff => (BuffAtStar(data, GuardianGroup.DaedreDebuff, skill.Star),
+                Enumerable.Range(AttributeId.BeNoneEle, AttributeId.ElementCount).Select(id => ((long)id, -Description(skill, 4) * 100))
+                    .Prepend(((long)AttributeId.BuffPerSpeed, -Description(skill, 5) * 100)).ToArray()),
+            Reaction.SilverVulnerability => (BuffAtStar(data, GuardianGroup.SilverVulnerability, skill.Star),
+                [(AttributeId.PerBeRemoteDmg1, -Description(skill, 1) * 100)]),
             _ => null,
         };
     }

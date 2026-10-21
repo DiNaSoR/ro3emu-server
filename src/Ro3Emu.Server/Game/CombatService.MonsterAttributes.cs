@@ -7,7 +7,10 @@ namespace Ro3Emu.Server.Game;
 
 public sealed partial class CombatService
 {
-    private static readonly int[] PublishedMonsterAttributes = [103, 104, 105, 106, 109, 110, 111, 116];
+    private static readonly int[] PublishedMonsterAttributes = [
+        AttributeId.Atk, AttributeId.Matk, AttributeId.Def, AttributeId.Mdef, AttributeId.Hit, AttributeId.Flee, AttributeId.Cri,
+        AttributeId.CastSpeed,
+    ];
 
     /// <summary>BuffConfig._kChangeAttri uses the same AttributeConfig groups for enemy PATK/MATK/DEF/MDEF.
     /// (inferred) Overlay live changes on the resolved monster template, using the existing player/pet calculator.
@@ -17,8 +20,10 @@ public sealed partial class CombatService
         var t = unit.Template;
         var raw = new Dictionary<int, double>
         {
-            [101] = t.MaxHp, [103] = t.Atk, [104] = t.Matk, [105] = t.Def, [106] = t.Mdef,
-            [109] = t.Hit, [110] = t.Flee, [111] = t.Cri, [113] = t.SpeedCm, [116] = t.CastSpeed,
+            [AttributeId.MaxHp] = t.MaxHp, [AttributeId.Atk] = t.Atk, [AttributeId.Matk] = t.Matk, [AttributeId.Def] = t.Def,
+            [AttributeId.Mdef] = t.Mdef,
+            [AttributeId.Hit] = t.Hit, [AttributeId.Flee] = t.Flee, [AttributeId.Cri] = t.Cri, [AttributeId.Speed] = t.SpeedCm,
+            [AttributeId.CastSpeed] = t.CastSpeed,
         };
         foreach (var (id, value) in _buffs.GuardianUnitAttributes(unit)) raw[(int)id] = raw.GetValueOrDefault((int)id) + value;
         return StatCalculator.Compute(raw, _data);
@@ -31,8 +36,9 @@ public sealed partial class CombatService
         if (!_buffs.HasGuardianUnitBuffs(unit))
             return new(t.Atk, t.Matk, t.Hit, t.Cri, t.Level, t.Element) { Def = t.Def, Mdef = t.Mdef, Flee = t.Flee };
         var stats = MonsterStats(unit);
-        return new(stats[103], stats[104], stats[109], stats[111], unit.Template.Level, unit.Template.Element)
-        { Def = stats[105], Mdef = stats[106], Flee = stats[110], ResCri = stats[112] };
+        return new(stats[AttributeId.Atk], stats[AttributeId.Matk], stats[AttributeId.Hit], stats[AttributeId.Cri], unit.Template.Level,
+            unit.Template.Element)
+        { Def = stats[AttributeId.Def], Mdef = stats[AttributeId.Mdef], Flee = stats[AttributeId.Flee], ResCri = stats[AttributeId.ResCri] };
     }
 
     private long MonsterBuffDamage(MonsterUnit monster, JsonElement? skill, long amount)
@@ -40,9 +46,7 @@ public sealed partial class CombatService
         if (!_buffs.HasGuardianUnitBuffs(monster)) return amount;
         int element = skill is { } row && GameData.Int(row, "_iEleType") > 1
             ? (int)GameData.Int(row, "_iEleType") : monster.Template.Element;
-        const int DamageBonus = 1215, FirstElementBonus = 301;
-        double bonus = _buffs.GuardianUnitAttributes(monster).Where(c => c.Id == DamageBonus
-            || element is >= 1 and <= 10 && c.Id == FirstElementBonus + element - 1).Sum(c => c.Value);
+        double bonus = _buffs.GuardianUnitAttributes(monster).Where(c => RaisesDamage(c.Id, element)).Sum(c => c.Value);
         return (long)Math.Clamp(Math.Floor(amount * Math.Max(0, 1 + bonus / 10000)), 0, long.MaxValue);
     }
 
@@ -54,7 +58,7 @@ public sealed partial class CombatService
         // and, once the last guardian buff is gone, the return to the template.
         if (!guardian && monster.BuffSpeedCm == null) return;
         var stats = MonsterStats(monster);
-        await _monsters.SetBuffSpeedAsync(monster, guardian ? (int)Math.Clamp(stats[113], 0, int.MaxValue) : null);
+        await _monsters.SetBuffSpeedAsync(monster, guardian ? (int)Math.Clamp(stats[AttributeId.Speed], 0, int.MaxValue) : null);
         var changed = new AOIAttrChange
         {
             EntityUuid = (ulong)unit.Uid,

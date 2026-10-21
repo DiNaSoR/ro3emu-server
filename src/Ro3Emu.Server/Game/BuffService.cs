@@ -51,13 +51,18 @@ public sealed partial class BuffService : IGameTicker
         world.UnitRemoved.Add(unit => { _unitBuffs.Remove(unit.Uid); return Task.CompletedTask; });
     }
 
+    // BuffConfig._iBuffID of the control groups; StateFor names the SpecialStatusConfig row each one shows.
+    internal const int StunGroup = 9016, KnockBackGroup = 9017, KnockUpGroup = 9018, FreezeGroup = 9020, PetrifyGroup = 9021,
+        SleepGroup = 9022, SilenceGroup = 9023, RootGroup = 9024, BlindGroup = 9025, SuperArmorGroup = 9031,
+        ControlImmunityGroup = 9032, DebuffImmunityGroup = 9033;
+
     // Inferred: these exact buff groups are named Stun/Sleep/Silence/Freeze/Invincible; matching
     // SpecialStatusConfig rows specify forbidden actions. No general category interpreter was recovered.
     private static int StateFor(int buffGroup, bool guardianOwned) => buffGroup switch
     {
-        9016 => 18,
-        9022 => 19,
-        9023 => 20,
+        StunGroup => 18, // Stun
+        SleepGroup => 19, // Sleep
+        SilenceGroup => 20, // Silence
         12003 => 11,
         9034 => 25,
         _ => guardianOwned ? GuardianStateFor(buffGroup) : 0,
@@ -68,14 +73,14 @@ public sealed partial class BuffService : IGameTicker
     /// until each state is established and tested for every source.</summary>
     private static int GuardianStateFor(int buffGroup) => buffGroup switch
     {
-        9018 => 3, // Knock-Up -> FlyHit
-        9020 => 11, // Freeze
-        9021 => 12, // Petrify
-        9024 => 21,
-        9031 => 22, // Super Armor
-        9032 => 23, // Control immunity
-        9033 => 24, // Debuff immunity
-        23022 => 2, // Shinobi stealth
+        KnockUpGroup => 3, // Knock-Up -> FlyHit
+        FreezeGroup => 11, // Freeze
+        PetrifyGroup => 12, // Petrify
+        RootGroup => 21, // Root
+        SuperArmorGroup => 22, // Super Armor
+        ControlImmunityGroup => 23, // Control immunity
+        DebuffImmunityGroup => 24, // Debuff immunity
+        GuardianGroup.ShinobiStealth => 2, // Stealth
         _ => 0,
     };
 

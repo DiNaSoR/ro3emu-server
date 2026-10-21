@@ -16,7 +16,7 @@ public sealed partial class CombatService
         _scene.Loaded.Add(SyncGuardianWheelAsync);
         DealtAsync.Add(GuardianDamageReactionAsync);
         DealtAsync.Add(GuardianWindowMonsterHitAsync);
-        DealtAsync.Add((_, target, _, damage) => damage > 0 ? _buffs.ConsumeGuardianGroupAsync(target, 23019) : Task.CompletedTask);
+        DealtAsync.Add((_, target, _, damage) => damage > 0 ? _buffs.ConsumeGuardianGroupAsync(target, GuardianGroup.CatVulnerability) : Task.CompletedTask);
         TakenAsync.Add((_, target, amount) => GuardianTakenAsync(target, amount));
         DamageAdjusters.Add((s, _, row, _, damage) => GuardianOutgoingDamage(s, row, damage));
         DamageAdjusters.Add((s, target, _, _, damage) => GuardianControlledDamage(s, GuardianControlTarget(target), damage));
@@ -201,7 +201,7 @@ public sealed partial class CombatService
         if (CurrentCastMap(s, action) && pulse.HealCoefficient is { } heal && hit.GuardianDamage.Count > 0)
         {
             var stats = _character.Stats(s);
-            long amount = (long)Math.Floor(Math.Max(stats[103], stats[104]) * heal / 100 * hit.GuardianDamage.Count);
+            long amount = (long)Math.Floor(Math.Max(stats[AttributeId.Atk], stats[AttributeId.Matk]) * heal / 100 * hit.GuardianDamage.Count);
             await GuardianHealAsync(s, s, skill.EffectId, action.Id, GuardianPetRules.DirectHealing(skill.Effect, amount),
                 () => CurrentCastMap(s, action));
         }
@@ -250,7 +250,7 @@ public sealed partial class CombatService
                 await _buffs.AddGuardianAsync(recipient, buffId, ms, action.OwnerId, shield);
             }
             if (!current() || skill.Kind != GuardianPetRules.Kind.Heal) continue;
-            long amount = (long)Math.Max(0, Math.Floor(Math.Max(ownerStats[GuardianPetRules.PhysicalAttack], ownerStats[GuardianPetRules.MagicAttack])
+            long amount = (long)Math.Max(0, Math.Floor(Math.Max(ownerStats[AttributeId.Atk], ownerStats[AttributeId.Matk])
                 * Numbers(skill.Effect, "_kDamageParam1").FirstOrDefault() / 10000));
             await GuardianHealAsync(s, recipient, skill.EffectId, action.Id, GuardianPetRules.DirectHealing(skill.Effect, amount), current);
         }
@@ -266,7 +266,7 @@ public sealed partial class CombatService
             && _data.Row("BuffConfig", buffId) is { } buff)
             return PetCombatRules.AttributeAmount(buff, owner, recipient);
         return GuardianPetRules.Script(skill.Effect) == "BoLiPaoPao"
-            ? (long)Math.Max(0, Math.Floor(Math.Max(owner[GuardianPetRules.PhysicalAttack], owner[GuardianPetRules.MagicAttack])
+            ? (long)Math.Max(0, Math.Floor(Math.Max(owner[AttributeId.Atk], owner[AttributeId.Matk])
                 * Numbers(skill.Active, "_kDescData").FirstOrDefault() / 100)) : 0;
     }
 
@@ -288,9 +288,9 @@ public sealed partial class CombatService
         foreach (var modifier in ExtraHeal) amount = modifier(source, amount);
         var stats = _character.Stats(recipient);
         amount = ModifiedHealing(_buffs.GuardianAttributes(source), _buffs.GuardianAttributes(recipient), amount);
-        long actual = Math.Min(Math.Max(0, amount), Math.Max(0, stats[GuardianPetRules.Hp] - stats[GuardianPetRules.CurrentHp]));
+        long actual = Math.Min(Math.Max(0, amount), Math.Max(0, stats[AttributeId.MaxHp] - stats[AttributeId.Hp]));
         long owner = source.Role!.Id, target = recipient.Role!.Id;
-        await _character.SetHpSpAsync(recipient, stats[GuardianPetRules.CurrentHp] + actual, null);
+        await _character.SetHpSpAsync(recipient, stats[AttributeId.Hp] + actual, null);
         if (!current()) return;
         await ToPlayerAndViewersAsync(source, SkillHit, new SkillHitInfo
         {
