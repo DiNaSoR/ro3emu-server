@@ -27,7 +27,9 @@ public abstract class GateListener(IPAddress address, int port, ILogger log, Dia
     private long _nextServeId;
     private bool _stopping;
     public bool DrainSucceeded { get; private set; } = true;
-    public int OutstandingServeTasks { get { lock (_servesGate) return _serves.Count; } }
+    /// <summary>Connection tasks still running. A finished task leaves <c>_serves</c> in a continuation that may not have
+    /// run yet, so it is not counted.</summary>
+    public int OutstandingServeTasks { get { lock (_servesGate) return _serves.Values.Count(s => !s.Task.IsCompleted); } }
     protected ILogger Log { get; } = log;
     protected Diagnostics.ServerMetrics? Metrics { get; } = metrics;
 

@@ -39,7 +39,10 @@ public sealed class DbWriterFaultTests : IDisposable
         var metrics = new DbAccessMetrics();
         using var writer = new DbWriter($"Data Source={Database}", metrics) { LazyMaxWait = TimeSpan.FromMilliseconds(30) };
         using var hold = new ManualResetEventSlim();
-        var blocker = writer.ExecuteAsync<int>(new Plan("block", _executed, () => hold.Wait(TimeSpan.FromSeconds(10))));
+        using var started = new ManualResetEventSlim();
+        var blocker = writer.ExecuteAsync<int>(new Plan("block", _executed, () => { started.Set(); hold.Wait(TimeSpan.FromSeconds(10)); }));
+        // Queue the rest only once the writer runs the blocker: opening the database first can outlast LazyMaxWait (#243).
+        Assert.True(started.Wait(TimeSpan.FromSeconds(10)));
         var durable = Enumerable.Range(0, 100).Select(i => writer.ExecuteAsync<int>(new Plan("d" + i, _executed, () => Thread.Sleep(1)))).ToList();
         var lazy = new[] { writer.ExecuteAsync<int>(new Plan("lazy0", _executed), lazy: true), writer.ExecuteAsync<int>(new Plan("lazy1", _executed), lazy: true) };
         await Task.Delay(80); // both lazy jobs are now older than LazyMaxWait
@@ -61,7 +64,10 @@ public sealed class DbWriterFaultTests : IDisposable
         var metrics = new DbAccessMetrics();
         using var writer = new DbWriter($"Data Source={Database}", metrics) { LazyMaxWait = TimeSpan.FromSeconds(30) };
         using var hold = new ManualResetEventSlim();
-        var blocker = writer.ExecuteAsync<int>(new Plan("block", _executed, () => hold.Wait(TimeSpan.FromSeconds(10))));
+        using var started = new ManualResetEventSlim();
+        var blocker = writer.ExecuteAsync<int>(new Plan("block", _executed, () => { started.Set(); hold.Wait(TimeSpan.FromSeconds(10)); }));
+        // Queue the rest only once the writer runs the blocker: opening the database first can outlast LazyMaxWait (#243).
+        Assert.True(started.Wait(TimeSpan.FromSeconds(10)));
         var lazy = writer.ExecuteAsync<int>(new Plan("lazy", _executed), lazy: true);
         var durable = Enumerable.Range(0, 5).Select(i => writer.ExecuteAsync<int>(new Plan("d" + i, _executed))).ToList();
         hold.Set();
