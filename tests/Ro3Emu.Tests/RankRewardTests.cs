@@ -117,6 +117,30 @@ public sealed class RankRewardTests
         Assert.Equal(5L, Amount(Rewards(roles, alice)[0]));
     }
 
+    [Fact]
+    public async Task AFailedSettlementOfABoundaryTheServerSawCloseStillPaysOnRetry()
+    {
+        var clock = new TestClock();
+        await using var host = await SyntheticHost.StartAsync(clock: clock);
+        var roles = host.Service<RoleStore>();
+        var rank = host.Service<RankService>();
+        long alice = Role(roles, "Alice");
+        long first = new DateTimeOffset(2026, 10, 5, 5, 0, 0, TimeSpan.Zero).ToUnixTimeSeconds();
+        await Until(() => Settled(host)?.Period == first, "the start-up settlement");
+        Climb(roles, alice, 94);
+        int attempts = 0;
+        rank.RewardRetryEvery = TimeSpan.FromMilliseconds(200);
+        rank.BeforeRankForTest = _ => Interlocked.Increment(ref attempts) == 1
+            ? throw new InvalidOperationException("transient failure") : Task.CompletedTask;
+
+        // The first attempt at 10-06 05:00 fails; the retry still pays the boundary it saw close.
+        clock.Advance(TimeSpan.FromHours(1));
+        await Until(() => Rewards(roles, alice).Count == 1, "the retried 10-06 letter");
+        Assert.Equal(2, attempts);
+        Assert.Equal(first + 86400, Settled(host)!.Period);
+        Assert.Equal(alice, Settled(host)!.Winners[1]);
+    }
+
     private static RankService.BoardSettlement? Settled(SyntheticHost host) =>
         host.Service<AccountStore>().ReadSync<string?>(new SeasonStateReadPlan(RankService.RewardStateKey)) is { Length: > 0 } saved
             ? JsonSerializer.Deserialize<RankService.RewardState>(saved)!.Boards.GetValueOrDefault(1011) : null;

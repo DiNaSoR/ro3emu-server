@@ -17,7 +17,8 @@ namespace Ro3Emu.Server.Micro;
 /// period are saved (server_state "rank_rewards") before any letter goes out; each letter is delivered once per board,
 /// period and role. A period whose letters have not all gone out (a failed letter, a restart) is sent again every
 /// minute until they have, and is finished before the board's next period replaces its winners, so a restart never
-/// ranks a period again.
+/// ranks a period again. A letter that cannot be sent at all (the role is gone, the gift no longer resolves to fixed
+/// grants) is owed nothing until the next start, when the saved period is tried once more.
 /// </para>
 /// <para>
 /// A period is paid only when the server saw it close: it directly follows the saved one and the previous check of
@@ -30,7 +31,13 @@ public sealed partial class RankService : IGameTicker
 {
     internal const string RewardStateKey = "rank_rewards";
     private const int DailyPrize = 1, WeeklyPrize = 2;
-    private static readonly TimeSpan RewardCheckEvery = TimeSpan.FromSeconds(1), RewardRetryEvery = TimeSpan.FromMinutes(1);
+    private static readonly TimeSpan RewardCheckEvery = TimeSpan.FromSeconds(1);
+
+    /// <summary>How long a failed settlement waits before it is tried again (tests shorten it).</summary>
+    internal TimeSpan RewardRetryEvery { get; set; } = TimeSpan.FromMinutes(1);
+
+    /// <summary>Test hook: runs before a paid period is ranked (a throw fails that attempt).</summary>
+    internal Func<int, Task>? BeforeRankForTest { get; set; }
 
     private TimeSpan lastRewardCheck, rewardRetryAt;
     private long? previousCheckUnix;
@@ -39,6 +46,9 @@ public sealed partial class RankService : IGameTicker
 
     /// <summary>Boards whose saved period may still owe letters: every saved board after a start, until delivered.</summary>
     private readonly HashSet<int> unfinished = [];
+
+    /// <summary>A boundary not yet saved and whether it pays: decided at its first check, kept for its retries.</summary>
+    private readonly Dictionary<int, (long Period, bool Pay)> pending = [];
 
     /// <summary>The last settled period of each paying board and its winners (rank to role).</summary>
     public sealed class RewardState
@@ -75,7 +85,16 @@ public sealed partial class RankService : IGameTicker
             if (LatestBoundary(board.Id, now) is not { } period) continue;
             long settled = state.Boards.GetValueOrDefault(board.Id)?.Period ?? 0;
             if (period > settled)
-                due.Add(new DueSettlement(board, period, settled > 0 && previousCheck < period && PreviousBoundary(board.Id, period) == settled));
+            {
+                if (pending.TryGetValue(board.Id, out var decided) && decided.Period == period)
+                {
+                    if (retry) due.Add(new DueSettlement(board, period, decided.Pay));
+                    continue;
+                }
+                bool pay = settled > 0 && previousCheck < period && PreviousBoundary(board.Id, period) == settled;
+                pending[board.Id] = (period, pay);
+                due.Add(new DueSettlement(board, period, pay));
+            }
             else if (retry && period == settled && unfinished.Contains(board.Id)) due.Add(new DueSettlement(board, period, true));
         }
         if (due.Count == 0) return;
@@ -85,9 +104,12 @@ public sealed partial class RankService : IGameTicker
         {
             try
             {
-                foreach (var settlement in due) await SettleAsync(settlement);
+                foreach (var settlement in due)
+                {
+                    try { await SettleAsync(settlement); }
+                    catch (Exception e) { LogSettlementFailed(log, e, settlement.Board.Id, settlement.Period); }
+                }
             }
-            catch (Exception e) { LogSettlementFailed(log, e); }
             finally { settling = false; }
         }, "rank reward settlement");
     }
@@ -115,6 +137,7 @@ public sealed partial class RankService : IGameTicker
         List<Entry> rows = [];
         if (pay)
         {
+            if (BeforeRankForTest is { } hook) await hook(board.Id);
             Invalidate();
             rows = (await BoardsAsync()).Boards.GetValueOrDefault(board.Id)?.Rows ?? [];
         }
@@ -123,6 +146,7 @@ public sealed partial class RankService : IGameTicker
         var next = new RewardState { Boards = new(RewardStateNow().Boards) { [board.Id] = saved } };
         await accounts.WriteLegacyAsync<int>(new SeasonStateWritePlan(RewardStateKey, JsonSerializer.Serialize(next)));
         rewardState = next;
+        pending.Remove(board.Id);
         unfinished.Add(board.Id);
         LogSettled(log, board.Id, period, saved.Winners.Count);
         return saved;
@@ -141,6 +165,11 @@ public sealed partial class RankService : IGameTicker
                 if (gift.Reward <= 0) continue;
                 await mail.SendTemplateOnceAsync(role, board.MailId, mail.FixedGroupAward(gift.Reward),
                     $"rank:{board.Id}:{saved.Period}:{role}", _ => { }, loop.Owners?.Current, contentParams: [rank]);
+            }
+            catch (Exception e) when (e is ArgumentException or AwardResolutionException)
+            {
+                // (inferred) Retrying cannot help: the role or the configuration would have to change first.
+                LogLetterRefused(log, e, board.Id, rank, role);
             }
             catch (Exception e)
             {
@@ -215,14 +244,17 @@ public sealed partial class RankService : IGameTicker
         return boundary > now ? boundary.AddDays(-7) : boundary;
     }
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "Rank reward settlement failed")]
-    private static partial void LogSettlementFailed(ILogger logger, Exception error);
+    [LoggerMessage(Level = LogLevel.Error, Message = "Rank reward settlement of board {Board} period {Period} failed")]
+    private static partial void LogSettlementFailed(ILogger logger, Exception error, int board, long period);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Rank rewards: board {Board} period {Period} pays {Count} roles")]
     private static partial void LogSettled(ILogger logger, int board, long period, int count);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Rank reward letter for board {Board} rank {Rank} to {Role} failed")]
     private static partial void LogLetterFailed(ILogger logger, Exception error, int board, int rank, long role);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Rank reward letter for board {Board} rank {Rank} to {Role} cannot be sent")]
+    private static partial void LogLetterRefused(ILogger logger, Exception error, int board, int rank, long role);
 
     private static long[] Numbers(JsonElement row, string field) =>
         row.TryGetProperty(field, out var value) && value.ValueKind == JsonValueKind.Array

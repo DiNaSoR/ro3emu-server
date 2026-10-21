@@ -36,7 +36,9 @@ Settlement *(inferred: the original's server side is not in the client)*:
   restart the saved period's letters are sent again, which only completes an interrupted settlement: the board is not
   ranked again, so a role that climbed in the meantime waits for the next period. A letter that fails (a database
   error) is retried every minute until the period's letters have all gone out, and an unfinished period is completed
-  before the board's next period replaces its saved winners.
+  before the board's next period replaces its saved winners. A letter that cannot be sent at all (the role is gone, the
+  gift no longer resolves to fixed grants) is owed nothing until the next start, when it is tried once more. A boundary's
+  pay decision is taken at its first check and kept while a failed settlement is retried.
 - A period is paid only when the server saw it close (it was running at the boundary, and the boundary directly
   follows the saved period). On the first start (nothing saved) or after the server was down across a boundary, the
   latest boundary is only recorded with no winners, so a missed boundary can never be paid twice (Steven's rule on
