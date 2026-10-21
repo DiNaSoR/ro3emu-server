@@ -1,6 +1,7 @@
 using System.Globalization;
 using Romsg;
 using Ro3Emu.Server.Accounts;
+using Ro3Emu.Server.Accounts.Persistence;
 using Ro3Emu.Server.Data;
 using Ro3Emu.Server.Economy;
 
@@ -73,7 +74,7 @@ public sealed partial class GuildService
             done = await character.CommitSharedItemActionAsync(use, "item-action/guild-badge",
                 tx => store.EnlistSave(g, tx, "guild disappeared during badge unlock"), null);
         }
-        catch (InvalidOperationException e) when (e.Message == "guild disappeared during badge unlock") { }
+        catch (RowMissingException e) when (e.Is(GuildStore.Table, g.Id)) { }
         finally { if (!done) foreach (long icon in icons) g.UnlockedHeadIcons.Remove(icon); }
         if (!done) return ErrorCodes.ItemsShort;
         var change = new GuildBaseInfoChangeNtf { Tp = GuildBaseInfoChangeNtf.Types.ChangeType.ChangeUnLockHeadIcon };
@@ -206,7 +207,7 @@ public sealed partial class GuildService
                     persist: tx => { store.EnlistSave(g, tx, "guild disappeared during store purchase"); tx.WithEconomy(economy); },
                     asyncCommit: true) != null;
             }
-            catch (InvalidOperationException e) when (e.Message == "guild disappeared during store purchase") { }
+            catch (RowMissingException e) when (e.Is(GuildStore.Table, g.Id)) { }
             finally
             {
                 if (!ok)
