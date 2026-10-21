@@ -84,7 +84,9 @@ public sealed class MicroSession(PhonestChannel channel)
 
     public long HandshakeToken { get; set; }
 
-    /// <summary>Account bound by LoginService.verifySdk.</summary>
     /// <summary>The verified account; set only by <see cref="MicroSessions.SignIn"/> (tests may set it).</summary>
     public string? Account { get; internal set; }
+
+    /// <summary>A call was refused before sign-in (MicroServiceRouter); only the first refusal is logged.</summary>
+    internal bool RefusalLogged { get; set; }
 }

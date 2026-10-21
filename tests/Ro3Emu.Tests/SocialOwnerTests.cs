@@ -299,7 +299,7 @@ public sealed class SocialOwnerTests : IAsyncLifetime
         {
             var reply = await Call(method, args);
             Assert.False(Ok(reply), method);
-            Assert.Equal("no selected role", Message(reply));
+            Assert.Equal("not verified", Message(reply)); // the micro gate refuses it before FriendService
         }
         foreach (var (method, uid, field) in new[]
         {
