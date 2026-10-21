@@ -19,7 +19,7 @@ public sealed partial class CombatService
     internal async Task<int> MonsterSkillHitAsync(MonsterUnit caster, JsonElement row, IEnumerable<GameSession> targets, long sourceId,
         long session = 0, int damagePercent = 100, bool bossDebuffsOnly = false)
     {
-        if (caster.Dead || caster.Hp <= 0 || _buffs.UnitForbidden(caster, 5)) return 0;
+        if (caster.Dead || caster.Hp <= 0 || _buffs.UnitForbidden(caster, ForbiddenState.CastSkill)) return 0;
         int skillId = (int)GameData.Int(row, "_iID");
         if (session <= 0) session = ++_sessionIds;
         int show = HitEffect(GameData.Int(row, "_iScriptShow"));

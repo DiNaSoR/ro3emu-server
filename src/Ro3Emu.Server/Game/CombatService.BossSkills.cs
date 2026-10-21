@@ -28,7 +28,7 @@ public sealed partial class CombatService
     }
 
     private bool BossCastCurrent(MonsterUnit boss, long serial) =>
-        !boss.Dead && boss.Hp > 0 && !_buffs.UnitForbidden(boss, 5)
+        !boss.Dead && boss.Hp > 0 && !_buffs.UnitForbidden(boss, ForbiddenState.CastSkill)
             && boss.BossSkills is { } rt && rt.CastSerial == serial;
 
     private async Task CastBossSkillAsync(MonsterUnit boss, GameSession? player, TowerPetUnit? pet, BossSkill skill, long serial)

@@ -16,8 +16,7 @@ public sealed partial class CombatService
     {
         _buffs.ResolvePeriodicSource = ResolvePeriodicSource;
         _buffs.PeriodicTick = PeriodicTickAsync;
-        _buffs.HaloHostilePlayer = (carrier, other) => PlayerHostile?.Invoke(carrier, other) == true
-            || PlayerHostile?.Invoke(other, carrier) == true || CanPlayerHit(carrier, other) || CanPlayerHit(other, carrier);
+        _buffs.HaloHostilePlayer = (carrier, other) => PlayerHostile?.Invoke(carrier, other) == true;
         _buffs.HaloEnemyMonster = CanHitMonster;
     }
 
@@ -220,7 +219,8 @@ public sealed partial class CombatService
         var stats = _character.Stats(p);
         long amount = rule.HealFlat + (rule.HealRatioBp != 0 && rule.HealAttr > 0 ? stats[rule.HealAttr] * rule.HealRatioBp / 10000 : 0);
         amount *= Math.Max(1, buff.PileCount);
-        amount = ModifiedHealing(stats, stats, amount);
+        var guardian = _buffs.GuardianAttributes(p);
+        amount = ModifiedHealing(guardian, guardian, amount);
         long actual = Math.Min(amount, Math.Max(0, stats[101] - stats[2000]));
         if (actual <= 0) return;
         await _character.SetHpSpAsync(p, stats[2000] + actual, null);

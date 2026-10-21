@@ -357,13 +357,12 @@ public sealed partial class MonsterService : MonsterBrain, IGameTicker
             && (!_spawns.TryGetValue(m.RuntimeMap, out var state) || state.Retired)) return;
         if (m.Dead || m.Hp <= 0) return; // lethal HP is authoritative before the awaited death broadcast finishes
         long now = NowMs;
-        if (Forbidden?.Invoke(m, 3) == true && m.Moving)
+        if (Forbidden?.Invoke(m, ForbiddenState.Walk) == true && m.Moving)
         {
             m.Advance(now);
             m.Moving = false;
             SendStop(m, now);
         }
-        if (Forbidden?.Invoke(m, 5) == true) return;
         if (m.SlowMovementExpireMs > 0 && now >= m.SlowMovementExpireMs)
         {
             m.SlowMovementBp = 0;
@@ -448,10 +447,14 @@ public sealed partial class MonsterService : MonsterBrain, IGameTicker
         Property = { new AoIProperty { Idx = 113, Data = m.SpeedCm(now), BaseData = m.Template.SpeedCm } },
     };
 
-    internal async Task SetBuffSpeedAsync(MonsterUnit monster, int speed)
+    /// <summary>A guardian's speed change, or null to return to the template. A unit that moves keeps at least 1 cm/s:
+    /// a walk divides by its speed.</summary>
+    internal async Task SetBuffSpeedAsync(MonsterUnit monster, int? speed)
     {
-        if (monster.BuffSpeedCm == speed) return;
-        monster.BuffSpeedCm = Math.Max(0, speed);
+        int? effective = speed is { } value ? Math.Max(monster.Template.SpeedCm > 0 ? 1 : 0, value) : null;
+        bool changed = (effective ?? monster.Template.SpeedCm) != (monster.BuffSpeedCm ?? monster.Template.SpeedCm);
+        monster.BuffSpeedCm = effective;
+        if (!changed) return;
         long now = NowMs;
         if (monster.Moving)
         {
@@ -608,7 +611,7 @@ public sealed partial class MonsterService : MonsterBrain, IGameTicker
     /// <summary>One straight Walk segment when the nav grid allows it.</summary>
     private void WalkTo(MonsterUnit m, MapInstance map, float x, float z, float speedFactor)
     {
-        if (Forbidden?.Invoke(m, 3) == true) return;
+        if (Forbidden?.Invoke(m, ForbiddenState.Walk) == true) return;
         var nav = _worldData.Map(m.SceneEntry)?.Nav;
         float? y = nav?.WalkHeight(x, z, m.Y) ?? m.Y;
         if (y == null || nav != null && !nav.CanWalk(m.X, m.Y, m.Z, x, z)) return;

@@ -96,7 +96,7 @@ public sealed partial class SkillCombatTests
                 customTemplate: template with { NormalSkill = (int)GameData.Int(ranged, "_iID"), RoamDistance = 0 });
             Assert.NotNull(unit);
             combat.IncomingDamageAdjusters.Add((_, _, _, _) => Task.FromResult(400L));
-            await buffs.AddSupportAsync(s, 2342301, 20000, s.Role!.Id, 5);
+            await buffs.AddGuardianAsync(s, 2342301, 20000, s.Role!.Id, 5);
             await monsters.Attack!(unit, s);
             return unit;
         });

@@ -22,6 +22,28 @@ public sealed partial class BuffService
     public long ShieldAmount(WorldUnit unit) => _unitBuffs.TryGetValue(unit.Uid, out var buffs) ? LiveShield(buffs) : 0;
 
     /// <summary>Active raw attribute contributions; the combat owner passes these through StatCalculator.</summary>
+    /// <summary>The attribute changes of a guardian's live buffs on the unit. (inferred scope) Only these alter a monster's
+    /// combat stats, damage and speed: ordinary unit buffs keep their previous, display-only behaviour.</summary>
+    internal IEnumerable<(long Id, double Value)> GuardianUnitAttributes(WorldUnit unit) =>
+        _unitBuffs.TryGetValue(unit.Uid, out var buffs)
+            ? buffs.Where(b => b.IsGuardianOwned && b.ExpireMs > MonsterService.NowMs)
+                .SelectMany(b => b.Changes.Select(change => (change.Attr, change.Value))).ToArray()
+            : [];
+
+    /// <summary>A player's live guardian buffs alone, through the same attribute calculator. (inferred scope) Healing,
+    /// SP cost and chant modifiers read these, so equipment and ordinary buffs keep their previous effect.</summary>
+    internal StatSheet GuardianAttributes(GameSession p)
+    {
+        var raw = new Dictionary<int, double>();
+        long now = MonsterService.NowMs;
+        foreach (var buff in p.Buffs.Where(b => b.IsGuardianOwned && b.ExpireMs > now))
+            foreach (var (attr, value) in buff.Changes) raw[(int)attr] = raw.GetValueOrDefault((int)attr) + value;
+        return StatCalculator.Compute(raw, _data);
+    }
+
+    internal bool HasGuardianUnitBuffs(WorldUnit unit) => _unitBuffs.TryGetValue(unit.Uid, out var buffs)
+        && buffs.Any(b => b.IsGuardianOwned && b.ExpireMs > MonsterService.NowMs);
+
     public IEnumerable<(long Id, double Value)> UnitAttributes(WorldUnit unit) =>
         _unitBuffs.TryGetValue(unit.Uid, out var buffs)
             ? buffs.Where(b => b.ExpireMs > MonsterService.NowMs)

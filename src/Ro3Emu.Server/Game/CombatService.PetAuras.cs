@@ -6,8 +6,10 @@ namespace Ro3Emu.Server.Game;
 public sealed partial class CombatService
 {
     // Baphomet Jr.'s description requires the target to be slowed BEFORE this hit, not by its first Buff2 tuple.
+    private const string KuangFengXiJuan = "KuangFengXiJuan";
+
     private static bool GuardianAllowsHostileBuff(JsonElement row, JsonElement tuple, bool previouslySlowed) =>
-        GuardianPetRules.Script(row) != "KuangFengXiJuan" || tuple.GetArrayLength() == 0
+        GuardianPetRules.Script(row) != KuangFengXiJuan || tuple.GetArrayLength() == 0
             || (int)(GameData.Number(tuple[0]) ?? 0) / 100 != 9024 || previouslySlowed;
 
     /// <summary>Named primary scripts with periodic effects described by their wrapper. Coefficients, range,

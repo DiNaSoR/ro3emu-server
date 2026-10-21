@@ -49,7 +49,7 @@ public sealed partial class CombatService
         if (Script(row) == "Resurrection")
         {
             var target = FindPlayer(s, action.Request.TargetId, dead: true);
-            if (target == null || target.SceneLoading || _buffs.HasForbidden(target, 16)
+            if (target == null || target.SceneLoading || _buffs.HasForbidden(target, ForbiddenState.Revive)
                 || s.WorldState.ResurrectionCastId != action.Id
                 || Distance(s.Position, target.Position) > Range(row) + 1.5f) return;
             s.WorldState.ResurrectionCastId = 0;
@@ -120,15 +120,18 @@ public sealed partial class CombatService
             && _sessions.All().Contains(s);
         string script = Script(row);
         var targets = SelectEnemies(s, action, center, field?.Trap == true ? field.Radius : null);
-        var alreadySlowed = targets.Where(m => m.SlowMovementExpireMs > Now
-            || _buffs.UnitAttributes(m).Any(c => c.Id == GuardianPetRules.SpeedPercent && c.Value < 0)).Select(m => m.Uid).ToHashSet();
+        // Only Kuang Feng Xi Juan's second slow depends on an earlier one; no other cast pays for the scan.
+        bool slowMatters = GuardianPetRules.Script(row) == KuangFengXiJuan;
+        HashSet<long> alreadySlowed = slowMatters ? targets.Where(m => m.SlowMovementExpireMs > Now
+            || _buffs.GuardianUnitAttributes(m).Any(c => c.Id == GuardianPetRules.SpeedPercent && c.Value < 0))
+            .Select(m => m.Uid).ToHashSet() : [];
         var playerTargets = GameData.Int(row, "_iRangeType") == 2
             ? IsGuardianEffect(row) ? GuardianPlayerTargets(s, action, center) : EventAreaTargets(s, row)
             : EventTarget(s, action.Request.TargetId) is { } eventTarget
                 && PlayerDistance(s, eventTarget) <= Range(row) + 1.5f ? new[] { eventTarget } : [];
         if (playerTargets.Length > 0)
         {
-            foreach (var player in playerTargets.Where(p => p.Buffs.Any(b => b.ExpireMs > Now
+            foreach (var player in playerTargets.Where(p => slowMatters && p.Buffs.Any(b => b.ExpireMs > Now
                 && b.Changes.Any(c => c.Attr == GuardianPetRules.SpeedPercent && c.Value < 0)))) alreadySlowed.Add(player.Role!.Id);
             int maxTargets = checked((int)Math.Max(1, GameData.Int(row, "_iTargetMax")));
             var selected = targets.Select(m => (Id: m.Uid, Distance: MonsterService.Distance(m, s)))
@@ -197,7 +200,8 @@ public sealed partial class CombatService
                         foreach (var modifier in DamageAdjusters) amount = Math.Max(0, modifier(s, target, row, result, amount));
                         foreach (var extra in ExtraHitDamage) amount += Math.Max(0, extra(s, target, row, amount));
                     }
-                    if (!fixedGuardianHit) amount = ApplyPetSupportResistance(amount, _buffs.UnitAttributes(target), row, attacker.Element);
+                    if (!fixedGuardianHit)
+                        amount = ApplyPetSupportResistance(amount, _buffs.GuardianUnitAttributes(target), row, attacker.Element);
                     long beforeHp = target.Hp;
                     target.Hp = Math.Max(0, beforeHp - amount);
                     long effective = beforeHp - target.Hp;
@@ -227,7 +231,7 @@ public sealed partial class CombatService
                         if (CanApplyMoreEffects() && GuardianAllowsHostileBuff(row, tuple, alreadySlowed.Contains(target.Uid))
                             && RollHostileBuff(tuple, s, null, null, target, out int id, out int duration))
                             await _buffs.AddSupportAsync(target, id, duration, castingRole.Id,
-                                attributeMultiplier: GuardianPetRules.BuffMultiplier(row));
+                                attributeMultiplier: GuardianPetRules.BuffMultiplier(row), guardianOwned: IsGuardianEffect(row));
                 if (CanApplyMoreEffects() && script is ("Provoke" or "Taunt")) _monsters.Engage(target, s);
                 if (CanApplyMoreEffects() && !target.Dead && target.Hp > 0) await DisplaceTargetAsync(s, action, target);
             }
@@ -245,7 +249,7 @@ public sealed partial class CombatService
                     long amount = (long)Math.Max(0, Math.Round(stats[104] * multiplier / 10000 + flat));
                     foreach (var modifier in ExtraHeal) amount = modifier(s, amount);
                     var before = _character.Stats(recipient);
-                    amount = ModifiedHealing(stats, before, amount);
+                    amount = ModifiedHealing(_buffs.GuardianAttributes(s), _buffs.GuardianAttributes(recipient), amount);
                     long actual = Math.Min(amount, Math.Max(0, before[101] - before[2000]));
                     await _character.SetHpSpAsync(recipient, before[2000] + amount, null);
                     hit.Dsts.Add(new DamageInfo { DstID = recipient.Role!.Id, Damage = actual, DamageType = DamageType.Heal, DstElement = 1 });

@@ -2,7 +2,8 @@ namespace Ro3Emu.Server.Game;
 
 public sealed partial class CombatService
 {
-    /// <summary>AttributeConfig 207/208 and 1207/1208: independent healing done/received inputs.
+    /// <summary>AttributeConfig 207/208 and 1207/1208: independent healing done/received inputs. Callers pass the
+    /// guardian attributes (<see cref="BuffService.GuardianAttributes"/>), not the full stat sheets.
     /// (inferred) Multiply the two additive groups, floor once, then clamp to missing HP.</summary>
     internal static long ModifiedHealing(StatSheet source, StatSheet target, long amount) =>
         (long)Math.Clamp(Math.Floor(amount * Math.Max(0, 1 + (source[207] + source[1207]) / 10000.0)

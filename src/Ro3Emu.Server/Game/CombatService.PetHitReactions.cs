@@ -97,7 +97,7 @@ public sealed partial class CombatService
         var tuple = JsonSerializer.SerializeToElement(new[] { (double)buffId, chance * 100, duration });
         if (monster is { Dead: true } || monster?.Hp <= 0 || monster == null && player == null
             || !RollHostileBuff(tuple, source, null, player, monster, out int id, out int ms)) return;
-        if (monster != null) await _buffs.ShowOnUnitAsync(monster, id, ms, parent.OwnerId);
+        if (monster != null) await _buffs.AddGuardianAsync(monster, id, ms, parent.OwnerId);
         else if (player != null) await _buffs.AddGuardianAsync(player, id, ms, parent.OwnerId);
     }
 }

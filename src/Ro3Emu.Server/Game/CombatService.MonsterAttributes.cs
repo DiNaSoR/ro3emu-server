@@ -20,7 +20,7 @@ public sealed partial class CombatService
             [101] = t.MaxHp, [103] = t.Atk, [104] = t.Matk, [105] = t.Def, [106] = t.Mdef,
             [109] = t.Hit, [110] = t.Flee, [111] = t.Cri, [113] = t.SpeedCm, [116] = t.CastSpeed,
         };
-        foreach (var (id, value) in _buffs.UnitAttributes(unit)) raw[(int)id] = raw.GetValueOrDefault((int)id) + value;
+        foreach (var (id, value) in _buffs.GuardianUnitAttributes(unit)) raw[(int)id] = raw.GetValueOrDefault((int)id) + value;
         return StatCalculator.Compute(raw, _data);
     }
 
@@ -36,7 +36,7 @@ public sealed partial class CombatService
         int element = skill is { } row && GameData.Int(row, "_iEleType") > 1
             ? (int)GameData.Int(row, "_iEleType") : monster.Template.Element;
         const int DamageBonus = 1215, FirstElementBonus = 301;
-        double bonus = _buffs.UnitAttributes(monster).Where(c => c.Id == DamageBonus
+        double bonus = _buffs.GuardianUnitAttributes(monster).Where(c => c.Id == DamageBonus
             || element is >= 1 and <= 10 && c.Id == FirstElementBonus + element - 1).Sum(c => c.Value);
         return (long)Math.Clamp(Math.Floor(amount * Math.Max(0, 1 + bonus / 10000)), 0, long.MaxValue);
     }
@@ -44,8 +44,12 @@ public sealed partial class CombatService
     private async Task PublishMonsterAttributesAsync(WorldUnit unit)
     {
         if (unit is not MonsterUnit monster) return;
+        bool guardian = _buffs.HasGuardianUnitBuffs(monster);
+        // Ordinary unit buffs leave the template's stats and speed as they were; publish only a guardian's changes
+        // and, once the last guardian buff is gone, the return to the template.
+        if (!guardian && monster.BuffSpeedCm == null) return;
         var stats = MonsterStats(monster);
-        await _monsters.SetBuffSpeedAsync(monster, (int)Math.Clamp(stats[113], 0, int.MaxValue));
+        await _monsters.SetBuffSpeedAsync(monster, guardian ? (int)Math.Clamp(stats[113], 0, int.MaxValue) : null);
         var changed = new AOIAttrChange
         {
             EntityUuid = (ulong)unit.Uid,

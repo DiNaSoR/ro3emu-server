@@ -83,8 +83,9 @@ public sealed partial class CombatService
             if (owned != null ? !owned.Skills.Contains(req.SkillId) : !Learned(s, row!.Value)) error = ErrorCodes.SkillNotLearned;
             else if (!SkillModeAllowed(s, row!.Value)) error = ErrorCodes.SkillRequirements;
             else if (GameData.Int(row!.Value, "_iBasicType") != 1) error = ErrorCodes.SkillPassive;
-            else if (_buffs.HasForbidden(s, GameData.Int(row.Value, "_iIsNormalAtk") == 1 ? 5 : 4)) error = ErrorCodes.SkillBadState;
-            else if (req.SkillId == PublicSkill("WorldTreeSkillId") && _buffs.HasForbidden(s, 12)) error = ErrorCodes.ItemUseForbidden;
+            else if (_buffs.HasForbidden(s, GameData.Int(row.Value, "_iIsNormalAtk") == 1
+                ? ForbiddenState.NormalAttack : ForbiddenState.CastSkill)) error = ErrorCodes.SkillBadState;
+            else if (req.SkillId == PublicSkill("WorldTreeSkillId") && _buffs.HasForbidden(s, ForbiddenState.UseItem)) error = ErrorCodes.ItemUseForbidden;
             else if (req.SkillId == PublicSkill("WorldTreeSkillId") && !ItemAllowedInMap(s, (int)PublicSkill("WorldTreeItemId"))) error = ErrorCodes.ItemUseAreaForbidden;
             else if (req.IsExtraSkill && owned == null && GameData.Int(row.Value, "_iExtraType") == 0) error = ErrorCodes.SkillRequirements;
         }
@@ -239,7 +240,7 @@ public sealed partial class CombatService
             if (monster != null && CanHitMonster(s, monster) && Relation(row, false, race: monster.Template.Race)) targetPosition = monster.Pos;
             else if (!revive && enemyPlayer != null) targetPosition = enemyPlayer.Position;
             else if (player != null && player.Dead == revive && Relation(row, true, player == s, dead: revive)
-                && (!revive || !_buffs.HasForbidden(player, 16))) targetPosition = player.Position;
+                && (!revive || !_buffs.HasForbidden(player, ForbiddenState.Revive))) targetPosition = player.Position;
             else if (req.TargetId == 0 && Relation(row, true, true)) { req.TargetId = s.Role.Id; targetPosition = s.Position; }
             else return ErrorCodes.SkillTargetInvalid;
             req.TargetPos = targetPosition.Clone();
@@ -319,7 +320,7 @@ public sealed partial class CombatService
                 default: result.Invalid = true; break; // reject an unsupported cost rather than grant a free cast.
             }
         }
-        if (result.Attrs.TryGetValue(2001, out long sp)) result.Attrs[2001] = ModifiedSpCost(stats, sp);
+        if (result.Attrs.TryGetValue(2001, out long sp)) result.Attrs[2001] = ModifiedSpCost(_buffs.GuardianAttributes(s), sp);
         return result;
     }
 
@@ -379,7 +380,7 @@ public sealed partial class CombatService
         using var held = await CharacterService.Lock(s);
         if (target != null && !CanHitMonster(s, target)) return;
         if (EffectiveSkillRow(s, skillId) is not { } row || !Learned(s, row) || !SkillModeAllowed(s, row)
-            || _buffs.HasForbidden(s, 5) || s.SkillCast is { Cancelled: false }) return;
+            || _buffs.HasForbidden(s, ForbiddenState.NormalAttack) || s.SkillCast is { Cancelled: false }) return;
         var request = new CastSkillReq
         {
             SkillId = (int)GameData.Int(row, "_iID"), TargetId = target?.Uid ?? 0,

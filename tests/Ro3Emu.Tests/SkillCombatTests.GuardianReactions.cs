@@ -96,7 +96,7 @@ public sealed partial class SkillCombatTests
         var combat = _app.Services.GetRequiredService<CombatService>();
         var buffs = _app.Services.GetRequiredService<BuffService>();
         long original = combat.MonsterStats(target)[103];
-        await Loop.InvokeAsync(() => buffs.ShowOnUnitAsync(target, 2324301, 5000, Session("alice").Role!.Id));
+        await Loop.InvokeAsync(() => buffs.AddGuardianAsync(target, 2324301, 5000, Session("alice").Role!.Id));
         Assert.True(combat.MonsterStats(target)[103] < original);
         Assert.Equal(original, target.Template.Atk);
         await Loop.InvokeAsync(() => buffs.ClearUnitAsync(target));

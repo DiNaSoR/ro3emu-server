@@ -62,7 +62,7 @@ public sealed partial class SkillCombatTests
         {
             enemy.X = player.Position.X + 6; enemy.Z = player.Position.Z;
             Assert.True(monsters.TargetVisible?.Invoke(enemy, player));
-            await buffs.ShowOnUnitAsync(enemy, 902501, 10000, player.Role!.Id);
+            await buffs.AddGuardianAsync(enemy, 902501, 10000, player.Role!.Id);
             Assert.False(monsters.TargetVisible?.Invoke(enemy, player));
             enemy.X = player.Position.X + 4;
             Assert.True(monsters.TargetVisible?.Invoke(enemy, player));
@@ -93,7 +93,7 @@ public sealed partial class SkillCombatTests
                 Row = JsonSerializer.SerializeToElement(new { _iChantVar = 2000, _iChantFix = 0 }),
             };
             int before = monsters.BossChant(enemy, skill);
-            await buffs.ShowOnUnitAsync(enemy, 2339101, 10000, player.Role!.Id);
+            await buffs.AddGuardianAsync(enemy, 2339101, 10000, player.Role!.Id);
             Assert.Equal(275, combat.MonsterStats(enemy)[116]);
             Assert.True(monsters.BossChant(enemy, skill) > before);
             await buffs.ClearUnitAsync(enemy);

@@ -7,17 +7,24 @@ namespace Ro3Emu.Server.Game;
 public sealed partial class BuffService
 {
     private const int ControlBuffTag = 37, NegativeBuffType = 2;
-    private const int ControlImmunityGroup = 9032, DebuffImmunityGroup = 9033;
+    private const int KnockBackGroup = 9017, KnockUpGroup = 9018;
     private const int ControlChargeGroup = 9101; // Chimera's three _kBuff1 entries; three applications, capped by BuffConfig._iMaxStack.
 
-    private async Task<bool> RejectIncomingAsync(GameSession player, JsonElement incoming)
+    // SpecialStatusConfig 22-24 (_kDesc): immunity is implemented through the holder buff's _kBuffCategory. Super Armor
+    // 9031 carries 19, control immunity 9032 (and the MVP born buff 9009) 20, debuff immunity 9033 21, 9034 22.
+    private const int DisplacementImmunityCategory = 19, ControlImmunityCategory = 20,
+        DebuffImmunityCategory = 21, AllNegativeImmunityCategory = 22;
+
+    private async Task<bool> RejectIncomingAsync(GameSession player, JsonElement incoming, bool guardianOwned, long sourceId)
     {
-        if (ImmuneTo(player.Buffs, incoming)) return true;
+        if (ImmuneTo(player.Buffs, incoming, guardianOwned)) return true;
         if (GameData.Int(incoming, "_iType") != NegativeBuffType
             || !GuardianPetRules.Numbers(incoming, "_kBuffCategory").Contains(ControlBuffTag)) return false;
         var charge = player.Buffs.FirstOrDefault(b => b.IsGuardianOwned && b.ExpireMs > MonsterService.NowMs
             && _data.Row("BuffConfig", b.ConfigId) is { } row && GameData.Int(row, "_iBuffID") == ControlChargeGroup);
-        if (charge == null) return false;
+        // A control that diminishing returns refuses anyway costs no charge.
+        if (charge == null || sourceId != player.Role!.Id
+            && DecayRefuses(player.Role.Id, player.SceneEntry, (int)GameData.Int(incoming, "_iID"))) return false;
         // (inferred) Spend one charge per incoming control application; ordinary immunity spends none.
         if (charge.PileCount <= 1) await RemoveAsync(player, charge);
         else await AddCoreAsync(player, charge.ConfigId, (int)Math.Clamp(charge.ExpireMs - MonsterService.NowMs, 1, int.MaxValue),
@@ -25,19 +32,24 @@ public sealed partial class BuffService
         return true;
     }
 
-    /// <summary>SpecialStatusConfig 23/24 explicitly says immunity is implemented through BuffConfig categories.
-    /// The named standard immunity groups and tag 37 identify control effects; _iType 2 identifies debuffs.
-    /// (inferred) Reject the incoming buff before decay, rather than merely hiding its icon.</summary>
-    private bool ImmuneTo(IEnumerable<ActiveBuff> active, JsonElement incoming)
+    /// <summary>Tag 37 identifies control effects and _iType 2 debuffs; the holder's categories decide immunity.
+    /// (inferred) Reject the incoming buff before decay, rather than merely hiding its icon. (inferred scope) Only where a
+    /// guardian is involved, as the incoming buff's source or as the immunity's holder buff: ordinary buffs meeting
+    /// ordinary immunity keep their previous behaviour until that is established and tested for every source.</summary>
+    private bool ImmuneTo(IEnumerable<ActiveBuff> active, JsonElement incoming, bool incomingGuardian)
     {
         if (GameData.Int(incoming, "_iType") != NegativeBuffType) return false;
-        if (active.Any(b => b.ExpireMs > MonsterService.NowMs && b.ShieldDebuffImmunity && b.ShieldRemaining > 0)) return true;
+        long now = MonsterService.NowMs;
+        if (active.Any(b => b.ExpireMs > now && b.ShieldDebuffImmunity && b.ShieldRemaining > 0)) return true;
         bool control = GuardianPetRules.Numbers(incoming, "_kBuffCategory").Contains(ControlBuffTag);
-        bool displacement = GameData.Int(incoming, "_iBuffID") is 9017 or 9018;
-        return active.Any(b => b.ExpireMs > MonsterService.NowMs && _data.Row("BuffConfig", b.ConfigId) is { } row
-            && (GameData.Int(row, "_iBuffID") is DebuffImmunityGroup or 9034
-                || displacement && GameData.Int(row, "_iBuffID") == 9031
-                || control && GameData.Int(row, "_iBuffID") == ControlImmunityGroup));
+        bool displacement = GameData.Int(incoming, "_iBuffID") is KnockBackGroup or KnockUpGroup;
+        // Chimera's charge also carries control immunity (category 20), but it is spent per application instead.
+        return active.Any(b => b.ExpireMs > now && (incomingGuardian || b.IsGuardianOwned)
+            && _data.Row("BuffConfig", b.ConfigId) is { } row && GameData.Int(row, "_iBuffID") != ControlChargeGroup
+            && GuardianPetRules.Numbers(row, "_kBuffCategory") is var held
+            && (held.Contains(DebuffImmunityCategory) || held.Contains(AllNegativeImmunityCategory)
+                || control && held.Contains(ControlImmunityCategory)
+                || displacement && held.Contains(DisplacementImmunityCategory)));
     }
 
     internal async Task DispelControlsAsync(GameSession player, bool allDebuffs = false)

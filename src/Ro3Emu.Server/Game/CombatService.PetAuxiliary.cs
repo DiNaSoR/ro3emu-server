@@ -74,7 +74,7 @@ public sealed partial class CombatService
             var tuple = JsonSerializer.SerializeToElement(new[] { GuardianPetRules.StunBuff, 10000, (int)(literals[1] * 1000) });
             if (RollHostileBuff(tuple, source, null, player, monster, out int stun, out int ms))
             {
-                if (monster != null) await _buffs.ShowOnUnitAsync(monster, stun, ms, action.OwnerId);
+                if (monster != null) await _buffs.AddGuardianAsync(monster, stun, ms, action.OwnerId);
                 else if (player != null) await _buffs.AddGuardianAsync(player, stun, ms, action.OwnerId);
             }
         }
@@ -91,7 +91,7 @@ public sealed partial class CombatService
             || GameData.Pairs(attack, "_kChangeAttri").Any(c => c.Id is not (1032 or 1042)
                 || Math.Abs(c.Value + GuardianPetRules.CoreDescription(pet, 1) * 100) > 0.000001)) return;
         int duration = (int)(GuardianPetRules.CoreDescription(pet, 2) * 1000);
-        if (monster != null) await _buffs.ShowOnUnitAsync(monster, attackId, duration, action.OwnerId);
+        if (monster != null) await _buffs.AddGuardianAsync(monster, attackId, duration, action.OwnerId);
         else if (player != null) await _buffs.AddGuardianAsync(player, attackId, duration, action.OwnerId);
     }
 }

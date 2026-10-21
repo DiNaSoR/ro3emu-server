@@ -47,7 +47,7 @@ public sealed partial class CombatService
         using var held = await CharacterService.Lock(source);
         if (!CanPlayerHit(source, target) || !GuardianCanObserve(source, target) || source.SkillCast is { Cancelled: false }
             || EffectiveSkillRow(source, skillId) is not { } row || !Learned(source, row)
-            || !SkillModeAllowed(source, row) || _buffs.HasForbidden(source, 5)) return;
+            || !SkillModeAllowed(source, row) || _buffs.HasForbidden(source, ForbiddenState.NormalAttack)) return;
         var request = new CastSkillReq
         {
             SkillId = (int)Data.GameData.Int(row, "_iID"), TargetId = target.Role!.Id,

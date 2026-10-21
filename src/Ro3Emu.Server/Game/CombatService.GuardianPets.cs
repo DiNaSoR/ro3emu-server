@@ -29,7 +29,7 @@ public sealed partial class CombatService
         if (!_pets.GuardianEquipped(s, skill)) return ErrorCodes.SkillNotLearned;
         if (req.OpUnitId != 0 && req.OpUnitId != s.Role.Id) return ErrorCodes.SkillRequirements;
         if (!float.IsFinite(req.Face) || req.TargetPos is { } pos && !Finite(pos)) return ErrorCodes.Parameter;
-        if ((_buffs.HasForbidden(s, 4) || _buffs.HasForbidden(s, 5)) && !GuardianPetRules.DispelsControl(skill)
+        if ((_buffs.HasForbidden(s, ForbiddenState.CastSkill) || _buffs.HasForbidden(s, ForbiddenState.NormalAttack)) && !GuardianPetRules.DispelsControl(skill)
             && !GuardianShinobiDispel(s, skill).Any()
             || MatchSkillRule?.Invoke(s, skill.Id) == false) return ErrorCodes.SkillBadState;
         if (GameData.Int(skill.Active, "_iBasicType") != 1 || GameData.Int(skill.Effect, "_iBasicType") != 1)
@@ -218,7 +218,7 @@ public sealed partial class CombatService
         if (!current()) return;
         foreach (var modifier in ExtraHeal) amount = modifier(source, amount);
         var stats = _character.Stats(recipient);
-        amount = ModifiedHealing(_character.Stats(source), stats, amount);
+        amount = ModifiedHealing(_buffs.GuardianAttributes(source), _buffs.GuardianAttributes(recipient), amount);
         long actual = Math.Min(Math.Max(0, amount), Math.Max(0, stats[GuardianPetRules.Hp] - stats[GuardianPetRules.CurrentHp]));
         long owner = source.Role!.Id, target = recipient.Role!.Id;
         await _character.SetHpSpAsync(recipient, stats[GuardianPetRules.CurrentHp] + actual, null);

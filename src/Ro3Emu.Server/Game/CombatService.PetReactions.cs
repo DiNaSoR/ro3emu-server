@@ -72,7 +72,7 @@ public sealed partial class CombatService
             var tuple = JsonSerializer.SerializeToElement(new[] { buff, chance, (int)(GuardianPetRules.Description(passive, durationIndex) * 1000) });
             if (RollHostileBuff(tuple, s, null, null, target, out int id, out int duration))
             {
-                await _buffs.ShowOnUnitAsync(target, id, duration, role);
+                await _buffs.AddGuardianAsync(target, id, duration, role);
                 // (inferred) Reuse the existing timed monster slow policy, not only the cosmetic buff icon.
                 if (passive.Reactive == GuardianPetRules.Reaction.Slow && s.Role?.Id == role && s.SceneGeneration == generation && s.WorldScene == worldScene
                     && !s.Dead && !s.SceneLoading && ReferenceEquals(s.Attachment, attachment)

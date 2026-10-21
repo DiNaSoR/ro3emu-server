@@ -5,7 +5,12 @@ namespace Ro3Emu.Server.Game;
 
 public sealed partial class BuffService
 {
-    private static bool BreaksOnDamage(ActiveBuff buff) => buff.ConfigId / 100 is 9020 or 9021 or 9022;
+    private const int FreezeGroup = 9020, PetrifyGroup = 9021, SleepGroup = 9022;
+
+    /// <summary>(inferred scope) Only a guardian's Freeze/Petrify/Sleep breaks on a hit: the same groups from ordinary
+    /// skills keep their previous behaviour until the rule is established and tested for every source.</summary>
+    private static bool BreaksOnDamage(ActiveBuff buff) =>
+        buff.IsGuardianOwned && buff.ConfigId / 100 is FreezeGroup or PetrifyGroup or SleepGroup;
 
     /// <summary>BuffConfig Freeze/Petrify/Sleep descriptions remove control on a hit. Freeze/Petrify explicitly
     /// link their follow-up slow and duration in _kLogicData. (inferred) Only positive committed HP damage breaks it.</summary>
@@ -28,7 +33,7 @@ public sealed partial class BuffService
             await RemoveUnitBuffAsync(unit, buff);
             if (_data.Row("BuffConfig", buff.ConfigId) is not { } row) continue;
             var next = GuardianPetRules.Numbers(row, "_kLogicData");
-            if (next.Length == 2 && next[1] > 0) await ShowOnUnitAsync(unit, (int)next[0], (int)next[1], buff.SourceId);
+            if (next.Length == 2 && next[1] > 0) await AddGuardianAsync(unit, (int)next[0], (int)next[1], buff.SourceId);
         }
     }
 }

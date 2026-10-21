@@ -167,7 +167,7 @@ public sealed partial class CombatService
                 var player = EventTarget(source, targetId);
                 var tuple = JsonSerializer.SerializeToElement(new[] { window.BuffId, 10000, window.BuffDuration });
                 if (!RollHostileBuff(tuple, source, null, player, monster, out int id, out int ms)) break;
-                if (monster is { Dead: false, Hp: > 0 }) await _buffs.ShowOnUnitAsync(monster, id, ms, window.Cast.OwnerId);
+                if (monster is { Dead: false, Hp: > 0 }) await _buffs.AddGuardianAsync(monster, id, ms, window.Cast.OwnerId);
                 else if (player != null) await _buffs.AddGuardianAsync(player, id, ms, window.Cast.OwnerId);
                 break;
         }
