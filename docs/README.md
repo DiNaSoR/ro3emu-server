@@ -13,6 +13,7 @@
 - [Reopened content](guide/reopened-content.md): the Season menu and the "Dejected Young Man" side chain, switched off in the client data, opened again
 - [Bug reports](guide/feedback.md): the in-game Feedback button and `/bug`, and how to read the reports
 - [Launcher and patch repository](guide/launcher.md): hosting the client for your players (`RO3EmuDesktop.exe` in the release zip needs no repository)
+- [Development mode](guide/development-mode.md): what `server.sh --dev` (`ASPNETCORE_ENVIRONMENT=Development`) turns on
 - [Tests](guide/testing.md): content tests on your exported data, rule tests on the invented fixture that CI runs
 
 ## Systems: how each part is implemented

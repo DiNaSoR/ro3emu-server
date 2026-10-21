@@ -18,7 +18,7 @@ Code: `src/Ro3Emu.Server/Game/TradeService.System.cs`, options in `src/Ro3Emu.Se
 ```
 
 Both are off by default. `appsettings.Development.json` turns both on, so local play (`RO3Emu.exe` without hosting)
-has them. A hosted server can turn them on with `--Ro3Emu:Exchange:SystemSeller=true --Ro3Emu:Exchange:BuyBack=true`.
+has them, and so does `server.sh --dev` ([development mode](development-mode.md)). A hosted server can turn them on with `--Ro3Emu:Exchange:SystemSeller=true --Ro3Emu:Exchange:BuyBack=true`.
 
 ## System seller
 

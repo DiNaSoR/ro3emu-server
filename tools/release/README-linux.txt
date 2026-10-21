@@ -17,6 +17,8 @@ Options:
   --host ADDRESS    the address players connect to (default: this machine's first address)
   --gm ACCOUNT      an account that gets GM commands in game (repeatable)
   --voice-port PORT turn on party voice chat on this TCP port, for example 33101 (off by default)
+  --dev             run as Development instead of Production, for testing: reads
+                    server/appsettings.Development.json, and without --gm every account has GM
   --service         install and start a systemd service (needs sudo)
   --reexport        export the game data again (after a game update)
 
