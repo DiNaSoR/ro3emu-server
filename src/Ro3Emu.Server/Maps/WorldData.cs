@@ -122,7 +122,7 @@ public sealed class MapWorld
             .Concat(Npcs.Where(n => n.Kind is WorldNpcKind.Kafra or WorldNpcKind.Portal).Select(n => n.Arrival))
             .Select(Grounded);
         var reach = nav.Reachable(arrivals.Select(p => (p.X, p.Y, p.Z)));
-        return reach.IsEmpty ? spots : spots.Where(p => reach.Contains(p.X, p.Y, p.Z)).ToList();
+        return reach.IsEmpty ? spots : [.. spots.Where(p => reach.Contains(p.X, p.Y, p.Z))];
     }
 }
 
