@@ -100,6 +100,7 @@ public sealed class SkillGrowthTests : IAsyncLifetime
 
         await Gm("novice", "!job 1100");
         await again.SendGameAsync(1023, new PlayerAssetReq { AssetType = { 5 } });
+        // The career's own normal attack takes the slot: without it a Swordman has no attack on the bar.
         var swordman = await Next(again, SkillService.SkillDataSync, DBSkillDataIncrement.Parser,
             m => m.SyncAllMark && m.CurrentAtkSkillId == 1001001);
         // The Novice's Normal Attack slot now casts the job's attack (the skill window shows that cell as it too).

@@ -15,6 +15,7 @@
 - [Launcher and patch repository](guide/launcher.md): hosting the client for your players (`RO3EmuDesktop.exe` in the release zip needs no repository)
 - [Development mode](guide/development-mode.md): what `server.sh --dev` (`ASPNETCORE_ENVIRONMENT=Development`) turns on
 - [Tests](guide/testing.md): content tests on your exported data, rule tests on the invented fixture that CI runs
+- [Config tables](guide/config-tables.md): the typed views of the client's tables and the startup check of the export
 - [Security model](systems/security.md): what the server exposes, what it trusts, and how to report a vulnerability
 
 ## Systems: how each part is implemented
@@ -23,7 +24,7 @@
 |---|---|
 | Combat and skills | [skill protocol](systems/skill-protocol.md) · [buffs and resources](systems/skill-buffs.md) · [skill growth](systems/skill-growth.md) · [remaining skill messages](systems/skills-rest.md) · [totem effects](systems/totem-effects.md) |
 | Character and items | [equipment affixes](systems/equipment-affixes.md) · [titles](systems/titles.md) · [social outfits](systems/social-outfits.md) · [Astral Level](systems/astral-level.md) · [build presets](systems/genre.md) · [season talents](systems/season-talents.md) · [wardrobe](systems/wardrobe.md) · [mounts and totems](systems/mount-totem.md) |
-| Pets | [pets](systems/pet.md) · [pets in the world](systems/pet-world-follow.md) · [tower companions and Bonus Time](systems/tower-pets-afk.md) |
+| Pets | [pets](systems/pet.md) · [ordinary guardian skills](systems/pet-guardian-skills.md) · [pets in the world](systems/pet-world-follow.md) · [tower companions and Bonus Time](systems/tower-pets-afk.md) |
 | Life jobs | [life jobs and production](systems/lifejob.md) · [gathering](systems/gathering.md) |
 | Economy | [cash shop and Top Up](systems/cash-shop.md) · [Fashion gifts](systems/fashion-gifts.md) · [trade and stalls](systems/trade-stalls.md) · [auctions](systems/auction.md) · [mail](systems/mail.md) · [durable activity settlement](systems/durable-settlement.md) |
 | Social | [the Tavern](systems/tavern.md) · [profile card](systems/profile-card.md) · [leaderboards and rank rewards](systems/leaderboards.md) · [Connect Quests and activity Intimacy](systems/connect-quests.md) |
@@ -35,6 +36,7 @@
 
 - [World core](research/world-core-evidence.md) · [world effects](research/world-effects-evidence.md) · [NPC interaction](research/world-interaction-evidence.md) · [role operations](research/world-role-operations-evidence.md) · [social](research/world-social-evidence.md) · [MG_Common](research/world-common-evidence.md)
 - [Activities census](research/activities-evidence.md) · [season page](research/season-page-evidence.md) · [season refine](research/season-refine-evidence.md) · [equipment rating](research/equipment-rating-evidence.md)
+- [Pet guardian skills and reactive effects](research/pet-skills-evidence.md)
 
 Citations such as `re/clientB/lua-src/Logic/...lua:123` point into your own decompiled client (see the main
 [README](../README.md#running-from-source)); `MG_*.proto` files are in `src/Ro3Emu.Server/Protos/romsg/`.

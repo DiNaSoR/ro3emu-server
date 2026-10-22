@@ -81,18 +81,6 @@ public sealed partial class SkillCombatTests
     }
 
     [ClientDataFact]
-    public async Task TheFollowingWolfHowlsWhileTheRangerFights()
-    {
-        await using var alice = await InWorld("Alice");
-        await Gm("alice", "!job 3400"); await Teach("alice", 13310); await Seasoned("alice"); await Wield("alice", 2110120);
-        await Lease(alice, WolfLease);
-        await CastAt(alice, "alice", 1300001); // the bow's normal attack
-        await Until(s => s.Buffs.Any(b => b.ConfigId == 1332501), "alice"); // Warg Howl: Physical ATK +5% for 10 sec
-        long next = await Loop.InvokeAsync(() => Task.FromResult(Session("alice").WargHowlMs - MonsterService.NowMs));
-        Assert.InRange(next, 25_000, 30_000); // Wolf Taming's "every 30 sec"
-    }
-
-    [ClientDataFact]
     public async Task TheMadogearPunchesAndGatesItsSkills()
     {
         await using var alice = await InWorld("Alice");

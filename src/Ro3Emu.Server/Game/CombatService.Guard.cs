@@ -16,8 +16,6 @@ namespace Ro3Emu.Server.Game;
 /// cast removes the caster's control effects (category 25), and "taking DMG restores HP equal to ${4}% of the DMG
 /// taken" while it lasts. Enemies under its orbit (group 11626, _kLogicData [slow row]) gain a 【Slow】 pile every ${9} s;
 /// at ${10} piles the slow becomes Stun 901601 for ${6} s.</item>
-/// <item>Union 11614: one 【Union】 1162701 pile (PATK/PDEF/MDEF +10) per Crusader-line member (Crusader 1210, Paladin
-/// 1310, Royal Guard 1410) of the party, the Royal Guard included (inferred), up to ${2}.</item>
 /// <item>Sight 12002 (buff group 12012) and Sight Sprout 12110 uncover hidden enemy players within 3.5 m; Ruwach's buff
 /// (14005, _kLogicData [1400601]) finds one within ${1} (20) m, uncovers it, strikes it with Ruwach2 and ends. Only
 /// players hide (BuffService.Stealth).</item>
@@ -31,12 +29,9 @@ namespace Ro3Emu.Server.Game;
 public sealed partial class CombatService
 {
     private const int DevotionGroup = 11504, DevotionSkillGroup = 11413, KingsGraceSkillGroup = 11612,
-        KingsGraceCarrierGroup = 11614, KingsGraceLinkGroup = 11615, KingsGraceOrbitGroup = 11626, UnionSkillGroup = 11614,
-        UnionBuff = 1162701, SightBuffGroup = 12012, SightSkillGroup = 12002, SightSproutGroup = 12110, RuwachBuffGroup = 14005,
+        KingsGraceCarrierGroup = 11614, KingsGraceLinkGroup = 11615, KingsGraceOrbitGroup = 11626,
+        SightBuffGroup = 12012, SightSkillGroup = 12002, SightSproutGroup = 12110, RuwachBuffGroup = 14005,
         RuwachSkillGroup = 14005, MeltDownGroup = 16203, MeltDownDebuffGroup = 16205, StunBuff = 901601, ControlCategory = 25;
-
-    /// <summary>Team roster by role id (TeamService.MembersOf), wired by ServerHost.</summary>
-    public Func<long, IReadOnlyList<long>>? TeamMembers { get; set; }
 
     private void WireGuardSkills()
     {
@@ -116,28 +111,8 @@ public sealed partial class CombatService
     private async Task GuardTickAsync(GameSession s)
     {
         if (s.Role == null || s.Progress == null || s.Dead || s.SceneLoading) return;
-        await SyncUnionAsync(s);
         await KingsGraceSlowAsync(s);
         await UncoverAroundAsync(s);
-        await GatherAstralBodiesAsync(s);
-        await PrayerShieldAsync(s);
-    }
-
-    private async Task SyncUnionAsync(GameSession s)
-    {
-        int piles = 0;
-        if (_skills.Level(s.Progress!, UnionSkillGroup) > 0)
-        {
-            var desc = SkillDescAt(UnionSkillGroup, 1);
-            int cap = desc.Length > 1 && desc[1] > 0 ? (int)desc[1] : 10;
-            var members = TeamMembers?.Invoke(s.Role!.Id) ?? [s.Role!.Id];
-            piles = Math.Min(cap, members.Count(id => _sessions.All().FirstOrDefault(m => m.Role?.Id == id) is { Progress: { } p }
-                && p.Career is 1210 or 1310 or 1410));
-        }
-        if (piles == s.UnionPiles && (piles == 0 || s.Buffs.Any(b => b.ConfigId == UnionBuff))) return;
-        s.UnionPiles = piles;
-        if (s.Buffs.FirstOrDefault(b => b.ConfigId == UnionBuff) is { } old) await _buffs.RemoveAsync(s, old);
-        if (piles > 0) await _buffs.AddLastingAsync(s, UnionBuff, s.Role!.Id, piles);
     }
 
     private async Task KingsGraceSlowAsync(GameSession s)

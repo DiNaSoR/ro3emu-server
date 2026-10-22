@@ -18,7 +18,9 @@ internal sealed record HitStage(int Branch, int Element = 0, int Split = 0, bool
 public sealed partial class CombatService
 {
     private const int UndeadRace = 5, DemonRace = 3, UndeadElement = 10, ShadowElement = 8;
-    private const int SupersonicBlowGroup = 15103, PreyOnTheWeakGroup = 15316;
+
+    /// <summary>ItemConfig weapon subtype 5, the Knight Spear (_iEquipPart 1, two-handed; subtype 4 Halberd is one-handed).</summary>
+    internal const int TwoHandedSpear = 5;
 
     /// <summary>
     /// A skill's _kDamageFormulaExtra multiplier for a player (none for monsters). Every name reads its
@@ -77,7 +79,6 @@ public sealed partial class CombatService
     /// </summary>
     private double AttackPower(Fighter a, JsonElement skill, bool magic) => magic ? a.Matk : Script(skill) switch
     {
-        _ when AdaptiveGuardian(skill) => Math.Max(a.Atk, a.Matk),
         "MoJiShu" or "MoJiPao" or "JudexMix1" => a.Matk,
         "SoulDestroyer" => a.Atk + a.Matk,
         _ => a.Atk,
@@ -106,37 +107,10 @@ public sealed partial class CombatService
             "Magnus_Exorcismus" => target is { } m && (m.Template.Race is UndeadRace or DemonRace
                 || m.Template.Element is ShadowElement or UndeadElement) ? 1 : 0,
             "ShieldPress" or "ShieldPresss1" or "EarthDrive" or "Smite3" or "Smite2" => target != null ? 1 : 0,
-            "SonicBlow" => SonicBlowBranch(s, row, target),
+            "SonicBlow" => target is { } blown ? SonicBlowBranch(s, blown, row) : 0, // CombatService.Passives
             _ => 0,
         };
         return branch < Numbers(row, "_kDamageParam1").Length ? branch : 0;
-    }
-
-    private int SonicBlowBranch(GameSession s, JsonElement row, MonsterUnit? target)
-    {
-        if (target == null || target.Template.MaxHp <= 0) return 0;
-        double hp = target.Hp * 10000.0 / target.Template.MaxHp;
-        if (s.Progress is { } p && _skills.Level(p, SupersonicBlowGroup) > 0
-            && _data.Row("SkillConfig", _skills.RealId(SupersonicBlowGroup, _skills.Level(p, SupersonicBlowGroup))) is { } super
-            && Numbers(super, "_kDescData") is [var threshold and > 0, ..] && hp <= threshold * 100) return 2;
-        var logic = Numbers(row, "_kLogicData");
-        return logic.Length >= 3 && logic[1] == 101 && hp <= logic[2] ? 1 : 0;
-    }
-
-    /// <summary>
-    /// Prey on the Weak 15316: "Damage dealt to enemies afflicted with status effects is increased by 0.5%" per level
-    /// (its same-id buff's _kLogicData [50] in basis points). A status effect is any live debuff (_iType 2) on the
-    /// target.
-    /// </summary>
-    private long PreyOnTheWeak(GameSession s, MonsterUnit target, JsonElement row, DamageHitResult result, long amount)
-    {
-        if (amount <= 0 || s.Progress is not { } p || _skills.Level(p, PreyOnTheWeakGroup) is not (var level and > 0)
-            || _data.Row("BuffConfig", _skills.RealId(PreyOnTheWeakGroup, level)) is not { } buff
-            || Numbers(buff, "_kLogicData") is not [var bp and > 0, ..]) return amount;
-        long now = Now;
-        bool afflicted = _buffs.UnitBuffs(target).Any(b => b.ExpireMs > now
-            && _data.Row("BuffConfig", b.ConfigId) is { } config && GameData.Int(config, "_iType") == 2);
-        return afflicted ? (long)Math.Round(amount * (1 + bp / 10000)) : amount;
     }
 
     /// <summary>

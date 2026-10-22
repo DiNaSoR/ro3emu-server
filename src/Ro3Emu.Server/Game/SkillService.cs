@@ -3,6 +3,7 @@ using Romsg;
 using Google.Protobuf;
 using Ro3Emu.Server.Accounts;
 using Ro3Emu.Server.Data;
+using Ro3Emu.Server.Data.Config;
 
 namespace Ro3Emu.Server.Game;
 
@@ -29,14 +30,10 @@ public sealed class SkillService
     private Dictionary<(int Group, int Level), int>? _rowIds;
     private Dictionary<int, int>? _upgradedGroupByBase;
 
-    /// <summary>
-    /// The main-slot pet's Main Skill (PetService.MainSkill), shown in the wheel's pet slot and castable while it is
-    /// deployed; null without one.
-    /// </summary>
-    public Func<GameSession, PetMainSkill?>? PetMainSkill { get; set; }
-
     /// <summary>Combat-owned dynamic queue eligibility (LC_DynamicParamMgr).</summary>
     public Func<GameSession, int, bool>? QueueEligibility { get; set; }
+    /// <summary>Ordinary pet guardian projection; LC_System_Skill consumes whellSkills[SkillWheelPet].</summary>
+    internal Func<GameSession, SkillWheelSlot?>? PetWheel { get; set; }
 
     public SkillService(GameData data, CharacterService character, RoleStore roles, ILogger<SkillService> log)
     {
@@ -101,10 +98,6 @@ public sealed class SkillService
         int mainSub = SubType(main), viceSub = SubType(vice);
         return (main > 0 ? mainSub : viceSub, main > 0 && vice > 0 && mainSub == viceSub);
     }
-
-    /// <summary>A shield (ItemConfig subtype 50) in the off hand.</summary>
-    internal bool HoldsShield(GameSession session) =>
-        SubType(session.Items.FirstOrDefault(i => i.Grid == ViceHandGrid)?.Entry ?? 0) == CombatService.ShieldSubType;
 
     private int SubType(int entry) =>
         entry > 0 && _data.Row("ItemConfig", entry) is { } row ? (int)GameData.Int(row, "_iSubType") : 0;
@@ -188,7 +181,7 @@ public sealed class SkillService
     /// <summary>Learnable skill groups of a career chain (SkillTreeConfig rows _iX1.._iX7) with the career that teaches them.</summary>
     internal IReadOnlyList<(int Group, int Career)> Tree(int career) => _trees.GetOrAdd(career, BuildTree);
 
-    private bool InTree(int career, int group) => _treeGroups.GetOrAdd(career, c => Tree(c).Select(t => t.Group).ToHashSet()).Contains(group);
+    internal bool InTree(int career, int group) => _treeGroups.GetOrAdd(career, c => Tree(c).Select(t => t.Group).ToHashSet()).Contains(group);
 
     private List<(int Group, int Career)> BuildTree(int career)
     {
@@ -485,19 +478,11 @@ public sealed class SkillService
     }
 
     /// <summary>
-    /// 5025 as the client gets it: <see cref="Build"/> plus the pet slot. The pet's Main Skill is not part of the saved
-    /// plans; LC_System_Skill reads the slot map from skillWheel.whellSkills, and JoyStickSkillNormalMixin shows the
-    /// SkillWheelPet (11) button when that slot holds a skill (LC_DunGeon_ClimbTower hides it in the tower).
+    /// 5025 as the client gets it: <see cref="Build"/> (which projects the pet guardian slot) plus the mount slot.
     /// </summary>
     internal DBSkillData ClientState(GameSession session)
     {
         var state = Build(session);
-        if (PetMainSkill?.Invoke(session) is { } pet)
-        {
-            var slot = new SkillWheelSlot { SkillConfigId = pet.SkillId, Enable = true };
-            (state.SkillWheel ??= new SkillWheel()).WhellSkills[(int)SkillWheelSlotType.SkillWheelPet] = slot;
-            (state.OriginSkillWheel ??= new SkillWheel()).WhellSkills[(int)SkillWheelSlotType.SkillWheelPet] = slot.Clone();
-        }
         // A flying mount's take-off (on the ground) or landing (in the air): LC_System_Skill reads the slot map from
         // whellSkills and JoyStickSkillNormalMixin._updateFlyMountSkillShow shows the mount button for SkillWheelMount1.
         session.MountSkillShown = MountSkill(session);
@@ -577,6 +562,8 @@ public sealed class SkillService
         foreach (var (_, skill) in selected.SkillQueue.OrderBy(kv => kv.Key))
             if (skill.SkillId > 0 && RealId(skill.SkillId, skill.SkillLevel) is var id and > 0)
             { state.SkillWheel.SkillQueue = new SkillWheelSlot { SkillConfigId = id, Enable = true }; break; }
+        if (PetWheel?.Invoke(session) is { } pet)
+            state.SkillWheel.WhellSkills[(int)SkillWheelSlotType.SkillWheelPet] = pet;
         state.OriginSkillWheel = state.SkillWheel.Clone();
         return state;
     }
@@ -586,30 +573,43 @@ public sealed class SkillService
     {
         if (p.SkillBar.Count > 0)
         {
-            foreach (var (slot, group) in p.SkillBar.OrderBy(s => s.Key))
-                if (Level(p, group) > 0) yield return (slot, group);
+            foreach (var (slot, saved) in p.SkillBar.OrderBy(s => s.Key))
+                if (BarGroup(p, saved) is var group and > 0 && Level(p, group) > 0) yield return (slot, group);
             yield break;
         }
         int next = 1;
-        // The PC bar renders whellSkills, not atkSkillId. At level 1 a Novice has no other
-        // active skill, so expose the already learned normal attack in a clickable slot.
-        if (p.Career == 1000 && _data.Row("SkillConfig", NormalAttack(p.Career)) is { } attack)
-        {
-            int group = (int)GameData.Int(attack, "_iSkillID");
-            if (group > 0 && Level(p, group) > 0 && IsActive(group)) yield return (next++, group);
-        }
+        // The PC bar renders whellSkills, not atkSkillId, and the client attacks a selected target by
+        // itself only with eSelectTargetNormalAttack set, so expose the career's learned normal attack
+        // in a clickable slot (inferred, as for a Novice, who has no other active skill at level 1).
+        if (CareerNormalGroup(p.Career) is var attack and > 0 && Level(p, attack) > 0 && IsActive(attack)) yield return (next++, attack);
         foreach (var (group, _) in Tree(p.Career))
         {
             if (next > BarSlots) break;
-            if (Level(p, group) > 0 && IsActive(group) && !IsNormalGroup(p, group)) yield return (next++, group);
+            if (Level(p, group) > 0 && IsActive(group) && !IsChainNormalGroup(p, group)) yield return (next++, group);
         }
     }
+
+    /// <summary>
+    /// The group a bar slot shows. A normal attack on the bar is the career's own: the tree and a saved bar still hold
+    /// the earlier careers' (the Novice's 10000), and shown, the client cast the Novice's 1000001 instead of the career's
+    /// (1300001 for an Archer). Without its own (a Mage's 1200001 has no SkillConfig row) the slot is empty (0).
+    /// </summary>
+    private int BarGroup(RoleProgress p, int group) => IsChainNormalGroup(p, group) ? CareerNormalGroup(p.Career) : group;
 
     /// <summary>Active skills can go on the bar: SkillConfig._iBasicType 1 (passives such as Sword Mastery have 0).</summary>
     private bool IsActive(int group) =>
         RealId(group, 1) is var id and > 0 && _data.Row("SkillConfig", id) is { } row && GameData.Int(row, "_iBasicType") == 1;
 
     private bool IsNormalGroup(RoleProgress p, int group) => NormalGroups(p.Career).Contains(group);
+
+    /// <summary>The skill group of a career's normal attack (JobConfig._kSkillNormalID).</summary>
+    private int CareerNormalGroup(int career) =>
+        _data.Row("SkillConfig", NormalAttack(career)) is { } row ? (int)new SkillConfig(row).SkillId : 0;
+
+    /// <summary>The normal attack of the career or of one before it (the Novice's 10000 for every career).</summary>
+    private bool IsChainNormalGroup(RoleProgress p, int group) =>
+        group > 0 && CareerChain(p.Career).Any(career => CareerNormalGroup(career) == group);
+
 
     public async Task SyncAsync(GameSession session)
     {
@@ -1046,6 +1046,3 @@ public sealed class SkillService
         await session.SendGameAsync(QueueUpdate, new SkillQueueUpdateResp { Result = code, Plan = req.Plan });
     }
 }
-
-/// <summary>A deployed pet's Main Skill: the SkillConfig row the player casts and the pet it belongs to.</summary>
-public readonly record struct PetMainSkill(int SkillId, int PetId);

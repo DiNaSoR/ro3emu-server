@@ -3,6 +3,7 @@ using Google.Protobuf;
 using Romsg;
 using Ro3Emu.Server.Accounts;
 using Ro3Emu.Server.Data;
+using Ro3Emu.Server.Data.Config;
 using Ro3Emu.Server.Maps;
 
 namespace Ro3Emu.Server.Game;
@@ -18,7 +19,9 @@ public sealed class AttackLoop
     /// <summary>Started while the player still walked: the stop that follows at once is where the loop really starts.</summary>
     public bool StartedWalking { get; set; }
     public long StartMs { get; init; }
-    public float ArrivalSlack { get; init; }
+    /// <summary>The walk speed (m/s) and the last walk message when the loop started (CombatService.WithinArrival).</summary>
+    public float ArrivalSpeed { get; init; }
+    public DateTime WalkFromUtc { get; init; }
 }
 
 /// <summary>
@@ -241,6 +244,14 @@ public sealed partial class CombatService : IGameTicker
 
     // Totem passives need the row and final target before the existing post-hit event loses that context.
     public List<Func<GameSession, JsonElement, Task>> CastLanded { get; } = new();
+    /// <summary>After a player's own cast applied its effects, with the monsters it processed and its published hit (each
+    /// target's result, the allies it healed) (TalentProcs).</summary>
+    internal List<Func<GameSession, ActiveSkillCast, IReadOnlyList<MonsterUnit>, SkillHitInfo, Task>> CastResolved { get; } = [];
+    /// <summary>The row a cast deals its damage with once its monster targets are chosen ("For every enemy hit by [Hammer
+    /// Fall], ... increases"), by their count (TalentProcs).</summary>
+    internal Func<GameSession, JsonElement, int, JsonElement>? TargetCountRow { get; set; }
+    /// <summary>May the caster's skill put this _kBuff1 buff on the recipient (TalentProcs: talent-gated buffs).</summary>
+    internal Func<GameSession, GameSession, int, bool>? SkillBuffAllowed { get; set; }
     public List<Func<GameSession, MonsterUnit, JsonElement, DamageHitResult, long, long>> DamageAdjusters { get; } = new();
     public List<Func<GameSession, MonsterUnit, JsonElement, long, long>> ExtraHitDamage { get; } = new();
     public List<Func<GameSession, MonsterUnit, JsonElement, long, Task>> DealtAsync { get; } = new();
@@ -257,7 +268,8 @@ public sealed partial class CombatService : IGameTicker
     public Func<GameSession, GameSession, JsonElement, Task<bool>>? ReviveItemSkill { get; set; }
 
     public CombatService(World world, MonsterService monsters, CharacterService character, SkillService skills, SceneService scene, BuffService buffs,
-        WorldData worldData, SessionRegistry sessions, GameData data, GameLoop loop, ILogger<CombatService> log)
+        WorldData worldData, SessionRegistry sessions, GameData data, GameLoop loop, ILogger<CombatService> log, PetService pets,
+        SeasonTalentService talents)
     {
         this._world = world;
         this._monsters = monsters;
@@ -270,6 +282,8 @@ public sealed partial class CombatService : IGameTicker
         this._data = data;
         this._loop = loop;
         this._log = log;
+        _pets = pets;
+        WireGuardians();
         monsters.Attack = MonsterAttackAsync;
         buffs.ImmuneDeathDeclined = PlayerDiesAsync;
         scene.Leaving.Add(ClearSkillsAsync);
@@ -283,16 +297,13 @@ public sealed partial class CombatService : IGameTicker
         character.JobChanged.Add(RefreshSkillParametersAsync); // a job change can change which passives apply
         buffs.Changed.Add(RefreshSkillParametersAsync);
         character.EquipmentChanged.Add(RefreshSkillParametersAsync); // cards and gear can carry per_sp_dedution
+        talents.EffectsChanged.Add(RefreshSkillParametersAsync);
         scene.Loaded.Add(RefreshSkillParametersAsync);
         scene.Leaving.Add(ClearSceneSkillProtocolAsync);
         skills.QueueEligibility = CanQueueSkill;
         character.ProgressHandlers.Add(buffs.ReconcileEnergyAsync);
-        ExtraHitDamage.Add(DoubleAttackDamage);
-        DamageAdjusters.Add(PreyOnTheWeak);
         TakenAsync.Add((_, p, amount) => amount > 0 ? buffs.StealthHitAsync(p) : Task.CompletedTask);
         DealtAsync.Add((s, _, _, amount) => amount > 0 ? buffs.StealthDealtAsync(s) : Task.CompletedTask);
-        DealtAsync.Add((s, _, _, amount) => amount > 0 ? WargHowlAsync(s) : Task.CompletedTask);
-        RegisterPetEffects();
         // Companion buffs follow the lease and the ride (MountService and CareerSpecialService register in ServerHost).
         skills.Learned.Add(SyncCompanionsAsync);
         character.JobChanged.Add(SyncCompanionsAsync);
@@ -302,11 +313,9 @@ public sealed partial class CombatService : IGameTicker
         buffs.UnitChanged.Add(PublishTowerPetStatsAsync);
         WireBuffRules();
         WireBossSkills();
-        WireSupportSkills();
         WireGuardSkills();
-        WireTriggerSkills();
         WireDelayedSkills();
-        WireAstralBodies(); WireChains();
+        WireChains();
     }
 
     private static long Now => MonsterService.NowMs;
@@ -337,6 +346,15 @@ public sealed partial class CombatService : IGameTicker
         }
         return first != 0 ? first : 1000002;
     }
+
+    /// <summary>
+    /// SkillHitInfo.split: how many damage words the client shows for one hit. SkillConfig._kShowDmg holds one count
+    /// per show attack point and only the server reads it. LC_DamageHelper.ProcessDamageWord divides the damage into
+    /// that many words and, for the caster, adds a running total (Dmg_Accumulate) for skills with _iAccumDmgType, so
+    /// with split 1 the total repeats the hit. A cast resolves at its first attack point, so the first count applies
+    /// (inferred for skills with several points).
+    /// </summary>
+    private static int HitSplit(JsonElement row) => (int)Math.Max(1, new SkillConfig(row).ShowDmg.FirstOrDefault(1));
 
     // ---- monsters hitting players ----
 
@@ -491,6 +509,7 @@ public sealed partial class CombatService : IGameTicker
         var (damage, result) = row is { } r ? Damage(attacker, defender, r)
             : (Math.Max(1, monster.Template.Atk), DamageHitResult.Normal);
         damage = ScaleMonsterDamage(damage, monster.DamageRatio);
+        damage = MonsterBuffDamage(monster, row, damage);
         if (damagePercent != 100) damage = damagePercent <= 0 ? 0 : ScaleMonsterDamage(damage, damagePercent * 100);
         foreach (var adjust in MonsterDamageAdjusters) damage = adjust(monster, damage, true);
         damage = ApplyPetSupportResistance(damage, _buffs.UnitAttributes(pet), row, monster.Template.Element);
@@ -518,7 +537,7 @@ public sealed partial class CombatService : IGameTicker
 
     private async Task MonsterAttackAsync(MonsterUnit m, GameSession p)
     {
-        if (m.Dead || m.Hp <= 0) return;
+        if (m.Dead || m.Hp <= 0 || _buffs.UnitForbidden(m, ForbiddenState.NormalAttack) || GuardianStealthed(p) || !_buffs.CanSeePosition(m, p.Position)) return;
         var targetRole = p.Role;
         if (targetRole == null) return;
         long targetScene = p.WorldScene;
@@ -537,17 +556,18 @@ public sealed partial class CombatService : IGameTicker
             && GameData.Int(swingRow, "_iSkillEffectLevel") > 0);
         ScheduleRuntime(m.WorldScene, TimeSpan.FromSeconds(m.Template.HitPointSeconds), async () =>
         {
-            if (m.Dead || m.Hp <= 0 || p.Dead || p.Role == null || p.SceneLoading || p.WorldScene != m.WorldScene) return;
+            if (m.Dead || m.Hp <= 0 || _buffs.UnitForbidden(m, ForbiddenState.NormalAttack) || GuardianStealthed(p) || p.Dead || p.Role == null || p.SceneLoading || p.WorldScene != m.WorldScene) return;
             if (!ReferenceEquals(p.Role, targetRole) || p.WorldScene != targetScene
                 || p.SceneGeneration != targetGeneration || !ReferenceEquals(p.Attachment, targetLease)
                 || targetLease?.Cancelled == true) return;
-            if (MonsterService.Distance(m, p) > m.Template.AttackRange + 2f) return; // stepped away
+            if (MonsterService.Distance(m, p) > m.Template.AttackRange + 2f || !_buffs.CanSeePosition(m, p.Position)) return; // stepped away
             var stats = _character.Stats(p);
             var attacker = AsAttacker(m);
             var defender = PlayerDefender(p, stats);
             var row = _data.Row("SkillConfig", m.Template.NormalSkill);
             var (damage, result) = row is { } r ? Damage(attacker, defender, r) : (Math.Max(1, m.Template.Atk), DamageHitResult.Normal);
             damage = ScaleMonsterDamage(damage, m.DamageRatio);
+            damage = MonsterBuffDamage(m, row, damage);
             foreach (var adjust in MonsterDamageAdjusters) damage = adjust(m, damage, true);
             if (damage > 0) foreach (var modifier in IncomingDamageAdjusters) damage = Math.Max(0, await modifier(m, p, result, damage));
             var committed = await CommitPlayerDamageAsync(p, damage, row,
@@ -593,18 +613,23 @@ public sealed partial class CombatService : IGameTicker
             || valid?.Invoke() == false) return null;
         if (target.CutsceneProtected) return null; // nothing lands while a story plays (GameSession.CutsceneProtected)
         // A missed/fully absorbed hit must not spend a finite Safety Wall charge.
-        if (damage > 0 && (target.GmInvincible || _buffs.HasForbidden(target, 9) || await GroundProtectsAsync(target, row))) damage = 0;
+        if (damage > 0 && (target.GmInvincible || _buffs.HasForbidden(target, ForbiddenState.Damage)
+            || await GroundProtectsAsync(target, row))) damage = 0;
+        if (row is { } incomingSkill) damage = GuardianNormalAttackResistance(target, incomingSkill, damage);
         // (inferred) Support damage reductions precede the finite shield and lethal-hit handling.
         damage = ApplyPetSupportResistance(damage, target.Buffs.Where(b => b.ExpireMs > Now
-                && b.SourceId is >= (1L << 51) and < (1L << 52))
+                && (b.SourceId is >= TowerPetUnit.UidBase and < TowerPetUnit.UidLimit || b.IsGuardianOwned))
             .SelectMany(b => b.Changes).Select(c => (c.Attr, c.Value)), row, sourceElement);
         // Devotion / King's Grace pass their share to the Crusader (CombatService.Guard); a passed share is not passed again.
         if (!shared) damage = await ShareDamageAsync(target, damage);
         long beforeShield = damage;
         if (damage > 0) target.LastDamagedMs = Now;
         damage = await _buffs.AbsorbAsync(target, damage);
+        long shieldDamage = beforeShield - damage;
         if (!ReferenceEquals(target.Role, targetRole) || target.SceneLoading || valid?.Invoke() == false) return null;
         long before = _character.Stats(target)[2000];
+        long floor = GuardianHpFloor(target, before);
+        if (floor > 0) damage = Math.Min(damage, Math.Max(0, before - floor));
         long hp = Math.Max(0, before - damage);
         if (hp == 0 && await _buffs.TryPreventLethalAsync(target)) hp = _character.Stats(target)[2000];
         else if (hp > 0 && KingsGraceRecovery(target, damage) is var recovered and > 0)
@@ -620,7 +645,7 @@ public sealed partial class CombatService : IGameTicker
                 _deathPublications.Add(target);
             }
         }
-        return (damage, hp, Math.Max(0, before - hp), beforeShield - damage);
+        return (damage, hp, Math.Max(0, before - hp), shieldDamage);
     }
 
     // ---- damage formula (inferred) ----
@@ -641,7 +666,6 @@ public sealed partial class CombatService : IGameTicker
         /// <summary>The part of a stat another system already applies (deployed totems' own multipliers).</summary>
         public Func<int, double>? Covered { get; init; }
         /// <summary>A cut to every monster hit on this side, in basis points (Monster Resistance with a shield).</summary>
-        public int MonsterDamageCutBp { get; init; }
         /// <summary>The element of this side's normal attacks when a buff changes it (Aspersio: Holy); 0 for none.</summary>
         public int NormalAttackElement { get; init; }
     }
@@ -695,14 +719,16 @@ public sealed partial class CombatService : IGameTicker
             (long)hit, (long)cri, (long)flee, (long)resCri);
     }
 
-    private (long Damage, DamageHitResult Result) Damage(Fighter a, Fighter b, JsonElement skill, int branch = 0, int element = 0)
+    private (long Damage, DamageHitResult Result) Damage(Fighter a, Fighter b, JsonElement skill, int branch = 0,
+        double bonusCrit = 0, bool forceCrit = false, int element = 0)
     {
         // A skill that never misses (_iSkillHit 10000) draws no hit roll, as before.
         if (GameData.Int(skill, "_iSkillHit") < 10000 && Rolls.Hit() >= HitRate(a, b, skill)) return (0, DamageHitResult.Miss);
         double dmg = BaseDamage(a, b, skill, branch, out bool magic, element);
         dmg *= 0.97 + DamageFloatRoll() * 0.06; // DamageFloat [9700, 10300]
         var result = DamageHitResult.Normal;
-        if (!magic && Rolls.Crit() < CritRate(a, b, skill))
+        // (inferred) Miguel's guardian crit bonus (bonusCrit/forceCrit) also lets a magic hit crit; nothing else changes.
+        if (forceCrit || (!magic || bonusCrit > 0) && Rolls.Crit() < CritRate(a, b, skill) + bonusCrit)
         {
             dmg *= CritFactor(a, b); // FormulaParamCriDmg 15000 plus Crit Damage% 209 minus Crit Damage Reduction% 210
             result = DamageHitResult.Critical;

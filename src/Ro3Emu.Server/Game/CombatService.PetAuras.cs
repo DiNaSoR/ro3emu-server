@@ -3,110 +3,98 @@ using Ro3Emu.Server.Data;
 
 namespace Ro3Emu.Server.Game;
 
-/// <summary>
-/// Pet Main Skills that leave a timed aura on the master and act from it on a cadence:
-/// <list type="bullet">
-/// <item>Demon Attendant (2308201..06): the guardian row grants 【Demonic Aura】 2308101 for 5 s. The buff's _kLogicData
-/// [23086] names the extra _kAutoLearnSkill row (2308601..06, "emodiyu", 600 cm, 5 targets, P1 4500..9000), and the
-/// description says "Every ${7} seconds, deals ... Adaptive ATK*${3}% to up to ${6} enemies within ${1} meters" (0.5 s).</item>
-/// <item>Chimera (2309201..06): 【Holy Light Field】 2309101..06 (_kLogicData [23097]) lasts ${6} = 5 s; "Every ${1} sec.,
-/// it grants the master and up to ${3} allies within ${2} meters a shield" (2309701..06, buff 2309201..06,
-/// T_AXadd0_etc Max Life * 2..4%).</item>
-/// </list>
-/// The tick casts that extra row as a server follow-up from the master's current position while the aura buff it
-/// granted is still on them (inferred: the field follows the master; the first tick is one interval after the cast).
-/// </summary>
 public sealed partial class CombatService
 {
-    /// <summary>Main Skill group -> the _kDescData index holding the aura's tick in seconds (from its description).</summary>
-    private static readonly IReadOnlyDictionary<int, int> PetAuraTickDesc = new Dictionary<int, int>
+    // Baphomet Jr.'s description requires the target to be slowed BEFORE this hit, not by its first Buff2 tuple.
+    private const string KuangFengXiJuan = "KuangFengXiJuan";
+
+    private static bool GuardianAllowsHostileBuff(JsonElement row, JsonElement tuple, bool previouslySlowed) =>
+        GuardianPetRules.Script(row) != KuangFengXiJuan || tuple.GetArrayLength() == 0
+            || (int)(GameData.Number(tuple[0]) ?? 0) / 100 != BuffService.RootGroup || previouslySlowed;
+
+    /// <summary>Named primary scripts with periodic effects described by their wrapper. Coefficients, range,
+    /// duration and interval are read from that star's description/linked auxiliary, never tower support rows.
+    /// (inferred) First periodic tick follows one interval; Angeling's unspecified heal interval is one second.</summary>
+    private async Task GuardianSpecialSupportAsync(GameSession source, GuardianPetRules.Skill pet, ActiveSkillCast action)
     {
-        [23082] = 6, // Demon Attendant: "Every ${7} seconds"
-        [23092] = 0, // Chimera: "Every ${1} sec."
-    };
-
-    private readonly HashSet<long> _petAuraLoops = new();
-    private HashSet<long>? _petAuraRows, _petAuraGuardians;
-
-    internal int PetAuraCount => _petAuraLoops.Count;
-
-    /// <summary>The extra rows a Main Skill's aura casts (not GuardianSkill, named by a GuardianSkill buff's
-    /// _kLogicData). They scale from Adaptive ATK like the guardian rows.</summary>
-    private bool PetAuraRow(JsonElement row) => PetAuraRows().Rows.Contains(GameData.Int(row, "_iID"));
-
-    /// <summary>A guardian row that only lays an aura. The Holy Light Field's P1 [10] is not a heal (its description
-    /// names none), so the friendly heal branch skips it.</summary>
-    private bool PetAuraGuardian(JsonElement row) => PetAuraRows().Guardians.Contains(GameData.Int(row, "_iID"));
-
-    private (HashSet<long> Rows, HashSet<long> Guardians) PetAuraRows()
-    {
-        if (_petAuraRows == null || _petAuraGuardians == null)
+        GuardianPrimaryWindows(source, pet, action);
+        var desc = Numbers(pet.Active, "_kDescData");
+        bool Current() => CurrentCastMap(source, action);
+        switch (GuardianPetRules.Script(pet.Effect))
         {
-            HashSet<long> rows = new(), guardians = new();
-            foreach (var (_, main) in _data.Table("SkillConfig"))
-                if (GameData.Int(main, "_iSystemType") == ActiveGuardSkill && PetAuraTickDesc.ContainsKey((int)GameData.Int(main, "_iSkillID")))
-                    foreach (var id in Numbers(main, "_kAutoLearnSkill"))
-                        if (_data.Row("SkillConfig", (long)id) is { } extra)
-                            (GameData.Int(extra, "_iSystemType") == GuardianSkill ? guardians : rows).Add((long)id);
-            (_petAuraRows, _petAuraGuardians) = (rows, guardians);
-        }
-        return (_petAuraRows, _petAuraGuardians);
-    }
-
-    /// <summary>After the guardian row landed: start a tick for each aura buff it granted the master.</summary>
-    private void StartPetAuras(GameSession s, JsonElement main, JsonElement guardian)
-    {
-        if (!PetAuraTickDesc.TryGetValue((int)GameData.Int(main, "_iSkillID"), out int index)
-            || Numbers(main, "_kDescData").ElementAtOrDefault(index) is not (> 0 and var seconds)) return;
-        int interval = (int)Math.Round(seconds * 1000);
-        foreach (var tuple in Tuples(guardian, "_kBuff1"))
-        {
-            if (tuple.GetArrayLength() < 1 || GameData.Number(tuple[0]) is not { } buffId
-                || _data.Row("BuffConfig", (long)buffId) is not { } config
-                || Numbers(config, "_kLogicData") is not [var group, ..]
-                || ExtraRow(main, (long)group) is not { } extra) continue;
-            long now = MonsterService.NowMs;
-            var aura = s.Buffs.Where(b => b.ConfigId == (int)buffId && b.ExpireMs > now).MaxBy(b => b.ExpireMs);
-            if (aura == null || !_petAuraLoops.Add(aura.Guid)) continue;
-            SchedulePetAura(s, s.Role!, extra, aura.Guid, aura.ExpireMs, interval, aura.ExpireMs - aura.DurationMs + interval);
+            case "GuoShuGui_HuZhu" when desc.Length >= 7:
+                long extra = (long)(Math.Floor((action.GuardianDamage?.Count ?? 0) / Math.Max(1, desc[5])) * desc[6]);
+                await GuardianHealAsync(source, source, pet.EffectId, action.Id, extra, Current);
+                for (int second = 1; second <= desc[1]; second++)
+                    ScheduleRuntime(action.WorldScene, TimeSpan.FromSeconds(second), () => Current()
+                        ? GuardianHealAsync(source, source, pet.EffectId, action.Id, (long)desc[0], Current) : Task.CompletedTask);
+                break;
+            // Angeling: (inferred) one heal a second over the description's radius, not the linked halo's.
+            case "ShengGuangJiangLin" when desc.Length >= 7:
+                for (int second = 1; second <= desc[6]; second++)
+                    ScheduleRuntime(action.WorldScene, TimeSpan.FromSeconds(second), () =>
+                        GuardianAreaHealAsync(source, pet, action, (float)desc[3], (int)GameData.Int(pet.Effect, "_iTargetMax"), desc[5]));
+                break;
+            // Incubus: the aura hits with the linked emodiyu auxiliary, so its range is that row's _kRange, which differs from
+            // the description's.
+            case "moqihuanrao" when desc.Length >= 7:
+                if (GuardianLinkedAuxiliary(pet.Active, pet.Star, "emodiyu") is { } damage)
+                    ScheduleGuardianAura(source, pet, action, damage, desc[6], desc[1]);
+                break;
+            case "shengguanglingyu" when desc.Length >= 6:
+                if (GuardianLinkedAuxiliary(pet.Active, pet.Star, "shengguangjianglin2") is { } shield)
+                    for (double second = desc[0]; desc[0] > 0 && second <= desc[5]; second += desc[0])
+                        ScheduleRuntime(action.WorldScene, TimeSpan.FromSeconds(second), () =>
+                            GuardianAreaShieldAsync(source, pet, action, shield, (float)desc[1], (int)desc[2] + 1));
+                break;
         }
     }
 
-    private JsonElement? ExtraRow(JsonElement main, long group)
+    private JsonElement? GuardianLinkedAuxiliary(JsonElement owner, int star, string script)
     {
-        foreach (var id in Numbers(main, "_kAutoLearnSkill"))
-            if (_data.Row("SkillConfig", (long)id) is { } row && GameData.Int(row, "_iSystemType") != GuardianSkill
-                && GameData.Int(row, "_iSkillID") == group) return row;
-        return null;
+        var candidates = Numbers(owner, "_kAutoLearnSkill").Select(id => _data.Row("SkillConfig", (long)id))
+            .Where(r => r is { } row && GuardianPetRules.Script(row) == script && GameData.Int(row, "_iLevel") == star).ToArray();
+        return candidates.Length == 1 ? candidates[0] : null;
     }
 
-    /// <summary>One tick at <paramref name="due"/>; the next is due one interval later, so a slow loop or a slow
-    /// cast does not stretch the cadence (5 s at 0.5 s stays 10 ticks).</summary>
-    private void SchedulePetAura(GameSession s, object role, JsonElement extra, long guid, long expire, int interval, long due)
+    private void ScheduleGuardianAura(GameSession source, GuardianPetRules.Skill pet, ActiveSkillCast parent,
+        JsonElement effect, double interval, double duration)
     {
-        long scene = s.WorldScene, generation = s.SceneGeneration;
-        // The loop runs a callback on the tick after its delay, so aim one tick early (as the bolts do).
-        var delay = TimeSpan.FromMilliseconds(Math.Max(0, due - MonsterService.NowMs - GameLoop.TickInterval.TotalMilliseconds));
-        ScheduleRuntime(scene, delay, async () =>
-        {
-            // A tick due at the expiry moment still lands, though the buff may have just been removed for expiring;
-            // one removed early (dispelled, cleared) stops the aura.
-            var buff = s.Buffs.FirstOrDefault(b => b.Guid == guid);
-            bool live = ReferenceEquals(s.Role, role) && !s.Dead && !s.SceneLoading && s.WorldScene == scene
-                && s.SceneGeneration == generation && _sessions.Contains(s)
-                && (buff != null ? buff.ExpireMs >= due : due == expire && MonsterService.NowMs >= expire - GameLoop.TickInterval.TotalMilliseconds);
-            if (!live)
+        if (interval <= 0 || duration <= 0 || duration / interval > GuardianPetRules.MaxAuraPulses) return;
+        for (double second = interval; second <= duration + .000001; second += interval)
+            ScheduleRuntime(parent.WorldScene, TimeSpan.FromSeconds(second), async () =>
             {
-                _petAuraLoops.Remove(guid);
-                return;
-            }
-            try { await ProcCastAsync(s, extra, null, face: s.Face, area: true, at: s.Position.Clone()); }
-            finally
+                if (!CurrentCastMap(source, parent) || !_pets.GuardianEquipped(source, pet)) return;
+                var proc = GuardianProcAction(source, pet, parent, effect);
+                await ApplyEffectsAsync(source, proc, source.Position);
+            });
+    }
+
+    private async Task GuardianAreaHealAsync(GameSession source, GuardianPetRules.Skill pet, ActiveSkillCast action,
+        float radius, int maximum, double coefficient)
+    {
+        bool Current() => CurrentCastMap(source, action) && _pets.GuardianEquipped(source, pet);
+        if (!Current()) return;
+        var stats = _character.Stats(source);
+        long amount = (long)Math.Floor(Math.Max(stats[AttributeId.Atk], stats[AttributeId.Matk]) * coefficient / 100);
+        amount = GuardianPetRules.DirectHealing(pet.Effect, amount);
+        foreach (var (ally, allyCurrent) in GuardianReactionAllies(source, radius, maximum)
+            .Select(ally => (ally, GuardianRecipientCurrent(source, ally, action))).ToArray())
+            if (Current() && allyCurrent())
+                await GuardianHealAsync(source, ally, pet.EffectId, action.Id, amount, () => Current() && allyCurrent());
+    }
+
+    private async Task GuardianAreaShieldAsync(GameSession source, GuardianPetRules.Skill pet, ActiveSkillCast action,
+        JsonElement effect, float radius, int maximum)
+    {
+        foreach (var ally in GuardianReactionAllies(source, radius, maximum))
+            foreach (var tuple in Tuples(effect, "_kBuff1"))
             {
-                if (s.Buffs.FirstOrDefault(b => b.Guid == guid) is { } current) expire = current.ExpireMs;
-                if (due + interval <= expire) SchedulePetAura(s, role, extra, guid, expire, interval, due + interval);
-                else _petAuraLoops.Remove(guid);
+                if (!CurrentCastMap(source, action) || !_pets.GuardianEquipped(source, pet)) return;
+                if (ally.Dead || ally.SceneLoading || ally.WorldScene != action.WorldScene
+                    || !RollBuff(tuple, out int id, out int duration) || _data.Row("BuffConfig", id) is not { } buff) continue;
+                long amount = PetCombatRules.AttributeAmount(buff, _character.Stats(source), _character.Stats(ally));
+                await _buffs.AddGuardianAsync(ally, id, duration, action.OwnerId, amount);
             }
-        });
     }
 }

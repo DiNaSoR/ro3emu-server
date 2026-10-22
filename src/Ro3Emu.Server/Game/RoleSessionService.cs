@@ -334,7 +334,7 @@ public sealed class RoleSessionService(RoleStore roles, Data.GameData data, Buff
 
     internal async Task WalkAsync(GameSession session, WalkReq walk)
     {
-        if (session.Role == null || walk.Pos == null || session.SceneLoading || session.Dead || buffs.HasForbidden(session, 3)) return;
+        if (session.Role == null || walk.Pos == null || session.SceneLoading || session.Dead || buffs.HasForbidden(session, ForbiddenState.Walk)) return;
         // NaN makes every later "dist > max" range check false, so a NaN position would pass all of them.
         if (!WorldCoreService.Finite(walk.Pos) || !float.IsFinite(walk.Face) || MathF.Abs(walk.Pos.X) > MaxCoordinate
             || MathF.Abs(walk.Pos.Y) > MaxCoordinate || MathF.Abs(walk.Pos.Z) > MaxCoordinate) return;

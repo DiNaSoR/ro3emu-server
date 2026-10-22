@@ -2,6 +2,7 @@ using System.Text.Json;
 using Google.Protobuf;
 using Romsg;
 using Ro3Emu.Server.Data;
+using Ro3Emu.Server.Data.Config;
 using Ro3Emu.Server.Maps;
 
 namespace Ro3Emu.Server.Game;
@@ -27,7 +28,6 @@ public sealed partial class CombatService
     }
 
     private Dictionary<(int Group, int Level, int Mode), int>? _configuredModeRows;
-    private int[]? _passiveGroups;
 
     private Dictionary<(int Group, int Level, int Mode), int> ConfiguredModeRows =>
         _configuredModeRows ??= _data.Table("SkillConfig").Values
@@ -42,7 +42,6 @@ public sealed partial class CombatService
     public JsonElement? EffectiveSkillRow(GameSession session, int requestedRowId)
     {
         if (session.Progress == null || _data.Row("SkillConfig", requestedRowId) is not { } requested) return null;
-        SyncPassiveSkillModifiers(session);
         int group = (int)GameData.Int(requested, "_iSkillID"), level = (int)GameData.Int(requested, "_iLevel");
         int mode = SkillParameterRules.Mode(group, SkillParameterRules.CategoriesOf(_data, requested), SkillParameterRules.Active(session, _data));
         int requestedMode = (int)GameData.Int(requested, "_iMode");
@@ -62,7 +61,6 @@ public sealed partial class CombatService
     public bool CanQueueSkill(GameSession session, int group)
     {
         if (session.Progress == null || _skills.Level(session.Progress, group) is not > 0) return false;
-        SyncPassiveSkillModifiers(session);
         int rowId = _skills.RealId(group, _skills.Level(session.Progress, group));
         if (_data.Row("SkillConfig", rowId) is not { } row) return false;
         long allowed = GameData.Int(row, "_iQueue");
@@ -72,28 +70,19 @@ public sealed partial class CombatService
         return allowed != 0;
     }
 
-    /// <summary>Direct _kAttri on the learned mode-0 passive row; no duplicate stacking of its lower levels.
-    /// Plus the few passives whose same-id buff attributes apply (CombatService.PassiveSkills).</summary>
-    public IEnumerable<(long Id, double Value)> PassiveAttributes(GameSession session)
-    {
-        foreach (var (_, row) in LearnedPassiveRows(session))
-            foreach (var pair in GameData.Pairs(row, "_kAttri")) yield return pair;
-        foreach (var pair in PassiveBuffAttributes(session)) yield return pair;
-        foreach (var pair in PassiveConditionalAttributes(session)) yield return pair;
-    }
-
     /// <summary>Reconcile actual buff/energy-derived parameters and wheel replacements after login/skill/buff changes.</summary>
     public async Task RefreshSkillParametersAsync(GameSession session)
     {
         if (session.Role == null || session.Progress == null) return;
-        SyncPassiveSkillModifiers(session);
+        var passives = PassiveModifiers(session);
+        if (!passives.SequenceEqual(session.PassiveSkillModifiers)) session.PassiveSkillModifiers = passives;
         var mods = SkillParameterRules.Active(session, _data);
         var update = new SkillBeAffectedParamExNotify { IsAll = true, Uuid = session.Role.Id };
         // Scope 0 names its group; a scope-1 tag selector reaches every learned skill whose row carries its tags.
         var groups = new SortedSet<int>(mods.Where(m => m.Scope == 0).Select(m => m.Group));
         var stats = _character.Stats(session);
-        // per_sp_dedution changes every learned SP cost, so the client needs those skills' cost lists too.
-        bool spDeduction = stats[SpDeductionAttribute] != 0;
+        // sp_dedution and per_sp_dedution change every learned SP cost, so the client needs those skills' cost lists too.
+        bool spDeduction = stats[AttributeId.SpDedution] != 0 || stats[AttributeId.PerSpDedution] != 0;
         if (spDeduction)
             foreach (int learned in session.Progress.Skills.Keys)
                 if (_skills.Level(session.Progress, learned) is var at and > 0
@@ -258,13 +247,6 @@ public sealed partial class CombatService
                 break;
         }
     }
-
-    /// <summary>
-    /// SkillConfig._kShowDmg[0]: how many hits the client shows (Fire Bolt level N shows N). It is both the bullet
-    /// count (LC_BulletEmit_Mgr emits split bullets, m_fBulletHatchInterval apart) and SkillHitInfo.split, which
-    /// LC_DamageHelper.ProcessDamageWord uses to cut one total into that many damage numbers.
-    /// </summary>
-    internal static int ShowHits(JsonElement row) => (int)Math.Clamp(Numbers(row, "_kShowDmg").FirstOrDefault(1), 1, 100);
 
     /// <summary>Server-timed bullet only when a skill script owns projectile travel.</summary>
     public Task SendSkillBulletAsync(GameSession source, SkillFixTimeBulletNotify bullet, bool highLevel = false) =>

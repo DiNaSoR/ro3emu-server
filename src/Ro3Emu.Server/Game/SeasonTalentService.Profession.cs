@@ -94,11 +94,11 @@ public sealed partial class SeasonTalentService
                     {
                         await CharacterService.SyncAsync(s, TalentSync, next.Clone());
                         await _character.RefreshStatsAsync(s);
+                        await RefreshEffectsAsync(s);
                     }
                 }
             }
         }
         await s.SendGameAsync(Upgrade, new SeasonTalentUpgradeResp { Result = result, TalentId = req.TalentId });
-        if (result == 0) await ChangedAsync(s); // the chosen branch's buffs and skill modifiers, as after a purchase
     }
 }

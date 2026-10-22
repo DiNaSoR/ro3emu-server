@@ -97,11 +97,13 @@ public static class ServerHost
         builder.Services.AddSingleton<MvpService>();
         builder.Services.AddSingleton<CardService>();
         builder.Services.AddSingleton<CardEffects>();
+        builder.Services.AddSingleton<TalentProcs>();
+        builder.Services.AddSingleton<PassiveSkills>();
+        builder.Services.AddSingleton<RidingEffects>();
         builder.Services.AddSingleton<SeasonService>();
         builder.Services.AddSingleton<SeasonPageService>();
         builder.Services.AddSingleton<SeasonRefineService>();
         builder.Services.AddSingleton<SeasonTalentService>();
-        builder.Services.AddSingleton<SeasonTalentEffects>();
         builder.Services.AddSingleton<ShopService>();
         builder.Services.AddSingleton<ItemBoxService>();
         builder.Services.AddSingleton<MountService>();
@@ -233,7 +235,6 @@ public static class ServerHost
         app.Services.GetRequiredService<MountService>().Changed.Add(s => app.Services.GetRequiredService<WorldCoreService>().MountsChangedAsync(s));
         app.Services.GetRequiredService<MountService>().Changed.Add(app.Services.GetRequiredService<SkillService>().RefreshMountSkillAsync);
         app.Services.GetRequiredService<SceneService>().Loaded.Add(app.Services.GetRequiredService<SkillService>().RefreshMountSkillAsync);
-        app.Services.GetRequiredService<CombatService>().TeamMembers = app.Services.GetRequiredService<TeamService>().MembersOf;
         app.Use(async (context, next) =>
         {
             if (HttpMethods.IsPost(context.Request.Method) && app.Services.GetRequiredService<GameLoop>().Phase != GameLoopPhase.Accepting)
@@ -417,7 +418,10 @@ public static class ServerHost
         questTasks.SocialityScored = app.Services.GetRequiredService<FriendExtraService>().GrantActivityIntimacyAsync;
         app.Services.GetRequiredService<ReconnectService>(); // hooks the handover and registers !netdrop
         app.Services.GetRequiredService<CardEffects>(); // socketed-card passives and procs (sockets, scene loads, hits)
-        app.Services.GetRequiredService<SeasonTalentEffects>(); // season talent job node buffs and skill modifiers
+        app.Services.GetRequiredService<TalentProcs>(); // profession talent procs (cast resolutions)
+        app.Services.GetRequiredService<PassiveSkills>(); // learned passives' procs, shields and reactions
+        // A ridden mount's buffs and the riding passives; a flying mount's ground buff gives way to its air buff in flight.
+        app.Services.GetRequiredService<WorldCoreService>().FlightChanged.Add(app.Services.GetRequiredService<RidingEffects>().SyncAsync);
         // Create the key before the first client connects, so ClientPatch can read the public half.
         app.Services.GetRequiredService<GateCrypto>();
         app.Logger.LogInformation("Data dir {DataDir}", options.DataDir);
@@ -502,6 +506,8 @@ internal sealed class GameLoopTickers(IServiceProvider services) : IHostedServic
         Add<CombatService>();
         Add<SeasonService>();
         Add<MountService>();
+        Add<RidingEffects>();
+        Add<PassiveSkills>();
         Add<TeamService>();
         Add<DailyActivityService>();
         Add<TimedEventService>();

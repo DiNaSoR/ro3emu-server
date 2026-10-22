@@ -175,8 +175,6 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
     internal HashSet<int> CompanionBuffs { get; set; } = new();
     /// <summary>The battle mount ridden when companions were last synced: a change resends the normal attack.</summary>
     internal long CompanionRide { get; set; }
-    /// <summary>When the following wolf may howl again (Wolf Taming, CombatService.Companions).</summary>
-    internal long WargHowlMs { get; set; }
     /// <summary>EnergyConfig._iBelongMount mounts owned when the meters were last reconciled (BuffService.Energy).</summary>
     public int EnergyMounts { get; set; }
     /// <summary>31134/31135 lethal-hit choice; only an eligible active Osiris buff may create it.</summary>
@@ -191,9 +189,8 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
     internal long EmergencyTreatmentReadyMs { get; set; }
     /// <summary>Chances left on a charged immunity buff (Hymn of the Lamb), by buff guid (BuffService.Immunity).</summary>
     internal Dictionary<long, int> ImmunityCharges { get; } = new();
-    /// <summary>Next support check (Union stacks, Sight reveals: CombatService.Guard) and the Union piles last given.</summary>
+    /// <summary>Next support check (Sight reveals: CombatService.Guard).</summary>
     internal long GuardTickMs { get; set; }
-    internal int UnionPiles { get; set; }
     /// <summary>Melt Down's Weapon Damage state the last stat sheet was sent with.</summary>
     internal bool WeaponDamagedShown { get; set; }
     /// <summary>Arm Cannon attacks left on the Madogear's Firepower Loaded (CombatService.Delayed).</summary>
@@ -364,8 +361,6 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
     /// <summary>Transient deployed actor; visibility is owned by World, never persisted with the roster.</summary>
     public PetFollowerActor? PetActor { get; set; }
 
-    /// <summary>The pet Main Skill the last 5025 showed (PetService.RefreshMainSkillAsync); 0 for none.</summary>
-    public int PetMainSkillShown { get; set; }
     /// <summary>The SkillWheelMount1 skill last sent in 5025 (SkillService.RefreshMountSkillAsync).</summary>
     public int MountSkillShown { get; set; }
 
@@ -476,19 +471,25 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
     /// <summary>Current playbook and delivered tasks permit this role's purchased talent attributes.</summary>
     public bool TalentEffectsEnabled { get; set; }
 
+    /// <summary>The active talent plan's skill parameter modifiers, with the weapon and the buff group each needs
+    /// (SeasonTalentService).</summary>
+    internal IReadOnlyList<(long Weapon, long Buff, SkillParameterRules.Modifier Modifier)> TalentSkillModifiers { get; set; } = [];
+
+    /// <summary>The skill tuples of the talents' armed next-cast charges (TalentProcs.Charges).</summary>
+    internal IReadOnlyList<SkillParameterRules.Modifier> TalentChargeModifiers { get; set; } = [];
+
+    /// <summary>The learned passives' skill tuples with the weapons each needs (CombatService.PassiveModifiers),
+    /// refreshed with 31132.</summary>
+    internal IReadOnlyList<(long[] Weapons, SkillParameterRules.Modifier Modifier)> PassiveSkillModifiers { get; set; } = [];
+
+    /// <summary>The active talent plan's Buff(2) rows with their effect's _kDescData (TalentProcs).</summary>
+    internal IReadOnlyList<(long Buff, string[] Description)> TalentProcBuffs { get; set; } = [];
+
+    /// <summary>The active talent plan's changes to other buffs' values (BuffConfig._kBuffAttributeList, op 12).</summary>
+    internal IReadOnlyList<SeasonTalentService.BuffAttribute> TalentBuffAttributes { get; set; } = [];
+
     /// <summary>Last accepted 83552 switch in this session (PublicParamConfig.SchemeCD).</summary>
     public DateTime TalentPlanSwitchUtc { get; set; }
-
-    /// <summary>Skill parameter modifiers from non-buff sources (season talent opcode 21), read by SkillParameterRules
-    /// with the live buffs' modifiers. Replace the list and bump the version together.</summary>
-    internal IReadOnlyList<SkillParameterRules.Modifier> ExtraSkillModifiers { get; set; } = [];
-    internal long ExtraSkillModifierVersion { get; set; }
-
-    /// <summary>Learned passive skills' modifiers (CombatService.PassiveSkills); the signature is of the learned
-    /// levels they were computed from.</summary>
-    internal IReadOnlyList<SkillParameterRules.Modifier> PassiveSkillModifiers { get; set; } = [];
-    internal long PassiveSkillModifierVersion { get; set; }
-    internal long PassiveSkillSignature { get; set; } = long.MinValue;
 
     /// <summary>Proc state (CombatService.Procs): each proc's internal cooldown end by skill group, and a parry's
     /// "took a hit" mark. Session-local.</summary>

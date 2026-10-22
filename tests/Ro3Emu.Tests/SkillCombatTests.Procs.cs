@@ -236,7 +236,7 @@ public sealed partial class SkillCombatTests
             total += (await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser, h => h.SessionId == first.SessionId))
                 .Dsts.Single(d => d.DstID == target.Uid).Damage;
         Assert.InRange(clock.ElapsedMilliseconds, 1900, 4000); // nine more bolts, 250 ms apart
-        Assert.Equal(0, first.Split);
+        Assert.Equal(1, first.Split); // one number per bolt
         await Loop.InvokeAsync(() => { Assert.Equal(1_000_000 - total, target.Hp); return Task.CompletedTask; });
     }
     [ClientDataFact]

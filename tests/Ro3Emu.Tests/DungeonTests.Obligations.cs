@@ -114,9 +114,9 @@ public sealed partial class DungeonTests
             role = (long)alice.Self!.Uuid;
             Assert.Equal(0, await Enter(alice));
             room = await Load(alice);
-            // The server closes the quarantined connection and its cleanup unregisters the session, so keep it.
-            var session = Session(alice);
             var faulted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            // Held from here on: the fault closes the connection, after which the registry may already have dropped it.
+            var session = Session(alice);
             var accounts = Service<AccountStore>();
             accounts.BeforeOwnedApplyForTest = label =>
             {

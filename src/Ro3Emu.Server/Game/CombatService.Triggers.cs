@@ -5,7 +5,8 @@ using Ro3Emu.Server.Maps;
 namespace Ro3Emu.Server.Game;
 
 /// <summary>
-/// Learned and buff-borne triggers beyond the proc table (CombatService.Procs):
+/// Learned and buff-borne triggers beyond the proc table (CombatService.Procs). Enchant Blade, Energy Coat, Soul Drain
+/// and Advanced Katar Mastery are PassiveSkills and TalentProcs.Passives:
 /// <list type="bullet">
 /// <item>Blitz Beat 13102: "When using a Basic Attack, the Falcon has a ${8}% Chance to cast 【Blitz Beat】 on the enemy"
 /// (same-id BuffConfig _kLogicData [chance bp, 13110]: the auto-blitz row of the learned level, mode 0). The falcon has to
@@ -14,14 +15,6 @@ namespace Ro3Emu.Server.Game;
 /// 1235001, MATK x 108%, on the main target).</item>
 /// <item>Dragon Breath (Fire) 11304: "a ${6}% Chance to Burn damaged enemies" (Burn 1138201 on each enemy hit; one roll
 /// per enemy per cast, inferred).</item>
-/// <item>Enchant Blade 11313: "After dealing damage, increases your DEF by ${2}%" (the buff's _kLogicData row, 1131501-
-/// 1131503) for 5 s, refreshed on each hit (inferred: the duration is @{1} with no source).</item>
-/// <item>Advanced Katar Mastery 15220: "When a Basic Attack crits (internal cooldown: ${1}s), your ${2} Crit increases for
-/// ${3}s, stacking up to ${4} times" (same-id buff _kLogicData [crit buff row, ...]: 1522101-1522110, +10 to +100 Crit
-/// a pile).</item>
-/// <item>Soul Drain 12209: "Each Kill restores ${2}% of Max MP as MP".</item>
-/// <item>Energy Coat 12003: "When you take damage, gain 【Energy Coat】 for ${1} sec. ... Cooldown: ${3} sec." (buff
-/// 1201401 _kLogicData [1201501, ms, 1]).</item>
 /// <item>Recoil 11416: while 【Shrink】 (group 11409, _kLogicData [11420]) and 【Auto Guard】 (group 11403) last, a hit
 /// from an attacker within ${5} m has a ${2}% chance to cast Recoil Auto Counter 1142001 (Stun ${3} s) on it;
 /// cooldown ${4} s.</item>
@@ -32,17 +25,8 @@ namespace Ro3Emu.Server.Game;
 /// </summary>
 public sealed partial class CombatService
 {
-    private const int BlitzBeatGroup = 13102, CrimsonRockGroup = 12312, DragonBurnRow = 1138201,
-        EnchantBladeGroup = 11313, SoulDrainGroup = 12209, EnergyCoatGroup = 12003, EnergyCoatBuffRow = 1201401,
-        ShrinkGroup = 11409, AutoGuardGroup = 11403, RecoilSkill = 11416, ShieldDefenseOrbitGroup = 11616, ShieldDefenseSkill = 11613,
-        EnchantBladeMs = 5000;
-
-    private void WireTriggerSkills()
-    {
-        DealtAsync.Add(EnchantBladeAsync);
-        DamageAdjusters.Add(AdvancedKatarCrit);
-        Killed.Add(SoulDrainAsync);
-    }
+    private const int BlitzBeatGroup = 13102, CrimsonRockGroup = 12312, DragonBurnRow = 1138201, DragonBreathFireGroup = 11304,
+        ShrinkGroup = 11409, AutoGuardGroup = 11403, RecoilSkill = 11416, ShieldDefenseOrbitGroup = 11616, ShieldDefenseSkill = 11613;
 
     /// <summary>Learned-skill procs for <see cref="OutgoingProcs"/>: Blitz Beat's auto-blitz and Crimson Rock's Meteorite.</summary>
     private IEnumerable<(int Chance, JsonElement Row)> LearnedProcs(GameSession s, JsonElement row, bool normal)
@@ -72,56 +56,10 @@ public sealed partial class CombatService
         }
     }
 
-    private async Task EnchantBladeAsync(GameSession s, MonsterUnit target, JsonElement row, long amount)
-    {
-        if (amount <= 0 || LiveGroup(s, EnchantBladeGroup) is not { } blade || _data.Row("BuffConfig", blade.ConfigId) is not { } bladeRow
-            || Numbers(bladeRow, "_kLogicData") is not [var defId, ..]) return;
-        await _buffs.AddAsync(s, (int)defId, EnchantBladeMs, s.Role!.Id);
-    }
-
-    private const int AdvancedKatarGroup = 15220;
-
-    private long AdvancedKatarCrit(GameSession s, MonsterUnit target, JsonElement row, Romsg.DamageHitResult result, long damage)
-    {
-        if (result != Romsg.DamageHitResult.Critical || GameData.Int(row, "_iIsNormalAtk") != 1 || s.Progress is not { } progress
-            || _skills.Level(progress, AdvancedKatarGroup) is not (var level and > 0)) return damage;
-        long now = MonsterService.NowMs;
-        if (now < s.ProcState.GetValueOrDefault(AdvancedKatarGroup)
-            || _data.Row("SkillConfig", _skills.RealId(AdvancedKatarGroup, level)) is not { } skill
-            || Numbers(skill, "_kDescData") is not { Length: > 2 } desc
-            || _data.Row("BuffConfig", _skills.RealId(AdvancedKatarGroup, level)) is not { } buff
-            || Numbers(buff, "_kLogicData") is not [var critId, ..]) return damage;
-        s.ProcState[AdvancedKatarGroup] = now + (long)(desc[0] * 1000);
-        var role = s.Role;
-        ScheduleRuntime(s.WorldScene, TimeSpan.Zero, async () =>
-        {
-            if (ReferenceEquals(s.Role, role) && !s.Dead) await _buffs.AddAsync(s, (int)critId, (int)(desc[2] * 1000), role!.Id);
-        });
-        return damage;
-    }
-
-    private async Task SoulDrainAsync(GameSession s, MonsterUnit monster)
-    {
-        if (s.Progress is not { } progress || s.Dead || _skills.Level(progress, SoulDrainGroup) is not (var level and > 0)
-            || _data.Row("SkillConfig", _skills.RealId(SoulDrainGroup, level)) is not { } row
-            || Numbers(row, "_kDescData") is not { Length: > 1 } desc) return;
-        var stats = _character.Stats(s);
-        long restore = (long)Math.Ceiling(stats[102] * desc[1] / 100);
-        if (restore > 0 && stats[2001] < stats[102]) await _character.SetHpSpAsync(s, null, stats[2001] + restore);
-    }
-
     /// <summary>The learned and buff-borne answers to a monster's hit (any distance or type).</summary>
     private async Task ReactWithTriggersAsync(MonsterUnit attacker, GameSession p, long now)
     {
         var progress = p.Progress!;
-        if (_skills.Level(progress, EnergyCoatGroup) is var coat and > 0 && now >= p.ProcState.GetValueOrDefault(EnergyCoatGroup)
-            && _data.Row("SkillConfig", _skills.RealId(EnergyCoatGroup, coat)) is { } coatRow
-            && Numbers(coatRow, "_kDescData") is { Length: > 2 } coatDesc
-            && _data.Row("BuffConfig", EnergyCoatBuffRow) is { } coatBuff && Numbers(coatBuff, "_kLogicData") is [var coatId, ..])
-        {
-            p.ProcState[EnergyCoatGroup] = now + (long)(coatDesc[2] * 1000);
-            await _buffs.AddAsync(p, (int)coatId, (int)(coatDesc[0] * 1000), p.Role!.Id);
-        }
         if (attacker.Dead || attacker.Hp <= 0) return;
         if (LiveGroup(p, ShrinkGroup) is { } shrink && LiveGroup(p, AutoGuardGroup) != null
             && now >= p.ProcState.GetValueOrDefault(ShrinkGroup)
