@@ -116,6 +116,23 @@ public sealed partial class SkillCombatTests
             && SkillHitInfo.Parser.ParseFrom(e.Body) is { SkillId: 1235301 } h && h.Dsts.Any(d => d.DstID == plain.Uid));
     }
 
+    // NPCConfig _kBornEventBuff stands on every monster from its birth, not only on field MVPs: the dungeon Baphomet
+    // 4390000 is born with 900801 (control immunity), 4390101, 904101 and 910801 (Element Counter Immunity).
+    private static readonly int[] BaphometBornGroups = [9008, 43901, 9041, 9108];
+
+    [ClientDataFact]
+    public async Task AMonsterSpawnedAloneCarriesItsBornBuffs()
+    {
+        await using var alice = await InWorld("Alice");
+        var boss = await Target("alice", stationary: true, npcId: 4390000);
+        var buffs = _app.Services.GetRequiredService<BuffService>();
+        await Loop.InvokeAsync(() =>
+        {
+            foreach (int group in BaphometBornGroups) Assert.True(buffs.UnitHasGroup(boss, group), $"group {group}");
+            return Task.CompletedTask;
+        });
+    }
+
     // Union: "For each Crusader on the team, gain 1 stack of [Union]" (the other Crusader-line members): a Royal Guard
     // in a party with a Paladin carries one pile of BuffConfig 1162701, and none after the Paladin leaves.
     [ClientDataFact]
