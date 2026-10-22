@@ -253,7 +253,8 @@ public sealed partial class CombatService : IGameTicker
     public Func<GameSession, GameSession, JsonElement, Task<bool>>? ReviveItemSkill { get; set; }
 
     public CombatService(World world, MonsterService monsters, CharacterService character, SkillService skills, SceneService scene, BuffService buffs,
-        WorldData worldData, SessionRegistry sessions, GameData data, GameLoop loop, ILogger<CombatService> log, PetService pets)
+        WorldData worldData, SessionRegistry sessions, GameData data, GameLoop loop, ILogger<CombatService> log, PetService pets,
+        SeasonTalentService talents)
     {
         this._world = world;
         this._monsters = monsters;
@@ -278,6 +279,7 @@ public sealed partial class CombatService : IGameTicker
         skills.Learned.Add(RefreshSkillParametersAsync);
         skills.Learned.Add(character.RefreshStatsAsync);
         buffs.Changed.Add(RefreshSkillParametersAsync);
+        talents.EffectsChanged.Add(RefreshSkillParametersAsync);
         scene.Loaded.Add(RefreshSkillParametersAsync);
         scene.Leaving.Add(ClearSceneSkillProtocolAsync);
         skills.QueueEligibility = CanQueueSkill;

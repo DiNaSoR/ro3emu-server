@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Ro3Emu.Server.Data;
+using Ro3Emu.Server.Data.Config;
 
 namespace Ro3Emu.Server.Game;
 
@@ -17,6 +18,7 @@ namespace Ro3Emu.Server.Game;
 /// recovered original-server code. Only the fields <see cref="Field"/> names are applied;
 /// the list-valued types 33-38 (SkillBuff1, SkillBuff2, SkillCost, SkillRange, SkillDamageParamExtra,
 /// SkillStageStates; 163 scope-1 tuples) have no recovered list arithmetic and are skipped, as are 5/9/10/22/28/31/32/39.
+/// Talent plans add the same tuples (SeasonTalentService.Effects).
 /// </summary>
 internal static class SkillParameterRules
 {
@@ -40,7 +42,7 @@ internal static class SkillParameterRules
     }
 
     /// <summary>The parsed tuples of one BuffConfig row (empty when it has none), once per game data.</summary>
-    private static Modifier[] ParsedFor(GameData data, int configId)
+    internal static Modifier[] BuffModifiers(GameData data, int configId)
     {
         var table = Parsed.GetValue(data, _ => new Dictionary<int, Modifier[]>());
         lock (table)
@@ -75,23 +77,41 @@ internal static class SkillParameterRules
         return tags.Length == 0 ? null : new Modifier(0, (int)type, (int)op, (long)value, index, 1, tags, all);
     }
 
-    /// <summary>The live modifiers of a session, once per pile, in buff order.</summary>
+    /// <summary>The live modifiers of a session: the talent plan's (whose weapon is held), then once per buff pile, in
+    /// buff order. Talents first is (inferred).</summary>
     internal static IReadOnlyList<Modifier> Active(GameSession session, GameData data) => Cache(session, data).Modifiers;
+
+    /// <summary>Is an item of this ItemConfig._iSubType (1 Dagger, 2 Sword, 3 Two-Handed Sword, 4 Spear ...) in the
+    /// main-hand or off-hand grid (enum_EquipGridType 1, 2).</summary>
+    internal static bool Wields(GameSession session, GameData data, long subType) =>
+        session.Items.Any(i => i.Grid is 1 or 2 && ItemConfig.Get(data, i.Entry) is { } item && item.SubType == subType);
 
     private static SessionCache Cache(GameSession session, GameData data)
     {
         var cache = Sessions.GetOrCreateValue(session);
         long now = MonsterService.NowMs;
-        // A cheap fingerprint of what Active depends on: which buffs, their piles and whether each is still live.
+        // A cheap fingerprint of what Active depends on: which buffs, their piles and whether each is still live, the
+        // talent modifiers and, when one needs a weapon, what the hands hold.
         long signature = 17;
         foreach (var buff in session.Buffs)
             signature = unchecked(((signature * 31 + buff.Guid) * 31 + buff.ConfigId) * 31 + buff.PileCount * 2 + (buff.ExpireMs > now ? 1 : 0));
+        var talents = session.TalentSkillModifiers;
+        signature = unchecked(signature * 31 + RuntimeHelpers.GetHashCode(talents));
+        for (int i = 0; i < talents.Count; i++)
+        {
+            if (talents[i].Weapon == 0) continue;
+            foreach (var item in session.Items)
+                if (item.Grid is 1 or 2) signature = unchecked((signature * 31 + item.Entry) * 31 + item.Grid);
+            break;
+        }
         if (cache.Signature == signature && ReferenceEquals(cache.Data, data)) return cache;
         var result = new List<Modifier>();
+        foreach (var (weapon, mod) in talents)
+            if (weapon == 0 || Wields(session, data, weapon)) result.Add(mod);
         foreach (var buff in session.Buffs)
         {
             if (buff.ExpireMs <= now) continue;
-            var mods = ParsedFor(data, buff.ConfigId);
+            var mods = BuffModifiers(data, buff.ConfigId);
             for (int i = 0; i < buff.PileCount; i++) result.AddRange(mods);
         }
         cache.Signature = signature;
