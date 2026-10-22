@@ -99,6 +99,27 @@ public sealed partial class SkillCombatTests
         Assert.Contains(proc.Dsts, d => d.DstID == monster.Uid && d.Damage > 0);
     }
 
+    // Opening has no proc row: "After casting [Basic Attack], there is a ${1}% Chance to Deals DMG to the enemy an Extra
+    // ${2} times, each dealing PATK * ${3}% + ${4}". The extra hit is the attack's own row with that damage.
+    [ClientDataFact]
+    public async Task OpeningAddsADescribedHitToTheBasicAttack()
+    {
+        await using var alice = await InWorld("Alice");
+        await Gm("alice", "!lvl 99"); await Gm("alice", "!job 5200"); await Teach("alice", 15000);
+        await ChooseProfessionTalent(alice, "alice", 10102103);
+        _app.Services.GetRequiredService<TalentProcs>().Roll = _ => 0;
+        var monster = await Target("alice", stationary: true);
+        await Loop.InvokeAsync(() => { monster.Hp = 1_000_000; return Task.CompletedTask; });
+
+        await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1500001, TargetId = monster.Uid });
+        var accepted = await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser);
+        Assert.Equal(0, accepted.Result);
+        await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser, x => x.SessionId == accepted.SessionId);
+        var extra = await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser,
+            x => x.SkillId == 1500001 && x.SessionId != accepted.SessionId && x.SrcID == Session("alice").Role!.Id);
+        Assert.Contains(extra.Dsts, d => d.DstID == monster.Uid && d.Damage > 0);
+    }
+
     // Meteor Storm leaves a field, so Flame Burst centres on its target point: "After using [Meteor Storm], immediately
     // triggers [Fire Explosion] ... to up to ${2} enemies within a ${1}-meter radius."
     [ClientDataFact]

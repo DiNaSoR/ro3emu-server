@@ -15,11 +15,11 @@ namespace Ro3Emu.Server.Game;
 /// _kScriptLogic carry its damage, and the proc is an extra cast through the ordinary effect path.
 /// <see cref="WhileActive"/> lists the talents whose _kLogicData buff applies while another buff lives ("While [Aura
 /// Blade] is active ..."); SeasonTalentService applies those. A description's skill links (&lt;link="skill/1411801"&gt;)
-/// name the same triggers the rules list. Rules exist for the Knight, Crusader, Priest, Mage and Archer lines and their
-/// later jobs. Not covered yet: the Thief and Merchant lines (no proc row: their damage is only in the description),
-/// counters ("after every N casts"), taking-damage and kill triggers, heals on allies, zones, Cross Thrust (its target
-/// count is a runtime value), Concussive Shield Bash (its _kLogicData names no SkillConfig row) and Shield Bash Echo (no
-/// _kLogicData).
+/// name the same triggers the rules list. Rules exist for every job line's damage, buff and recast procs; the Thief and
+/// Merchant lines have no proc rows, so their hits come from the descriptions. Not covered yet: counters ("after every N
+/// casts"), timed follow-ups ("for ${1} seconds after casting"), taking-damage, kill and Double Attack triggers, heals on
+/// allies, zones, Earth Spike's stun, Cross Thrust (its target count is a runtime value), Concussive Shield Bash (its
+/// _kLogicData names no SkillConfig row) and Shield Bash Echo (no _kLogicData).
 /// </summary>
 public sealed class TalentProcs
 {
@@ -29,7 +29,11 @@ public sealed class TalentProcs
         TurnUndead = 14118, MagnusExorcismus = 14109,
         FireBolt = 12004, LightningBolt = 12005, ColdBolt = 12006, FireBall = 12012, EarthSpike = 12100, JupitelThunder = 12102,
         FrostNova = 12103, MeteorStorm = 12106, StormGust = 12108, GravitationField = 12212,
-        ArrowAttack = 13000, DoubleStrafe = 13003, ArrowShower = 13004, BlitzBeat = 13102, FalconAssault = 13202;
+        ArrowAttack = 13000, DoubleStrafe = 13003, ArrowShower = 13004, BlitzBeat = 13102, FalconAssault = 13202,
+        SonicBlow = 15102, VirusSpread = 15106, Grimtooth = 15109, SoulDestroyer = 15210, MeteorAssault = 15229,
+        CartRevolution = 16006, HammerFall = 16104, HighSpeedCartRam = 16202;
+    // The client's element enum (Lua_GameDefine): None 1, Wind 2, Earth 3, Fire 4, Water 5, Poison 6 ...
+    private const long Neutral = 1, Fire = 4, Poison = 6;
     // BuffConfig._iBuffID of the skills' own buffs, named by BuffConfig._iName.
     private const long AuraBlade = 11201, Parry = 11210, AutoGuard = 11403, Sacrifice = 11501, BattleChant = 11505;
     private const long TwoHandedSword = 3, Mace = 8; // ItemConfig._iSubType
@@ -46,10 +50,15 @@ public sealed class TalentProcs
     /// the BuffConfig row goes on the caster (<paramref name="TargetBuff"/>: on the target) for the _kLogicData value after
     /// it in ms, or <paramref name="BuffSeconds"/> of the description. <paramref name="Active"/>: a buff group that must live.
     /// </summary>
+    /// <remarks><paramref name="Ratio"/>/<paramref name="Flat"/>: no proc row exists, the description gives the hit ("PATK *
+    /// ${4}% + ${5}"), dealt as the triggering row with that damage (SkillConfig.AsDescribedHit) of <paramref name="Element"/>,
+    /// <paramref name="Hits"/> times; <paramref name="HpBelow"/>: only on a target below that HP percentage;
+    /// <paramref name="RandomHit"/> centres the area on a random monster the cast hit.</remarks>
     private sealed record Rule(int[] Groups, bool NormalAttack = false, long Weapon = 0, int? Chance = null, int? Cooldown = null,
         int? Radius = null, int? Count = null, int? Others = null, bool OthersOnly = false, bool RowArea = false, bool Buff = false,
         long Active = 0, bool AroundCaster = false, int Logic = 0, bool Recast = false, bool TargetBuff = false, int? BuffSeconds = null,
-        bool HitTargets = false);
+        bool HitTargets = false, int? Ratio = null, int? Flat = null, int? Hits = null, long Element = Neutral, int? HpBelow = null,
+        bool RandomHit = false);
 
     /// <summary>Talent BuffConfig id -> the buff group that must live for its _kLogicData buff to apply.</summary>
     internal static readonly IReadOnlyDictionary<long, long> WhileActive = new Dictionary<long, long>
@@ -172,6 +181,50 @@ public sealed class TalentProcs
         // Falcon Rush: "When [Falcon Assault] hits an enemy, it deals ... to up to ${2} enemies within a ${1}-meter radius of
         // the target. Internal Cooldown: ${5} seconds."
         [1323601] = new([FalconAssault], Logic: 1, Radius: 0, Count: 1, Cooldown: 4),
+
+        // Thief line: no proc row; the description gives the hit ("Neutral Melee Physical" unless named).
+        // Blade Dance: "After casting [Basic Attack], there is a ${1}% Chance to Deals DMG equal to PATK * ${4}% + ${5} ...
+        // to up to ${3} enemies within a ${2}-meter radius of you. Cooldown: ${6} seconds."
+        [1522301] = new([], NormalAttack: true, Chance: 0, Radius: 1, Count: 2, AroundCaster: true, Ratio: 3, Flat: 4, Cooldown: 5),
+        // Opening: "After casting [Basic Attack], there is a ${1}% Chance to Deals DMG to the enemy an Extra ${2} times, each
+        // dealing PATK * ${3}% + ${4} ... Cooldown: ${5} seconds."
+        [1522401] = new([], NormalAttack: true, Chance: 0, Hits: 1, Ratio: 2, Flat: 3, Cooldown: 4),
+        // Chain Reaction: "After casting [Sonic Blow], there is a ${1}% Chance to Deals DMG equal to PATK * ${4}% + ${5} ...
+        // to up to ${3} enemies within a ${2}-meter radius of you. Cooldown: ${6} seconds."
+        [1522601] = new([SonicBlow], Chance: 0, Radius: 1, Count: 2, AroundCaster: true, Ratio: 3, Flat: 4, Cooldown: 5),
+        // Shadow Fang: "After casting [Grimtooth], there is a ${1}% Chance to Deals DMG equal to PATK * ${4}% + ${5} ... to
+        // up to ${3} enemies within a ${2}-meter radius of the target. Cooldown: ${6} seconds."
+        [1523201] = new([Grimtooth], Chance: 0, Radius: 1, Count: 2, Ratio: 3, Flat: 4, Cooldown: 5),
+        // Poisoned to the Core: "After casting [Virus Spread], deals Extra Neutral melee Physical damage equal to PATK *
+        // ${1}% + ${2} to a single enemy."
+        [1524101] = new([VirusSpread], Ratio: 0, Flat: 1),
+        // Toxic Rampage: "After casting [Virus Spread], deals Poison melee Physical damage equal to PATK * ${3}% + ${4} to
+        // up to ${2} enemies within a ${1}-meter radius of a random target hit."
+        [1524201] = new([VirusSpread], Radius: 0, Count: 1, RandomHit: true, Ratio: 2, Flat: 3, Element: Poison),
+        // Spreading Shockwave: "[Soul Destroyer] ... After casting, deals Neutral melee Physical damage equal to PATK *
+        // ${4}% + ${5} to up to ${3} enemies within a ${2}-meter radius of the target."
+        [1524801] = new([SoulDestroyer], Radius: 1, Count: 2, Ratio: 3, Flat: 4),
+        // Hidden Blade: "After casting [Meteor Assault], deals Neutral melee Physical damage equal to PATK * ${3}% + ${4} to
+        // up to ${2} enemies within a ${1}-meter radius of you."
+        [1525101] = new([MeteorAssault], Radius: 0, Count: 1, AroundCaster: true, Ratio: 2, Flat: 3),
+
+        // Merchant line: no proc row either; "@{1}" counts are runtime values, read as one.
+        // Mammonite: "[Cart Revolution] hits its primary target, triggering [Money Throw] @{1} Extra times and dealing PATK *
+        // ${1}% + ${2} Neutral melee Physical damage. This effect has a ${3}-second Cooldown."
+        [1640201] = new([CartRevolution], Ratio: 0, Flat: 1, Cooldown: 2),
+        // Gunpowder Smash: "After using [Cart Revolution], immediately trigger @{1} instances of [Gunpowder Throw], dealing
+        // Fire melee Physical damage equal to PATK * ${3}% + ${4} to up to ${2} enemies within ${1} meters. This effect has
+        // a ${5}-second Cooldown."
+        [1640301] = new([CartRevolution], Radius: 0, Count: 1, AroundCaster: true, Ratio: 2, Flat: 3, Element: Fire, Cooldown: 4),
+        // Earth Spike: "[Hammer Fall] strikes ${1} enemies within range with [Earth Spike], dealing ... PATK * ${2}% + ${3},
+        // with a ${4}% Chance to inflict [Stun] for ${5} seconds. This effect has a ${6}-second Cooldown."
+        [1642201] = new([HammerFall], HitTargets: true, Count: 0, Ratio: 1, Flat: 2, Cooldown: 5),
+        // Stunning Smash: "[High Speed Cart Ram] performs @{1} Extra [Cart Clash] attacks against targets below ${1}% HP,
+        // dealing PATK*${2}%+${3} ... This effect has a ${4}-second Cooldown."
+        [1646201] = new([HighSpeedCartRam], HpBelow: 0, Ratio: 1, Flat: 2, Cooldown: 3),
+        // Terminate Blast: "[High Speed Cart Ram] triggers [Explosive Strike] an Extra @{1} times when cast, dealing ... PATK
+        // * ${3}% + ${4} to up to ${2} enemies within ${1} meters. This effect has a ${5}-second Cooldown."
+        [1646301] = new([HighSpeedCartRam], Radius: 0, Count: 1, Ratio: 2, Flat: 3, Cooldown: 4),
     };
 
     private readonly GameData _data;
@@ -181,6 +234,7 @@ public sealed class TalentProcs
     private readonly SessionRegistry _sessions;
     private readonly ConditionalWeakTable<GameSession, Dictionary<long, long>> _readyAt = [];
     private readonly Dictionary<long, SkillConfig?> _procRows = [];
+    private readonly Dictionary<(long Row, long Buff), JsonElement> _describedHits = [];
 
     // A test can fix each ten-thousandth roll without changing the production probability.
     internal Func<int, int> Roll { get; set; } = bound => Random.Shared.Next(bound);
@@ -262,11 +316,21 @@ public sealed class TalentProcs
                 ?? (processed.Count == 0 && rule.Radius is int radius
                     ? _combat.MonstersNear(s, action.Request.TargetPos ?? s.Position, (float)Value(description, radius)).FirstOrDefault()
                     : null);
-            if (target == null) continue;
+            if (rule.RandomHit && processed.Count > 0) target = processed[Roll(processed.Count)];
+            if (target == null || target.Hp <= 0) continue;
+            if (rule.HpBelow is int below && target.Hp * 100 >= target.Template.MaxHp * Value(description, below)) continue;
             if (rule.Weapon != 0 && !SkillParameterRules.Wields(s, _data, rule.Weapon)) continue;
             if (rule.Active != 0 && !SkillParameterRules.HasBuffGroup(s, _data, rule.Active)) continue;
             if (rule.Chance is int chance && Roll(10000) >= Value(description, chance) * 100) continue;
             if (!Ready(s, buff, rule.Cooldown is int cooldown ? (long)(Value(description, cooldown) * 1000) : 0)) continue;
+            if (rule.Ratio is int ratio && SkillConfig.Get(_data, cast.Id) is { } trigger)
+            {
+                var hit = DescribedHit(trigger, buff, rule, description, ratio);
+                var targets = Targets(s, rule, description, new SkillConfig(hit), target, processed);
+                int hits = rule.Hits is int count ? Math.Max(1, (int)Value(description, count)) : 1;
+                for (int i = 0; i < hits && targets.Any(m => m.Hp > 0); i++) await _combat.CastExtraAsync(s, hit, targets);
+                continue;
+            }
             if (rule.Recast)
             {
                 await _combat.CastExtraAsync(s, action.Row, Targets(s, rule with { RowArea = true }, description, cast, target, processed));
@@ -285,6 +349,18 @@ public sealed class TalentProcs
             }
             if (ProcRow(id) is not { } row || target.Hp <= 0) continue;
             await _combat.CastExtraAsync(s, row.Row, Targets(s, rule, description, row, target, processed));
+        }
+    }
+
+    /// <summary>The triggering row with the description's damage, once per (row, talent).</summary>
+    private JsonElement DescribedHit(SkillConfig trigger, long buff, Rule rule, string[] description, int ratio)
+    {
+        var key = (trigger.Id, buff);
+        lock (_describedHits)
+        {
+            if (_describedHits.TryGetValue(key, out var hit)) return hit;
+            return _describedHits[key] = trigger.AsDescribedHit((long)(Value(description, ratio) * 100),
+                rule.Flat is int flat ? (long)Value(description, flat) : 0, rule.Element);
         }
     }
 
