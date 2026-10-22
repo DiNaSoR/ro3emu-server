@@ -1,8 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using Romsg;
-using Ro3Emu.Server.Data;
 using Ro3Emu.Server.Data.Config;
 using Ro3Emu.Server.Maps;
 
@@ -59,38 +57,26 @@ public sealed partial class TalentProcs
 
     private readonly ConditionalWeakTable<GameSession, Reaper> _reapers = [];
 
-    private JsonElement TargetCountRow(GameSession s, JsonElement row, int count)
+    private static JsonElement TargetCountRow(GameSession s, JsonElement row, int count)
     {
+        var skill = new SkillConfig(row);
         // Holy Cross Exorciser's mode row: "When [Magnus Exorcismus] hits a single enemy" its damage pairs 2 and 3 apply
         // (Magnus_ExorcismusBD [500,650,1000,1300] / [24,24,110,110]).
-        if (count == 1 && new SkillConfig(row).ScriptLogic == "Magnus_ExorcismusBD") return SingleTargetPairs(row);
+        if (count == 1 && skill.ScriptLogic == "Magnus_ExorcismusBD" && skill.DamageParam1 is [_, _, var ratio, var ratio2]
+            && skill.DamageParam2 is [_, _, var flat, var flat2])
+            return skill.WithDamage([ratio, ratio2], [flat, flat2]);
         if (s.TalentProcBuffs.Count == 0) return row;
-        long group = GameData.Int(row, "_iSkillID");
         foreach (var (buff, description) in s.TalentProcBuffs)
         {
-            if (!PerEnemyHit.TryGetValue(buff, out var rule) || rule.Group != group) continue;
+            if (!PerEnemyHit.TryGetValue(buff, out var rule) || rule.Group != skill.SkillId) continue;
             double bonus = Math.Min(Value(description, 0) * count, Value(description, 1));
             if (bonus <= 0) return row;
-            var node = JsonNode.Parse(row.GetRawText())!.AsObject();
-            foreach (string field in rule.Multiplier ? ["_kDamageParam1", "_kDamageParam2"] : new[] { "_kDamageParam1" })
-                if (node[field] is JsonArray values)
-                    for (int i = 0; i < values.Count; i++)
-                    {
-                        double value = GameData.Number(JsonSerializer.SerializeToElement(values[i])) ?? 0;
-                        values[i] = (long)Math.Round(rule.Multiplier ? value * (1 + bonus / 100) : value + bonus * 100);
-                    }
-            return JsonSerializer.SerializeToElement(node);
+            return rule.Multiplier
+                ? skill.WithDamage([.. skill.DamageParam1.Select(v => (long)Math.Round(v * (1 + bonus / 100)))],
+                    [.. skill.DamageParam2.Select(v => (long)Math.Round(v * (1 + bonus / 100)))])
+                : skill.WithDamage([.. skill.DamageParam1.Select(v => v + (long)Math.Round(bonus * 100))], skill.DamageParam2);
         }
         return row;
-    }
-
-    private static JsonElement SingleTargetPairs(JsonElement row)
-    {
-        var node = JsonNode.Parse(row.GetRawText())!.AsObject();
-        foreach (string field in new[] { "_kDamageParam1", "_kDamageParam2" })
-            if (node[field] is JsonArray { Count: >= 4 } values)
-                node[field] = new JsonArray(values[2]!.DeepClone(), values[3]!.DeepClone());
-        return JsonSerializer.SerializeToElement(node);
     }
 
     private async Task OnTakenAsync(MonsterUnit attacker, GameSession s, long damage)
@@ -134,7 +120,7 @@ public sealed partial class TalentProcs
 
     private async Task OnFieldEndedAsync(GameSession s, SkillObject field)
     {
-        if (s.Role == null || GameData.Int(field.Cast.Row, "_iSkillID") != GravitationField
+        if (s.Role == null || new SkillConfig(field.Cast.Row).SkillId != GravitationField
             || Talent(s, GravityTrap) is not { } description) return;
         foreach (var monster in _combat.MonstersNear(s, field.Pos, field.Radius))
             await _buffs.ShowOnUnitAsync(monster, (int)Immobilize, (int)(Value(description, 0) * 1000), s.Role.Id);

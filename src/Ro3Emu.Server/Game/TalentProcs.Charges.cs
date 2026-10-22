@@ -70,7 +70,7 @@ public sealed partial class TalentProcs
         var state = _charges.GetOrCreateValue(s);
         int group = (int)cast.SkillId;
         long now = MonsterService.NowMs;
-        var target = processed.FirstOrDefault(m => m.Uid == action.Request.TargetId) ?? processed.FirstOrDefault();
+        var target = processed.FirstOrDefault(m => m.Uid == action.Request.TargetId) ?? (processed.Count > 0 ? processed[0] : null);
         foreach (var (buff, description) in s.TalentProcBuffs)
         {
             if (Charges.TryGetValue(buff, out var charge)) await ChargeAsync(s, state, buff, charge, description, group);

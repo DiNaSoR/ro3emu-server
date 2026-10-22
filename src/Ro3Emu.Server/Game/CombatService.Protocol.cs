@@ -2,6 +2,7 @@ using System.Text.Json;
 using Google.Protobuf;
 using Romsg;
 using Ro3Emu.Server.Data;
+using Ro3Emu.Server.Data.Config;
 using Ro3Emu.Server.Maps;
 
 namespace Ro3Emu.Server.Game;
@@ -86,7 +87,7 @@ public sealed partial class CombatService
     {
         var result = new List<SkillParameterRules.Modifier>();
         foreach (var row in PassiveRows(session))
-            result.AddRange(SkillParameterRules.BuffModifiers(_data, (int)GameData.Int(row, "_iID")));
+            result.AddRange(SkillParameterRules.BuffModifiers(_data, (int)new SkillConfig(row).Id));
         return result;
     }
 

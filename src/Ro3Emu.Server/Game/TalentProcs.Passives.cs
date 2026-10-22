@@ -31,8 +31,8 @@ public sealed partial class TalentProcs
     private async Task PassiveProcsAsync(GameSession s, ActiveSkillCast action, SkillConfig cast, IReadOnlyList<MonsterUnit> processed,
         SkillHitInfo hit)
     {
-        if (s.Progress == null || (processed.FirstOrDefault(m => m.Uid == action.Request.TargetId) ?? processed.FirstOrDefault()) is not { } target)
-            return;
+        if (s.Progress == null || (processed.FirstOrDefault(m => m.Uid == action.Request.TargetId) ?? (processed.Count > 0 ? processed[0] : null))
+            is not { } target) return;
         if (cast.IsNormalAtk == 1)
         {
             await DoubleAttackAsync(s, cast, target);

@@ -185,7 +185,7 @@ internal static class SkillParameterRules
     {
         var mods = Active(session, data);
         if (mods.Count == 0) return 0;
-        int group = (int)GameData.Int(row, "_iSkillID");
+        int group = (int)new SkillConfig(row).SkillId;
         int[]? tags = null;
         long sum = 0;
         foreach (var mod in mods)

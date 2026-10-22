@@ -367,25 +367,13 @@ public sealed partial class CombatService
         var unit = new SkillObject
         {
             Uid = ++_skillObjectIds, SceneEntry = s.SceneEntry, InstanceId = s.InstanceId, RuntimeMap = s.RuntimeMap,
-            OwnerSession = s, OwnerId = s.Role.Id, NpcId = npc, EntityType = (int)GameData.Int(npcRow, "_iNPCType"), Cast = action,
+            OwnerSession = s, OwnerId = s.Role.Id, NpcId = npc, EntityType = (int)new NPCConfig(npcRow).NPCType, Cast = action,
             X = center.X, Y = center.Y, Z = center.Z, Face = s.Face, ExpiresMs = Now + durationMs,
             IntervalMs = Math.Max(50, intervalMs), NextTickMs = Now + intervalMs,
-            Radius = (float)(Numbers(row, "_kRange").FirstOrDefault(150) / 100),
+            Radius = (new SkillConfig(row).Range is [var range, ..] ? range : 150) / 100f,
         };
         s.SkillObjects.Add(unit);
         await _world.AddUnitAsync(unit);
-    }
-
-    /// <summary>Sets a skill group's remaining cooldown and tells the owner (31113 like a cast's).</summary>
-    internal async Task SetCooldownAsync(GameSession s, int group, long remainingMs)
-    {
-        if (s.Role == null) return;
-        long now = Now, end = now + Math.Max(0, remainingMs);
-        s.SkillCds[group] = end;
-        s.SkillModeCds[(group, 0)] = end;
-        var notice = new SkillCdNotify { Uuid = s.Role.Id };
-        notice.Infos.Add(new SkillCdInfo { SkillId = group, CdStartTimestampMs = now, CdEndTimestampMs = end });
-        await s.SendGameAsync(SkillCdUpdate, notice);
     }
 
     /// <summary>
