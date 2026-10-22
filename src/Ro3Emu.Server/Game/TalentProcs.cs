@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using Romsg;
 using Ro3Emu.Server.Data;
 using Ro3Emu.Server.Data.Config;
 using Ro3Emu.Server.Maps;
@@ -16,12 +17,13 @@ namespace Ro3Emu.Server.Game;
 /// <see cref="WhileActive"/> lists the talents whose _kLogicData buff applies while another buff lives ("While [Aura
 /// Blade] is active ..."); SeasonTalentService applies those. A description's skill links (&lt;link="skill/1411801"&gt;)
 /// name the same triggers the rules list. Rules exist for every job line's damage, buff and recast procs; the Thief and
-/// Merchant lines have no proc rows, so their hits come from the descriptions. Not covered yet: counters ("after every N
-/// casts"), timed follow-ups ("for ${1} seconds after casting"), taking-damage, kill and Double Attack triggers, heals on
-/// allies, zones, Earth Spike's stun, Cross Thrust (its target count is a runtime value), Concussive Shield Bash (its
-/// _kLogicData names no SkillConfig row) and Shield Bash Echo (no _kLogicData).
+/// Merchant lines have no proc rows, so their hits come from the descriptions. The base passives the talents build on
+/// (Double Attack, Deadly Poison's Venom, Advanced Katar Mastery) are in TalentProcs.Passives, counters and next-cast
+/// charges in TalentProcs.Charges, and the reactions to damage taken, kills, Gravitation Field's end, heals and the count of enemies
+/// hit in TalentProcs.Reactions. Not executed: Shield Bash Echo (no value for its new cooldown), Falcon's Might (op 20)
+/// and Scouting (a scope-1 BuffLogicData tuple).
 /// </summary>
-public sealed class TalentProcs
+public sealed partial class TalentProcs
 {
     // SkillConfig._iSkillID of the triggering casts, named by SkillConfig._iName.
     private const int Pierce = 11120, BowlingBash = 11104, HolyCross = 11411, GrandCross = 11412, ShieldBoomerang = 11418,
@@ -31,9 +33,10 @@ public sealed class TalentProcs
         FrostNova = 12103, MeteorStorm = 12106, StormGust = 12108, GravitationField = 12212,
         ArrowAttack = 13000, DoubleStrafe = 13003, ArrowShower = 13004, BlitzBeat = 13102, FalconAssault = 13202,
         SonicBlow = 15102, VirusSpread = 15106, Grimtooth = 15109, SoulDestroyer = 15210, MeteorAssault = 15229,
-        CartRevolution = 16006, HammerFall = 16104, HighSpeedCartRam = 16202;
+        CartRevolution = 16006, HammerFall = 16104, HighSpeedCartRam = 16202, Smite = 11409, Basilica = 14206;
     // The client's element enum (Lua_GameDefine): None 1, Wind 2, Earth 3, Fire 4, Water 5, Poison 6 ...
     private const long Neutral = 1, Fire = 4, Poison = 6;
+    private const long Stun = 901601; // BuffConfig "Stun" (Momentum-Breaking Hammer's _kLogicData)
     // BuffConfig._iBuffID of the skills' own buffs, named by BuffConfig._iName.
     private const long AuraBlade = 11201, Parry = 11210, AutoGuard = 11403, Sacrifice = 11501, BattleChant = 11505,
         MysticalAmplification = 12201;
@@ -84,12 +87,14 @@ public sealed class TalentProcs
     /// <remarks><paramref name="Ratio"/>/<paramref name="Flat"/>: no proc row exists, the description gives the hit ("PATK *
     /// ${4}% + ${5}"), dealt as the triggering row with that damage (SkillConfig.AsDescribedHit) of <paramref name="Element"/>,
     /// <paramref name="Hits"/> times; <paramref name="HpBelow"/>: only on a target below that HP percentage;
-    /// <paramref name="RandomHit"/> centres the area on a random monster the cast hit.</remarks>
+    /// <paramref name="RandomHit"/> centres the area on a random monster the cast hit (without an area: hits that monster);
+    /// <paramref name="Status"/> lands on each monster the described hit struck with the <paramref name="StatusChance"/>% of
+    /// the description for its <paramref name="StatusSeconds"/>.</remarks>
     private sealed record Rule(int[] Groups, bool NormalAttack = false, long Weapon = 0, int? Chance = null, int? Cooldown = null,
         int? Radius = null, int? Count = null, int? Others = null, bool OthersOnly = false, bool RowArea = false, bool Buff = false,
         long Active = 0, bool AroundCaster = false, int Logic = 0, bool Recast = false, bool TargetBuff = false, int? BuffSeconds = null,
         bool HitTargets = false, int? Ratio = null, int? Flat = null, int? Hits = null, long Element = Neutral, int? HpBelow = null,
-        bool RandomHit = false);
+        bool RandomHit = false, long Status = 0, int? StatusChance = null, int? StatusSeconds = null);
 
     /// <summary>Talent BuffConfig id -> the buff group that must live for its _kLogicData buff to apply.</summary>
     internal static readonly IReadOnlyDictionary<long, long> WhileActive = new Dictionary<long, long>
@@ -144,6 +149,13 @@ public sealed class TalentProcs
         [1151701] = new([GloriaDomini]),
         // Shield Pursuit: "[Rapid Smiting] has a ${1}% Chance to Deals DMG to the target an Extra @{1} times ..."
         [1155301] = new([RapidSmiting], Chance: 0),
+        // Concussive Shield Bash: "When [Smite] is cast, it additionally deals PATK*${3}%+${4} Neutral melee Physical damage
+        // to a total of ${2} Other enemies within ${1} meters of the target. Internal Cooldown: ${5} seconds." (Its
+        // _kLogicData buff switches Smite to SmiteBd, whose second damage pair is that 20% + 50.)
+        [1153001] = new([Smite], Radius: 0, Others: 1, OthersOnly: true, Ratio: 2, Flat: 3, Cooldown: 4),
+        // Cross Thrust: "When [Grand Cross] is cast, triggers [Cross Thrust] on @{1} random targets within the area"; the
+        // runtime count is read as one.
+        [1151301] = new([GrandCross], RandomHit: true),
 
         // Priest line: _kLogicData is [chance in basis points, proc row]; the description's chance, when it has one, is
         // the same value.
@@ -165,6 +177,10 @@ public sealed class TalentProcs
         // Holy Light Bludgeon: "When using [Basic Attack] with a Mace, ... to the enemy and up to ${2} enemies within a
         // ${1}-meter radius. Internal Cooldown: ${5} seconds."
         [1422701] = new([], NormalAttack: true, Weapon: Mace, Logic: 1, Radius: 0, Others: 1, Cooldown: 4),
+        // Divine Judgment, Shrined Judex: "While [Basilica] is active, [Holy Light] and [Turn Undead]'s percentage damage
+        // multipliers increase ..."; _kLogicData [Basilica [Triggered Effect], 60000 ms] (its "Cast Completion Detection").
+        [1423401] = new([Basilica], Buff: true),
+        [1423601] = new([Basilica], Buff: true),
 
         // Mage line (the descriptions are the _kOtherDesc buffs').
         // Elemental Pursuit: "After [Fire Bolt], [Cold Bolt], [Lightning Bolt], or [Earth Spike] hits, it triggers
@@ -249,7 +265,8 @@ public sealed class TalentProcs
         [1640301] = new([CartRevolution], Radius: 0, Count: 1, AroundCaster: true, Ratio: 2, Flat: 3, Element: Fire, Cooldown: 4),
         // Earth Spike: "[Hammer Fall] strikes ${1} enemies within range with [Earth Spike], dealing ... PATK * ${2}% + ${3},
         // with a ${4}% Chance to inflict [Stun] for ${5} seconds. This effect has a ${6}-second Cooldown."
-        [1642201] = new([HammerFall], HitTargets: true, Count: 0, Ratio: 1, Flat: 2, Cooldown: 5),
+        [1642201] = new([HammerFall], HitTargets: true, Count: 0, Ratio: 1, Flat: 2, Cooldown: 5, Status: Stun, StatusChance: 3,
+            StatusSeconds: 4),
         // Stunning Smash: "[High Speed Cart Ram] performs @{1} Extra [Cart Clash] attacks against targets below ${1}% HP,
         // dealing PATK*${2}%+${3} ... This effect has a ${4}-second Cooldown."
         [1646201] = new([HighSpeedCartRam], HpBelow: 0, Ratio: 1, Flat: 2, Cooldown: 3),
@@ -263,6 +280,8 @@ public sealed class TalentProcs
     private readonly BuffService _buffs;
     private readonly CharacterService _character;
     private readonly SessionRegistry _sessions;
+    private readonly SkillService _skills;
+    private readonly GameLoop _loop;
     private readonly ConditionalWeakTable<GameSession, Dictionary<long, long>> _readyAt = [];
     private readonly Dictionary<long, SkillConfig?> _procRows = [];
     private readonly Dictionary<(long Row, long Buff), JsonElement> _describedHits = [];
@@ -270,17 +289,26 @@ public sealed class TalentProcs
     // A test can fix each ten-thousandth roll without changing the production probability.
     internal Func<int, int> Roll { get; set; } = bound => Random.Shared.Next(bound);
 
-    public TalentProcs(GameData data, CombatService combat, BuffService buffs, CharacterService character, SessionRegistry sessions)
+    public TalentProcs(GameData data, CombatService combat, BuffService buffs, CharacterService character, SessionRegistry sessions,
+        SkillService skills, GameLoop loop)
     {
         _data = data;
         _combat = combat;
         _buffs = buffs;
         _character = character;
         _sessions = sessions;
+        _skills = skills;
+        _loop = loop;
         buffs.SourceAttributes = BuffAttributes;
         combat.SkillBuffAllowed = SkillBuffAllowed;
         combat.CastResolved.Add(OnCastResolvedAsync);
         buffs.Changed.Add(OnBuffsChangedAsync);
+        combat.TargetCountRow = TargetCountRow;
+        combat.TakenAsync.Add(OnTakenAsync);
+        combat.Killed.Add(OnKilledAsync);
+        combat.PlayerDied.Add(OnDiedAsync);
+        combat.PlayerKilled.Add(OnPlayerKilledAsync);
+        character.ExtraAttributes.Add(SoulReaperAttributes);
     }
 
     /// <summary>
@@ -346,10 +374,15 @@ public sealed class TalentProcs
     /// After a player's cast: <paramref name="processed"/> are the monsters it hit. A field cast (Meteor Storm, Storm Gust)
     /// resolves later, so it comes with none and its procs centre on the cast's target point.
     /// </summary>
-    private async Task OnCastResolvedAsync(GameSession s, ActiveSkillCast action, IReadOnlyList<MonsterUnit> processed)
+    private async Task OnCastResolvedAsync(GameSession s, ActiveSkillCast action, IReadOnlyList<MonsterUnit> processed, SkillHitInfo hit)
     {
-        if (s.TalentProcBuffs.Count == 0 || s.Role == null) return;
+        if (s.Role == null) return;
         var cast = new SkillConfig(action.Row);
+        await PassiveProcsAsync(s, action, cast, processed, hit);
+        if (s.TalentProcBuffs.Count == 0) return;
+        await ChargesAsync(s, action, cast, processed);
+        await HealProcsAsync(s, action, cast, hit);
+        GravityTrap(s, action, cast);
         foreach (var (buff, description) in s.TalentProcBuffs)
         {
             if (!Rules.TryGetValue(buff, out var rule)) continue;
@@ -362,18 +395,29 @@ public sealed class TalentProcs
                 ?? (rule.AroundCaster && rule.Radius is int around
                     ? _combat.MonstersNear(s, s.Position, (float)Value(description, around)).FirstOrDefault() : null);
             if (rule.RandomHit && processed.Count > 0) target = processed[Roll(processed.Count)];
-            if (target == null || target.Hp <= 0) continue;
-            if (rule.HpBelow is int below && target.Hp * 100 >= target.Template.MaxHp * Value(description, below)) continue;
+            // A buff on the caster needs no living target: Basilica hits no monster.
+            bool selfBuff = rule is { Buff: true, TargetBuff: false };
+            if (!selfBuff && target is not { Hp: > 0 }) continue;
+            if (rule.HpBelow is int below && target is { } weak && weak.Hp * 100 >= weak.Template.MaxHp * Value(description, below)) continue;
             if (rule.Weapon != 0 && !SkillParameterRules.Wields(s, _data, rule.Weapon)) continue;
             if (rule.Active != 0 && !SkillParameterRules.HasBuffGroup(s, _data, rule.Active)) continue;
             if (rule.Chance is int chance && Roll(10000) >= Value(description, chance) * 100) continue;
             if (!Ready(s, buff, rule.Cooldown is int cooldown ? (long)(Value(description, cooldown) * 1000) : 0)) continue;
+            if (target == null || rule.Buff)
+            {
+                await AddProcBuffAsync(s, buff, rule, description, target);
+                continue;
+            }
             if (rule.Ratio is int ratio && SkillConfig.Get(_data, cast.Id) is { } trigger)
             {
-                var hit = DescribedHit(trigger, buff, rule, description, ratio);
-                var targets = Targets(s, rule, description, new SkillConfig(hit), target, processed);
+                var described = DescribedHit(trigger, buff, rule, description, ratio);
+                var targets = Targets(s, rule, description, new SkillConfig(described), target, processed);
                 int hits = rule.Hits is int count ? Math.Max(1, (int)Value(description, count)) : 1;
-                for (int i = 0; i < hits && targets.Any(m => m.Hp > 0); i++) await _combat.CastExtraAsync(s, hit, targets);
+                for (int i = 0; i < hits && targets.Any(m => m.Hp > 0); i++) await _combat.CastExtraAsync(s, described, targets);
+                if (rule.Status != 0 && rule.StatusChance is int statusChance && rule.StatusSeconds is int statusSeconds)
+                    foreach (var struck in targets)
+                        if (struck.Hp > 0 && Roll(10000) < Value(description, statusChance) * 100)
+                            await _buffs.ShowOnUnitAsync(struck, (int)rule.Status, (int)(Value(description, statusSeconds) * 1000), s.Role.Id);
                 continue;
             }
             if (rule.Recast)
@@ -382,32 +426,28 @@ public sealed class TalentProcs
                 continue;
             }
             if (BuffConfig.Get(_data, buff)?.LogicData is not { } logic || rule.Logic >= logic.Length) continue;
-            long id = logic[rule.Logic];
-            if (rule.Buff)
-            {
-                if (BuffConfig.Get(_data, id) == null) continue;
-                int ms = rule.BuffSeconds is int seconds ? (int)(Value(description, seconds) * 1000)
-                    : rule.Logic + 1 < logic.Length ? (int)logic[rule.Logic + 1] : 0;
-                if (rule.TargetBuff) await _buffs.ShowOnUnitAsync(target, (int)id, ms, s.Role.Id);
-                else await _buffs.AddAsync(s, (int)id, ms, s.Role.Id);
-                continue;
-            }
-            if (ProcRow(id) is not { } row || target.Hp <= 0) continue;
+            if (ProcRow(logic[rule.Logic]) is not { } row || target.Hp <= 0) continue;
             await _combat.CastExtraAsync(s, row.Row, Targets(s, rule, description, row, target, processed));
         }
     }
 
-    /// <summary>The triggering row with the description's damage, once per (row, talent).</summary>
-    private JsonElement DescribedHit(SkillConfig trigger, long buff, Rule rule, string[] description, int ratio)
+    /// <summary>A Buff rule: the _kLogicData BuffConfig row on the caster (or the target) for the value after it in ms, or
+    /// the description's seconds.</summary>
+    private async Task AddProcBuffAsync(GameSession s, long buff, Rule rule, string[] description, MonsterUnit? target)
     {
-        var key = (trigger.Id, buff);
-        lock (_describedHits)
-        {
-            if (_describedHits.TryGetValue(key, out var hit)) return hit;
-            return _describedHits[key] = trigger.AsDescribedHit((long)(Value(description, ratio) * 100),
-                rule.Flat is int flat ? (long)Value(description, flat) : 0, rule.Element);
-        }
+        if (!rule.Buff || BuffConfig.Get(_data, buff)?.LogicData is not { } logic || rule.Logic >= logic.Length) return;
+        long id = logic[rule.Logic];
+        if (BuffConfig.Get(_data, id) == null) return;
+        int ms = rule.BuffSeconds is int seconds ? (int)(Value(description, seconds) * 1000)
+            : rule.Logic + 1 < logic.Length ? (int)logic[rule.Logic + 1] : 0;
+        if (!rule.TargetBuff) await _buffs.AddAsync(s, (int)id, ms, s.Role!.Id);
+        else if (target != null) await _buffs.ShowOnUnitAsync(target, (int)id, ms, s.Role!.Id);
     }
+
+    /// <summary>The triggering row with the description's damage, once per (row, talent).</summary>
+    private JsonElement DescribedHit(SkillConfig trigger, long buff, Rule rule, string[] description, int ratio) =>
+        DescribedHit(trigger, buff, (long)(Value(description, ratio) * 100), rule.Flat is int flat ? (long)Value(description, flat) : 0,
+            rule.Element);
 
     /// <summary>_kLogicData's first value: a SkillConfig row, or a skill group (Double Counter's 11127) at its level 1.</summary>
     private SkillConfig? ProcRow(long id)

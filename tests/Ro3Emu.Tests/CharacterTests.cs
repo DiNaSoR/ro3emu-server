@@ -504,10 +504,10 @@ public sealed class CharacterTests : IAsyncLifetime
         Assert.Equal((3, 42L), (rank.Rankid, (long)rank.Itemuid));
     }
 
-    // A Novice's saved bar holds the Novice normal attack. After a job change it leaves the bar (a later career attacks
-    // with atkSkillId), or the client keeps casting the Novice's 1000001 instead of the career's.
+    // A Novice's saved bar holds the Novice normal attack. After a job change its slot shows the career's own (an Archer's
+    // 1300001), or the client keeps casting the Novice's 1000001 instead of the career's.
     [ClientDataFact]
-    public async Task ASavedNoviceAttackSlotLeavesTheBarAfterAJobChange()
+    public async Task ASavedNoviceAttackSlotBecomesTheCareersAttackAfterAJobChange()
     {
         await using var alice = await InWorld("Alice");
         await _app.Services.GetRequiredService<GameLoop>().InvokeAsync(() =>
@@ -525,6 +525,7 @@ public sealed class CharacterTests : IAsyncLifetime
         var skills = await Next(alice, SkillService.SkillDataSync, DBSkillDataIncrement.Parser, m => m.SyncAllMark && m.CurrentAtkSkillId == 1300001);
         Assert.Equal(1300001, skills.SkillWheel.All.AtkSkillId); // JobConfig 3100 _kSkillNormalID
         Assert.DoesNotContain(skills.SkillWheel.All.WhellSkills.Values, slot => slot.SkillConfigId == 1000001);
+        Assert.Equal(1300001, skills.SkillWheel.All.WhellSkills[1].SkillConfigId);
     }
 
     [ClientDataFact]

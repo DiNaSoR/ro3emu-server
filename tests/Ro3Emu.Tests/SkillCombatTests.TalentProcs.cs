@@ -11,9 +11,11 @@ public sealed partial class SkillCombatTests
 {
     // Talent tree 10102 (a node's effect depends on the job). Knight: gate 10102003, Pierce Enhance 10102101 > Rapid Pierce
     // 10102102, Swift Sword 10102105 > Double Counter 10102107. Wizard: 10102103 Elemental Pursuit, 10102126 Flame Burst.
-    // The tree opens at a total talent level of 40.
+    // The tree opens at a total talent level of 40. An option of a later profession tree (10103 ...) also maxes the earlier
+    // trees' type-1 nodes.
     private async Task ChooseProfessionTalent(BotClient bot, string name, int option)
     {
+        long optionTree = option / 1000;
         await Gm(name, "!quest done 10101170");
         await Gm(name, "!quest done 10103160");
         var data = _app.Services.GetRequiredService<GameData>();
@@ -24,7 +26,7 @@ public sealed partial class SkillCombatTests
             foreach (var row in data.Table("SeasonTalentConfig").Values)
             {
                 long tree = GameData.Int(row, "_iTalentTreeID");
-                if ((tree == 10101 || tree == 10102 && GameData.Int(row, "_iType") == 1)
+                if ((tree == 10101 || tree >= 10102 && tree <= optionTree && GameData.Int(row, "_iType") == 1)
                     && plan.TalentNodes.TryGetValue(GameData.Int(row, "_iId"), out var node))
                     node.CurrentLevel = (int)GameData.Int(row, "_iMaxLevel");
             }
