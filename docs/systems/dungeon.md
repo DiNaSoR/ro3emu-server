@@ -96,8 +96,14 @@ original-server encounter parity:
 8. Reward balances are keyed by group, boss-family tuple and difficulty. Refresh type 1 is daily; type 2 is weekly
    using `[weekday,hour]`, local server time (the shipped `[1,5]` means Monday 05:00). A new balance gets one configured
    increment, and later periods accumulate increments up to the configured cap. No allowance is spent on entry.
-9. A first personal clear grants the same configured personal reward without spending a recurring balance. The
-   independent first-pass state changes directly to Finish=2 after automatic settlement; no separate bonus is invented.
+9. A first personal clear grants the same configured personal reward without spending a recurring balance.
+   Separately, the boss's first-clear reward (`TenGameplayBossConfig._iPartAward`, MultiverseGroupConfig ->
+   AwardConfig) is paid by claim: 5062 `isFirst` is 1 (Complete) once the boss is cleared and unpaid, and 82587 pays it,
+   rolled once, in the commit that marks it paid (`State.FirstPassPaid`); `isFirst` is then 2 (Finish). Claiming a Hard
+   boss also pays the Normal boss in the same `_kBoss` slot when that one is still unpaid ("you will directly Claim that
+   Boss's Normal First Clear Rewards", Phantom Realm rules). A boss with `_iPartAward` 0 shows Finish once cleared.
+   Paying by claim instead of at settlement (82584 `firstPassAward`), and offering it to roles cleared earlier, is the
+   maintainer's choice *(inferred: the client supports both)*. The paid flags reset with the season, as the records do.
 10. Normal spends its own extra balance first, then an unlocked same-type Hard balance, paying the selected Normal
     boss's reward. When Lua's same-type lookup has multiple Hard candidates, the lowest config id wins.
 11. Team-boss world loot is suppressed because the personal award is paid with its allowance. Story results report
@@ -280,14 +286,14 @@ Not implemented or unqualified:
 - Exported team-boss identity and scene are used, but boss phases, scripted waves/delays, mechanics and task scores
   are not recovered from UI phase descriptions. The team test qualifies a basic boss combat loop, not its encounter.
 - Tactical-team changes: a run keeps its preformed squad (`DungeonService.SendRosterAsync`); there is no reorganization.
-- The first-pass award (`_iPartAward`, claimed with 82587) is not mapped: 82587 refuses with RewardMissing. Auction
-  lots come only from the boss's configured `_iGuildAward` roll; `_iPartAward` and preview items never become lots.
+- Auction lots come only from the boss's configured `_iGuildAward` roll; `_iPartAward` and preview items never become
+  lots.
 - 30123 belongs to Dragon Island and 30132 to Dragon Island/LeisureForty client paths, so ordinary dungeons do not
   emit those mode-specific pushes. The 30126 alias/scoring formula is unverified; no fabricated scoring push is sent.
 - Full client UI behavior, especially empty auction/first-pass repeated fields in 82584. This has not been checked
   in the original client; protobuf/wire tests do not prove screen rendering.
 
-Tests (`DungeonTests`, `TowerTests`, `TowerShopTests`):
+Tests (`DungeonTests`, `TowerTests`, `TowerShopTests`, `FirstPassAwardTests`):
 
 - The revive case moves the player with the authoritative in-map teleport before its wire kill; the server rejects
   a 33 m walk immediately after a revive as a speed violation.

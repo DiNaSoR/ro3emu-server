@@ -88,7 +88,10 @@ public static partial class EconomySnapshotReader
     // receipt that also writes the timed_battle state and marks the row delivered.
     // Field Bonus Time: role.wild_afk WildAfkService.State.PartyAutoBattleSeconds holds party auto-battle seconds not yet
     // added to Connect Quest 106014. A counter, no balance and no asset: the quest's only effect is friend Intimacy.
-    public const string ExpectedFormatManifestHash = "426A27F6BDF013BC3CE96A102485281DB26525FA539F93DB744383AEE7732DB4";
+    // First-clear rewards: role.dungeons DungeonService.State.FirstPassPaid names the bosses whose _iPartAward was paid;
+    // once-only markers, no balance and no asset (the goods are paid by the dungeon/first-pass-award receipt that writes
+    // the marker).
+    public const string ExpectedFormatManifestHash = "65D823A1FF87461D6624C4CF99BAAFA87653C59A728E352B07AD3F8ED2631FB6";
     public static string FormatManifestHash => State.FormatManifestHash;
 
     private sealed partial class State
