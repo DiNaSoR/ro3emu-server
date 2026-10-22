@@ -16,42 +16,55 @@ public sealed class FlyWingSpotTests : IDisposable
     public void Dispose() => Directory.Delete(_dir, true);
 
     [Fact]
-    public void SpotsOnGroundCutOffFromTheArrivalsAreLeftOut()
+    public async Task SpotsOnGroundCutOffFromTheArrivalsAreLeftOut()
     {
         // x 0-7 is the play area; x 8 is a wall; x 9-19 is a walkable strip behind it, like Payon Forest's north edge.
         var nav = Grid(20, 10, (x, _) => x == 8 ? null : 0f);
         var map = Map(nav, new MapPoint(2, 0, 2, 0), new MapPoint(5, 0, 5, 0), new MapPoint(15, 0, 5, 0));
+        Assert.Equal([new MapPoint(5, 0, 5, 0)], await map.WarmRandomSpots());
+        Assert.Equal([new MapPoint(5, 0, 5, 0)], map.RandomSpots);
+    }
+
+    /// <summary>#274: the flood fill runs off the game loop; until it has finished every walkable spot is used.</summary>
+    [Fact]
+    public async Task BeforeTheFloodFillFinishesEveryWalkableSpotCounts()
+    {
+        var nav = Grid(20, 10, (x, _) => x == 8 ? null : 0f);
+        var map = Map(nav, new MapPoint(2, 0, 2, 0), new MapPoint(5, 0, 5, 0), new MapPoint(15, 0, 5, 0), new MapPoint(8, 0, 5, 0));
+        Assert.Equal([new MapPoint(5, 0, 5, 0), new MapPoint(15, 0, 5, 0)], map.RandomSpots);
+        Assert.Same(map.WarmRandomSpots(), map.WarmRandomSpots()); // started once
+        await map.WarmRandomSpots();
         Assert.Equal([new MapPoint(5, 0, 5, 0)], map.RandomSpots);
     }
 
     [Fact]
-    public void ACliffTallerThanAStepCutsTheGroundOff()
+    public async Task ACliffTallerThanAStepCutsTheGroundOff()
     {
         // The strip is walkable and touches the play area, but 3 m up: more than the 2 m a walk can climb.
         var nav = Grid(20, 10, (x, _) => x < 10 ? 0f : 3f);
         var map = Map(nav, new MapPoint(2, 0, 2, 0), new MapPoint(5, 0, 5, 0), new MapPoint(15, 3, 5, 0));
-        Assert.Equal([new MapPoint(5, 0, 5, 0)], map.RandomSpots);
+        Assert.Equal([new MapPoint(5, 0, 5, 0)], await map.WarmRandomSpots());
 
         // A slope of 1 m steps joins them.
         var slope = Map(Grid(20, 10, (x, _) => x < 10 ? 0f : Math.Min(3f, x - 9)), new MapPoint(2, 0, 2, 0),
             new MapPoint(5, 0, 5, 0), new MapPoint(15, 3, 5, 0));
-        Assert.Equal(2, slope.RandomSpots.Count);
+        Assert.Equal(2, (await slope.WarmRandomSpots()).Count);
     }
 
     [Fact]
-    public void WithoutAnArrivalOnWalkableGroundEverySpotCounts()
+    public async Task WithoutAnArrivalOnWalkableGroundEverySpotCounts()
     {
         var nav = Grid(20, 10, (x, _) => x == 8 ? null : 0f);
         var map = Map(nav, new MapPoint(8, 0, 2, 0), new MapPoint(5, 0, 5, 0), new MapPoint(15, 0, 5, 0));
-        Assert.Equal(2, map.RandomSpots.Count);
+        Assert.Equal(2, (await map.WarmRandomSpots()).Count);
     }
 
     [ClientDataFact]
-    public void PayonForestNeverLandsOnItsNorthernEdge()
+    public async Task PayonForestNeverLandsOnItsNorthernEdge()
     {
         var options = Options.Create(new ServerOptions { GameDataDir = Path.Combine(ClientData.RepoRoot, "data") });
         var world = new WorldData(options, new GameData(options, NullLogger<GameData>.Instance), NullLogger<WorldData>.Instance);
-        var spots = world.Map(10220)!.RandomSpots;
+        var spots = await world.Map(10220)!.WarmRandomSpots(); // started by the load
         Assert.NotEmpty(spots);
         // The cut-off strip holds about 30 authored points at z 398-399.
         Assert.DoesNotContain(spots, p => p.Z > 397);
