@@ -3,6 +3,7 @@ using Google.Protobuf;
 using Romsg;
 using Ro3Emu.Server.Accounts;
 using Ro3Emu.Server.Data;
+using Ro3Emu.Server.Data.Config;
 using Ro3Emu.Server.Maps;
 
 namespace Ro3Emu.Server.Game;
@@ -305,6 +306,15 @@ public sealed partial class CombatService : IGameTicker
             if (effects.TryGetValue(id.ToString(), out var e) && e.TryGetProperty("m_kDamage", out _)) return (int)id;
         return 1000002;
     }
+
+    /// <summary>
+    /// SkillHitInfo.split: how many damage words the client shows for one hit. SkillConfig._kShowDmg holds one count
+    /// per show attack point and only the server reads it. LC_DamageHelper.ProcessDamageWord divides the damage into
+    /// that many words and, for the caster, adds a running total (Dmg_Accumulate) for skills with _iAccumDmgType, so
+    /// with split 1 the total repeats the hit. A cast resolves at its first attack point, so the first count applies
+    /// (inferred for skills with several points).
+    /// </summary>
+    private static int HitSplit(JsonElement row) => (int)Math.Max(1, new SkillConfig(row).ShowDmg.FirstOrDefault(1));
 
     // ---- monsters hitting players ----
 
