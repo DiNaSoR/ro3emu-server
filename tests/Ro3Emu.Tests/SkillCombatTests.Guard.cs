@@ -75,14 +75,6 @@ public sealed partial class SkillCombatTests
     }
 
     [ClientDataFact]
-    public async Task UnionCountsTheCrusaders()
-    {
-        await using var alice = await InWorld("Alice");
-        await Gm("alice", "!job 1410"); await Teach("alice", 11614);
-        await Until(s => s.Buffs.Any(b => b.ConfigId == 1162701 && b.PileCount == 1), "alice"); // PATK/PDEF/MDEF +10
-    }
-
-    [ClientDataFact]
     public async Task MeltDownWeakensMonsters()
     {
         await using var alice = await InWorld("Alice");

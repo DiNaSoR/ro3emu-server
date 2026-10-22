@@ -14,8 +14,7 @@ namespace Ro3Emu.Server.Game;
 /// </summary>
 public sealed partial class CombatService
 {
-    private const int EnvenomBuffGroup = 15120, DeadlyPoisonGroup = 15211, FearBreezeBuffGroup = 13301, FearBreezeHitGroup = 13304,
-        JudexGroup = 14309, DoubleHolyLightGroup = 14311, HolySpiritSurgeGroup = 14312,
+    private const int EnvenomBuffGroup = 15120, FearBreezeBuffGroup = 13301, FearBreezeHitGroup = 13304,
         WargStrikeGroup = 13312, FocusedArrowStrikeGroup = 13305,
         ParryGroup = 11210, DeathBoundGroup = 11311, AutoCounterGroup = 11105,
         ShieldReflectGroup = 11404, ShieldReflectSkill = 11410, ReflectDamageGroup = 11610, ReflectDamageSkill = 11609,
@@ -86,12 +85,8 @@ public sealed partial class CombatService
     /// <list type="bullet">
     /// <item>Envenom 15111's buff (group 15120, [chance, row]): "When your Basic Attack deals damage, there is a 30%
     /// chance to inflict 【Poisoned】" (normal attacks, _iIsNormalAtk).</item>
-    /// <item>Deadly Poison 15211's buff [chance, row]: "After attacking, there is a 50% chance to inflict 【Venom】"
-    /// (any damaging hit, inferred).</item>
     /// <item>Fear Breeze 13303's buff (group 13301, [chance]): "when a targeted bow skill hits", 30% to cast Fear Breeze
     /// 13304 of the buff's level (a single-target skill other than the normal attack, with a bow).</item>
-    /// <item>Double Holy Light 14311 (learned passive, same-id BuffConfig [chance, row, chance, row]): after Judex 14309,
-    /// two independent rolls; Holy Spirit Surge 14312's buff sets both to its [10000] ("becomes 100%").</item>
     /// <item>Warg Strike 13312's auto-learned trigger 13317 ([10000, row]): "every 2.5 seconds, using Focused Arrow Strike
     /// casts this skill on the target" (the internal cooldown is the Warg Strike row's _kDescData[6] seconds).</item>
     /// </list>
@@ -107,7 +102,6 @@ public sealed partial class CombatService
             switch ((int)GameData.Int(config, "_iBuffID"))
             {
                 case EnvenomBuffGroup when normal:
-                case DeadlyPoisonGroup:
                     foreach (var pair in LogicPairs(config)) yield return pair;
                     break;
                 case FearBreezeBuffGroup when !normal && GameData.Int(row, "_iRangeType") != 2 && _skills.Weapon(s).SubType == BowSubType:
@@ -119,14 +113,6 @@ public sealed partial class CombatService
         }
         foreach (var learned in LearnedProcs(s, row, normal)) yield return learned;
         if (s.Progress is not { } progress) yield break;
-        if (group == JudexGroup && _skills.Level(progress, DoubleHolyLightGroup) is var holy and > 0
-            && _data.Row("BuffConfig", _skills.RealId(DoubleHolyLightGroup, holy)) is { } light)
-        {
-            int? surge = s.Buffs.Where(b => b.ExpireMs > now).Select(b => _data.Row("BuffConfig", b.ConfigId))
-                .Where(r => r is { } c && GameData.Int(c, "_iBuffID") == HolySpiritSurgeGroup)
-                .Select(r => Numbers(r!.Value, "_kLogicData").FirstOrDefault() is var v and > 0 ? (int?)v : null).FirstOrDefault(v => v != null);
-            foreach (var (chance, hit) in LogicPairs(light)) yield return (surge ?? chance, hit);
-        }
         if (group == FocusedArrowStrikeGroup && _skills.Level(progress, WargStrikeGroup) is var warg and > 0
             && _data.Row("SkillConfig", _skills.RealId(WargStrikeGroup, warg)) is { } strike
             && Numbers(strike, "_kAutoLearnSkill") is [var trigger, ..] && _data.Row("BuffConfig", (long)trigger) is { } wargTrigger

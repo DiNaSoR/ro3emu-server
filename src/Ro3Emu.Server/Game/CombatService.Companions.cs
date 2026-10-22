@@ -14,13 +14,8 @@ namespace Ro3Emu.Server.Game;
 /// falcon and no wolf ride, Warg Bite the wolf ride, Dragon Breath the dragon, Arm Cannon the Madogear, Pierce a spear.
 /// m_eType 1 is all of its clauses, 2 any; m_bInverse negates a clause.</item>
 /// <item>Companion buffs: a leased pendant's CartRemouldTable _iPendantBuffID (Falconry 1310101, Warg Accessory 1399901)
-/// lasts while it is leased, and a ridden battle mount's _kBindBuff (the wolf's 【Wolf Taming】 1331001: Movement Speed
-/// +10% and Warg Strike's mounted form) while it is ridden. Wolf's Fang 13311's BuffConfig row names the buff it gives
-/// "while mounted on the Demonic Wolf" (_kLogicData [1331210, 13312]: Physical ATK +10% and +10% on the wolf skills).
-/// They are re-applied after a scene change clears them (_iSceneClear) (inferred lifetimes).</item>
-/// <item>Wolf Taming: "When the Demonic Wolf is not mounted and follows the Ranger, it howls every 30 sec, increasing the
-/// Ranger's Physical ATK by 5% for 10 sec" (_kDescData [10, 30, 5, 10]); the howl is Warg Howl 13321's buff 1332501
-/// (inferred: on the first damage dealt once the 30 sec have passed, so it howls while fighting).</item>
+/// lasts while it is leased (inferred lifetime). A ridden mount's bind buffs, Wolf's Fang and Wolf Taming's howl are
+/// RidingEffects.</item>
 /// <item>Warg Bite 13325 "resets the Cooldown of 【Warg Hunt】"; Swift Warg 13326: "Casting 【Warg Charge】 or 【Warg Hunt】
 /// resets this skill's Cooldown" (Warg Charge is Warg Strike's mounted form, 13312 mode 1).</item>
 /// <item>King of the Wargs 13322's 【King of the Pack】 (buff group 13326, _kLogicData [charge companion, bite companion]):
@@ -31,9 +26,9 @@ namespace Ro3Emu.Server.Game;
 /// </summary>
 public sealed partial class CombatService
 {
-    private const int WolfTamingGroup = 13310, WolfsFangGroup = 13311, WargStrikeSkillGroup = 13312, WargHowlGroup = 13321,
+    private const int WargStrikeSkillGroup = 13312,
         KingOfTheWargsGroup = 13322, WargHuntGroup = 13323, WargBiteGroup = 13325, SwiftWargGroup = 13326,
-        KingOfThePackBuffGroup = 13326, WolfPendantType = 6, WolfMountType = 4;
+        KingOfThePackBuffGroup = 13326, WolfMountType = 4;
 
     // ------------------------------------------------------------------ skill conditions
 
@@ -79,6 +74,12 @@ public sealed partial class CombatService
 
     private bool RidesWolf(GameSession s) => RiddenMountType(s) == WolfMountType;
 
+    /// <summary>The ridden Battle mount's CartRemouldTable _iSubType (2 Peco Peco, 4 wolf, 5 Madogear, 6 dragon,
+    /// 7 gryphon); 0 on foot or on an ordinary mount.</summary>
+    private int RiddenMountType(GameSession session) =>
+        MountService.Rider(session) is var id and not 0 && _data.Row("CartRemouldTable", id) is { } row
+            && GameData.Int(row, "_iType") == 2 ? (int)GameData.Int(row, "_iSubType") : 0;
+
     // ------------------------------------------------------------------ companion buffs
 
     /// <summary>After a lease, a ride, a learned level, a job change or a scene load: grant or end the companion buffs, and
@@ -100,19 +101,11 @@ public sealed partial class CombatService
                 && s.CareerPendants.Contains((int)GameData.Int(cart, "_iPendantId")))
                 want.Add((int)buff);
         long ride = MountService.RidingBattle(s);
-        if (ride != 0 && _data.Row("CartRemouldTable", ride) is { } mount)
-            foreach (var bound in Numbers(mount, "_kBindBuff")) if (bound > 0) want.Add((int)bound);
-        // A flying System mount: on the ground its MountsConfig _kBindBuff (Starshatter Dragon 3112101), in the air the
-        // buff that shares the landing skill's id (3112201, FlyBuffTag 3100000, which WorldCoreService.CanFly needs).
-        // The two rows name each other's group in _kLogicData (31121 <-> 31122), so one replaces the other (inferred).
-        if (MountService.RidingSystem(s) is var system and > 0 && _data.Row("MountsConfig", system) is { } ridden)
-        {
-            if (s.WorldState.Flying && MountService.FlySkills(s, _data) is { } fly) want.Add(fly.Down);
-            else foreach (var bound in Numbers(ridden, "_kBindBuff")) if (bound > 0) want.Add((int)bound);
-        }
-        if (RidesWolf(s) && _skills.Level(s.Progress, WolfsFangGroup) is var fang and > 0
-            && _data.Row("BuffConfig", _skills.RealId(WolfsFangGroup, fang)) is { } fangRow && Numbers(fangRow, "_kLogicData") is [var fangBuff, ..])
-            want.Add((int)fangBuff);
+        // A flying System mount in the air: the buff that shares the landing skill's id (3112201, FlyBuffTag 3100000,
+        // which WorldCoreService.CanFly needs). On the ground its MountsConfig _kBindBuff (Starshatter Dragon 3112101)
+        // stands instead; RidingEffects grants the bind buffs of every ridden mount and Wolf's Fang. The two rows name
+        // each other's group in _kLogicData (31121 <-> 31122), so one replaces the other (inferred).
+        if (s.WorldState.Flying && MountService.RidingSystem(s) > 0 && MountService.FlySkills(s, _data) is { } fly) want.Add(fly.Down);
         want.RemoveWhere(id => _data.Row("BuffConfig", id) == null);
 
         foreach (var ending in s.Buffs.Where(b => s.CompanionBuffs.Contains(b.ConfigId) && !want.Contains(b.ConfigId)
@@ -127,22 +120,6 @@ public sealed partial class CombatService
             s.CompanionRide = ride;
             await _skills.WeaponChangedAsync(s);
         }
-    }
-
-    /// <summary>The following (not ridden) wolf's howl, once per Wolf Taming's interval, when the Ranger deals damage.</summary>
-    private async Task WargHowlAsync(GameSession s)
-    {
-        if (s.Role == null || s.Progress == null || !HasPendantType(s, WolfPendantType) || RidesWolf(s)) return;
-        long now = MonsterService.NowMs;
-        if (now < s.WargHowlMs || _skills.Level(s.Progress, WolfTamingGroup) is not (var level and > 0)
-            || _data.Row("SkillConfig", _skills.RealId(WolfTamingGroup, level)) is not { } taming
-            || _data.Row("SkillConfig", _skills.RealId(WargHowlGroup, 1)) is not { } howl
-            || Tuples(howl, "_kBuff1").FirstOrDefault() is not { ValueKind: JsonValueKind.Array } grant || grant.GetArrayLength() < 3) return;
-        var desc = Numbers(taming, "_kDescData");
-        long every = desc.Length > 1 && desc[1] > 0 ? (long)(desc[1] * 1000) : 30000;
-        int duration = desc.Length > 3 && desc[3] > 0 ? (int)(desc[3] * 1000) : (int)(GameData.Number(grant[2]) ?? 10000);
-        s.WargHowlMs = now + every;
-        await _buffs.AddAsync(s, (int)(GameData.Number(grant[0]) ?? 0), duration, s.Role.Id);
     }
 
     // ------------------------------------------------------------------ wolf skill links

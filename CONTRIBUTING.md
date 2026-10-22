@@ -27,9 +27,10 @@ client: tests of rules use an invented data set, and tests of real content are s
 dotnet test tests/Ro3Emu.Tests/Ro3Emu.Tests.csproj -c Release --filter "Category!=Slow"
 ```
 
-Compiler and analyzer warnings fail the build (`Directory.Build.props`), except in `Ro3Emu.ClientHooks`,
-`Ro3Emu.Loc` and `Ro3Emu.ClientTools`, which only build against a local client. CI checks the C# layout set in
-`.editorconfig`. Before you push, run:
+Compiler and analyzer warnings fail the build (`Directory.Build.props`) in every project. `Ro3Emu.ClientHooks` and
+`Ro3Emu.Loc` keep a few named rules as warnings (`WarningsNotAsErrors` in their project files, with the reason); they
+build only against a local client, so CI does not compile them. CI checks the C# layout set in `.editorconfig`.
+Before you push, run:
 
 ```powershell
 dotnet format whitespace --folder

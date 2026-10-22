@@ -103,7 +103,8 @@ public sealed class ProfessionTalentChoiceTests
         Assert.Equal(1, before.Plan[0].TalentNodes[4].CurrentLevel);
         Assert.True(before.Plan[0].TalentNodes[4].IsActivated);
         Assert.Equal(0, before.Plan[1].TalentNodes[4].CurrentLevel);
-        Assert.True(before.UnlockedTrees[20]); // chosen job nodes count toward the total talent level
+        // The panel's grade counts the chosen Profession_L/Profession_M but not the SkillPoint gate: 1 + 2 + 2 = 5.
+        Assert.True(before.UnlockedTrees[20]);
         Assert.Equal(0, await Choose(bot, 4)); // retry does not increment or charge for the choice
         Assert.Equal(before, f.Saved());
 
@@ -121,7 +122,7 @@ public sealed class ProfessionTalentChoiceTests
         foreach (var (id, node) in before.Plan[1].TalentNodes)
             Assert.Equal(node.CurrentLevel, after.Plan[1].TalentNodes[id].CurrentLevel);
         Assert.Equal(after, f.Session.SeasonTalent);
-        Assert.True(after.UnlockedTrees[20]);
+        Assert.True(after.UnlockedTrees[20]); // switching replaced a path, it never added levels: 1 + 1 + 2 = 4
     }
 
     [Fact]

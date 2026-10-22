@@ -75,7 +75,7 @@ public sealed class CardEffects
 
     /// <summary>The passives currently registered for this session's socketed cards.</summary>
     internal IReadOnlyList<(long Source, int Config)> Registered(GameSession s) =>
-        s.Buffs.Where(b => b.IsPassive && !b.IsTotemOwned && !b.IsTalentOwned).Select(b => (b.SourceId, b.ConfigId)).ToList();
+        s.Buffs.Where(b => b.IsPassive && !b.IsTotemOwned).Select(b => (b.SourceId, b.ConfigId)).ToList();
 
     /// <summary>Reconcile card-owned passives with the socketed copies (insert, remove, transfer, plan switch,
     /// star-up, scene load).</summary>
@@ -85,7 +85,7 @@ public sealed class CardEffects
         var wanted = Passives(s).Select(p => (Source: p.Card.Guid, p.Id)).ToHashSet();
         var state = _runtime.GetOrCreateValue(s);
         bool statsChanged = false;
-        foreach (var stale in s.Buffs.Where(b => b.IsPassive && !b.IsTotemOwned && !b.IsTalentOwned && !wanted.Contains((b.SourceId, b.ConfigId))).ToArray())
+        foreach (var stale in s.Buffs.Where(b => b.IsPassive && !b.IsTotemOwned && !wanted.Contains((b.SourceId, b.ConfigId))).ToArray())
         {
             statsChanged |= stale.Changes.Count > 0;
             state.Registered.Remove((stale.SourceId, stale.ConfigId));
@@ -93,9 +93,9 @@ public sealed class CardEffects
         }
         foreach (var (source, id) in wanted)
         {
-            if (s.Buffs.Any(b => b.IsPassive && !b.IsTotemOwned && !b.IsTalentOwned && b.SourceId == source && b.ConfigId == id)) continue;
+            if (s.Buffs.Any(b => b.IsPassive && !b.IsTotemOwned && b.SourceId == source && b.ConfigId == id)) continue;
             await _buffs.AddPassiveAsync(s, id, source, totemOwned: false);
-            if (s.Buffs.FirstOrDefault(b => b.IsPassive && !b.IsTotemOwned && !b.IsTalentOwned && b.SourceId == source && b.ConfigId == id) is not { } added)
+            if (s.Buffs.FirstOrDefault(b => b.IsPassive && !b.IsTotemOwned && b.SourceId == source && b.ConfigId == id) is not { } added)
                 continue;
             statsChanged |= added.Changes.Count > 0;
             // A scene change cleared the previous registration; its internal cooldown stays with the card.

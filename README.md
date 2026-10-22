@@ -42,8 +42,8 @@ server first; changes to the original rules come after.
 
 **Don't have the game?** RO3Emu.exe downloads it from the Genesis update servers (about 24 GB) and checks every file
 against the publisher's signature: it offers this when it finds no game folder, or run `RO3Emu.exe install`. RO3Emu
-never hosts game files. Tested with the Genesis client releases of 7 and 16 October 2026, and adapted to the 18
-October 2026 release ([reopened content](docs/guide/reopened-content.md)); the 20 October
+never hosts game files. Tested with the Genesis client releases of 7, 16 and 21 October 2026 (2026.10.21.1, the current
+one), and adapted to the 18 October 2026 release ([reopened content](docs/guide/reopened-content.md)); the 20 October
 release passes `RO3Emu.exe check` and the data export. Genesis is a private server, not the
 official one: the official Ragnarok Online 3 server has not launched yet.
 

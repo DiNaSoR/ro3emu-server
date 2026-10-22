@@ -6,7 +6,7 @@ using Ro3Emu.Server.Maps;
 
 namespace Ro3Emu.Tests;
 
-/// <summary>Ground fields, party support and description-only passives (CombatService.Ground, CombatService.Support).</summary>
+/// <summary>Ground fields and party support (CombatService.Ground).</summary>
 public sealed partial class SkillCombatTests
 {
     private Task<MonsterUnit> Spawn(string name, Func<MonsterTemplate, MonsterTemplate> change) => Loop.InvokeAsync(async () =>
@@ -168,69 +168,4 @@ public sealed partial class SkillCombatTests
         Assert.Equal(new[] { 1610501 }, await Loop.InvokeAsync(() => Task.FromResult(For("bob"))));
     }
 
-    [ClientDataFact]
-    public async Task WoodSpiritsBlessingSavesOneLethalHit()
-    {
-        await using var alice = await InWorld("Alice");
-        await Gm("alice", "!job 4400"); await Teach("alice", 14307);
-        var p = Session("alice");
-        bool saved = await Loop.InvokeAsync(async () =>
-        {
-            using var held = await CharacterService.Lock(p);
-            return await Buffs.TryPreventLethalAsync(p);
-        });
-        Assert.True(saved);
-        await Loop.InvokeAsync(() =>
-        {
-            var stats = Character.Stats(p);
-            Assert.Equal(Math.Max(1, (long)(stats[101] * 30.0 / 100)), stats[2000]); // "recover 30% Life"
-            Assert.True(p.InvincibleUntilMs > MonsterService.NowMs);
-            Assert.True(Buffs.HasForbidden(p, 9));
-            Assert.InRange(p.WoodSpiritReadyMs - MonsterService.NowMs, 230_000, 240_000); // Withered for 4 minutes
-            return Task.CompletedTask;
-        });
-        Assert.True(await HasBuff("alice", 1430801));
-        Assert.False(await Loop.InvokeAsync(async () =>
-        {
-            using var held = await CharacterService.Lock(p);
-            return await Buffs.TryPreventLethalAsync(p);
-        }));
-    }
-
-    [ClientDataFact]
-    public async Task EmergencyTreatmentShieldsAndHealsBelowHalfLife()
-    {
-        await using var alice = await InWorld("Alice");
-        await Gm("alice", "!job 6400"); await Teach("alice", 16303);
-        var p = Session("alice");
-        var monster = await Spawn("alice", t => t);
-        long max = await Loop.InvokeAsync(() => Task.FromResult(Character.Stats(p)[101]));
-        long low = max * 30 / 100;
-        await Loop.InvokeAsync(() => Character.SetHpSpAsync(p, low, null));
-        await Loop.InvokeAsync(async () => { foreach (var handler in Combat.TakenAsync) await handler(monster, p, 10); });
-        await Loop.InvokeAsync(() =>
-        {
-            var stats = Character.Stats(p);
-            Assert.Equal(low + (long)(max * 6.0 / 100), stats[2000]); // Lv1 "restores 6% of your Life"
-            Assert.Contains(p.Buffs, b => b.ConfigId == 1630802); // the 16% shield row
-            Assert.True(p.EmergencyTreatmentReadyMs > MonsterService.NowMs + 170_000);
-            return Task.CompletedTask;
-        });
-    }
-
-    [ClientDataFact]
-    public async Task DragonTrainingAndArcaneMasteryRaiseTheirSkills()
-    {
-        await using var alice = await InWorld("Alice");
-        var p = Session("alice");
-        var monster = await Spawn("alice", t => t);
-        var breath = Data.Row("SkillConfig", 1130401)!.Value;
-        var turn = Data.Row("SkillConfig", 1411801)!.Value;
-        long Adjusted(System.Text.Json.JsonElement row) =>
-            Combat.DamageAdjusters.Aggregate(1000L, (amount, adjust) => adjust(p, monster, row, DamageHitResult.Normal, amount));
-        Assert.Equal(1000, await Loop.InvokeAsync(() => Task.FromResult(Adjusted(breath))));
-        await Teach("alice", 11307); await Teach("alice", 14207);
-        Assert.Equal(1060, await Loop.InvokeAsync(() => Task.FromResult(Adjusted(breath)))); // Lv1 +6%
-        Assert.Equal(1055, await Loop.InvokeAsync(() => Task.FromResult(Adjusted(turn)))); // Lv1 +55
-    }
 }
