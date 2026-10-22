@@ -19,6 +19,8 @@ public sealed class OwnerRegistry
     /// <summary>Replacement admissions that encountered an unresolved predecessor handover/readiness fence.</summary>
     public long HandoverConflicts { get; internal set; }
     internal Action<string>? DeferredForTest { get; set; }
+    /// <summary>A deferred admission's origin and what blocked it ("origin @ kind"), for a test's timeout message.</summary>
+    internal Action<string, string>? BlockedForTest { get; set; }
     public OwnerRegistry(GameLoop loop, RoleStore roles)
     {
         _loop = loop; _roles = roles; loop.Owners = this;
@@ -288,6 +290,7 @@ public sealed class OwnerRegistry
                 {
                     Deferred++; deferred = true; DeferredForTest?.Invoke(origin);
                     blockedBy = BlockerLabel(keys);
+                    BlockedForTest?.Invoke(origin, blockedBy);
                 }
                 await Reservations.Changed.WaitAsync(cancellation);
                 cancellation.ThrowIfCancellationRequested();
