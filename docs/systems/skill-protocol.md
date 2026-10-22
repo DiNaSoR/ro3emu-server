@@ -99,3 +99,21 @@ Not executed: Sight Sprout. The 6-digit season passives (Moonlit Echo, Melody Ca
 `TalentProcs.Reactions`: Resilient Spirit puts its `_kLogicData` buff (DMG Reduction) on a player hit while Auto Guard lives; Soul Reaper adds ${1} MATK (attribute 1043) per kill with Soul Drain learned, twice for a player, up to ${2}, cleared by death or a scene change. Gravitation Field resolves at once here, so Gravity Trap's Immobilize 902401 lands `_kLogicData[1]` (3900 ms) after the cast on the monsters within its `_kRange` **(inferred)**. Earthshatter adds ${1}% to Hammer Fall's ratio per enemy hit up to ${2}%, Thunder Shockwave and Greater Psychic Shockwave multiply Lord of Vermilion's and Napalm Vulcan's damage likewise **(inferred)** from the wording, and Holy Cross Exorciser's mode row Magnus_ExorcismusBD deals its third and fourth damage values to a single enemy. Heals: Sacred Divine Light heals an ally Heal left below `_kLogicData[0]`% with its proc row, Holy Healing Light repeats the Heal on ${3} other allies within ${2} m, Purifying Light Orbit heals ${1} allies in Sanctuary's area, and Radiant Sanctuary heals ${2} allies within ${1} m of the caster `_kLogicData[1]` ms after Sanctuary. A talent heal is an extra cast on the allies the talent chooses (`CombatService.CastExtraOnAlliesAsync`); every player counts as an ally.
 
 Not executed: Shield Bash Echo (its description gives no value for the new cooldown), Falcon's Might (op 20) and Scouting (a scope-1 BuffLogicData tuple). `SkillCombatTests.TalentCharges` checks Double Attack, Deadly Poison, Charged Shield Bash, Magic Cannon, Sacred Divine Light, Gravity Trap, Soul Reaper, Ember Zone, the per-enemy rows and a passive's crit tuple on the client data.
+
+## Field MVP summons and ground objects
+
+The field MVPs' summon and prop skills carry no NPC in their rows (no `_kLogicData`); the original AI scripts spawned them on the server. `BossSkillSets.ReconstructedSummons` binds each to the 50010xx NPC made for that MVP, by the NPC's name and the skill its NPC casts on spawn **(inferred)**:
+
+| Boss skill | NPC | Kind |
+|---|---|---|
+| Pharaoh's Summon Coffin 5209701 | 5001035 Pharaoh's Coffin | minion, erupts with its `_kRespawnSkill` Coffin Eruption 5210101 |
+| Pharaoh's Summon Pyramid 5209901 | 5001036 Pyramid | minion, Spinning Pyramid 5210001 |
+| Drake's Roaming Tempest 5213101 (script MVPDrakeSummonLongJuan) | 5001037 Water Tornado | minion casting 5213201 |
+| Osiris's Summon Horong 5207101 | 5001031 Osiris Horong | ground object |
+| Goblin Leader's Boss Spear Throw 5208601 | 5001032 Goblin Leader Spear Throw | ground object |
+| Moonlight Flower's Falling Bell 5212401 | 5001039 Bell | ground object |
+| Dracula's Gift of the Underworld 5210601 and Circle of the Dead 5210801 (script zhixianmubei) | 5001042 MVP Dracula Tombstone | ground object, Gravestone Blast 5214901 when it goes |
+| Baphomet's Hellfire 5209401 (MVPHellRing) | 5001033 Baphomet Magic Circle | ground object |
+| Doppelganger's Storm Gust 5213701 | 5001040 Wraith Storm Gust Magic Circle | ground object |
+
+A minion with a blast stands, shows it and blasts when its life ends: the blast's described delay, else its show's `_iActionTime`. A ground object (`_iNPCType` 4) stands where the skill lands (on its target, or the area's centre) for the skill's action and at least 3 s, then its `_kRespawnSkill`, if any, hits the players around it; the skill's own damage is unchanged. Minions and objects end with the boss. A summoned unit's own skills (its `_kRespawnSkill` and `_kSkills`) leave the boss's rotation, so Pharaoh no longer casts Coffin Eruption and Spinning Pyramid himself. Not bound: Mistress's two magic circles (5001034, 5001043) and the Mummy 5001044, which no skill name points to.
