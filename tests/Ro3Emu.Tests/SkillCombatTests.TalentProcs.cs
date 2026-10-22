@@ -36,6 +36,70 @@ public sealed partial class SkillCombatTests
         Assert.Equal(0, (await Next(bot, SeasonTalentService.Upgrade, SeasonTalentUpgradeResp.Parser)).Result);
     }
 
+    // Issue #62: Rapid Throw switches Spear Throw (11110) to a mode row whose _iCdModeGroup is 0. The client's bar keeps
+    // the mode 0 row and reads its cooldown under group * 10000 + 0, so the 31113 has to carry mode 0, not the mode cast.
+    [ClientDataFact]
+    public async Task ATalentModeRowsCooldownIsShownUnderItsCdModeGroup()
+    {
+        await using var alice = await InWorld("Alice");
+        await Gm("alice", "!lvl 99"); await Gm("alice", "!job 1200"); await Teach("alice", 11110);
+        await ChooseProfessionTalent(alice, "alice", 10102114);
+        var monster = await Target("alice", stationary: true);
+        await Loop.InvokeAsync(() => { monster.Hp = 1_000_000; return Task.CompletedTask; });
+
+        await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1111001, TargetId = monster.Uid });
+        var accepted = await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser);
+        Assert.Equal(0, accepted.Result);
+        var cd = await Next(alice, CombatService.SkillCdUpdate, SkillCdNotify.Parser, x => x.Infos.Any(i => i.SkillId == 11110));
+        Assert.Equal(0, cd.Infos.Single(i => i.SkillId == 11110).SkillMode);
+        var hit = await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser, x => x.SessionId == accepted.SessionId);
+        Assert.NotEqual(1111001, hit.SkillId); // the talent's mode row was cast
+    }
+
+    // The same for a mode row with its own cooldown (_iCdModeGroup -1): the wolf's Mount Buff 1331001 turns Arrow Smash
+    // 13099 into its wolf row 1309911, while the bar keeps asking for 1309901 and reads mode 0.
+    [ClientDataFact]
+    public async Task AMountModeRowsCooldownIsShownUnderTheAskedRowsMode()
+    {
+        await using var alice = await InWorld("Alice");
+        await Gm("alice", "!lvl 99"); await Gm("alice", "!job 3400"); await Teach("alice", 13099);
+        await Loop.InvokeAsync(() => _app.Services.GetRequiredService<BuffService>().AddAsync(Session("alice"), 1331001, 600_000, Session("alice").Role!.Id));
+        var monster = await Target("alice", stationary: true);
+        await Loop.InvokeAsync(() => { monster.Hp = 1_000_000; return Task.CompletedTask; });
+
+        await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1309901, TargetId = monster.Uid });
+        var accepted = await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser);
+        Assert.Equal(0, accepted.Result);
+        var cd = await Next(alice, CombatService.SkillCdUpdate, SkillCdNotify.Parser, x => x.Infos.Any(i => i.SkillId == 13099));
+        Assert.Equal(0, cd.Infos.Single(i => i.SkillId == 13099).SkillMode);
+        var hit = await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser, x => x.SessionId == accepted.SessionId);
+        Assert.Equal(1309911, hit.SkillId);
+    }
+
+    // The client walks into the range of the row it asks for (Arrow Smash 18 m), not of the wolf row (5 m): a cast from
+    // 10 m was refused 3024 for ever, the client never walking closer.
+    [ClientDataFact]
+    public async Task AModeRowIsCastWithinTheAskedRowsRange()
+    {
+        await using var alice = await InWorld("Alice");
+        await Gm("alice", "!lvl 99"); await Gm("alice", "!job 3400"); await Teach("alice", 13099);
+        await Loop.InvokeAsync(() => _app.Services.GetRequiredService<BuffService>().AddAsync(Session("alice"), 1331001, 600_000, Session("alice").Role!.Id));
+        var monster = await Target("alice", stationary: true);
+        await Loop.InvokeAsync(() => { monster.Hp = 1_000_000; return Task.CompletedTask; });
+        var start = Session("alice").Position.Clone();
+        var nav = _app.Services.GetRequiredService<Ro3Emu.Server.Maps.WorldData>().Map(Session("alice").SceneEntry)!.Nav!;
+        var away = new[] { (10f, 0f), (-10f, 0f), (0f, 10f), (0f, -10f), (7f, 7f), (-7f, -7f) }
+            .Select(o => new Vec3 { X = start.X + o.Item1, Y = start.Y, Z = start.Z + o.Item2 })
+            .First(p => nav.IsWalkable(p.X, p.Y, p.Z) && nav.CanWalk(p.X, p.Y, p.Z, start.X, start.Z));
+        await alice.SendGameAsync(MsgId.Walk, new WalkReq { Pos = away, Face = 180, BStop = true, SpeedRate = 1 });
+        await Task.Delay(300);
+
+        await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1309901, TargetId = monster.Uid });
+        var accepted = await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser);
+        Assert.Equal(0, accepted.Result);
+        Assert.Equal(1309911, (await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser, x => x.SessionId == accepted.SessionId)).SkillId);
+    }
+
     [ClientDataFact]
     public async Task RapidPierceAddsItsExtraHitsOnlyWhenItsChanceRolls()
     {
