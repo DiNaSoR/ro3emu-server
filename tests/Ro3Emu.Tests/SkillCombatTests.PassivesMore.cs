@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Romsg;
+using Ro3Emu.Bot;
 using Ro3Emu.Server.Data;
 using Ro3Emu.Server.Data.Config;
 using Ro3Emu.Server.Game;
@@ -68,6 +69,24 @@ public sealed partial class SkillCombatTests
     {
         await using var alice = await InWorld("Alice");
         await using var bob = await InWorld("Bob");
+        await UnionParty(alice, bob);
+        await Loop.InvokeAsync(() => _app.Services.GetRequiredService<TeamService>().LeaveAsync(Session("bob")));
+        await Next(alice, BuffService.BuffRemove, BuffRemoveNotify.Parser);
+    }
+
+    // In-game 22.10: the Paladin going offline left the Union pile on, since only roster changes recounted it.
+    [ClientDataFact]
+    public async Task UnionDropsAPaladinWhoGoesOffline()
+    {
+        await using var alice = await InWorld("Alice");
+        var bob = await InWorld("Bob");
+        await UnionParty(alice, bob);
+        await bob.DisposeAsync();
+        await Next(alice, BuffService.BuffRemove, BuffRemoveNotify.Parser);
+    }
+
+    private async Task UnionParty(BotClient alice, BotClient bob)
+    {
         await Gm("alice", "!lvl 99"); await Gm("alice", "!job 1410");
         await Gm("bob", "!lvl 99"); await Gm("bob", "!job 1310");
         await Loop.InvokeAsync(() => { Session("alice").Progress!.Skills[11614] = 1; return Task.CompletedTask; });
@@ -84,7 +103,5 @@ public sealed partial class SkillCombatTests
 
         var union = await Next(alice, BuffService.BuffUpdate, BuffUpdateNotify.Parser, x => x.Buffs.Any(b => b.ConfigId == 1162701));
         Assert.Equal(1, union.Buffs.Single(b => b.ConfigId == 1162701).PileCount);
-        await Loop.InvokeAsync(() => _app.Services.GetRequiredService<TeamService>().LeaveAsync(Session("bob")));
-        await Next(alice, BuffService.BuffRemove, BuffRemoveNotify.Parser);
     }
 }

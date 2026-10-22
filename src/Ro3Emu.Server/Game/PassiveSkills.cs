@@ -64,7 +64,7 @@ public sealed class PassiveSkills
         scenes.AddOwnedAfterLoaded(StandingBuffsAsync);
         skills.Learned.Add(StandingBuffsAsync);
         character.JobChanged.Add(StandingBuffsAsync);
-        // A roster change runs in the party's scope; each member's Union is set in a work item of its own.
+        // A roster or member card change runs in the party's scope; each member's Union is set in a work item of its own.
         teams.RosterChanged.Add(roles =>
         {
             foreach (long role in roles)

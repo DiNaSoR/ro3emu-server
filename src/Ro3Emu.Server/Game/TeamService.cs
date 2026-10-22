@@ -83,8 +83,8 @@ public sealed partial class TeamService(SessionRegistry sessions, CharacterServi
         return ExpBuff[Math.Clamp(sameMap, 1, ExpBuff.Length) - 1];
     }
 
-    /// <summary>After a party's roster changed, with the roles it concerns: the members and one who left
-    /// (PassiveSkills: Union).</summary>
+    /// <summary>After a party's roster or a member's card (career, online state) changed, with the roles it concerns: the
+    /// members and one who left (PassiveSkills: Union).</summary>
     internal List<Func<IReadOnlyList<long>, Task>> RosterChanged { get; } = [];
 
     private async Task NotifyRosterAsync(IReadOnlyList<long> roles)
@@ -311,6 +311,7 @@ public sealed partial class TeamService(SessionRegistry sessions, CharacterServi
     private async Task RefreshAsync(Team team)
     {
         if (!_teams.TryGetValue(team.Id, out var current) || !ReferenceEquals(team, current)) return;
+        bool cardChanged = false;
         foreach (var m in team.Members.ToList())
         {
             var detail = Detail(team, m);
@@ -320,6 +321,7 @@ public sealed partial class TeamService(SessionRegistry sessions, CharacterServi
             if (team.LastCard.GetValueOrDefault(m) != card)
             {
                 team.LastCard[m] = card;
+                cardChanged = true;
                 detail.BattleInfo = battle;
                 var update = new TeamMemberChangeResp { TeamId = team.Id };
                 update.MemberList[m] = detail;
@@ -332,6 +334,8 @@ public sealed partial class TeamService(SessionRegistry sessions, CharacterServi
             }
             team.LastBattle[m] = fight;
         }
+        // A card carries a member's career and online state, which party-counting passives (Union) read.
+        if (cardChanged) await NotifyRosterAsync([.. team.Members]);
     }
 
     // ---- shapes ----
