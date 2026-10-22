@@ -42,12 +42,19 @@ public sealed class RegionReachTests
     }
 
     [Fact]
+    public void AStraightLegLongerThanTheRegionWindowKeepsTheCastSlack()
+    {
+        // No WALK on a straight leg: 4 s in, casts still count 4 s at 7 m/s.
+        Assert.Equal(28f, At(0, walking: true, secondsSinceWalk: 4).WalkReportLag(5), 0.5f);
+    }
+
+    [Fact]
     public void AStaleWalkReportGivesNoAllowance()
     {
-        // A client that stops sending WALK keeps no bonus: only the fixed 3 + 5 m.
+        // A client that stops sending WALK keeps no bonus past 5 s: only the fixed 3 + 5 m.
         Assert.True(SceneService.NearRegion(At(8f, walking: true, secondsSinceWalk: 60), Circle));
         Assert.False(SceneService.NearRegion(At(9.3f, walking: true, secondsSinceWalk: 60), Circle));
-        Assert.Equal(0, At(0, walking: true, secondsSinceWalk: 2.5).WalkReportLag(0.75));
+        Assert.Equal(0, At(0, walking: true, secondsSinceWalk: 5.5).WalkReportLag(5));
     }
 
     [Fact]

@@ -22,8 +22,8 @@ public sealed partial class SceneService
     }
 
     /// <summary>
-    /// The longest walk report gap a region check allows for: twice the client's 0.9 s WALK keep-alive
-    /// (GameAoiSink.WalkDurationMs), so one late report still passes (inferred).
+    /// The longest walk report gap a region check counts (inferred). The client sends WALK only when its direction
+    /// changes (CombatService.WalkSlack), so on a longer straight leg the check falls back to the fixed tolerance.
     /// </summary>
     private const double RegionWalkLagSeconds = 2;
 

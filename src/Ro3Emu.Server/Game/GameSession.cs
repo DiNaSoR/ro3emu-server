@@ -236,16 +236,17 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
     public bool Walking { get; set; }
 
     /// <summary>
-    /// After this long without a walk report the client is no longer walking, whatever the last report said: a moving
-    /// client re-sends WALK at least every 0.9 s (GameAoiSink.WalkDurationMs), so two missed keep-alives mean it
-    /// stopped without a stop report reaching us, or is holding the allowance on purpose (inferred).
+    /// After this long without a walk report the client is no longer counted as walking, whatever the last report said.
+    /// The client sends WALK only when its direction changes (CombatService.WalkSlack), so a straight leg has no
+    /// reports; this is the longest gap the walk check itself measures (SceneService.AcceptWalkAsync). Without it a
+    /// client that sends one moving WALK and then nothing keeps the walk allowance for good (inferred).
     /// </summary>
-    internal const double StaleWalkReportSeconds = 2;
+    internal const double StaleWalkReportSeconds = 5;
 
     /// <summary>
     /// How far a walking client can have moved since its last walk report, counting at most
-    /// <paramref name="maxSeconds"/>: between reports (start, turn, stop, and a keep-alive every 0.9 s along a straight
-    /// stretch) <see cref="Position"/> trails a walking player. Nothing once the report is older than
+    /// <paramref name="maxSeconds"/>: the client reports a walk when it starts, turns or stops, not along a straight
+    /// stretch, so <see cref="Position"/> trails a walking player. Nothing once the report is older than
     /// <see cref="StaleWalkReportSeconds"/>.
     /// </summary>
     public float WalkReportLag(double maxSeconds)

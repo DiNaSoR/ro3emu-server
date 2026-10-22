@@ -501,7 +501,7 @@ public sealed partial class SceneService(IOptions<ServerOptions> options, World 
         var now = DateTime.UtcNow;
         var from = s.Position;
         float dx = walk.Pos.X - from.X, dz = walk.Pos.Z - from.Z, dist = MathF.Sqrt(dx * dx + dz * dz);
-        double seconds = Math.Clamp((now - s.LastWalkUtc).TotalSeconds, 0.05, 5);
+        double seconds = Math.Clamp((now - s.LastWalkUtc).TotalSeconds, 0.05, GameSession.StaleWalkReportSeconds);
         float maxDist = (float)(s.Speed / 100.0 * seconds * 1.5) + 1.5f;
         string? pathProblem = pathMode == "off" ? null
             : !nav.IsWalkable(walk.Pos.X, walk.Pos.Y, walk.Pos.Z) ? "unwalkable cell"
