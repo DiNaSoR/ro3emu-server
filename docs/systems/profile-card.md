@@ -15,7 +15,7 @@ The head icon, frame, chat bubble, title and honor shown on the card are social 
 | State | 5016 `DBPersonalInfo` auto-sync (`LC_DAL_Personal._processPersonalInfo`, `LC_DAL_Personal.lua:64-241`): `unlockInfos`, `upvoteTimes`, `curPlanId`, `planInfos` |
 | Editor | 82553 `UpdateAppearance` (the whole preset; `UI_Sys_PersonalPanelModel.ApplyEditChange`, the sticker panel, the friend window's signature and mood), 82559 current preset, 82560 preset name |
 | Likes | 82554 `Upvote {roleId}` (`UI_Sys_PersonalPanelCtrl._onLickBtnClick`, `LC_DAL_Personal.SendPersonalUpvote`) |
-| Others' view | global cache `Personal` (`romsg.PersonalInfo`, `LC_DAL_RolePublic.lua:874-900`), `PopularityStar`, `PersonalUpvoteCount`, `PersonalUpvoteList`; avatar, frame and title through `Base` |
+| Others' view | global cache `Personal` (`romsg.PersonalInfo`, `LC_DAL_RolePublic.lua:874-900`), `Extra` (`romsg.RoleExpandInfo`), `PopularityStar`, `PersonalUpvoteCount`, `PersonalUpvoteList`; avatar, frame and title through `Base` |
 | Popularity | `UI_Sys_Friend_GiftToFriendsPanelCtrl` (item effects 107 intimacy, 108 popularity, 109 affection), `UI_Sys_Friend_GiftRecordListWidgetCtrl` |
 | Config | `PersonalHomepageImageConfig` (themes, backgrounds, moods), `PersonalPerformanceConfig` (actions), `PerformanceConfig` (poses), `FriendlyItemConfig` (gifts), `PublicParamConfig` `Personal*` limits and defaults |
 | Errors | `ErrorCodeConfig` 3351-3367 (`PersonalService.Err*`) |
@@ -48,6 +48,17 @@ The head icon, frame, chat bubble, title and honor shown on the card are social 
   restarts on Monday 05:00 realm time *(inferred, as the guild activity week)*.
 - **Saved** as the role blobs `personal` (presets, current preset, upvote times, 620 unlocks), `personal_upvote` (likes
   received) and `popularity` (`DBPopularityStar`).
+- **Attributes:** the attribute view of another player's card (`UI_Sys_Personal_PropertyleftWidgetCtrl`
+  `_refreshOtherPlayerPropertyInfo`) reads `Extra` (`romsg.RoleExpandInfo.selfproperty`, the character window's full
+  property list). It goes out only while the role's own `SettingShowDetailInfo` is ShowAll, and `Base.isShowDetail`
+  says the same; a role that never chose is NoShow, the enum's zero value. The own card uses the local stats. The
+  setting arrives as `{showDetailInfo}` alone (`LC_SettingServer`), so NoShow is an empty submessage: under type
+  ShowDetailInfo the sent value replaces the stored one instead of being merged. The Realm of the Gods first-clear
+  record stores each member's full list, but the 82583 reply sends a member who does not show details (as set
+  now, not at the clear) with the same property ids and zero values. `LC_DAL_MultiPlayerDungeon` walks `selfproperty`
+  with an unguarded `pairs()` and `UI_Sys_RoleInfoWidgetCtrl` shows it without reading `isShowDetail`, so the list
+  cannot be left out or empty (zero values inferred; the hall of fame does not bypass the privacy setting, Steven's
+  call).
 - **Other players** get the current preset as `Personal` only when they ask for it, and `PopularityStar` and the like
   count with every field present (the card re-asks until they arrive). The avatar, frame and title ids go in `Base`.
   `PersonalAvatarConfig` and `PersonalAvatarFrameConfig` export only placeholder rows and `PersonalTitleConfig` is
@@ -61,10 +72,10 @@ The head icon, frame, chat bubble, title and honor shown on the card are social 
   without stickers is never shown to others. The own 5016 has no such choice; `Ro3Emu.ClientHooks.PersonalCards` reads
   the missing lists as empty. The gate stays until that hook is proven in game.
 - **Showcase fields not sent:** the other player's card album and book showcase need `Library`
-  ([#215](https://github.com/akreao/ro3emu-server/issues/215)), the honor showcase needs `SeasonPage`
-  ([#216](https://github.com/akreao/ro3emu-server/issues/216)) and the attribute view needs `Extra`
-  ([#217](https://github.com/akreao/ro3emu-server/issues/217)). `UserDataService` sends none of them, so these are empty
-  on another player's card. For `Extra`, Steven decided the target's `SettingShowDetailInfo` privacy setting must be
-  respected: the attributes go out only when it is ShowAll.
+  ([#215](https://github.com/akreao/ro3emu-server/issues/215)) and the honor showcase needs `SeasonPage`
+  ([#216](https://github.com/akreao/ro3emu-server/issues/216)). `UserDataService` sends neither, so these are empty
+  on another player's card.
+- **Attributes of an offline role:** `Extra` is computed from the live character, so an offline role's attribute view
+  is empty even when it shows its details *(inferred: the client does not say what the original server kept)*.
 - The themes and backgrounds behind 620 items are also listed under `_kImageObtain` (the Fashion Shop, Growth Support
   rewards); the shops do not sell them yet.

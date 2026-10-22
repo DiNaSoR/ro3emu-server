@@ -389,6 +389,7 @@ public sealed class RoleSessionService(RoleStore roles, Data.GameData data, Buff
                 await session.SendGameAsync(MsgId.SaveSetting, new SaveSettingResp { Result = ErrorCodes.Parameter });
                 return;
             }
+            if (req.Type.Contains(SettingType.ShowDetailInfo)) ApplyShowDetail(req.DbSettingInfo, stored);
             session.Settings = stored;
             bool modeChanged = ApplyGameModeAttackDefault(req.DbSettingInfo, stored);
             if (req.Type.Contains(SettingType.WildAfk) && stored.WildAFKInfo != null)
@@ -430,6 +431,22 @@ public sealed class RoleSessionService(RoleStore roles, Data.GameData data, Buff
         stored.ClientSetting[ClickToAttackSetting] = value;
         return true;
     }
+
+    /// <summary>
+    /// LC_SettingServer (line 63) sends only { showDetailInfo = value } under type ShowDetailInfo. NoShow is the zero
+    /// value, so it arrives as an empty submessage that a field merge would ignore: the sent value replaces the stored one.
+    /// </summary>
+    private static void ApplyShowDetail(DBSettingInfo sent, DBSettingInfo stored)
+        => (stored.ShowDetailInfo ??= new SettingShowDetailInfo()).ShowDetailInfo
+            = sent.ShowDetailInfo?.ShowDetailInfo ?? ShowDetailInfoType.NoShow;
+
+    /// <summary>
+    /// SettingShowDetailInfo (MG_Setting.proto, the player's "show my details" choice): other players get the role's
+    /// attributes (global cache "Extra") and Base.isShowDetail only when it is ShowAll. A role that never set it is
+    /// NoShow, the enum's zero value.
+    /// </summary>
+    internal static bool ShowsDetail(DBSettingInfo? settings)
+        => settings?.ShowDetailInfo?.ShowDetailInfo == ShowDetailInfoType.ShowAll;
 
     private DBSettingInfo LoadSettings(long roleId)
     {

@@ -62,8 +62,31 @@ public sealed partial class DungeonService
         new QueryHallOfFameInfoResp
         {
             MultiDungeonBossId = req.MultiDungeonBossId,
-            HallOfFameInfo = ServerInfo.HallOfFame.TryGetValue(req.MultiDungeonBossId, out var record) ? record.Clone() : null
+            HallOfFameInfo = ServerInfo.HallOfFame.TryGetValue(req.MultiDungeonBossId, out var record) ? Private(record) : null
         });
+
+    /// <summary>
+    /// The stored record as a viewer may see it: a role that does not show its details (SettingShowDetailInfo NoShow,
+    /// read now, not at the clear) sends its property ids with zero values. The list itself must stay, since
+    /// LC_DAL_RolePublic._parseAllProperty walks selfproperty.propertys with an unguarded pairs() and an empty list
+    /// decodes as nil (inferred: the client data does not say what the original server sent for a hidden role).
+    /// </summary>
+    private DBMultiDungeonHallOfFame Private(DBMultiDungeonHallOfFame record)
+    {
+        var copy = record.Clone();
+        foreach (var role in copy.RoleInfo)
+        {
+            bool shows = ShowsDetailNow(role.Rolebase.Roleid);
+            role.Rolebase.IsShowDetail = shows;
+            if (!shows) role.Selfproperty = CharacterService.Hidden(role.Selfproperty);
+        }
+        return copy;
+    }
+
+    /// <summary>The role's SettingShowDetailInfo: the live session's settings, or the stored ones while offline.</summary>
+    private bool ShowsDetailNow(long role)
+        => RoleSessionService.ShowsDetail(_sessions.All().FirstOrDefault(s => s.Role?.Id == role)?.Settings
+            ?? (_roles.LoadSettings(role) is { Length: > 0 } stored ? DBSettingInfo.Parser.ParseFrom(stored) : null));
 
     /// <summary>
     /// The first won run of a boss on this realm becomes its hall of fame entry: the team leader, the time and every

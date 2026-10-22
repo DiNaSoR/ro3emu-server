@@ -14,7 +14,7 @@ namespace Ro3Emu.Server.Micro;
 /// including itself.
 /// </summary>
 public sealed class UserDataService(SocialOwnerCache cache, OwnerRegistry owners, GameLoop loop, SessionRegistry sessions, GuildService guilds,
-    GuildStore guildStore, GameData data, TimeProvider clock, IOptions<ServerOptions> options, ILogger<UserDataService> log) : IMicroService
+    GuildStore guildStore, CharacterService character, GameData data, TimeProvider clock, IOptions<ServerOptions> options, ILogger<UserDataService> log) : IMicroService
 {
     // (inferred) Full profile replies use increasing versions, so a previous guild/online snapshot is replaceable.
     // The original per-field version allocation is not exported; this service already returns all requested roles.
@@ -103,6 +103,25 @@ public sealed class UserDataService(SocialOwnerCache cache, OwnerRegistry owners
         };
     }
 
+    /// <summary>The role's own SettingShowDetailInfo: the live session's settings, or the stored ones while offline.</summary>
+    private static bool ShowsDetail(GameSession? session, Accounts.Persistence.ProfileSnapshot profile)
+        => RoleSessionService.ShowsDetail(session?.Settings
+            ?? (profile.Settings is { Length: > 0 } stored ? DBSettingInfo.Parser.ParseFrom(stored) : null));
+
+    /// <summary>
+    /// "Extra" (romsg.RoleExpandInfo bytes): the attribute view of another player's profile card. UI_Sys_PersonalPanelModel
+    /// asks for it with the card and LC_DAL_RolePublic reads only selfproperty (_parseAllProperty) into
+    /// m_kExtendInfo.m_kAllPropertyInfo, which UI_Sys_Personal_PropertyleftWidgetCtrl._refreshOtherPlayerPropertyInfo shows
+    /// (the own card uses the local stats instead). Sent only when the role shows its details (its privacy choice).
+    /// The attributes are computed from the live character, so an offline role sends none (inferred: the client data
+    /// does not say what the original server kept for offline roles).
+    /// </summary>
+    private RoleExpandInfo? Extra(GameSession? session, Accounts.Persistence.ProfileSnapshot profile)
+    {
+        if (session?.Progress == null || !ShowsDetail(session, profile)) return null;
+        return new RoleExpandInfo { Selfproperty = character.PublicProperties(session) };
+    }
+
     /// <summary>
     /// "Base" (romsg.RoleAdditionBaseInfo bytes) must always be present; Name/Level/Online/ClusterId are plain values.
     /// The guild roster reads PersonalSystem.Base, not GuildMemberInfo's name/level/online fields
@@ -125,6 +144,7 @@ public sealed class UserDataService(SocialOwnerCache cache, OwnerRegistry owners
             Career = live?.Career ?? role.Career, Gender = role.Sex, JobLevel = live?.JobLevel ?? 1, BornArea = role.Area,
             GuildID = guild?.Id ?? 0, GuildOfficial = member?.Official ?? 0,
             CantBeInvited = personal?.CantBeInvited ?? false, Offlinetime = offline,
+            IsShowDetail = ShowsDetail(session, profile),
             // The head-info Title line and the chat icon (LC_DAL_RolePublic.ParseRolePublicBaseInfo -> m_iTitle).
             Title = session?.Title != null ? Game.TitleService.Current(session) : Game.TitleService.Stored(profile.Title),
         };
@@ -171,6 +191,7 @@ public sealed class UserDataService(SocialOwnerCache cache, OwnerRegistry owners
         var upvotes = PersonalService.Upvotes(profile.PersonalUpvotes);
         if (asked.Contains("PersonalUpvoteCount")) fields["PersonalUpvoteCount"] = Explicit(upvotes?.Infos.Count ?? 0);
         if (asked.Contains("PersonalUpvoteList") && upvotes != null) fields["PersonalUpvoteList"] = upvotes.ToByteArray();
+        if (asked.Contains("Extra") && Extra(session, profile) is { } extra) fields["Extra"] = extra.ToByteArray();
         long snapshotVersion = Interlocked.Increment(ref _version);
         return new()
         {

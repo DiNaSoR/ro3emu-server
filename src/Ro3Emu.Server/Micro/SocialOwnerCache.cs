@@ -56,7 +56,7 @@ public sealed class SocialOwnerCache(AccountStore accounts, OwnerRegistry owners
         AssertLoop();
         return _profiles.TryGetValue(role, out var value) && Current(value.Vector,
             RevisionStore.Identity, RevisionStore.Progress, "wardrobe", "guild_info", "personal", "personal_upvote", "popularity",
-            "social_outfit", RevisionStore.GuildMembership)
+            "social_outfit", "settings", RevisionStore.GuildMembership)
             ? value : null;
     }
 
@@ -73,7 +73,7 @@ public sealed class SocialOwnerCache(AccountStore accounts, OwnerRegistry owners
             {
                 var owner = owners.GetOrRegister(snapshot.Vector);
                 if (!Matches(owner, snapshot.Vector, RevisionStore.Identity, RevisionStore.Progress,
-                    "wardrobe", "guild_info", "personal", "personal_upvote", "popularity", "social_outfit", RevisionStore.GuildMembership))
+                    "wardrobe", "guild_info", "personal", "personal_upvote", "popularity", "social_outfit", "settings", RevisionStore.GuildMembership))
                     throw new OwnerRevisionConflictException();
             }
             foreach (var (id, snapshot) in loaded)
