@@ -133,6 +133,9 @@ public sealed partial class MvpService : IGameTicker
         this._data = data;
         this._accounts = accounts;
         this._monsters = monsters;
+        // Every monster carries its NPCConfig _kBornEventBuff from birth, not only the field MVPs (the MVPs' 900801 /
+        // 900901 control immunity also stands on dungeon and story bosses).
+        monsters.Born.Add(ApplyBornBuffsAsync);
         this._worldData = worldData;
         this._character = character;
         this._rewards = rewards;
@@ -401,7 +404,6 @@ public sealed partial class MvpService : IGameTicker
         st.SkillReadyMs.Clear();
         st.NextCastMs = st.LastFightMs = 0;
         st.UnFightApplied = false;
-        await ApplyBornBuffsAsync(st.Unit);
         _log.LogInformation("MVP {Cfg} ({Npc} {Name}) spawned on {Map} at {X:F0},{Z:F0}", st.Def.CfgId, st.Def.NpcId, NpcName(st.Def.NpcId), st.Def.MapId, st.Unit.X, st.Unit.Z);
         await BroadcastAsync(st.Runtime, RefreshMessage, NpcName(st.Def.NpcId), _data.MapName(st.Def.MapId));
     }
