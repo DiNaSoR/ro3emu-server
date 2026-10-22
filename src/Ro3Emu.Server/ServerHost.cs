@@ -94,6 +94,7 @@ public static class ServerHost
         builder.Services.AddSingleton<CardService>();
         builder.Services.AddSingleton<CardEffects>();
         builder.Services.AddSingleton<TalentProcs>();
+        builder.Services.AddSingleton<PassiveSkills>();
         builder.Services.AddSingleton<SeasonService>();
         builder.Services.AddSingleton<SeasonPageService>();
         builder.Services.AddSingleton<SeasonRefineService>();
@@ -384,6 +385,7 @@ public static class ServerHost
         app.Services.GetRequiredService<ReconnectService>(); // hooks the handover and registers !netdrop
         app.Services.GetRequiredService<CardEffects>(); // socketed-card passives and procs (sockets, scene loads, hits)
         app.Services.GetRequiredService<TalentProcs>(); // profession talent procs (cast resolutions)
+        app.Services.GetRequiredService<PassiveSkills>(); // learned passives' procs, shields and reactions
         // Create the key before the first client connects, so ClientPatch can read the public half.
         app.Services.GetRequiredService<GateCrypto>();
         app.Logger.LogInformation("Data dir {DataDir}", options.DataDir);

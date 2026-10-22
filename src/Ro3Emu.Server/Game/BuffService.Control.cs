@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Ro3Emu.Server.Data;
+using Ro3Emu.Server.Data.Config;
 using Ro3Emu.Server.Maps;
 
 namespace Ro3Emu.Server.Game;
@@ -63,6 +64,10 @@ public sealed partial class BuffService
         && buffs.Any(b => b.ExpireMs > MonsterService.NowMs && b.StateOrdinal > 0
             && _data.Row("SpecialStatusConfig", b.StateOrdinal) is { } state
             && GuardianPetRules.Numbers(state, "_kForbidden").Contains(ordinal));
+
+    /// <summary>Does the unit carry a live negative buff (BuffConfig._iType 2: Stun, Immobilize, Poison ...).</summary>
+    internal bool UnitHasDebuff(WorldUnit unit) => _unitBuffs.TryGetValue(unit.Uid, out var buffs)
+        && buffs.Any(b => b.ExpireMs > MonsterService.NowMs && BuffConfig.Get(_data, b.ConfigId)?.Type == NegativeBuffType);
 
     internal bool UnitHasGroup(WorldUnit unit, int group) => _unitBuffs.TryGetValue(unit.Uid, out var buffs)
         && buffs.Any(b => b.ExpireMs > MonsterService.NowMs && _data.Row("BuffConfig", b.ConfigId) is { } row

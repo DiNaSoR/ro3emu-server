@@ -28,7 +28,6 @@ public sealed partial class CombatService
     }
 
     private Dictionary<(int Group, int Level, int Mode), int>? _configuredModeRows;
-    private int[]? _passiveGroups;
 
     private Dictionary<(int Group, int Level, int Mode), int> ConfiguredModeRows =>
         _configuredModeRows ??= _data.Table("SkillConfig").Values
@@ -69,43 +68,6 @@ public sealed partial class CombatService
         foreach (var mod in SkillParameterRules.Active(session, _data))
             if (mod.Type == 44 && SkillParameterRules.Matches(mod, group, tags)) allowed = SkillParameterRules.Apply(allowed, mod);
         return allowed != 0;
-    }
-
-    /// <summary>Direct _kAttri on the learned mode-0 passive row; no duplicate stacking of its lower levels.</summary>
-    public IEnumerable<(long Id, double Value)> PassiveAttributes(GameSession session)
-    {
-        foreach (var row in PassiveRows(session))
-            foreach (var pair in GameData.Pairs(row, "_kAttri")) yield return pair;
-    }
-
-    /// <summary>
-    /// The skill tuples of the learned passives' own BuffConfig rows, which share the passive row's id (Advanced Katar
-    /// Mastery 1522001: "Your [Assassin Normal Attack] CRIT Chance increases by ${5}%, but its damage is reduced by
-    /// ${6}%" is its row's [15000, 10, +4000] and [15000, 29, -2000]) (inferred from the descriptions).
-    /// </summary>
-    internal IReadOnlyList<SkillParameterRules.Modifier> PassiveModifiers(GameSession session)
-    {
-        var result = new List<SkillParameterRules.Modifier>();
-        foreach (var row in PassiveRows(session))
-            result.AddRange(SkillParameterRules.BuffModifiers(_data, (int)new SkillConfig(row).Id));
-        return result;
-    }
-
-    /// <summary>The SkillConfig row of each learned mode-0 passive at its level.</summary>
-    private IEnumerable<JsonElement> PassiveRows(GameSession session)
-    {
-        if (session.Progress == null) yield break;
-        _passiveGroups ??= _data.Table("SkillConfig").Values
-            .Where(r => GameData.Int(r, "_iBasicType") == 0 && GameData.Int(r, "_iMode") == 0
-                && GameData.Int(r, "_iInitialLevel") > 0)
-            .Select(r => (int)GameData.Int(r, "_iSkillID")).Where(g => g > 0).Distinct().ToArray();
-        foreach (int group in session.Progress.Skills.Keys.Concat(_passiveGroups).Distinct())
-        {
-            int level = _skills.Level(session.Progress, group);
-            if (level <= 0 || _data.Row("SkillConfig", _skills.RealId(group, level)) is not { } row
-                || GameData.Int(row, "_iBasicType") != 0) continue;
-            yield return row;
-        }
     }
 
     /// <summary>Reconcile actual buff/energy-derived parameters and wheel replacements after login/skill/buff changes.</summary>
