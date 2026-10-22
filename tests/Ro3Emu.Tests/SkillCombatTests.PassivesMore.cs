@@ -84,6 +84,38 @@ public sealed partial class SkillCombatTests
         Assert.Equal(3, bodies);
     }
 
+    // An MVP's born buff 900801 carries control immunity (category 20): a player's Frozen 902001 is resisted. Element
+    // Control: "When a Boss target resists your [Frozen] ... deals Water ... Ranged Magic damage equal to your MATK *
+    // 108%" is then the Ice Blast row 1235301 on that boss; an ordinary monster is frozen and no blast follows.
+    [ClientDataFact]
+    public async Task ABossResistsFrozenAndElementControlStrikesItWithIceBlast()
+    {
+        await using var alice = await InWorld("Alice");
+        await Gm("alice", "!lvl 99"); await Gm("alice", "!job 2400"); await Teach("alice", 12306);
+        var buffs = _app.Services.GetRequiredService<BuffService>();
+        var boss = await Target("alice", stationary: true);
+        var plain = await Target("alice", stationary: true);
+        long role = 0;
+        await Loop.InvokeAsync(async () =>
+        {
+            role = Session("alice").Role!.Id;
+            boss.Hp = 50_000_000;
+            await buffs.AddPermanentAsync(boss, 900801, boss.Uid);
+            await buffs.AddSupportAsync(boss, 902001, 3000, role);
+            await buffs.AddSupportAsync(plain, 902001, 3000, role);
+        });
+        var blast = await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser, h => h.SkillId == 1235301);
+        Assert.Equal(boss.Uid, Assert.Single(blast.Dsts).DstID);
+        await Loop.InvokeAsync(() =>
+        {
+            Assert.False(buffs.UnitHasGroup(boss, 9020)); // Frozen
+            Assert.True(buffs.UnitHasGroup(plain, 9020));
+            return Task.CompletedTask;
+        });
+        Assert.DoesNotContain(alice.Inbox.Snapshot(), e => e.IsGame(CombatService.SkillHit)
+            && SkillHitInfo.Parser.ParseFrom(e.Body) is { SkillId: 1235301 } h && h.Dsts.Any(d => d.DstID == plain.Uid));
+    }
+
     // Union: "For each Crusader on the team, gain 1 stack of [Union]" (the other Crusader-line members): a Royal Guard
     // in a party with a Paladin carries one pile of BuffConfig 1162701, and none after the Paladin leaves.
     [ClientDataFact]

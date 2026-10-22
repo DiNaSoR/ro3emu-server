@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using Romsg;
 using Ro3Emu.Server.Data;
 using Ro3Emu.Server.Data.Config;
@@ -13,13 +14,18 @@ namespace Ro3Emu.Server.Game;
 /// only in the description, as for the talents' procs (inferred). Double Attack, Deadly Poison's Venom and Advanced Katar
 /// Mastery are in TalentProcs.Passives, next to the talents that change them; Supersonic Blow and Arcane Mastery change a
 /// skill's damage in CombatService.Passives; the mount passives (Riding, Dragon Training, Wolf Taming, Wolf's Fang) are
-/// RidingEffects. Not executed: Sight Sprout's detection and Element Control's Boss resistance hit.
+/// RidingEffects. Not executed: Sight Sprout's detection.
 /// </summary>
 public sealed class PassiveSkills : IGameTicker
 {
     private const int DoubleHolyLight = 14311, Judex = 14309, EnchantBlade = 11313, EnergyCoat = 12003,
         EmergencyTreatment = 16303, SoulDrain = 12209, PreyOnTheWeak = 15316, PrayerOfGratitude = 14306,
-        WoodSpiritsBlessing = 14307, Union = 11614, SoulExpansion = 12302, PsychokineticAstralBody = 12343;
+        WoodSpiritsBlessing = 14307, Union = 11614, SoulExpansion = 12302, PsychokineticAstralBody = 12343, ElementControl = 12306;
+    // Element Control: "When a Boss target resists your [Frozen], [Petrify], or [Stun], respectively deals Water/Earth/Wind
+    // Ranged Magic damage equal to your MATK * ${2}% to the target." The control's BuffConfig category (Frozen 9, Petrify
+    // 10, Stun 13) picks the Warlock's Ice Blast 1235301, Earth Blast 1235501 or Thunder Blast 1235401 row: water, earth
+    // and wind, each _kDamageParam1 10800 (the ${2} 108).
+    private static readonly Dictionary<long, int> ElementControlBlasts = new() { [9] = 1235301, [10] = 1235501, [13] = 1235401 };
     // Psychokinetic Astral Body's description links its bodies to BuffConfig 12361 (the row of its level).
     private const int AstralBodyBuff = 12361;
     private const int UnionBuff = 1162701; // BuffConfig "Union": "Each stack increases your Physical ATK, ..." (_iMaxStack 10)
@@ -60,6 +66,7 @@ public sealed class PassiveSkills : IGameTicker
         _character = character;
         _loop = loop;
         combat.CastResolved.Add(OnCastResolvedAsync);
+        buffs.ControlResisted.Add(OnControlResistedAsync);
         combat.TakenAsync.Add(OnTakenAsync);
         combat.Killed.Add(OnKilledAsync);
         combat.DamageAdjusters.Add(PreyOnTheWeakDamage);
@@ -121,6 +128,19 @@ public sealed class PassiveSkills : IGameTicker
             await _buffs.RemoveAsync(s, live);
             for (int i = 0; i < live.PileCount && target.Hp > 0; i++) await _combat.CastExtraAsync(s, body, [target]);
         }
+    }
+
+    private async Task OnControlResistedAsync(WorldUnit unit, long sourceId, JsonElement control)
+    {
+        if (unit is not MonsterUnit monster || monster.Hp <= 0
+            || _sessions.All().FirstOrDefault(p => p.Role?.Id == sourceId) is not { Dead: false } s
+            || Learned(s, ElementControl) is null) return;
+        foreach (long category in new BuffConfig(control).BuffCategory)
+            if (ElementControlBlasts.TryGetValue(category, out int blast) && SkillConfig.Get(_data, blast) is { } row)
+            {
+                await _combat.CastExtraAsync(s, row.Row, [monster]);
+                return;
+            }
     }
 
     /// <summary>Psychokinetic Astral Body's bodies buff row and its numbers: "Auto-generating ${2} [Psychokinetic Astral

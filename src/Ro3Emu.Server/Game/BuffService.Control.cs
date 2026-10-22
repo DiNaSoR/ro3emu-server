@@ -52,6 +52,22 @@ public sealed partial class BuffService
                 || displacement && held.Contains(DisplacementImmunityCategory)));
     }
 
+    /// <summary>A unit holding a control immunity (category 20: the MVPs' born buffs 900801/900901, 9032) resists a control
+    /// (tag 37) from any source: Element Control's "When a Boss target resists your [Frozen], [Petrify], or [Stun]" says
+    /// bosses resist them. (inferred) Units only; a player's immunity keeps the guardian-only scope of ImmuneTo.</summary>
+    private bool UnitResistsControl(IEnumerable<ActiveBuff> active, JsonElement incoming)
+    {
+        var control = new BuffConfig(incoming);
+        if (control.Type != NegativeBuffType || !control.BuffCategory.Contains(ControlBuffTag)) return false;
+        long now = MonsterService.NowMs;
+        return active.Any(b => b.ExpireMs > now && BuffConfig.Get(_data, b.ConfigId) is { } row
+            && row.BuffId != ControlChargeGroup && row.BuffCategory.Contains(ControlImmunityCategory));
+    }
+
+    /// <summary>A unit resisted a control a player applied: the unit, the player's role id and the control's BuffConfig
+    /// row (PassiveSkills: Element Control).</summary>
+    internal List<Func<WorldUnit, long, JsonElement, Task>> ControlResisted { get; } = [];
+
     internal async Task DispelControlsAsync(GameSession player, bool allDebuffs = false)
     {
         foreach (var buff in player.Buffs.Where(b => !b.IsPassive && _data.Row("BuffConfig", b.ConfigId) is { } row
