@@ -14,6 +14,9 @@ public sealed class ProfessionTalentEffectTests : IAsyncDisposable
     private const int Skill = 900, SkillRow = 90001, Mastery = 901, Sword = 777001, Buff = 77001;
     // TalentProcs.WhileActive keys Auto Guard Enhance's talent buff to Auto Guard's group; the rows' values are invented.
     private const int AutoGuardEnhance = 1153701, Granted = 77002, AutoGuard = 77003, AutoGuardGroup = 11403;
+    private static readonly int[] PlayBook = [101], Career = [1000], BranchEffects = [1001], OptionEffects = [1002],
+        Ratio = [1000], Flat = [10], GrantedBuff = [Granted];
+    private static readonly int[][] GrantedAttrs = [[103, 9]];
     private readonly string _configRoot = Path.Combine(Path.GetTempPath(), "ro3emu-talent-effects-" + Guid.NewGuid().ToString("N"));
     private SyntheticHost _host = null!;
     private GameSession Session => _host.Service<SessionRegistry>().All().Single(s => s.Role != null);
@@ -26,7 +29,7 @@ public sealed class ProfessionTalentEffectTests : IAsyncDisposable
             Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
             File.Copy(path, dest);
         }
-        Write("SeasonTalentTreeConfig", new Dictionary<string, object> { ["10"] = new { _iId = 10, _kMultiverseArray = new[] { 101 }, _iNeedLevel = 0 } });
+        Write("SeasonTalentTreeConfig", new Dictionary<string, object> { ["10"] = new { _iId = 10, _kMultiverseArray = PlayBook, _iNeedLevel = 0 } });
         object Node(int id, int type, int[] after, bool start = false) => new
         {
             _iId = id, _iType = type, _iTalentTreeID = 10, _iLevelGroupId = 100 + id,
@@ -41,8 +44,8 @@ public sealed class ProfessionTalentEffectTests : IAsyncDisposable
         });
         Write("SeasonTalentEffectConfig", new object[]
         {
-            new { _iGroup = 103, _iLevel = 1, _iJobId = new[] { 1000 }, _kSpecialEffectList = new[] { 1001 } },
-            new { _iGroup = 104, _iLevel = 1, _iJobId = new[] { 1000 }, _kSpecialEffectList = new[] { 1002 } },
+            new { _iGroup = 103, _iLevel = 1, _iJobId = Career, _kSpecialEffectList = BranchEffects },
+            new { _iGroup = 104, _iLevel = 1, _iJobId = Career, _kSpecialEffectList = OptionEffects },
         });
         Write("SpecialEffectConfig", new object[]
         {
@@ -60,10 +63,10 @@ public sealed class ProfessionTalentEffectTests : IAsyncDisposable
         Write("BuffConfig", new object[]
         {
             new { _iID = Buff, _kSkillAttributeList = new[] { new[] { "0", $"{Skill}", "30", "1", "40" } } },
-            new { _iID = AutoGuardEnhance, _kLogicData = new[] { Granted } },
+            new { _iID = AutoGuardEnhance, _kLogicData = GrantedBuff },
             new
             {
-                _iID = Granted, _kChangeAttri = new[] { new[] { 103, 9 } },
+                _iID = Granted, _kChangeAttri = GrantedAttrs,
                 _kSkillAttributeList = new[] { new[] { "0", $"{Skill}", "30", "1", "5" } },
             },
             new { _iID = AutoGuard, _iBuffID = AutoGuardGroup },
@@ -73,7 +76,7 @@ public sealed class ProfessionTalentEffectTests : IAsyncDisposable
             new
             {
                 _iID = SkillRow, _iSkillID = Skill, _iLevel = 1, _iMode = 0, _iMaxLevel = 1, _iBasicType = 1, _iCD = 10000,
-                _kDamageParam1 = new[] { 1000 }, _kDamageParam2 = new[] { 10 },
+                _kDamageParam1 = Ratio, _kDamageParam2 = Flat,
             },
         });
         var items = JsonNode.Parse(File.ReadAllText(Path.Combine(_configRoot, "config", "ItemConfig.json")))!.AsObject();

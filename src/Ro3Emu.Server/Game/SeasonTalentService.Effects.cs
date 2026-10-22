@@ -24,7 +24,7 @@ public sealed partial class SeasonTalentService
     private const long AttrOp = 1, BuffOp = 2, WeaponAttrOp = 16, SkillLevelAttrOp = 19, SkillParameterOp = 21, WeaponSkillAttrOp = 22;
 
     /// <summary>Observers of a changed set of talent skill modifiers in the world (CombatService republishes 31132).</summary>
-    public List<Func<GameSession, Task>> EffectsChanged { get; } = new();
+    public List<Func<GameSession, Task>> EffectsChanged { get; } = [];
 
     private IEnumerable<(long Id, double Value)> SpecialAttributes(GameSession s, JsonElement effect)
     {

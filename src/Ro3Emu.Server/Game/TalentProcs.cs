@@ -99,7 +99,7 @@ public sealed class TalentProcs
     private readonly BuffService _buffs;
     private readonly CharacterService _character;
     private readonly ConditionalWeakTable<GameSession, Dictionary<long, long>> _readyAt = new();
-    private readonly Dictionary<long, SkillConfig?> _procRows = new();
+    private readonly Dictionary<long, SkillConfig?> _procRows = [];
 
     // A test can fix each ten-thousandth roll without changing the production probability.
     internal Func<int, int> Roll { get; set; } = bound => Random.Shared.Next(bound);
