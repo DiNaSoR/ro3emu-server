@@ -7,10 +7,11 @@ namespace Ro3Emu.Tests;
 /// <summary>
 /// 82587 first-clear rewards (TenGameplayBossConfig._iPartAward) on the synthetic set: TenGameplayConfig 9501 (Normal)
 /// and 9502 (Hard) share boss slots 901 and 902. Boss 1 pays 30 (Normal) or 40 (Hard) of currency 102; boss 2 has none.
+/// 9503 (Normal, locked by a condition the role does not meet) and 9504 (Hard) share slot 903 and pay the same.
 /// </summary>
 public sealed class FirstPassAwardTests
 {
-    private const int Normal = 9501, Hard = 9502, Currency = 102;
+    private const int Normal = 9501, Hard = 9502, LockedNormal = 9503, OpenHard = 9504, Currency = 102;
     private static readonly TimeSpan Wait = TimeSpan.FromSeconds(10);
 
     private static GameSession Session(SyntheticHost host, BotClient bot)
@@ -95,5 +96,19 @@ public sealed class FirstPassAwardTests
         Assert.Equal(0, await Claim(bot, Normal, 1));
         Assert.Equal(before + 30, await Count(host, bot));
         Assert.Equal(DungeonService.FirstAwardNone, (await AwardInfo(host, bot, Hard, 1)).IsFirst);
+    }
+
+    [Fact]
+    public async Task HardDoesNotPayALockedNormal()
+    {
+        await using var host = await SyntheticHost.StartAsync();
+        await using var bot = await host.InWorldAsync("Locked");
+        await Cleared(host, bot, OpenHard, 1);
+        long before = await Count(host, bot);
+        Assert.Equal(0, await Claim(bot, OpenHard, 1));
+        Assert.Equal(before + 40, await Count(host, bot));
+        bool paid = true;
+        await OnLoop(host, () => { paid = Session(host, bot).Dungeons!.FirstPassPaid.Contains($"{LockedNormal}:1"); return Task.CompletedTask; });
+        Assert.False(paid); // a locked dungeon is not in 5062, so its paid flag is checked on the state
     }
 }

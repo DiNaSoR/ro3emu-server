@@ -40,8 +40,14 @@ public sealed partial class DungeonService
         if (s.Owner != null) scope?.Context.Pin(s.Owner);
         int error = FirstPassRefusal(s, req.MultiDungeonId, req.MarkId);
         if (error == 0)
-            foreach (var (multi, mark) in FirstPassTargets(s, req.MultiDungeonId, req.MarkId))
-                if ((error = await PayFirstPassAsync(s, multi, mark)) != 0) break;
+        {
+            var targets = FirstPassTargets(s, req.MultiDungeonId, req.MarkId);
+            error = await PayFirstPassAsync(s, req.MultiDungeonId, req.MarkId);
+            // The answer is about the claimed boss; a Normal counterpart that fails to pay stays claimable on its own.
+            if (error == 0)
+                foreach (var (multi, mark) in targets)
+                    await PayFirstPassAsync(s, multi, mark);
+        }
         if (s.Dungeons != null) await SyncAsync(s);
         await s.SendGameAsync(ClaimFirstPass, new ClaimFirstPassAwardResp
         { Result = error, MultiDungeonId = req.MultiDungeonId, MarkId = req.MarkId });
@@ -56,15 +62,15 @@ public sealed partial class DungeonService
         return award == FirstAwardComplete ? 0 : award == FirstAwardFinish ? ErrorCodes.RewardClaimed : ErrorCodes.Parameter;
     }
 
-    /// <summary>The claimed boss, then for a Hard boss (_iDifficulty 2) the Normal boss in the same slot (_kBoss [mark, boss, slot]).</summary>
+    /// <summary>For a Hard boss (_iDifficulty 2), the unpaid Normal boss in the same slot (_kBoss [mark, boss, slot]) the role may enter.</summary>
     private List<(int Multi, int Mark)> FirstPassTargets(GameSession s, int multiId, int mark)
     {
-        var targets = new List<(int, int)> { (multiId, mark) };
+        var targets = new List<(int, int)>();
         var multi = MultiRow(multiId)!.Value;
         if (GameData.Int(multi, "_iDifficulty") != 2 || BossSlot(multi, mark) is not { } slot) return targets;
         var state = CurrentState(s.Dungeons!);
         foreach (var normal in _catalog.MultiRows.Where(r => GameData.Int(r, "_iType") == GameData.Int(multi, "_iType")
-            && GameData.Int(r, "_iDifficulty") == 1))
+            && GameData.Int(r, "_iDifficulty") == 1 && Meets(s, r)))
             for (int m = 1; m <= DungeonCatalog.Marks(normal); m++)
                 if (BossSlot(normal, m) == slot && _catalog.Boss(normal, m) is { } boss && GameData.Int(boss, "_iPartAward") != 0
                     && !state.FirstPassPaid.Contains($"{GameData.Int(normal, "_iID")}:{m}"))
