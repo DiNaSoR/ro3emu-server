@@ -48,6 +48,7 @@ public sealed partial class SeasonTalentService
         session.TalentPlanSwitchUtc = default;
         session.TalentSkillModifiers = [];
         session.TalentProcBuffs = [];
+        session.TalentBuffAttributes = [];
         Seed(session.SeasonTalent);
     }
 

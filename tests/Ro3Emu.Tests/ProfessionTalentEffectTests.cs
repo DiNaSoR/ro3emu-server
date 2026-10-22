@@ -16,7 +16,8 @@ public sealed class ProfessionTalentEffectTests : IAsyncDisposable
     private const int AutoGuardEnhance = 1153701, Granted = 77002, AutoGuard = 77003, AutoGuardGroup = 11403;
     private static readonly int[] PlayBook = [101], Career = [1000], BranchEffects = [1001], OptionEffects = [1002],
         Ratio = [1000], Flat = [10], GrantedBuff = [Granted];
-    private static readonly int[][] GrantedAttrs = [[103, 9]];
+    private static readonly int[][] GrantedAttrs = [[103, 9]], GuardAttrs = [[105, 32], [106, 32]];
+    private const int Guard = 77011, GuardGroup = 77010;
     private readonly string _configRoot = Path.Combine(Path.GetTempPath(), "ro3emu-talent-effects-" + Guid.NewGuid().ToString("N"));
     private SyntheticHost _host = null!;
     private GameSession Session => _host.Service<SessionRegistry>().All().Single(s => s.Role != null);
@@ -50,7 +51,14 @@ public sealed class ProfessionTalentEffectTests : IAsyncDisposable
         Write("SpecialEffectConfig", new object[]
         {
             // The branch: cooldown set, damage ratio added.
-            new { _iID = 1001, _kSpecialEffect = new[] { new long[] { 21, 0, 0, Skill, 0, 2, 4000 }, [21, 0, 0, Skill, 29, 1, 250] } },
+            // ... and BuffDictRef: the second _kChangeAttri pair of the group's buffs this player applies +50.
+            new
+            {
+                _iID = 1001, _kSpecialEffect = new[]
+                {
+                    new long[] { 21, 0, 0, Skill, 0, 2, 4000 }, [21, 0, 0, Skill, 29, 1, 250], [12, 0, GuardGroup, 2, 1, 50, 1, 1],
+                },
+            },
             // The option: flat attr, sword-only attr (two sword kinds, once), skill-level attr, per-level attr, a buff's tuples.
             new
             {
@@ -70,6 +78,7 @@ public sealed class ProfessionTalentEffectTests : IAsyncDisposable
                 _kSkillAttributeList = new[] { new[] { "0", $"{Skill}", "30", "1", "5" } },
             },
             new { _iID = AutoGuard, _iBuffID = AutoGuardGroup },
+            new { _iID = Guard, _iBuffID = GuardGroup, _kChangeAttri = GuardAttrs },
         });
         Write("SkillConfig", new[]
         {
@@ -163,6 +172,11 @@ public sealed class ProfessionTalentEffectTests : IAsyncDisposable
         await OnLoop(async () => { await buffs.RemoveAsync(Session, Session.Buffs.Single(b => b.ConfigId == AutoGuard)); return 0; });
         Assert.Equal(patk + 7 + 5 * 3, await Stat(103));
         Assert.Equal(50, (await Effective()).GetProperty("_kDamageParam2")[0].GetInt64());
+
+        // The talent changes the buff this player applies: [105, 32], [106, 32 + 50].
+        await OnLoop(async () => { await buffs.AddAsync(Session, Guard, 60_000, Session.Role!.Id); return 0; });
+        var guard = await OnLoop(() => Task.FromResult(Session.Buffs.Single(b => b.ConfigId == Guard).Changes.ToArray()));
+        Assert.Equal([(105L, 32d), (106L, 82d)], guard);
 
         Assert.Equal(0, await Request(bot, SeasonTalentService.SetPlan, new SeasonTalentSetCurPlanReq { PlanId = 1 },
             body => SeasonTalentSetCurPlanResp.Parser.ParseFrom(body).Result));

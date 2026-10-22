@@ -50,6 +50,12 @@ An empty successful 31127 snapshot is safe for the inspected client: `LC_DAL_Bos
 
 A weapon is an `ItemConfig._iSubType` (1 Dagger, 2 Sword, 3 Two-Handed Sword, 4 Spear, 5 Two-Handed Spear, 12 Katar) in the main-hand or off-hand grid. Ops of one effect that differ only in their condition ("a dagger or katar") apply once. Op 21 and the buffs' tuples go through `SkillParameterRules` like a live buff's, so the cast row, 31132 and mode selection see them. `_kBuffAttributeList`, BuffDictRef(12) and op 20 are not executed. `ProfessionTalentEffectTests` covers each applied op on an invented graph.
 
+### Talent changes to other buffs
+
+A talent can change the buffs its owner applies: `BuffConfig._kBuffAttributeList` of a Buff(2) row, or op 12 (BuffDictRef) written inline, as `["0", buff group, EBuffAffectValueType, operation, value, index, ...]`. Type 2 (BuffAttr) changes the value of the group's `_kChangeAttri` pair at `index` when the owner applies such a buff, to itself or to an ally. Guard Enhance's two rows give Parry's PDEF and MDEF pairs +50 each, and Rousing Support gives Crazy Uproar's second pair +10. The operation arithmetic is `SkillParameterRules`' **(inferred)**. Type 4 (BuffLogicData: proc chances such as Double Attack's) and scope-1 tuples are not applied yet.
+
+When a talent effect has `_iIsOtherDesc` 1, its description and values are those of its `_kOtherDesc` buff.
+
 ### Talent procs
 
 A Buff(2) row's `_kLogicData` names what a proc applies: a SkillConfig row (Rapid Pierce 1112101), a skill group (Double Counter's 11127) or a BuffConfig row with a duration. The proc row's own damage, `_kShowDmg` and script carry the hit. The talent's `_kDescData` holds the chance, cooldown and area in the order its description uses them. Which cast triggers a proc is written only in the description, so `TalentProcs.Rules` keys each rule by the talent buff and quotes the description **(inferred)**. A proc is an extra cast through `ApplyEffectsAsync` on the monsters the rule chooses. It pays nothing, starts no cooldown and never triggers another proc. `TalentProcs.WhileActive` lists the talents whose `_kLogicData` buff applies only while another buff group lives ("While [Aura Blade] is active ..."). Their skill tuples and `_kChangeAttri` follow that buff.

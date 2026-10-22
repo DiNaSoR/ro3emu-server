@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using Ro3Emu.Server.Data;
 using Ro3Emu.Server.Data.Config;
 using Ro3Emu.Server.Maps;
@@ -26,6 +27,7 @@ public sealed class TalentProcs
     // BuffConfig._iBuffID of the skills' own buffs, named by BuffConfig._iName.
     private const long AuraBlade = 11201, Parry = 11210, AutoGuard = 11403, Sacrifice = 11501, BattleChant = 11505;
     private const long TwoHandedSword = 3; // ItemConfig._iSubType
+    private const int BuffAttrType = 2; // EBuffAffectValueType.BuffAttr
 
     /// <summary>
     /// A proc rule. Indexes are into the talent's _kDescData; null means none (a sure proc, no cooldown).
@@ -98,20 +100,52 @@ public sealed class TalentProcs
     private readonly CombatService _combat;
     private readonly BuffService _buffs;
     private readonly CharacterService _character;
+    private readonly SessionRegistry _sessions;
     private readonly ConditionalWeakTable<GameSession, Dictionary<long, long>> _readyAt = [];
     private readonly Dictionary<long, SkillConfig?> _procRows = [];
 
     // A test can fix each ten-thousandth roll without changing the production probability.
     internal Func<int, int> Roll { get; set; } = bound => Random.Shared.Next(bound);
 
-    public TalentProcs(GameData data, CombatService combat, BuffService buffs, CharacterService character)
+    public TalentProcs(GameData data, CombatService combat, BuffService buffs, CharacterService character, SessionRegistry sessions)
     {
         _data = data;
         _combat = combat;
         _buffs = buffs;
         _character = character;
+        _sessions = sessions;
+        buffs.SourceAttributes = BuffAttributes;
         combat.CastResolved.Add(OnCastResolvedAsync);
         buffs.Changed.Add(OnBuffsChangedAsync);
+    }
+
+    /// <summary>
+    /// The applier's talents change a buff it applies: "【Crazy Uproar】 Extra PATK +${1}" is a BuffAttr (type 2) tuple on
+    /// Crazy Uproar's group. It counts for every recipient of the applier's buff ("Maximize Power increases nearby
+    /// allies' PATK") (inferred).
+    /// </summary>
+    private IReadOnlyList<(long Id, double Value)> BuffAttributes(long sourceId, JsonElement row, IReadOnlyList<(long Id, double Value)> pairs)
+    {
+        GameSession? source = null;
+        foreach (var s in _sessions.All())
+            if (s.Role?.Id == sourceId) { source = s; break; }
+        if (source == null || source.TalentBuffAttributes.Count == 0) return pairs;
+        long group = new BuffConfig(row).BuffId;
+        List<(long Id, double Value)>? changed = null;
+        foreach (var attribute in source.TalentBuffAttributes)
+        {
+            if (attribute.Group != group || attribute.Type != BuffAttrType || attribute.Index < 0 || attribute.Index >= pairs.Count) continue;
+            changed ??= [.. pairs];
+            var (id, value) = changed[attribute.Index];
+            changed[attribute.Index] = (id, attribute.Operation switch
+            {
+                1 => value + attribute.Value,
+                2 => attribute.Value,
+                5 => value * (1 + attribute.Value / 10000),
+                _ => value,
+            });
+        }
+        return changed ?? pairs;
     }
 
     /// <summary>A "while a buff is active" talent's attributes follow that buff (SeasonTalentService.Attributes).</summary>
