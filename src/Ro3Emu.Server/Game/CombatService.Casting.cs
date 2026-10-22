@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Romsg;
 using Ro3Emu.Server.Data;
+using Ro3Emu.Server.Data.Config;
 using Ro3Emu.Server.Maps;
 using Ro3Emu.Server.Game.Ownership;
 
@@ -98,7 +99,8 @@ public sealed partial class CombatService
             // Preserve the established cooldown refusal for a repeated cast, including during its action tail.
             else if (s.SkillCast is { Cancelled: false } active && Now < active.StartMs + active.ChantMs + active.ActionMs
                 && GameData.Int(row.Value, "_bCancelCast") == 0) error = ErrorCodes.SkillBusy;
-            else error = ValidateTarget(s, row.Value, req, origin, owned == null ? WalkSlack(s) : 0);
+            else error = ValidateTarget(s, row.Value, req, origin, owned == null ? WalkSlack(s) : 0,
+                _data.Row("SkillConfig", request.SkillId) is { } askedRow ? Range(askedRow) : 0);
         }
         var costs = row is { } value ? ResolveCosts(s, value) : new CastCosts();
         long errorParam = 0;
@@ -147,7 +149,7 @@ public sealed partial class CombatService
             _eventAttacks[s] = new EventAttack(playerTarget, loopSkill,
                 Now + SkillMs(s, row.Value) + ChantMs(s, row.Value) + 1,
                 s.Position.X, s.Position.Z);
-        await StartCooldownAsync(s, row.Value);
+        await StartCooldownAsync(s, row.Value, SkillConfig.Get(_data, request.SkillId) is { } asked ? (int)asked.Mode : null);
         await StartCastAsync(s, row.Value, req, id, owned);
     }
 
@@ -231,7 +233,9 @@ public sealed partial class CombatService
     private static double WalkedSeconds(DateTime since) => Math.Clamp((DateTime.UtcNow - since).TotalSeconds, 0, MaxWalkSlackSeconds);
     private static float WalkSlack(GameSession s) => !s.Walking ? 0 : (float)(s.Speed / 100.0 * WalkedSeconds(s.LastWalkUtc));
 
-    private int ValidateTarget(GameSession s, JsonElement row, CastSkillReq req, Vec3 origin, float slack = 0)
+    /// <param name="askedRange">The range of the row the client asked for: it walks into that range, not into the
+    /// range of a mode row a talent or a mount selects (Arrow Smash 18 m, its wolf row 5 m; issue #62).</param>
+    private int ValidateTarget(GameSession s, JsonElement row, CastSkillReq req, Vec3 origin, float slack = 0, float askedRange = 0)
     {
         int release = (int)GameData.Int(row, "_iRelease");
         var monster = FindMonster(s.WorldScene, req.TargetId);
@@ -264,7 +268,8 @@ public sealed partial class CombatService
         else { req.TargetPos ??= origin.Clone(); return 0; }
         if (!_buffs.CanSeePosition(s, targetPosition)) return ErrorCodes.SkillTargetInvalid;
         float d = Distance(origin, targetPosition);
-        if (d < GameData.Int(row, "_iDistanceMin") / 100f - slack || d > Range(row) + 0.5f + slack) return ErrorCodes.SkillDistance;
+        if (d < GameData.Int(row, "_iDistanceMin") / 100f - slack || d > Math.Max(Range(row), askedRange) + 0.5f + slack)
+            return ErrorCodes.SkillDistance;
         float height = GameData.Int(row, "_iHeightRange") / 100f;
         if (height > 0 && MathF.Abs(origin.Y - targetPosition.Y) > height) return ErrorCodes.SkillHeight;
         if (GameData.Int(row, "_iPassBlock") == 2 && _worldData.Map(s.SceneEntry)?.Nav is { } nav
@@ -351,20 +356,25 @@ public sealed partial class CombatService
             await _buffs.ConsumeBuffPilesAsync(s, group, (int)count);
     }
 
-    private async Task StartCooldownAsync(GameSession s, JsonElement row)
+    private async Task StartCooldownAsync(GameSession s, JsonElement row, int? askedMode = null)
     {
         int group = (int)GameData.Int(row, "_iSkillID"), mode = (int)GameData.Int(row, "_iMode");
         long now = Now, cd = GameData.Int(row, "_iCD");
         var notice = new SkillCdNotify { Uuid = s.Role!.Id };
-        void Set(int g, int m, long duration, bool shared)
+        void Set(int g, int m, long duration, bool shared, int shownMode)
         {
             if (duration <= 0) return;
             long end = now + duration;
             s.SkillModeCds[(g, m)] = Math.Max(end, s.SkillModeCds.GetValueOrDefault((g, m)));
             if (shared) s.SkillCds[g] = Math.Max(end, s.SkillCds.GetValueOrDefault(g));
-            notice.Infos.Add(new SkillCdInfo { SkillId = g, SkillMode = m, CdStartTimestampMs = now, CdEndTimestampMs = end });
+            notice.Infos.Add(new SkillCdInfo { SkillId = g, SkillMode = shownMode, CdStartTimestampMs = now, CdEndTimestampMs = end });
         }
-        Set(group, mode, cd, GameData.Int(row, "_iCdModeGroup") < 0);
+        // The client files a 31113 under group * 10000 + its mode (LC_Skill_Function.GetSkillCDInfoKey) and its bar reads
+        // the key of the row it keeps, the row it asks to cast. A mode a talent or a mount selects (type 15: Joint Beat,
+        // Spear Throw, Arrow Smash on the wolf) casts another row, and a cooldown sent under that row's mode never showed
+        // (issue #62): it goes under the asked row's mode. Without one, a mode row's _iCdModeGroup (0: mode 0's) decides.
+        int cdModeGroup = (int)new SkillConfig(row).CdModeGroup;
+        Set(group, mode, cd, cdModeGroup < 0, askedMode ?? (cdModeGroup >= 0 ? cdModeGroup : mode));
         var shared = Numbers(row, "_iPubCD");
         var groups = Numbers(row, "_iPubCDGroup");
         // Parallel arrays, e.g. BackSlide [15104,15330,15329] / [1000,15000,0] (inferred server application).
@@ -372,7 +382,7 @@ public sealed partial class CombatService
         {
             int sibling = (int)groups[i];
             if (_data.Row("SkillConfig", sibling) is { } siblingRow) sibling = (int)GameData.Int(siblingRow, "_iSkillID");
-            if (sibling > 0) Set(sibling, 0, (long)shared[i], true);
+            if (sibling > 0) Set(sibling, 0, (long)shared[i], true, 0);
         }
         if (notice.Infos.Count > 0) await s.SendGameAsync(SkillCdUpdate, notice);
     }
