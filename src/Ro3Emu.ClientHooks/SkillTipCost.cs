@@ -195,6 +195,7 @@ namespace Ro3Emu.ClientHooks
         private static void Place(Transform clone, Transform cooldown, Transform cell)
         {
             // Only groups inside the info block count: without the block, or above it, the copy would leave the tooltip.
+            if (cell != null && !cooldown.IsChildOf(cell)) cell = null;
             var row = cooldown;
             while (cell != null && row != cell && row.parent != null && row.parent.GetComponent<VerticalLayoutGroup>() == null)
                 row = row.parent;
@@ -209,6 +210,14 @@ namespace Ro3Emu.ClientHooks
             // No vertical group: below the cooldown's own row (its parent when that lays labels out side by side).
             var line = cooldown.parent.GetComponent<HorizontalLayoutGroup>() != null ? cooldown.parent : cooldown;
             if (clone.parent != line.parent) clone.SetParent(line.parent, false);
+            if (line.parent != null && line.parent.GetComponent<LayoutGroup>() != null)
+            {
+                // A layout group there would override the position: take the slot after the row instead.
+                int after = line.GetSiblingIndex() + 1;
+                if (clone.GetSiblingIndex() != after) clone.SetSiblingIndex(after);
+                if (line.parent is RectTransform group) LayoutRebuilder.MarkLayoutForRebuild(group);
+                return;
+            }
             if (line is RectTransform from)
                 clone.position = cooldown.position - line.up * (from.rect.height * line.lossyScale.y);
         }
