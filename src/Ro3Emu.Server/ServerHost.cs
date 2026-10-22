@@ -95,6 +95,7 @@ public static class ServerHost
         builder.Services.AddSingleton<CardEffects>();
         builder.Services.AddSingleton<TalentProcs>();
         builder.Services.AddSingleton<PassiveSkills>();
+        builder.Services.AddSingleton<RidingEffects>();
         builder.Services.AddSingleton<SeasonService>();
         builder.Services.AddSingleton<SeasonPageService>();
         builder.Services.AddSingleton<SeasonRefineService>();
@@ -386,6 +387,7 @@ public static class ServerHost
         app.Services.GetRequiredService<CardEffects>(); // socketed-card passives and procs (sockets, scene loads, hits)
         app.Services.GetRequiredService<TalentProcs>(); // profession talent procs (cast resolutions)
         app.Services.GetRequiredService<PassiveSkills>(); // learned passives' procs, shields and reactions
+        app.Services.GetRequiredService<RidingEffects>(); // a ridden mount's buffs and the riding passives
         // Create the key before the first client connects, so ClientPatch can read the public half.
         app.Services.GetRequiredService<GateCrypto>();
         app.Logger.LogInformation("Data dir {DataDir}", options.DataDir);
@@ -466,6 +468,7 @@ internal sealed class GameLoopTickers(IServiceProvider services) : IHostedServic
         Add<CombatService>();
         Add<SeasonService>();
         Add<MountService>();
+        Add<RidingEffects>();
         Add<TeamService>();
         Add<DailyActivityService>();
         Add<TimedEventService>();
