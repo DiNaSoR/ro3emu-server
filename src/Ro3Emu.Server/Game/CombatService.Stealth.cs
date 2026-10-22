@@ -39,8 +39,9 @@ public sealed partial class CombatService
         foreach (var buff in player.Buffs)
         {
             if (buff.ExpireMs <= Now || BuffConfig.Get(_data, buff.ConfigId) is not { } row) continue;
-            if (row.BuffCategory.Contains(DetectionCategory)
-                || buff.IsGuardianOwned && row.BuffId == GuardianGroup.ScoutDetection)
+            if (row.BuffCategory.Contains(DetectionCategory))
+                radius = Math.Max(radius, DetectionLogic(player, row.LogicData.FirstOrDefault()));
+            else if (buff.IsGuardianOwned && row.BuffId == GuardianGroup.ScoutDetection)
                 radius = Math.Max(radius, row.LogicData.FirstOrDefault());
             else if (row.BuffId == SightGroup && SkillConfig.Get(_data, SightSkill) is { } sight)
                 radius = Math.Max(radius, (long)sight.Range.FirstOrDefault());
@@ -49,6 +50,17 @@ public sealed partial class CombatService
             && double.TryParse(metres, NumberStyles.Float, CultureInfo.InvariantCulture, out double m))
             radius = Math.Max(radius, (long)Math.Round(m * 100));
         return (int)radius;
+    }
+
+    /// <summary>A detection row's radius after the talents' scope-1 BuffLogicData tuples on its category: Scouting's
+    /// "[Detect Stealth] range +${1} meters" is ["1", "109", "4", "1", "300", "0"].</summary>
+    private static long DetectionLogic(GameSession player, long radius)
+    {
+        double value = radius;
+        foreach (var tuple in player.TalentBuffAttributes)
+            if (tuple is { ByCategory: true, Group: DetectionCategory, Type: 4, Index: 0 })
+                value = tuple.Operation switch { 1 => value + tuple.Value, 2 => tuple.Value, 5 => value * (1 + tuple.Value / 10000), _ => value };
+        return (long)value;
     }
 
     /// <summary>Whether the viewer may single out the subject: itself, a visible unit, an ally, or a hidden enemy within
