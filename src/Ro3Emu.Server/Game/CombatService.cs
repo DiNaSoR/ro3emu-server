@@ -239,6 +239,8 @@ public sealed partial class CombatService : IGameTicker
     public List<Func<GameSession, JsonElement, Task>> CastLanded { get; } = new();
     /// <summary>After a player's own cast applied its effects, with the monsters it processed (TalentProcs).</summary>
     internal List<Func<GameSession, ActiveSkillCast, IReadOnlyList<MonsterUnit>, Task>> CastResolved { get; } = [];
+    /// <summary>May the caster's skill put this _kBuff1 buff on the recipient (TalentProcs: talent-gated buffs).</summary>
+    internal Func<GameSession, GameSession, int, bool>? SkillBuffAllowed { get; set; }
     public List<Func<GameSession, MonsterUnit, JsonElement, DamageHitResult, long, long>> DamageAdjusters { get; } = new();
     public List<Func<GameSession, MonsterUnit, JsonElement, long, long>> ExtraHitDamage { get; } = new();
     public List<Func<GameSession, MonsterUnit, JsonElement, long, Task>> DealtAsync { get; } = new();

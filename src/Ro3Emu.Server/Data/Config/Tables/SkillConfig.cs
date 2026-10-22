@@ -66,4 +66,24 @@ public readonly partial record struct SkillConfig(JsonElement Row)
     [ConfigField("_kShowDmg")] public partial long[] ShowDmg { get; }
     [ConfigField("_kSkillCategory")] public partial long[] SkillCategory { get; }
     [ConfigField("_kSpSkillParam")] public partial long[] SpSkillParam { get; }
+
+    /// <summary>
+    /// This row as a hit whose damage only a description gives (talent procs): PATK * ratio (basis points) + flat, of an
+    /// element (0 keeps the row's). It keeps the row's id, release and show, but drops its group, tags, script, buffs and
+    /// shown hit count, so no skill modifier, script effect or buff of the original applies to it.
+    /// </summary>
+    public JsonElement AsDescribedHit(long ratio, long flat, long element)
+    {
+        var node = System.Text.Json.Nodes.JsonNode.Parse(Row.GetRawText())!.AsObject();
+        node["_kDamageParam1"] = new System.Text.Json.Nodes.JsonArray(ratio);
+        node["_kDamageParam2"] = new System.Text.Json.Nodes.JsonArray(flat);
+        if (element > 0) node["_iEleType"] = element;
+        node["_iSkillID"] = 0;
+        node["_kSkillCategory"] = new System.Text.Json.Nodes.JsonArray();
+        node["_kScriptLogic"] = "";
+        node["_kBuff1"] = new System.Text.Json.Nodes.JsonArray();
+        node["_kBuff2"] = new System.Text.Json.Nodes.JsonArray();
+        node["_kShowDmg"] = new System.Text.Json.Nodes.JsonArray();
+        return JsonSerializer.SerializeToElement(node);
+    }
 }

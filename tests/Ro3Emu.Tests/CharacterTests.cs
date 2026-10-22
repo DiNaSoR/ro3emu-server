@@ -504,6 +504,29 @@ public sealed class CharacterTests : IAsyncLifetime
         Assert.Equal((3, 42L), (rank.Rankid, (long)rank.Itemuid));
     }
 
+    // A Novice's saved bar holds the Novice normal attack. After a job change it leaves the bar (a later career attacks
+    // with atkSkillId), or the client keeps casting the Novice's 1000001 instead of the career's.
+    [ClientDataFact]
+    public async Task ASavedNoviceAttackSlotLeavesTheBarAfterAJobChange()
+    {
+        await using var alice = await InWorld("Alice");
+        await _app.Services.GetRequiredService<GameLoop>().InvokeAsync(() =>
+        {
+            var s = _app.Services.GetRequiredService<SessionRegistry>().All().Single(s => s.Account == "alice");
+            s.Progress!.SkillBar[1] = 10000;
+            // ... and a plan's manual bar (SkillAssignPlan.ManualLoadSkill), which the wheel prefers.
+            var plan = s.SkillPlans!.SkillAssignPlans[s.SkillPlans.CurrentPlanIndex];
+            plan.ManualLoadSkill.Clear();
+            plan.ManualLoadSkill.Add(new SkillData { SkillId = 10000, SkillLevel = 1 });
+            return Task.CompletedTask;
+        });
+        await Gm("alice", "!job 3100");
+        await alice.SendGameAsync(1023, new PlayerAssetReq { AssetType = { 5 } });
+        var skills = await Next(alice, SkillService.SkillDataSync, DBSkillDataIncrement.Parser, m => m.SyncAllMark && m.CurrentAtkSkillId == 1300001);
+        Assert.Equal(1300001, skills.SkillWheel.All.AtkSkillId); // JobConfig 3100 _kSkillNormalID
+        Assert.DoesNotContain(skills.SkillWheel.All.WhellSkills.Values, slot => slot.SkillConfigId == 1000001);
+    }
+
     [ClientDataFact]
     public async Task SkillDataCarriesTheNormalAttackAndBashCanBeLearned()
     {

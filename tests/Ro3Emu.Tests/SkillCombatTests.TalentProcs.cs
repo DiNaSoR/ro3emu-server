@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Romsg;
 using Ro3Emu.Bot;
 using Ro3Emu.Server.Data;
+using Ro3Emu.Server.Data.Config;
 using Ro3Emu.Server.Game;
 
 namespace Ro3Emu.Tests;
@@ -97,6 +98,74 @@ public sealed partial class SkillCombatTests
         Assert.Equal(0, accepted.Result);
         var proc = await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser, x => x.SkillId == 1240301);
         Assert.Contains(proc.Dsts, d => d.DstID == monster.Uid && d.Damage > 0);
+    }
+
+    // Opening has no proc row: "After casting [Basic Attack], there is a ${1}% Chance to Deals DMG to the enemy an Extra
+    // ${2} times, each dealing PATK * ${3}% + ${4}". The extra hit is the attack's own row with that damage.
+    [ClientDataFact]
+    public async Task OpeningAddsADescribedHitToTheBasicAttack()
+    {
+        await using var alice = await InWorld("Alice");
+        await Gm("alice", "!lvl 99"); await Gm("alice", "!job 5200"); await Teach("alice", 15000);
+        await ChooseProfessionTalent(alice, "alice", 10102103);
+        _app.Services.GetRequiredService<TalentProcs>().Roll = _ => 0;
+        var monster = await Target("alice", stationary: true);
+        await Loop.InvokeAsync(() => { monster.Hp = 1_000_000; return Task.CompletedTask; });
+
+        await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1500001, TargetId = monster.Uid });
+        var accepted = await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser);
+        Assert.Equal(0, accepted.Result);
+        await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser, x => x.SessionId == accepted.SessionId);
+        var extra = await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser,
+            x => x.SkillId == 1500001 && x.SessionId != accepted.SessionId && x.SrcID == Session("alice").Role!.Id);
+        Assert.Contains(extra.Dsts, d => d.DstID == monster.Uid && d.Damage > 0);
+
+        // The described hit keeps the attack's id. With the attack's effective row cached by now (Normal Attack Boost is
+        // a live modifier), the extra cast must still deal the description's damage, not the attack's.
+        var described = SkillConfig.Get(_app.Services.GetRequiredService<GameData>(), 1500001)!.Value.AsDescribedHit(2000, 100, 1);
+        var row = await Loop.InvokeAsync(() =>
+            Task.FromResult(_app.Services.GetRequiredService<CombatService>().ExtraRow(Session("alice"), described)));
+        Assert.Equal(2000, row.GetProperty("_kDamageParam1")[0].GetInt64());
+        Assert.Equal(100, row.GetProperty("_kDamageParam2")[0].GetInt64());
+    }
+
+    // Blade Dance: "... to up to ${3} enemies within a ${2}-meter radius of you". It needs no living target: when the
+    // attack killed it, the proc still hits the monsters around the caster.
+    [ClientDataFact]
+    public async Task BladeDanceStillHitsAroundTheCasterWhenTheAttackKills()
+    {
+        await using var alice = await InWorld("Alice");
+        await Gm("alice", "!lvl 99"); await Gm("alice", "!job 5200"); await Teach("alice", 15000);
+        await ChooseProfessionTalent(alice, "alice", 10102102);
+        _app.Services.GetRequiredService<TalentProcs>().Roll = _ => 0;
+        var victim = await Target("alice", stationary: true);
+        var bystander = await Target("alice", stationary: true);
+        await Loop.InvokeAsync(() => { victim.Hp = 1; bystander.Hp = 1_000_000; return Task.CompletedTask; });
+
+        await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1500001, TargetId = victim.Uid });
+        var accepted = await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser);
+        Assert.Equal(0, accepted.Result);
+        var proc = await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser,
+            x => x.SessionId != accepted.SessionId && x.Dsts.Any(d => d.DstID == bystander.Uid));
+        Assert.True(proc.Dsts.Single(d => d.DstID == bystander.Uid).Damage > 0);
+    }
+
+    // Crazy Uproar's _kBuff1 lists "Crazy Uproar - Mind and Body Renewal" and "Crazy Uproar - Self-Motivation"
+    // unconditionally; each comes only with its talent (10102118 Mind and Body Renewal for a Whitesmith-line job).
+    [ClientDataFact]
+    public async Task CrazyUproarGivesOnlyTheChosenTalentsBuff()
+    {
+        await using var alice = await InWorld("Alice");
+        await Gm("alice", "!lvl 99"); await Gm("alice", "!job 6200"); await Teach("alice", 16008);
+        await ChooseProfessionTalent(alice, "alice", 10102118);
+
+        await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1600801, TargetPos = Session("alice").Position.Clone() });
+        Assert.Equal(0, (await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
+        await Next(alice, BuffService.BuffUpdate, BuffUpdateNotify.Parser, x => x.Buffs.Any(b => b.ConfigId == 1600801));
+        await Task.Delay(300);
+        var buffs = await Loop.InvokeAsync(() => Task.FromResult(Session("alice").Buffs.Select(b => b.ConfigId).ToArray()));
+        Assert.Contains(1601001, buffs); // Mind and Body Renewal
+        Assert.DoesNotContain(1601101, buffs); // Self-Motivation, not chosen
     }
 
     // Meteor Storm leaves a field, so Flame Burst centres on its target point: "After using [Meteor Storm], immediately

@@ -3,6 +3,7 @@ using Romsg;
 using Google.Protobuf;
 using Ro3Emu.Server.Accounts;
 using Ro3Emu.Server.Data;
+using Ro3Emu.Server.Data.Config;
 
 namespace Ro3Emu.Server.Game;
 
@@ -409,7 +410,7 @@ public sealed class SkillService
         {
             state.SkillWheel.WhellSkills.Clear();
             for (int slot = 1; slot <= Math.Min(BarSlots, selected.ManualLoadSkill.Count); slot++)
-                if (selected.ManualLoadSkill[slot - 1] is { SkillId: > 0 } skill
+                if (selected.ManualLoadSkill[slot - 1] is { SkillId: > 0 } skill && OnBar(session.Progress!, skill.SkillId)
                     && RealId(skill.SkillId, skill.SkillLevel) is var id and > 0)
                     state.SkillWheel.WhellSkills[slot] = new SkillWheelSlot { SkillConfigId = id, Enable = true };
         }
@@ -428,7 +429,7 @@ public sealed class SkillService
         if (p.SkillBar.Count > 0)
         {
             foreach (var (slot, group) in p.SkillBar.OrderBy(s => s.Key))
-                if (Level(p, group) > 0) yield return (slot, group);
+                if (OnBar(p, group) && Level(p, group) > 0) yield return (slot, group);
             yield break;
         }
         int next = 1;
@@ -442,13 +443,28 @@ public sealed class SkillService
         foreach (var (group, _) in Tree(p.Career))
         {
             if (next > BarSlots) break;
-            if (Level(p, group) > 0 && IsActive(group) && !IsNormalGroup(p, group)) yield return (next++, group);
+            if (Level(p, group) > 0 && IsActive(group) && !IsNormalGroup(p, group) && OnBar(p, group)) yield return (next++, group);
         }
     }
+
+    /// <summary>
+    /// Only a Novice keeps a normal attack on the bar; a later career attacks with atkSkillId (and may not slot its own,
+    /// UpdateWheel). The tree and a saved bar still hold the earlier careers' normal attacks (the Novice's 10000): shown,
+    /// the client cast the Novice's 1000001 instead of the career's (1300001 for an Archer).
+    /// </summary>
+    private bool OnBar(RoleProgress p, int group) => p.Career == 1000 || !IsChainNormalGroup(p, group);
 
     /// <summary>Active skills can go on the bar: SkillConfig._iBasicType 1 (passives such as Sword Mastery have 0).</summary>
     private bool IsActive(int group) =>
         RealId(group, 1) is var id and > 0 && _data.Row("SkillConfig", id) is { } row && GameData.Int(row, "_iBasicType") == 1;
+
+    /// <summary>The skill group of a career's normal attack (JobConfig._kSkillNormalID).</summary>
+    private int CareerNormalGroup(int career) =>
+        _data.Row("SkillConfig", NormalAttack(career)) is { } row ? (int)new SkillConfig(row).SkillId : 0;
+
+    /// <summary>The normal attack of the career or of one before it (the Novice's 10000 for every career).</summary>
+    private bool IsChainNormalGroup(RoleProgress p, int group) =>
+        group > 0 && CareerChain(p.Career).Any(career => CareerNormalGroup(career) == group);
 
     private bool IsNormalGroup(RoleProgress p, int group) =>
         _data.Row("SkillConfig", NormalAttack(p.Career)) is { } row && GameData.Int(row, "_iSkillID") == group;
