@@ -13,14 +13,15 @@ namespace Ro3Emu.Server.Game;
 /// only in the description, as for the talents' procs (inferred). Double Attack, Deadly Poison's Venom and Advanced Katar
 /// Mastery are in TalentProcs.Passives, next to the talents that change them; Supersonic Blow and Arcane Mastery change a
 /// skill's damage in CombatService.Passives; the mount passives (Riding, Dragon Training, Wolf Taming, Wolf's Fang) are
-/// RidingEffects. Not executed: Sight Sprout's detection, Psychokinetic Astral Body and Element Control's Boss resistance
-/// hit.
+/// RidingEffects. Not executed: Sight Sprout's detection and Element Control's Boss resistance hit.
 /// </summary>
-public sealed class PassiveSkills
+public sealed class PassiveSkills : IGameTicker
 {
     private const int DoubleHolyLight = 14311, Judex = 14309, EnchantBlade = 11313, EnergyCoat = 12003,
         EmergencyTreatment = 16303, SoulDrain = 12209, PreyOnTheWeak = 15316, PrayerOfGratitude = 14306,
-        WoodSpiritsBlessing = 14307, Union = 11614;
+        WoodSpiritsBlessing = 14307, Union = 11614, SoulExpansion = 12302, PsychokineticAstralBody = 12343;
+    // Psychokinetic Astral Body's description links its bodies to BuffConfig 12361 (the row of its level).
+    private const int AstralBodyBuff = 12361;
     private const int UnionBuff = 1162701; // BuffConfig "Union": "Each stack increases your Physical ATK, ..." (_iMaxStack 10)
     private const long Crusader = 1210; // JobConfig: the Crusader line (Paladin 1310, Royal Guard 1410) descends from it
     private const int AttrMaxSp = 102; // CharacterService stats: 101 Max HP, 102 Max SP, 2000 HP, 2001 SP
@@ -41,10 +42,12 @@ public sealed class PassiveSkills
     {
         public readonly Dictionary<int, long> ReadyAt = [];
         public long LastHitMs;
+        public long NextAstralMs;
     }
 
     // A test can fix each ten-thousandth roll without changing the production probability.
     internal Func<int, int> Roll { get; set; } = bound => Random.Shared.Next(bound);
+    private TimeSpan _lastTick;
 
     public PassiveSkills(GameData data, CombatService combat, BuffService buffs, CharacterService character, SceneService scenes,
         SkillService skills, GameLoop loop, SessionRegistry sessions, TeamService teams)
@@ -106,6 +109,52 @@ public sealed class PassiveSkills
         // whose _iTime is those seconds].
         if (hit.Dsts.Any(d => d.Damage > 0) && Learned(s, EnchantBlade) is { Own: { LogicData: [var defense, ..] } })
             await _buffs.AddAsync(s, (int)defense, 0, s.Role.Id);
+        // Psychokinetic Astral Body: "If you already have ${4} [Psychokinetic Astral Bodies], hitting with Soul Expansion
+        // Launches all [Psychokinetic Astral Bodies]. Each Deals Ghost Ranged Magic DMG equal to MATK * ${5}% to the target
+        // enemy." Each casts the row the bodies' buff's _kLogicData[0] names (12345 Singularity of its level), in the
+        // caster's mode.
+        if (cast.SkillId == SoulExpansion && hit.Dsts.Any(d => d.Damage > 0) && AstralBodies(s) is { } bodies
+            && s.Buffs.FirstOrDefault(b => b.ConfigId == bodies.Buff && b.ExpireMs > MonsterService.NowMs) is { } live
+            && live.PileCount >= bodies.Launch && BuffConfig.Get(_data, bodies.Buff) is { LogicData: [var launch, ..] }
+            && (_combat.EffectiveSkillRow(s, (int)launch) ?? SkillConfig.Get(_data, launch)?.Row) is { } body)
+        {
+            await _buffs.RemoveAsync(s, live);
+            for (int i = 0; i < live.PileCount && target.Hp > 0; i++) await _combat.CastExtraAsync(s, body, [target]);
+        }
+    }
+
+    /// <summary>Psychokinetic Astral Body's bodies buff row and its numbers: "Auto-generating ${2} [Psychokinetic Astral
+    /// Bodies] every ${1} seconds, up to ${3}. If you already have ${4} ..." The passive's mode row (a talent's type 15)
+    /// carries its faster ${1}.</summary>
+    private (int Buff, long EveryMs, int Count, int Max, int Launch)? AstralBodies(GameSession s)
+    {
+        if (Learned(s, PsychokineticAstralBody) is not { Skill: var learned }) return null;
+        var desc = (_combat.EffectiveSkillRow(s, (int)learned.Id) is { } row ? new SkillConfig(row) : learned).DescData;
+        return ((int)(AstralBodyBuff * 100L + learned.Level), (long)(Value(desc, 0) * 1000), (int)Value(desc, 1),
+            (int)Value(desc, 2), (int)Value(desc, 3));
+    }
+
+    /// <summary>Psychokinetic Astral Body generates its bodies every ${1} seconds, in and out of combat (inferred).</summary>
+    public void Tick(GameTime time)
+    {
+        if (time.Now - _lastTick < TimeSpan.FromMilliseconds(100)) return;
+        _lastTick = time.Now;
+        long now = MonsterService.NowMs;
+        foreach (var s in _sessions.All())
+        {
+            if (s.Role is not { } role || s.Dead || s.SceneLoading || AstralBodies(s) is not { EveryMs: > 0 } bodies) continue;
+            var state = _states.GetOrCreateValue(s);
+            if (state.NextAstralMs == 0) state.NextAstralMs = now + bodies.EveryMs;
+            if (now < state.NextAstralMs) continue;
+            // Keep the cadence: a body on time counts from when it was due, not from this tick.
+            state.NextAstralMs = (now - state.NextAstralMs < 100 ? state.NextAstralMs : now) + bodies.EveryMs;
+            _loop.PostOwned(s, async () =>
+            {
+                int held = s.Buffs.FirstOrDefault(b => b.ConfigId == bodies.Buff && b.ExpireMs > MonsterService.NowMs)?.PileCount ?? 0;
+                if (held < bodies.Max && !s.Dead)
+                    await _buffs.SetPileCountAsync(s, bodies.Buff, PermanentMs, role.Id, Math.Min(bodies.Max, held + bodies.Count));
+            }, "astral bodies");
+        }
     }
 
     private async Task OnTakenAsync(MonsterUnit attacker, GameSession s, long damage)

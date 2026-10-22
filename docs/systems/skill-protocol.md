@@ -86,7 +86,9 @@ A weapon mastery's own row names in `_kLogicData` the row that applies while the
 - Dragon Training's Dragon Breath bonus is its BuffConfig 11318 row of its level (11317 has the same name and no tuples). Wolf's Fang's "while mounted on the Demonic Wolf" is the row its own 13311 row's `_kLogicData[0]` names (13312). Each stands while its mount is ridden.
 - Wolf Taming's howl is BuffConfig 1332501 Warg Howl, linked by the name. It comes every `${2}` s for `${4}` s while the leased wolf follows unmounted.
 
-Not executed: Sight Sprout, Psychokinetic Astral Body and Element Control's Boss resistance hit. The 6-digit season passives (Moonlit Echo, Melody Cannon ...) are in no skill tree, so no player learns them.
+Psychokinetic Astral Body gathers its bodies as piles of the BuffConfig 12361 row of its level, the one its description links. It adds `${2}` every `${1}` s up to `${3}`, in and out of combat **(inferred)**. A talent's type 15 mode row carries the faster `${1}`. When Soul Expansion hits while `${4}` bodies are held, each body casts the row that buff's `_kLogicData` names (12345 Singularity, in the caster's mode) on the target, and the piles are removed.
+
+Not executed: Sight Sprout and Element Control's Boss resistance hit. The 6-digit season passives (Moonlit Echo, Melody Cannon ...) are in no skill tree, so no player learns them.
 
 ### Charges and reactions
 
