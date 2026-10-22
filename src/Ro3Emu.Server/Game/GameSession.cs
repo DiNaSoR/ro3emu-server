@@ -389,8 +389,9 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
     /// <summary>The skill tuples of the talents' armed next-cast charges (TalentProcs.Charges).</summary>
     internal IReadOnlyList<SkillParameterRules.Modifier> TalentChargeModifiers { get; set; } = [];
 
-    /// <summary>The learned passives' skill tuples (CombatService.PassiveModifiers), refreshed with 31132.</summary>
-    internal IReadOnlyList<SkillParameterRules.Modifier> PassiveSkillModifiers { get; set; } = [];
+    /// <summary>The learned passives' skill tuples with the weapons each needs (CombatService.PassiveModifiers),
+    /// refreshed with 31132.</summary>
+    internal IReadOnlyList<(long[] Weapons, SkillParameterRules.Modifier Modifier)> PassiveSkillModifiers { get; set; } = [];
 
     /// <summary>The active talent plan's Buff(2) rows with their effect's _kDescData (TalentProcs).</summary>
     internal IReadOnlyList<(long Buff, string[] Description)> TalentProcBuffs { get; set; } = [];

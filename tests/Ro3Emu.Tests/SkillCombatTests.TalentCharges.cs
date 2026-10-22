@@ -171,7 +171,7 @@ public sealed partial class SkillCombatTests
     public async Task ALearnedPassivesTuplesReachTheNormalAttack()
     {
         await using var alice = await InWorld("Alice");
-        await Gm("alice", "!lvl 99"); await Gm("alice", "!job 5200"); await Teach("alice", 15220);
+        await Gm("alice", "!lvl 99"); await Gm("alice", "!job 5300"); await Teach("alice", 15220);
         var data = _app.Services.GetRequiredService<GameData>();
         double crit = await Loop.InvokeAsync(async () =>
         {

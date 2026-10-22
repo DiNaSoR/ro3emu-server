@@ -15,9 +15,13 @@ namespace Ro3Emu.Server.Game;
 /// the client compares the same _kSkillCategory values in LC_Skill_Function.SkillInSelectWhitelist). The Wind-Pressure
 /// Blade buffs 1130301-1130305 are [1,-1,29,1,1500..3500]: +15..35 damage-ratio points on every skill.
 /// The operation arithmetic (1 add, 2 set, 5 basis-point multiplier) is inferred from the exported buff pairs, not
-/// recovered original-server code. Only the fields <see cref="Field"/> names are applied;
-/// the list-valued types 33-38 (SkillBuff1, SkillBuff2, SkillCost, SkillRange, SkillDamageParamExtra,
-/// SkillStageStates; 163 scope-1 tuples) have no recovered list arithmetic and are skipped, as are 5/9/10/22/28/31/32/39.
+/// recovered original-server code. Only the fields <see cref="Field"/> names are applied, and the list-valued types 33
+/// (SkillBuff1) and 34 (SkillBuff2): [.., value, row, column] changes column `column` of the _kBuff1/_kBuff2 tuple at
+/// `row` (-1: every row), whose columns are [buff, chance, duration]. Hilt Binding's [16105, 33, add, 60000, 0, 2] is
+/// "increases the duration of Adrenaline Rush ... by ${3} sec." and Dark Stalker's [15229, 34, add, 2000, -1, 1] "The
+/// Stun and Blind Chance of [Meteor Assault] is increased by ${1}%" (inferred from those descriptions). Types 35-38
+/// (SkillCost, SkillRange, SkillDamageParamExtra, SkillStageStates) are skipped, as are 5/9/22/28/31/32/39; type 10
+/// is a CRIT chance (<see cref="CritChance"/>).
 /// Talent plans add the same tuples (SeasonTalentService.Effects).
 /// </summary>
 internal static class SkillParameterRules
@@ -25,7 +29,9 @@ internal static class SkillParameterRules
     /// <summary>One tuple. Scope 0: <paramref name="Group"/> is the skill group. Scope 1: <paramref name="Group"/> is 0
     /// and the tags select (null = every skill; <paramref name="AllTags"/> requires every tag, else any).</summary>
     internal readonly record struct Modifier(int Group, int Type, int Operation, long Value, int Index,
-        int Scope = 0, int[]? Tags = null, bool AllTags = false);
+        int Scope = 0, int[]? Tags = null, bool AllTags = false, int Column = 0);
+
+    private const int Buff1Type = 33, Buff2Type = 34;
 
     private static readonly ConditionalWeakTable<GameData, Dictionary<int, Modifier[]>> Parsed = new();
     private static readonly ConditionalWeakTable<GameData, Dictionary<int, int[]>> Categories = new();
@@ -63,18 +69,19 @@ internal static class SkillParameterRules
             || GameData.Number(item[0]) is not { } scope || GameData.Number(item[2]) is not { } type
             || GameData.Number(item[3]) is not { } op || GameData.Number(item[4]) is not { } value) return null;
         int index = item.GetArrayLength() > 5 && GameData.Number(item[5]) is { } n ? (int)n : 0;
+        int column = item.GetArrayLength() > 6 && GameData.Number(item[6]) is { } c ? (int)c : 0;
         if (scope == 0)
             return GameData.Number(item[1]) is { } group && group > 0
-                ? new Modifier((int)group, (int)type, (int)op, (long)value, index) : null;
+                ? new Modifier((int)group, (int)type, (int)op, (long)value, index, Column: column) : null;
         if (scope != 1) return null;
         string selector = item[1].ValueKind == JsonValueKind.String ? item[1].GetString()! : item[1].GetRawText();
-        if (selector.Trim() == "-1") return new Modifier(0, (int)type, (int)op, (long)value, index, 1);
+        if (selector.Trim() == "-1") return new Modifier(0, (int)type, (int)op, (long)value, index, 1, Column: column);
         bool all = selector.Contains("and", StringComparison.Ordinal);
         var parts = selector.Split(all ? "and" : "or", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         var tags = new int[parts.Length];
         for (int i = 0; i < parts.Length; i++)
             if (!int.TryParse(parts[i], NumberStyles.Integer, CultureInfo.InvariantCulture, out tags[i])) return null;
-        return tags.Length == 0 ? null : new Modifier(0, (int)type, (int)op, (long)value, index, 1, tags, all);
+        return tags.Length == 0 ? null : new Modifier(0, (int)type, (int)op, (long)value, index, 1, tags, all, column);
     }
 
     /// <summary>The live modifiers of a session: the talent plan's (whose weapon is held and whose buff is live), then
@@ -107,15 +114,13 @@ internal static class SkillParameterRules
         var talents = session.TalentSkillModifiers;
         signature = unchecked(((signature * 31 + RuntimeHelpers.GetHashCode(talents)) * 31
             + RuntimeHelpers.GetHashCode(session.PassiveSkillModifiers)) * 31 + RuntimeHelpers.GetHashCode(session.TalentChargeModifiers));
-        for (int i = 0; i < talents.Count; i++)
-        {
-            if (talents[i].Weapon == 0) continue;
+        if (talents.Any(t => t.Weapon != 0) || session.PassiveSkillModifiers.Any(p => p.Weapons.Length > 0))
             foreach (var item in session.Items)
                 if (item.Grid is 1 or 2) signature = unchecked((signature * 31 + item.Entry) * 31 + item.Grid);
-            break;
-        }
         if (cache.Signature == signature && ReferenceEquals(cache.Data, data)) return cache;
-        var result = new List<Modifier>(session.PassiveSkillModifiers);
+        var result = new List<Modifier>();
+        foreach (var (weapons, mod) in session.PassiveSkillModifiers)
+            if (weapons.Length == 0 || weapons.Any(w => Wields(session, data, w))) result.Add(mod);
         foreach (var (weapon, buffGroup, mod) in talents)
             if ((weapon == 0 || Wields(session, data, weapon)) && (buffGroup == 0 || HasBuffGroup(session, data, buffGroup))) result.Add(mod);
         result.AddRange(session.TalentChargeModifiers);
@@ -224,11 +229,17 @@ internal static class SkillParameterRules
     internal static JsonElement Effective(JsonElement row, IReadOnlyList<Modifier> modifiers, int[] tags)
     {
         int group = (int)GameData.Int(row, "_iSkillID");
-        var relevant = modifiers.Where(m => Matches(m, group, tags) && Field(m.Type) != null && m.Operation is 1 or 2 or 5).ToList();
+        var relevant = modifiers.Where(m => Matches(m, group, tags) && (Field(m.Type) != null || m.Type is Buff1Type or Buff2Type)
+            && m.Operation is 1 or 2 or 5).ToList();
         if (relevant.Count == 0) return row;
         var json = JsonNode.Parse(row.GetRawText())!.AsObject();
         foreach (var mod in relevant)
         {
+            if (mod.Type is Buff1Type or Buff2Type)
+            {
+                ApplyToBuffTuples(json[mod.Type == Buff1Type ? "_kBuff1" : "_kBuff2"], mod);
+                continue;
+            }
             string field = Field(mod.Type)!;
             if (mod.Type is 29 or 30)
             {
@@ -251,4 +262,16 @@ internal static class SkillParameterRules
         return JsonSerializer.SerializeToElement(json);
     }
 
+    /// <summary>A type 33/34 tuple on a _kBuff1/_kBuff2 list: column <see cref="Modifier.Column"/> of the tuple at
+    /// <see cref="Modifier.Index"/> (-1 every tuple).</summary>
+    private static void ApplyToBuffTuples(JsonNode? list, Modifier mod)
+    {
+        if (list is not JsonArray tuples) return;
+        for (int i = 0; i < tuples.Count; i++)
+        {
+            if (mod.Index >= 0 && i != mod.Index || tuples[i] is not JsonArray tuple || mod.Column < 0 || mod.Column >= tuple.Count
+                || !long.TryParse(tuple[mod.Column]?.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out long old)) continue;
+            tuple[mod.Column] = Apply(old, mod);
+        }
+    }
 }
