@@ -214,6 +214,8 @@ public sealed class PositionPersistenceTests(ITestOutputHelper output) : IAsyncL
             var progress = new System.Collections.Concurrent.ConcurrentQueue<string>();
             handover.PhaseForTest = (phase, _) => progress.Enqueue($"phase {phase}");
             sessions.CleanupFailureForTest = (step, _) => { progress.Enqueue($"step {step}"); return null; };
+            // A cleanup admission that waits names its blocker: the held writer stalls whatever holds that key.
+            Service<OwnerRegistry>().BlockedForTest = (origin, blocker) => progress.Enqueue($"{origin} waited for {blocker}");
             accounts.WriteSyncPlanObserved = (plan, onLoop) =>
             {
                 progress.Enqueue($"sync write {plan.Label}");
@@ -256,6 +258,7 @@ public sealed class PositionPersistenceTests(ITestOutputHelper output) : IAsyncL
             accounts.WriteSyncPlanObserved = null;
             Service<RoleHandover>().PhaseForTest = null;
             Service<RoleSessionService>().CleanupFailureForTest = null;
+            Service<OwnerRegistry>().BlockedForTest = null;
             await bot.DisposeAsync();
         }
     }
