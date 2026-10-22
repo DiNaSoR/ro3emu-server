@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Diagnostics;
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using System.Net.Sockets;
@@ -99,9 +100,35 @@ public sealed class BotClient : IAsyncDisposable
             OnStageStarted?.Invoke(name);
             return await work();
         }
+        catch (TimeoutException e)
+        {
+            // A bare timeout does not say how far the server got; the last messages it sent do (#279).
+            error = new TimeoutException(StageTimeout(name, clock.Elapsed), e);
+            throw error;
+        }
         catch (Exception e) { error = e; throw; }
         finally { OnStageFinished?.Invoke(name, clock.Elapsed.TotalMilliseconds, error); }
     }
+
+    /// <summary>Messages a stage timeout lists: enough to show which server step the stage stopped after.</summary>
+    private const int TimeoutTail = 12;
+
+    private string StageTimeout(string stage, TimeSpan elapsed)
+    {
+        var events = _inbox.Snapshot();
+        string tail = events.Count == 0 ? "nothing"
+            : string.Join(", ", events.Skip(Math.Max(0, events.Count - TimeoutTail)).Select(Describe));
+        return string.Create(CultureInfo.InvariantCulture,
+            $"bot stage {stage} timed out after {elapsed.TotalSeconds:0.0} s; {events.Count} messages received, the last: {tail}");
+    }
+
+    private static string Describe(BotEvent e) => e.Kind switch
+    {
+        BotEventKind.Game => $"game {e.MsgId}",
+        BotEventKind.Entity => $"entity {e.Name}",
+        BotEventKind.Rpc => $"rpc {e.Name}",
+        _ => e.Kind.ToString(),
+    };
 
     private async Task StageAsync(string name, Func<Task> work) =>
         await StageAsync<object?>(name, async () => { await work(); return null; });
