@@ -12,8 +12,11 @@ namespace Ro3Emu.Tests;
 public sealed class ProfessionTalentEffectTests : IAsyncDisposable
 {
     private const int Skill = 900, SkillRow = 90001, Mastery = 901, Sword = 777001, Buff = 77001;
+    // TalentProcs.WhileActive keys Auto Guard Enhance's talent buff to Auto Guard's group; the rows' values are invented.
+    private const int AutoGuardEnhance = 1153701, Granted = 77002, AutoGuard = 77003, AutoGuardGroup = 11403;
     private static readonly int[] PlayBook = [101], Career = [1000], BranchEffects = [1001], OptionEffects = [1002],
-        Ratio = [1000], Flat = [10];
+        Ratio = [1000], Flat = [10], GrantedBuff = [Granted];
+    private static readonly int[][] GrantedAttrs = [[103, 9]];
     private readonly string _configRoot = Path.Combine(Path.GetTempPath(), "ro3emu-talent-effects-" + Guid.NewGuid().ToString("N"));
     private SyntheticHost _host = null!;
     private GameSession Session => _host.Service<SessionRegistry>().All().Single(s => s.Role != null);
@@ -53,11 +56,21 @@ public sealed class ProfessionTalentEffectTests : IAsyncDisposable
             {
                 _iID = 1002, _kSpecialEffect = new[]
                 {
-                    new long[] { 1, 103, 7 }, [16, 2, 1, 3], [16, 3, 1, 3], [19, Mastery, 2, 4, 6], [22, 2, 103, 5, Mastery], [2, Buff],
+                    new long[] { 1, 103, 7 }, [16, 2, 1, 3], [16, 3, 1, 3], [19, Mastery, 2, 4, 6], [22, 2, 103, 5, Mastery], [2, Buff], [2, AutoGuardEnhance],
                 },
             },
         });
-        Write("BuffConfig", new[] { new { _iID = Buff, _kSkillAttributeList = new[] { new[] { "0", $"{Skill}", "30", "1", "40" } } } });
+        Write("BuffConfig", new object[]
+        {
+            new { _iID = Buff, _kSkillAttributeList = new[] { new[] { "0", $"{Skill}", "30", "1", "40" } } },
+            new { _iID = AutoGuardEnhance, _kLogicData = GrantedBuff },
+            new
+            {
+                _iID = Granted, _kChangeAttri = GrantedAttrs,
+                _kSkillAttributeList = new[] { new[] { "0", $"{Skill}", "30", "1", "5" } },
+            },
+            new { _iID = AutoGuard, _iBuffID = AutoGuardGroup },
+        });
         Write("SkillConfig", new[]
         {
             new
@@ -141,6 +154,15 @@ public sealed class ProfessionTalentEffectTests : IAsyncDisposable
         Assert.Equal(patk + 7 + 5 * 3, await Stat(103));
         Assert.Equal(str + 3, await Stat(1)); // "a sword or a two-handed sword" counts once
         Assert.Equal(intelligence + 6, await Stat(4));
+
+        // "While [Auto Guard] is active ...": the granted buff's attrs and skill tuples follow Auto Guard.
+        var buffs = _host.Service<BuffService>();
+        await OnLoop(async () => { await buffs.AddAsync(Session, AutoGuard, 60_000, Session.Role!.Id); return 0; });
+        Assert.Equal(patk + 7 + 5 * 3 + 9, await Stat(103));
+        Assert.Equal(55, (await Effective()).GetProperty("_kDamageParam2")[0].GetInt64());
+        await OnLoop(async () => { await buffs.RemoveAsync(Session, Session.Buffs.Single(b => b.ConfigId == AutoGuard)); return 0; });
+        Assert.Equal(patk + 7 + 5 * 3, await Stat(103));
+        Assert.Equal(50, (await Effective()).GetProperty("_kDamageParam2")[0].GetInt64());
 
         Assert.Equal(0, await Request(bot, SeasonTalentService.SetPlan, new SeasonTalentSetCurPlanReq { PlanId = 1 },
             body => SeasonTalentSetCurPlanResp.Parser.ParseFrom(body).Result));
