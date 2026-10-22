@@ -231,6 +231,11 @@ public sealed partial class BuffService : IGameTicker
     {
         if (_data.Row("BuffConfig", configId) is not { } row || GameData.Int(row, "_iBuffID") <= 0) return;
         if (_unitBuffs.TryGetValue(unit.Uid, out var live) && ImmuneTo(live, row, guardianOwned)) return;
+        if (live != null && sourceId != unit.Uid && UnitResistsControl(live, row))
+        {
+            foreach (var handler in ControlResisted) await handler(unit, sourceId, row);
+            return;
+        }
         if (durationMs <= 0) durationMs = (int)GameData.Int(row, "_iTime");
         if (durationMs <= 0) durationMs = 60000;
         if (sourceId != unit.Uid && !ApplyDecay(unit.Uid, unit.SceneEntry, configId, ref durationMs)) return;
