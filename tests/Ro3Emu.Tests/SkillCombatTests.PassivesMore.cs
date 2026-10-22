@@ -62,6 +62,28 @@ public sealed partial class SkillCombatTests
         Assert.Equal(102 + 100, flat);
     }
 
+    // Psychokinetic Astral Body level 1: "Auto-generating 1 [Psychokinetic Astral Bodies] every 1.5 seconds, up to 3. If
+    // you already have 3 ..., hitting with Soul Expansion Launches all": three piles of BuffConfig 1236101, then three
+    // casts of its _kLogicData row 1234501 (Singularity) after Soul Expansion hits, and the piles are gone.
+    [ClientDataFact]
+    public async Task PsychokineticAstralBodiesGatherAndLaunchOnSoulExpansion()
+    {
+        await using var alice = await InWorld("Alice");
+        await Gm("alice", "!lvl 99"); await Gm("alice", "!job 2400"); await Teach("alice", 12302); await Teach("alice", 12343);
+        var full = await Next(alice, BuffService.BuffUpdate, BuffUpdateNotify.Parser,
+            p => p.Buffs.Any(b => b.ConfigId == 1236101 && b.PileCount == 3));
+        Assert.Equal(3, full.Buffs.Single(b => b.ConfigId == 1236101).PileCount);
+
+        var monster = await Target("alice", stationary: true);
+        await Loop.InvokeAsync(() => { monster.Hp = 50_000_000; return Task.CompletedTask; });
+        await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1230201, TargetId = monster.Uid });
+        Assert.Equal(0, (await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
+        await Next(alice, BuffService.BuffRemove, BuffRemoveNotify.Parser);
+        await Task.Delay(1500);
+        int bodies = alice.Inbox.Snapshot().Count(e => e.IsGame(CombatService.SkillHit) && SkillHitInfo.Parser.ParseFrom(e.Body).SkillId == 1234501);
+        Assert.Equal(3, bodies);
+    }
+
     // Union: "For each Crusader on the team, gain 1 stack of [Union]" (the other Crusader-line members): a Royal Guard
     // in a party with a Paladin carries one pile of BuffConfig 1162701, and none after the Paladin leaves.
     [ClientDataFact]

@@ -469,6 +469,7 @@ internal sealed class GameLoopTickers(IServiceProvider services) : IHostedServic
         Add<SeasonService>();
         Add<MountService>();
         Add<RidingEffects>();
+        Add<PassiveSkills>();
         Add<TeamService>();
         Add<DailyActivityService>();
         Add<TimedEventService>();
