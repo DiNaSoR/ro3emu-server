@@ -11,16 +11,17 @@ namespace Ro3Emu.Server.Game;
 /// The learned passives that act on events rather than stand as attributes (those are CombatService.Passives). Each reads
 /// its own BuffConfig row (CombatService.OwnBuffs) and its description values, quoted per passive. The trigger is written
 /// only in the description, as for the talents' procs (inferred). Double Attack, Deadly Poison's Venom and Advanced Katar
-/// Mastery are in TalentProcs.Passives, next to the talents that change them. Not executed: Union (its stacks count
-/// Crusaders on the team), the mount passives (Riding, Dragon Training, Wolf Taming, Wolf's Fang), Sight Sprout's
-/// detection, Psychokinetic Astral Body, Supersonic Blow, Element Control's Boss resistance hit and Arcane Mastery's
-/// Turn Undead bonus.
+/// Mastery are in TalentProcs.Passives, next to the talents that change them; Supersonic Blow and Arcane Mastery change a
+/// skill's damage in CombatService.Passives. Not executed: the mount passives (Riding, Dragon Training, Wolf Taming,
+/// Wolf's Fang), Sight Sprout's detection, Psychokinetic Astral Body and Element Control's Boss resistance hit.
 /// </summary>
 public sealed class PassiveSkills
 {
     private const int DoubleHolyLight = 14311, Judex = 14309, EnchantBlade = 11313, EnergyCoat = 12003,
         EmergencyTreatment = 16303, SoulDrain = 12209, PreyOnTheWeak = 15316, PrayerOfGratitude = 14306,
-        WoodSpiritsBlessing = 14307;
+        WoodSpiritsBlessing = 14307, Union = 11614;
+    private const int UnionBuff = 1162701; // BuffConfig "Union": "Each stack increases your Physical ATK, ..." (_iMaxStack 10)
+    private const long Crusader = 1210; // JobConfig: the Crusader line (Paladin 1310, Royal Guard 1410) descends from it
     private const int AttrMaxSp = 102; // CharacterService stats: 101 Max HP, 102 Max SP, 2000 HP, 2001 SP
     private const int AttrMaxHp = 101, AttrHp = 2000, AttrSp = 2001;
     // "Permanent" for the Prayer of Gratitude shield: a day, renewed on every scene load (inferred).
@@ -31,6 +32,8 @@ public sealed class PassiveSkills
     private readonly BuffService _buffs;
     private readonly CharacterService _character;
     private readonly GameLoop _loop;
+    private readonly SessionRegistry _sessions;
+    private readonly TeamService _teams;
     private readonly ConditionalWeakTable<GameSession, State> _states = [];
 
     private sealed class State
@@ -43,8 +46,10 @@ public sealed class PassiveSkills
     internal Func<int, int> Roll { get; set; } = bound => Random.Shared.Next(bound);
 
     public PassiveSkills(GameData data, CombatService combat, BuffService buffs, CharacterService character, SceneService scenes,
-        SkillService skills, GameLoop loop)
+        SkillService skills, GameLoop loop, SessionRegistry sessions, TeamService teams)
     {
+        _sessions = sessions;
+        _teams = teams;
         _data = data;
         _combat = combat;
         _buffs = buffs;
@@ -56,9 +61,17 @@ public sealed class PassiveSkills
         combat.DamageAdjusters.Add(PreyOnTheWeakDamage);
         buffs.PassiveLethalSave = WoodSpiritsBlessingAsync;
         // It touches only the loaded session's own buffs, inside the scene load's scope: no hook scope of its own.
-        scenes.AddOwnedAfterLoaded(PrayerShieldAsync);
-        skills.Learned.Add(PrayerShieldAsync);
-        character.JobChanged.Add(PrayerShieldAsync);
+        scenes.AddOwnedAfterLoaded(StandingBuffsAsync);
+        skills.Learned.Add(StandingBuffsAsync);
+        character.JobChanged.Add(StandingBuffsAsync);
+        // A roster change runs in the party's scope; each member's Union is set in a work item of its own.
+        teams.RosterChanged.Add(roles =>
+        {
+            foreach (long role in roles)
+                if (_sessions.All().FirstOrDefault(p => p.Role?.Id == role) is { } member)
+                    loop.PostLegacy(() => UnionAsync(member), "union stacks");
+            return Task.CompletedTask;
+        });
     }
 
     private (SkillConfig Skill, BuffConfig? Own)? Learned(GameSession s, int group) =>
@@ -127,6 +140,39 @@ public sealed class PassiveSkills
                     await PrayerShieldAsync(s);
             });
         }
+    }
+
+    private async Task StandingBuffsAsync(GameSession s)
+    {
+        await PrayerShieldAsync(s);
+        await UnionAsync(s);
+    }
+
+    /// <summary>
+    /// Union: "Join forces with other Crusaders on your team. For each Crusader on the team, gain 1 stack of [Union]:
+    /// Physical ATK, Physical DEF, and Magic DEF increase by ${1}. Stacks up to ${2} times." The other online members of the
+    /// Crusader line count (inferred), as piles of the Union buff, which leaves with the last of them or the passive.
+    /// </summary>
+    private async Task UnionAsync(GameSession s)
+    {
+        if (s.Role is not { } role || s.Dead) return;
+        int stacks = 0;
+        if (Learned(s, Union) is { Skill: var union })
+            stacks = Math.Min((int)Value(union.DescData, 1), _teams.MembersOf(role.Id).Count(id => id != role.Id
+                && _sessions.All().FirstOrDefault(p => p.Role?.Id == id) is { Progress: { } progress } && IsCrusader(progress.Career)));
+        var live = s.Buffs.FirstOrDefault(b => b.ConfigId == UnionBuff && b.ExpireMs > MonsterService.NowMs);
+        if (stacks > 0 && live?.PileCount != stacks) await _buffs.SetPileCountAsync(s, UnionBuff, PermanentMs, role.Id, stacks);
+        else if (stacks == 0 && live != null) await _buffs.RemoveAsync(s, live);
+    }
+
+    private bool IsCrusader(long career)
+    {
+        for (int guard = 0; career > 0 && guard < 8; guard++)
+        {
+            if (career == Crusader) return true;
+            career = JobConfig.Get(_data, career)?.ParentId ?? 0;
+        }
+        return false;
     }
 
     /// <summary>Prayer of Gratitude: "... plus a shield equal to Max Life * ${4}%." Its own row is "Gain a permanent

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Ro3Emu.Server.Data;
 using Ro3Emu.Server.Data.Config;
+using Ro3Emu.Server.Maps;
 
 namespace Ro3Emu.Server.Game;
 
@@ -73,7 +74,7 @@ public sealed partial class CombatService
         [16302] = AxesAndMaces, // Axe Mastery: "When equipped with an axe or mace, increases your Physical ATK ..."
     };
 
-    private const int DoubleAttackGroup = 15002;
+    private const int DoubleAttackGroup = 15002, SupersonicBlow = 15103, ArcaneMastery = 14207, TurnUndead = 14118;
     private const long CritAttribute = 111; // AttributeConfig "CRIT"; Advanced Katar Mastery's "+1 Crit" row is [111, 100]
     private int[]? _passiveGroups;
 
@@ -113,12 +114,35 @@ public sealed partial class CombatService
         foreach (var row in PassiveRows(session))
         {
             var skill = new SkillConfig(row);
+            // Arcane Mastery: "... and increases the damage of [Turn Undead] by ${2}." as flat damage (inferred; its own
+            // row's _kLogicData names a stacking MATK buff that nothing in the data triggers).
+            if (skill.SkillId == ArcaneMastery && skill.DescData.Length > 1
+                && long.TryParse(skill.DescData[1], System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out long bonus))
+                result.Add(([], new SkillParameterRules.Modifier(TurnUndead, 30, 1, bonus, -1)));
             if (OwnBuff(skill) is { } own)
                 foreach (var modifier in SkillParameterRules.BuffModifiers(_data, (int)own.Id)) result.Add(([], modifier));
             if (MasteryBuff(skill) is { } mastery && MasteryWeapons.TryGetValue((int)skill.SkillId, out var weapons))
                 foreach (var modifier in SkillParameterRules.BuffModifiers(_data, (int)mastery.Id)) result.Add((weapons, modifier));
         }
         return result;
+    }
+
+    /// <summary>
+    /// Sonic Blow: "If the target's HP is at or below ${4}%, increases the percentage damage multiplier of [Sonic Blow] by
+    /// ${5}%." Its damage pairs are [plain, +20%, +25%] and its _kLogicData [2000, 101, 5000] the 20% and the 50% (in basis
+    /// points). Supersonic Blow: "Allows [Sonic Blow] to trigger its damage increase effect when the target's Life is at or
+    /// below ${1}%, and changes the percentage damage multiplier increase to ${2}%": the third pair below its ${1}%. The
+    /// target's Life is read before the hit (inferred).
+    /// </summary>
+    private int SonicBlowBranch(GameSession s, MonsterUnit target, JsonElement row)
+    {
+        var skill = new SkillConfig(row);
+        if (skill.ScriptLogic != "SonicBlow" || skill.LogicData is not [_, _, var threshold, ..] || skill.DamageParam1.Length < 2) return 0;
+        double life = target.Hp * 10000.0 / Math.Max(1, target.Template.MaxHp);
+        if (skill.DamageParam1.Length > 2 && LearnedPassive(s, SupersonicBlow) is { DescData: [var below, ..] }
+            && double.TryParse(below, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double percent)
+            && life <= percent * 100) return 2;
+        return life <= threshold ? 1 : 0;
     }
 
     /// <summary>A passive row's own BuffConfig row (<see cref="OwnBuffs"/>), or null.</summary>
