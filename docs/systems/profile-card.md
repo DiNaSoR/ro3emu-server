@@ -53,7 +53,9 @@ The head icon, frame, chat bubble, title and honor shown on the card are social 
   property list). It goes out only while the role's own `SettingShowDetailInfo` is ShowAll, and `Base.isShowDetail`
   says the same; a role that never chose is NoShow, the enum's zero value. The own card uses the local stats. The
   setting arrives as `{showDetailInfo}` alone (`LC_SettingServer`), so NoShow is an empty submessage: under type
-  ShowDetailInfo the sent value replaces the stored one instead of being merged.
+  ShowDetailInfo the sent value replaces the stored one instead of being merged. The Realm of the Gods first-clear
+  record (`RoleDetailInfo.selfproperty`) keeps the full list whatever the setting: `LC_DAL_MultiPlayerDungeon` walks it
+  unguarded and `UI_Sys_RoleInfoWidgetCtrl` shows it without reading `isShowDetail` (kept so by Steven's call).
 - **Other players** get the current preset as `Personal` only when they ask for it, and `PopularityStar` and the like
   count with every field present (the card re-asks until they arrive). The avatar, frame and title ids go in `Base`.
   `PersonalAvatarConfig` and `PersonalAvatarFrameConfig` export only placeholder rows and `PersonalTitleConfig` is
