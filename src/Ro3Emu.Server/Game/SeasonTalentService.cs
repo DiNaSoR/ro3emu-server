@@ -47,6 +47,7 @@ public sealed partial class SeasonTalentService
         session.TalentEffectsEnabled = false; // TaskService has not loaded this role's quest state yet.
         session.TalentPlanSwitchUtc = default;
         session.TalentSkillModifiers = [];
+        session.TalentProcBuffs = [];
         Seed(session.SeasonTalent);
     }
 

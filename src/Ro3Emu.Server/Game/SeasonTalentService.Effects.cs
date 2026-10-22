@@ -16,8 +16,8 @@ namespace Ro3Emu.Server.Game;
 /// - Buff(2): the buff's _kSkillAttributeList ("Basic Attack's percentage damage multiplier increases by 3%").
 /// The ops of one effect that differ only in their condition ("a dagger or katar", "Sanctuary or Magnus Exorcismus")
 /// apply once. The skill tuples go through SkillParameterRules like a buff's.
-/// Not executed: Buff(2) procs (_kLogicData: Rapid Pierce's extra hits, Double Counter's extra cast ...),
-/// _kBuffAttributeList, BuffDictRef(12) and 20, which need the original server's scripts.
+/// Buff(2) procs (_kLogicData: Rapid Pierce's extra hits, Double Counter's extra cast ...) are TalentProcs'. Not executed:
+/// _kBuffAttributeList, BuffDictRef(12) and 20.
 /// </summary>
 public sealed partial class SeasonTalentService
 {
@@ -51,6 +51,13 @@ public sealed partial class SeasonTalentService
                         when SkillParameterRules.Wields(s, _data, weapon) && once.Add((WeaponSkillAttrOp, attr, perLevel, group)):
                         yield return (attr, perLevel * LearnedLevel(s, group));
                         break;
+                    // "While [Battle Chant] is active, your Max HP increases by ${1}.": the granted buff's _kChangeAttri.
+                    case [BuffOp, var buff] when TalentProcs.WhileActive.TryGetValue(buff, out long active)
+                        && SkillParameterRules.HasBuffGroup(s, _data, active) && BuffConfig.Get(_data, buff)?.LogicData is [var granted, ..]
+                        && BuffConfig.Get(_data, granted) is { } grantedRow:
+                        foreach (var change in grantedRow.ChangeAttri)
+                            if (change is [var attr, var value]) yield return (attr, value);
+                        break;
                 }
             }
         }
@@ -58,10 +65,13 @@ public sealed partial class SeasonTalentService
 
     private static long LearnedLevel(GameSession s, long group) => s.Progress?.Skills.GetValueOrDefault((int)group) ?? 0;
 
-    /// <summary>The active plan's skill parameter modifiers, each with the weapon it requires (0 = none).</summary>
-    private List<(long Weapon, SkillParameterRules.Modifier Modifier)> SkillModifiers(GameSession s)
+    /// <summary>The active plan's skill parameter modifiers, each with the weapon and the buff group it requires (0 = none),
+    /// and its Buff(2) rows with their effect's description values.</summary>
+    private (List<(long Weapon, long Buff, SkillParameterRules.Modifier Modifier)> Modifiers, List<(long Buff, string[] Description)> Buffs)
+        SkillEffects(GameSession s)
     {
-        var result = new List<(long, SkillParameterRules.Modifier)>();
+        var modifiers = new List<(long, long, SkillParameterRules.Modifier)>();
+        var buffs = new List<(long, string[])>();
         foreach (var effect in ActiveEffects(s))
             foreach (long id in new SeasonTalentEffectConfig(effect).SpecialEffectList)
             {
@@ -69,19 +79,26 @@ public sealed partial class SeasonTalentService
                 foreach (var op in special.SpecialEffect)
                 {
                     if (op is [SkillParameterOp, var weapon, 0, var group, var type, var operation, var value, ..] && group > 0)
-                        result.Add((weapon, new SkillParameterRules.Modifier((int)group, (int)type, (int)operation, value,
+                        modifiers.Add((weapon, 0, new SkillParameterRules.Modifier((int)group, (int)type, (int)operation, value,
                             op.Length > 7 ? (int)op[7] : 0)));
                     else if (op is [BuffOp, var buff])
-                        foreach (var modifier in SkillParameterRules.BuffModifiers(_data, (int)buff)) result.Add((0, modifier));
+                    {
+                        foreach (var modifier in SkillParameterRules.BuffModifiers(_data, (int)buff)) modifiers.Add((0, 0, modifier));
+                        // "While [Aura Blade] is active ...": the buff _kLogicData names applies while that group lives.
+                        if (TalentProcs.WhileActive.TryGetValue(buff, out long active) && BuffConfig.Get(_data, buff)?.LogicData is [var granted, ..])
+                            foreach (var modifier in SkillParameterRules.BuffModifiers(_data, (int)granted)) modifiers.Add((0, active, modifier));
+                        buffs.Add((buff, special.DescData));
+                    }
                 }
             }
-        return result;
+        return (modifiers, buffs);
     }
 
-    /// <summary>Recompute the session's talent skill modifiers after a talent, plan or quest change.</summary>
+    /// <summary>Recompute the session's talent skill modifiers and procs after a talent, plan or quest change.</summary>
     internal async Task RefreshEffectsAsync(GameSession s)
     {
-        var next = SkillModifiers(s);
+        var (next, buffs) = SkillEffects(s);
+        s.TalentProcBuffs = buffs;
         if (next.SequenceEqual(s.TalentSkillModifiers)) return;
         s.TalentSkillModifiers = next;
         if (s.SceneLoading || s.Role == null) return; // the loaded scene publishes 31132 itself

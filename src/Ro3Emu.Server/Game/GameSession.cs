@@ -382,8 +382,12 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
     /// <summary>Current playbook and delivered tasks permit this role's purchased talent attributes.</summary>
     public bool TalentEffectsEnabled { get; set; }
 
-    /// <summary>The active talent plan's skill parameter modifiers and the weapon each needs (SeasonTalentService).</summary>
-    internal IReadOnlyList<(long Weapon, SkillParameterRules.Modifier Modifier)> TalentSkillModifiers { get; set; } = [];
+    /// <summary>The active talent plan's skill parameter modifiers, with the weapon and the buff group each needs
+    /// (SeasonTalentService).</summary>
+    internal IReadOnlyList<(long Weapon, long Buff, SkillParameterRules.Modifier Modifier)> TalentSkillModifiers { get; set; } = [];
+
+    /// <summary>The active talent plan's Buff(2) rows with their effect's _kDescData (TalentProcs).</summary>
+    internal IReadOnlyList<(long Buff, string[] Description)> TalentProcBuffs { get; set; } = [];
 
     /// <summary>Last accepted 83552 switch in this session (PublicParamConfig.SchemeCD).</summary>
     public DateTime TalentPlanSwitchUtc { get; set; }

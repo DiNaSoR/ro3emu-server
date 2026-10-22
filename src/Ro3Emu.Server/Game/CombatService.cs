@@ -236,6 +236,8 @@ public sealed partial class CombatService : IGameTicker
 
     // Totem passives need the row and final target before the existing post-hit event loses that context.
     public List<Func<GameSession, JsonElement, Task>> CastLanded { get; } = new();
+    /// <summary>After a player's own cast applied its effects, with the monsters it processed (TalentProcs).</summary>
+    internal List<Func<GameSession, ActiveSkillCast, IReadOnlyList<MonsterUnit>, Task>> CastResolved { get; } = new();
     public List<Func<GameSession, MonsterUnit, JsonElement, DamageHitResult, long, long>> DamageAdjusters { get; } = new();
     public List<Func<GameSession, MonsterUnit, JsonElement, long, long>> ExtraHitDamage { get; } = new();
     public List<Func<GameSession, MonsterUnit, JsonElement, long, Task>> DealtAsync { get; } = new();

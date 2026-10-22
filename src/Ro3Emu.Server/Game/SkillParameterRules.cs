@@ -77,14 +77,23 @@ internal static class SkillParameterRules
         return tags.Length == 0 ? null : new Modifier(0, (int)type, (int)op, (long)value, index, 1, tags, all);
     }
 
-    /// <summary>The live modifiers of a session: the talent plan's (whose weapon is held), then once per buff pile, in
-    /// buff order. Talents first is (inferred).</summary>
+    /// <summary>The live modifiers of a session: the talent plan's (whose weapon is held and whose buff is live), then
+    /// once per buff pile, in buff order. Talents first is (inferred).</summary>
     internal static IReadOnlyList<Modifier> Active(GameSession session, GameData data) => Cache(session, data).Modifiers;
 
     /// <summary>Is an item of this ItemConfig._iSubType (1 Dagger, 2 Sword, 3 Two-Handed Sword, 4 Spear ...) in the
     /// main-hand or off-hand grid (enum_EquipGridType 1, 2).</summary>
     internal static bool Wields(GameSession session, GameData data, long subType) =>
         session.Items.Any(i => i.Grid is 1 or 2 && ItemConfig.Get(data, i.Entry) is { } item && item.SubType == subType);
+
+    /// <summary>Does the session carry a live buff of this BuffConfig._iBuffID group.</summary>
+    internal static bool HasBuffGroup(GameSession session, GameData data, long group)
+    {
+        long now = MonsterService.NowMs;
+        foreach (var buff in session.Buffs)
+            if (buff.ExpireMs > now && BuffConfig.Get(data, buff.ConfigId) is { } row && row.BuffId == group) return true;
+        return false;
+    }
 
     private static SessionCache Cache(GameSession session, GameData data)
     {
@@ -106,8 +115,8 @@ internal static class SkillParameterRules
         }
         if (cache.Signature == signature && ReferenceEquals(cache.Data, data)) return cache;
         var result = new List<Modifier>();
-        foreach (var (weapon, mod) in talents)
-            if (weapon == 0 || Wields(session, data, weapon)) result.Add(mod);
+        foreach (var (weapon, buffGroup, mod) in talents)
+            if ((weapon == 0 || Wields(session, data, weapon)) && (buffGroup == 0 || HasBuffGroup(session, data, buffGroup))) result.Add(mod);
         foreach (var buff in session.Buffs)
         {
             if (buff.ExpireMs <= now) continue;

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Romsg;
 using Ro3Emu.Server.Data;
+using Ro3Emu.Server.Data.Config;
 using Ro3Emu.Server.Maps;
 
 namespace Ro3Emu.Server.Game;
@@ -89,7 +90,8 @@ public sealed partial class CombatService
             .OrderBy(m => Distance(center, m.Pos)).ThenBy(m => m.Uid).Take(max).ToList();
     }
 
-    private async Task ApplyEffectsAsync(GameSession s, ActiveSkillCast action, Vec3 center, SkillObject? field = null)
+    private async Task ApplyEffectsAsync(GameSession s, ActiveSkillCast action, Vec3 center, SkillObject? field = null,
+        IReadOnlyList<MonsterUnit>? chosenTargets = null)
     {
         if (s.Dead || s.Role?.Id != action.OwnerId || s.WorldScene != action.WorldScene || s.SceneLoading
             || s.SceneGeneration != action.SceneGeneration || field?.Removing == true
@@ -109,7 +111,8 @@ public sealed partial class CombatService
             && ReferenceEquals(s.Attachment, action.Attachment)
             && _sessions.All().Contains(s);
         string script = Script(row);
-        var targets = SelectEnemies(s, action, center, field?.Trap == true ? field.Radius : null);
+        var targets = chosenTargets?.Where(m => m.Hp > 0 && CanHitMonster(s, m)).ToList()
+            ?? SelectEnemies(s, action, center, field?.Trap == true ? field.Radius : null);
         var playerTargets = EffectPlayerTargets(s, action, center);
         var alreadySlowed = GuardianPreviouslySlowed(row, targets, playerTargets);
         if (playerTargets.Length > 0)
@@ -283,7 +286,42 @@ public sealed partial class CombatService
                 await FinalizeLethalPublicationAsync(target);
             }
         }
+        // A player's own cast: not a field, not an extra cast such as a talent proc, so procs never chain.
+        if (field == null && !action.Request.IsExtraSkill)
+            foreach (var handler in CastResolved)
+            {
+                if (!CanApplyMoreEffects()) break;
+                await handler(s, action, processed);
+            }
     }
+
+    /// <summary>
+    /// An extra cast of a SkillConfig row on monsters the caller chose, through the ordinary effect path (damage, kills,
+    /// statistics, 31101). It is an extra skill: it pays nothing, starts no cooldown and triggers no CastResolved.
+    /// </summary>
+    internal Task CastExtraAsync(GameSession s, JsonElement row, IReadOnlyList<MonsterUnit> targets)
+    {
+        if (s.Role == null || targets.Count == 0) return Task.CompletedTask;
+        var target = targets[0];
+        var action = new ActiveSkillCast
+        {
+            Id = ++_sessionIds, OwnerId = s.Role.Id, WorldScene = s.WorldScene, SceneGeneration = s.SceneGeneration,
+            Attachment = s.Attachment, Row = SkillParameterRules.Effective(s, _data, row),
+            Request = new CastSkillReq
+            {
+                SkillId = (int)new SkillConfig(row).Id, TargetId = target.Uid, TargetPos = target.Pos.Clone(), Face = s.Face,
+                IsExtraSkill = true,
+            },
+            Origin = s.Position.Clone(), StartMs = Now, ChantMs = 0, ActionMs = 1,
+        };
+        return ApplyEffectsAsync(s, action, target.Pos.Clone(), chosenTargets: targets);
+    }
+
+    /// <summary>Living monsters this caster may hit within a radius of a point, nearest first.</summary>
+    internal List<MonsterUnit> MonstersNear(GameSession s, Vec3 center, float radius) =>
+        _world.Map(s.WorldScene).Units.OfType<MonsterUnit>()
+            .Where(m => m.Hp > 0 && CanHitMonster(s, m) && Distance(center, m.Pos) <= radius + 0.1f)
+            .OrderBy(m => Distance(center, m.Pos)).ThenBy(m => m.Uid).ToList();
 
     private bool RollBuff(JsonElement tuple, out int id, out int duration)
     {
