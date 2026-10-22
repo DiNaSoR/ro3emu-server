@@ -107,6 +107,57 @@ public sealed class ProfileDetailTests : IAsyncLifetime
         Assert.False(card.ContainsKey("Extra"));
     }
 
+    /// <summary>
+    /// The Realm of the Gods hall of fame stores the full attributes at the clear, but sends them only for a role that
+    /// shows its details now, online or offline; a hidden role keeps its property ids with zero values.
+    /// </summary>
+    [Fact]
+    public async Task HallOfFameHidesTheAttributesOfARoleThatDoesNotShowThem()
+    {
+        const int boss = 1;
+        var (alice, aliceId) = await InWorld("Alice");
+        var (bob, _) = await InWorld("Bob");
+        await using var _bob = bob;
+        var loop = _app.Services.GetRequiredService<GameLoop>();
+        var sessions = _app.Services.GetRequiredService<SessionRegistry>();
+        var dungeons = _app.Services.GetRequiredService<DungeonService>();
+        var character = _app.Services.GetRequiredService<CharacterService>();
+        var record = await loop.InvokeAsync(() => Task.FromResult(new DBMultiDungeonHallOfFame
+        {
+            MultiDungeonBossId = boss, TeamLeaderId = aliceId, TeamLeaderName = "Alice",
+            RoleInfo = { character.DetailInfo(sessions.All().Single(s => s.Role?.Id == aliceId)) },
+        }));
+        Assert.Contains(record.RoleInfo[0].Selfproperty.Propertys, p => p.Data != 0);
+        await loop.InvokeAsync(() => dungeons.StoreFirstClearAsync(record));
+
+        async Task<RoleDetailInfo> Seen()
+        {
+            using var reply = bob.Inbox.Expect(e => e.IsGame(DungeonService.HallOfFame));
+            await bob.SendGameAsync(DungeonService.HallOfFame, new QueryHallOfFameInfoReq { MultiDungeonBossId = boss });
+            return QueryHallOfFameInfoResp.Parser.ParseFrom((await reply.WaitAsync(Wait)).Body).HallOfFameInfo.RoleInfo.Single();
+        }
+        void Hidden(RoleDetailInfo seen)
+        {
+            Assert.False(seen.Rolebase.IsShowDetail);
+            Assert.Equal(record.RoleInfo[0].Selfproperty.Propertys.Select(p => p.PropertyId), seen.Selfproperty.Propertys.Select(p => p.PropertyId));
+            Assert.All(seen.Selfproperty.Propertys, p => Assert.True(p.Data == 0 && p.BaseData == 0 && p.Vd64 == 0));
+        }
+
+        Hidden(await Seen()); // never chosen: NoShow
+        await ShowDetail(alice, ShowDetailInfoType.ShowAll);
+        var shown = await Seen();
+        Assert.True(shown.Rolebase.IsShowDetail);
+        Assert.Equal(record.RoleInfo[0].Selfproperty, shown.Selfproperty);
+
+        // Offline, the stored choice decides.
+        await ShowDetail(alice, ShowDetailInfoType.NoShow);
+        await alice.SendGameAsync(MsgId.Logout, new LogoutReq());
+        await alice.Inbox.WaitAsync(e => e.IsGame(MsgId.Logout), Wait);
+        await alice.DisposeAsync();
+        await WaitUntilOffline(aliceId);
+        Hidden(await Seen());
+    }
+
     private async Task WaitUntilOffline(long role)
     {
         var loop = _app.Services.GetRequiredService<GameLoop>();

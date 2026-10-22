@@ -62,6 +62,15 @@ public sealed partial class CharacterService
         return all;
     }
 
+    /// <summary>The same property ids with every value zero: what a role that hides its details shows others.</summary>
+    internal static AllProperty Hidden(AllProperty? all)
+    {
+        var hidden = new AllProperty { EntityID = all?.EntityID ?? 0 };
+        if (all != null)
+            foreach (var p in all.Propertys) hidden.Propertys.Add(new Property { PropertyId = p.PropertyId });
+        return hidden;
+    }
+
     /// <summary>EntityBase.equipInfo: ItemConfig ids of grids 1..7, 0 for empty.</summary>
     private static long[] EquipInfo(GameSession session)
     {
