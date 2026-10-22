@@ -37,6 +37,53 @@ public sealed class GuildVoiceSessionTests
         });
     }
 
+    private static Task<GuildVoiceChannelKickPlayerRsp> Kick(BotClient bot, long target) =>
+        Ask(bot, GuildVoiceService.KickMsg, new GuildVoiceChannelKickPlayerReq { ChannelIndex = 0, TargetPlayerId = target },
+            GuildVoiceChannelKickPlayerRsp.Parser);
+
+    /// <summary>
+    /// #258: a voice kick follows the guild kick rule (GuildService.KickCoreAsync). Below the leader (Official 1) a
+    /// manager may kick only a member with a larger Official; the leader may kick anyone but itself.
+    /// </summary>
+    [Fact]
+    public async Task AVoiceManagerCannotKickAnEqualOrHigherOfficer()
+    {
+        await using var host = await SyntheticHost.StartAsync();
+        var bots = new List<BotClient>();
+        foreach (string name in new[] { "Alice", "Bob", "Carol", "Dave" }) bots.Add(await host.InWorldAsync(name));
+        try
+        {
+            var sessions = host.Service<SessionRegistry>();
+            long[] ids = [.. bots.Select(bot => (long)bot.Self!.Uuid)];
+            int[] officials = [1, 2, 3, 3];
+            await host.Service<GameLoop>().InvokeAsync(() =>
+            {
+                var guild = new GuildStore.State { Name = "VoiceRanks", Status = (int)GuildStatus.Normal };
+                for (int i = 0; i < ids.Length; i++)
+                    guild.Members[ids[i]] = new GuildStore.Member { RoleId = ids[i], Name = $"M{i}", Official = officials[i] };
+                guild.Rights[23] = [1, 2, 3];
+                Assert.True(host.Service<GuildStore>().Save(guild));
+                for (int i = 0; i < ids.Length; i++)
+                    sessions.All().Single(s => s.Role?.Id == ids[i]).Guild =
+                        new DBRoleGuildInfo { GuildId = guild.Id, Official = officials[i] };
+                return Task.CompletedTask;
+            });
+            foreach (var bot in bots)
+                Assert.Equal(0, (await Ask(bot, GuildVoiceService.JoinMsg, new GuildVoiceChannelJoinReq(),
+                    GuildVoiceChannelJoinRsp.Parser)).ErrorCode);
+            var (alice, bob, carol) = (bots[0], bots[1], bots[2]);
+
+            Assert.Equal(ErrorCodes.GuildVoiceNoPermission, (await Kick(carol, ids[1])).ErrorCode); // 3 cannot kick 2
+            Assert.Equal(ErrorCodes.GuildVoiceNoPermission, (await Kick(carol, ids[3])).ErrorCode); // nor an equal 3
+            Assert.Equal(0, (await Kick(bob, ids[2])).ErrorCode); // 2 kicks 3
+            Assert.Equal(0, (await Kick(alice, ids[1])).ErrorCode); // the leader kicks a vice-leader
+        }
+        finally
+        {
+            foreach (var bot in bots) await bot.DisposeAsync();
+        }
+    }
+
     [Theory]
     [InlineData(false, 0)]
     [InlineData(false, 1)]
