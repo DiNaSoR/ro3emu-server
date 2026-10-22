@@ -476,13 +476,20 @@ public sealed class BossSkillSets(GameData data, BossSkillOptions options)
     private int Charge(JsonElement row, out int ms)
     {
         ms = 0;
-        var (effect, time, curve) = CombatService.FindMovementEffect(data, GameData.Int(row, "_iScriptShow"));
+        var (effect, time, curve, text) = Displacement(row);
         if (effect == 0) return 0;
-        string text = (data.TextOf(row, "_iName") + " " + data.TextOf(row, "_iDescription")).ToLowerInvariant();
         if (curve.Contains("击退") || curve.Contains("震退") || curve.Contains('勾') || curve.Contains('吸') || curve.Contains('拉')
             || text.Contains("pull") || text.Contains("knock") || text.Contains("repel")) return 0;
         ms = time > 0 ? time : 300;
         return effect;
+    }
+
+    /// <summary>The show's displacement EffectData (id, time, curve) and the skill's lower-case name and description.</summary>
+    private (int Effect, int Ms, string Curve, string Text) Displacement(JsonElement row)
+    {
+        var (effect, time, curve) = CombatService.FindMovementEffect(data, GameData.Int(row, "_iScriptShow"));
+        return (effect, time, curve, effect == 0 ? ""
+            : (data.TextOf(row, "_iName") + " " + data.TextOf(row, "_iDescription")).ToLowerInvariant());
     }
 
     // (inferred) How far a boss's knockback moves a player, and where its pull stops: the player skills' Arrow Repel moves
@@ -496,9 +503,8 @@ public sealed class BossSkillSets(GameData data, BossSkillOptions options)
     {
         ms = 0;
         distance = 0;
-        var (effect, time, curve) = CombatService.FindMovementEffect(data, GameData.Int(row, "_iScriptShow"));
+        var (effect, time, curve, text) = Displacement(row);
         if (effect == 0) return 0;
-        string text = (data.TextOf(row, "_iName") + " " + data.TextOf(row, "_iDescription")).ToLowerInvariant();
         bool pull = curve.Contains('勾') || curve.Contains('吸') || curve.Contains('拉') || text.Contains("pull");
         bool knock = curve.Contains("击退") || curve.Contains("震退") || text.Contains("knock") || text.Contains("repel");
         if (!pull && !knock) return 0;
