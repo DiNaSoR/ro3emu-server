@@ -916,9 +916,11 @@ public sealed class SkillService
         }
         else if (code == 0)
         {
+            // Any career may load its normal attack: the skill window draws the Novice tree's Normal Attack cell as
+            // the current one (Arrow Attack for an Archer with a bow), and UI_Sys_Skill_SetItemWidget_PCCtrl only
+            // stops passives, unlearned skills and PublicParamConfig BanSkill/BanSkillCanPoints from being dragged.
             int learned = Level(p, group);
             if (group <= 0 || learned <= 0 || !IsActive(group)
-                || (IsNormalGroup(p, group) && p.Career != 1000)
                 || req.Info!.SkillLevel < 1 || req.Info.SkillLevel > learned
                 || op == 1 && target < loadList.Count && loadList[target].SkillId > 0
                     && loadList[target].SkillId != group
@@ -931,7 +933,11 @@ public sealed class SkillService
             if (op == 2) loadList[target] = new SkillData();
             else
             {
-                foreach (var skill in loadList.Where(skill => skill.SkillId == group))
+                // A slot holding the Novice attack or another normal attack casts the current one, so it counts as
+                // the same skill and moves too.
+                int atkGroup = GroupOf(plans.CurrentAtkSkillId);
+                int cast = WheelGroup(p, group, atkGroup);
+                foreach (var skill in loadList.Where(skill => skill.SkillId > 0 && WheelGroup(p, skill.SkillId, atkGroup) == cast))
                 { skill.SkillId = 0; skill.SkillLevel = 0; }
                 loadList[target] = req.Info!.Clone();
             }
