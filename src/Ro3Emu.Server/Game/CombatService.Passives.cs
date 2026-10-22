@@ -18,7 +18,7 @@ public sealed partial class CombatService
     /// Passive skill group -> the id prefix of its own BuffConfig rows (prefix * 100 + level), every level with the
     /// passive's English name in Localization_en (inferred). The same id but another name is another buff: BuffConfig
     /// 1310410 is Steel Crow's, not Beastbane's 1310410, and Riding's 1140701 is Providence. Union's row is its team
-    /// stacks (_iMaxStack 10) and the mount passives' rows (Wolf Taming, Wolf's Fang) need a mount, so they are left out.
+    /// stacks (_iMaxStack 10) and the mount passives' rows (Wolf Taming, Wolf's Fang) need a mount: RidingEffects grants them.
     /// </summary>
     internal static readonly IReadOnlyDictionary<int, int> OwnBuffs = new Dictionary<int, int>
     {

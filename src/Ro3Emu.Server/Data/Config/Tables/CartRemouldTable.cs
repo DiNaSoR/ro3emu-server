@@ -11,6 +11,7 @@ public readonly partial record struct CartRemouldTable(JsonElement Row)
     [ConfigField("_iTaskId")] public partial long TaskId { get; }
     [ConfigField("_iType")] public partial long Type { get; }
     [ConfigField("_iUnlockBaseLv")] public partial long UnlockBaseLv { get; }
+    [ConfigField("_kBindBuff")] public partial long[] BindBuff { get; }
     [ConfigField("_kJob")] public partial long[] Job { get; }
     [ConfigField("_kProfessionID")] public partial long[] ProfessionId { get; }
     [ConfigField("_kUnlockSkillID")] public partial long UnlockSkillId { get; }

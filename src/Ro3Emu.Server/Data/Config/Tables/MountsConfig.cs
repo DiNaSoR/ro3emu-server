@@ -9,5 +9,6 @@ public readonly partial record struct MountsConfig(JsonElement Row)
     [ConfigField("_iID")] public partial long Id { get; }
     [ConfigField("_iType")] public partial long Type { get; }
     [ConfigField("_kAttr")] public partial long[][] Attr { get; }
+    [ConfigField("_kBindBuff")] public partial long[] BindBuff { get; }
     [ConfigField("_kJob")] public partial long[] Job { get; }
 }

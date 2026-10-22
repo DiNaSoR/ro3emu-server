@@ -12,8 +12,9 @@ namespace Ro3Emu.Server.Game;
 /// its own BuffConfig row (CombatService.OwnBuffs) and its description values, quoted per passive. The trigger is written
 /// only in the description, as for the talents' procs (inferred). Double Attack, Deadly Poison's Venom and Advanced Katar
 /// Mastery are in TalentProcs.Passives, next to the talents that change them; Supersonic Blow and Arcane Mastery change a
-/// skill's damage in CombatService.Passives. Not executed: the mount passives (Riding, Dragon Training, Wolf Taming,
-/// Wolf's Fang), Sight Sprout's detection, Psychokinetic Astral Body and Element Control's Boss resistance hit.
+/// skill's damage in CombatService.Passives; the mount passives (Riding, Dragon Training, Wolf Taming, Wolf's Fang) are
+/// RidingEffects. Not executed: Sight Sprout's detection, Psychokinetic Astral Body and Element Control's Boss resistance
+/// hit.
 /// </summary>
 public sealed class PassiveSkills
 {
