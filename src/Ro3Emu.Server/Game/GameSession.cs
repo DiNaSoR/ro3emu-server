@@ -247,8 +247,8 @@ public sealed class GameSession(PhonestChannel channel, TrafficLog traffic)
 
     /// <summary>
     /// How far a walking client can have moved since its last walk report, counting at most
-    /// <paramref name="maxSeconds"/>: the client reports a walk when it starts, turns or stops, not along a straight
-    /// stretch, so <see cref="Position"/> trails a walking player. Nothing once the report is older than
+    /// <paramref name="maxSeconds"/>: between reports (start, turn, stop, and a keep-alive every 0.9 s along a straight
+    /// stretch) <see cref="Position"/> trails a walking player. Nothing once the report is older than
     /// <see cref="StaleWalkReportSeconds"/>.
     /// </summary>
     public float WalkReportLag(double maxSeconds)
