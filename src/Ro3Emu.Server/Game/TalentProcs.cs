@@ -19,7 +19,7 @@ namespace Ro3Emu.Server.Game;
 /// name the same triggers the rules list. Rules exist for every job line's damage, buff and recast procs; the Thief and
 /// Merchant lines have no proc rows, so their hits come from the descriptions. The base passives the talents build on
 /// (Double Attack, Deadly Poison's Venom, Advanced Katar Mastery) are in TalentProcs.Passives, counters and next-cast
-/// charges in TalentProcs.Charges, and the reactions to damage taken, kills, a field's end, heals and the count of enemies
+/// charges in TalentProcs.Charges, and the reactions to damage taken, kills, Gravitation Field's end, heals and the count of enemies
 /// hit in TalentProcs.Reactions. Not executed: Shield Bash Echo (no value for its new cooldown), Falcon's Might (op 20)
 /// and Scouting (a scope-1 BuffLogicData tuple).
 /// </summary>
@@ -304,7 +304,6 @@ public sealed partial class TalentProcs
         combat.CastResolved.Add(OnCastResolvedAsync);
         buffs.Changed.Add(OnBuffsChangedAsync);
         combat.TargetCountRow = TargetCountRow;
-        combat.FieldEnded.Add(OnFieldEndedAsync);
         combat.TakenAsync.Add(OnTakenAsync);
         combat.Killed.Add(OnKilledAsync);
         combat.PlayerDied.Add(OnDiedAsync);
@@ -383,6 +382,7 @@ public sealed partial class TalentProcs
         if (s.TalentProcBuffs.Count == 0) return;
         await ChargesAsync(s, action, cast, processed);
         await HealProcsAsync(s, action, cast, hit);
+        GravityTrap(s, action, cast);
         foreach (var (buff, description) in s.TalentProcBuffs)
         {
             if (!Rules.TryGetValue(buff, out var rule)) continue;

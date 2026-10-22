@@ -92,6 +92,39 @@ public sealed partial class SkillCombatTests
         Assert.False(await SmiteAsync());
     }
 
+    // Magic Cannon (10103102 for the Wizard line): "After every ${1} (2) casts of [Magic Crasher], the skill multiplier of the
+    // next @{1} casts of [Magic Crasher] increases by ${2}% ..." Its buff carries nothing, so the charge is skill tuples.
+    [ClientDataFact]
+    public async Task MagicCannonChargesTheMagicCrasherAfterEverySecond()
+    {
+        await using var alice = await InWorld("Alice");
+        await Gm("alice", "!lvl 99"); await Gm("alice", "!job 2400"); await Teach("alice", 12201);
+        await ChooseProfessionTalent(alice, "alice", 10103102);
+        var monster = await Target("alice", stationary: true);
+        await Loop.InvokeAsync(() => { monster.Hp = 1_000_000; return Task.CompletedTask; });
+
+        async Task<int> CrasherAsync()
+        {
+            await Loop.InvokeAsync(() =>
+            {
+                var s = Session("alice");
+                s.SkillCds.Clear();
+                s.SkillModeCds.Clear();
+                return Task.CompletedTask;
+            });
+            await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1220101, TargetId = monster.Uid });
+            var accepted = await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser);
+            Assert.Equal(0, accepted.Result);
+            await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser, x => x.SessionId == accepted.SessionId);
+            await Task.Delay(1500);
+            return await Loop.InvokeAsync(() => Task.FromResult(Session("alice").TalentChargeModifiers.Count));
+        }
+
+        Assert.Equal(0, await CrasherAsync());
+        Assert.Equal(2, await CrasherAsync()); // [12201, 29, add, 2000] and [12201, 30, add, 10]
+        Assert.Equal(0, await CrasherAsync());
+    }
+
     // Sacred Divine Light (10102106 for the Priest line): "[Heal] restores an Extra MATK*${2}%+${3} HP to targets below
     // ${1}% HP." Its extra heal is the proc row 1421601.
     [ClientDataFact]
@@ -147,6 +180,43 @@ public sealed partial class SkillCombatTests
             return SkillParameterRules.CritChance(s, data, SkillConfig.Get(data, 1500001)!.Value.Row);
         });
         Assert.Equal(0.4, crit, 6);
+    }
+
+    // Gravity Trap: "When [Gravitation Field] ends, inflicts [Immobilize] on enemies in the area for ${1} seconds." The
+    // field resolves at once, so it ends its _kLogicData[1] (3900 ms) later (10104103 for the Wizard line).
+    [ClientDataFact]
+    public async Task GravityTrapImmobilizesWhenGravitationFieldEnds()
+    {
+        await using var alice = await InWorld("Alice");
+        await Gm("alice", "!lvl 99"); await Gm("alice", "!job 2400"); await Teach("alice", 12212);
+        await ChooseProfessionTalent(alice, "alice", 10104103);
+        var monster = await Target("alice", stationary: true);
+        await Loop.InvokeAsync(() => { monster.Hp = 1_000_000; return Task.CompletedTask; });
+
+        await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1221201, TargetPos = monster.Pos.Clone() });
+        Assert.Equal(0, (await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
+        await Next(alice, BuffService.BuffUpdate, BuffUpdateNotify.Parser,
+            x => x.UnitId == monster.Uid && x.Buffs.Any(b => b.ConfigId == 902401));
+    }
+
+    // Soul Reaper (10103106 for the Wizard line): "When [Soul Drain] scores a Kill, gain ${1} MATK, up to ${2}."
+    [ClientDataFact]
+    public async Task SoulReaperAddsMatkForAKill()
+    {
+        await using var alice = await InWorld("Alice");
+        await Gm("alice", "!lvl 99"); await Gm("alice", "!job 2400"); await Teach("alice", 12209); await Teach("alice", 12004);
+        await ChooseProfessionTalent(alice, "alice", 10103106);
+        var character = _app.Services.GetRequiredService<CharacterService>();
+        long before = await Loop.InvokeAsync(() => Task.FromResult(character.Stats(Session("alice"))[104]));
+        var monster = await Target("alice", stationary: true);
+        await Loop.InvokeAsync(() => { monster.Hp = 1; return Task.CompletedTask; });
+
+        await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1200401, TargetId = monster.Uid });
+        Assert.Equal(0, (await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
+        await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser, x => x.Dsts.Any(d => d.DstID == monster.Uid && d.IsDead));
+        await Task.Delay(300);
+        long after = await Loop.InvokeAsync(() => Task.FromResult(character.Stats(Session("alice"))[104]));
+        Assert.True(after > before, $"MATK {before} -> {after}");
     }
 
     // Ember Zone (10102127 for the Wizard line): "After casting [Heaven's Drive], the next [Meteor Storm] cast within ${1}

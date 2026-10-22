@@ -243,8 +243,6 @@ public sealed partial class CombatService : IGameTicker
     /// <summary>The row a cast deals its damage with once its monster targets are chosen ("For every enemy hit by [Hammer
     /// Fall], ... increases"), by their count (TalentProcs).</summary>
     internal Func<GameSession, JsonElement, int, JsonElement>? TargetCountRow { get; set; }
-    /// <summary>A player's ground field ran its full time (TalentProcs: "When [Gravitation Field] ends ...").</summary>
-    internal List<Func<GameSession, SkillObject, Task>> FieldEnded { get; } = [];
     /// <summary>May the caster's skill put this _kBuff1 buff on the recipient (TalentProcs: talent-gated buffs).</summary>
     internal Func<GameSession, GameSession, int, bool>? SkillBuffAllowed { get; set; }
     public List<Func<GameSession, MonsterUnit, JsonElement, DamageHitResult, long, long>> DamageAdjusters { get; } = new();

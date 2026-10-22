@@ -69,8 +69,8 @@ public readonly partial record struct SkillConfig(JsonElement Row)
 
     /// <summary>
     /// This row as a hit whose damage only a description gives (talent procs): PATK * ratio (basis points) + flat, of an
-    /// element (0 keeps the row's). It keeps the row's id, release and show, but drops its group, tags, script, buffs and
-    /// shown hit count, so no skill modifier, script effect or buff of the original applies to it.
+    /// element and a target cap (0 keeps the row's). It keeps the row's id, release and show, but drops its group, tags,
+    /// script, buffs and shown hit count, so no skill modifier, script effect or buff of the original applies to it.
     /// </summary>
     public JsonElement AsDescribedHit(long ratio, long flat, long element, long targetMax = 0)
     {

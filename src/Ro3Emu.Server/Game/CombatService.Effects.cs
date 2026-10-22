@@ -590,9 +590,6 @@ public sealed partial class CombatService
         try
         {
             var owner = unit.OwnerSession;
-            if (Now >= unit.ExpiresMs && !unit.Trap && owner.Role?.Id == unit.OwnerId && !owner.SceneLoading
-                && owner.WorldScene == unit.WorldScene && owner.SceneGeneration == unit.Cast.SceneGeneration)
-                foreach (var handler in FieldEnded) await handler(owner, unit);
             if (Now >= unit.ExpiresMs || owner.Role?.Id != unit.OwnerId || owner.SceneLoading || owner.Dead
                 || owner.WorldScene != unit.WorldScene || owner.SceneGeneration != unit.Cast.SceneGeneration
                 || !ReferenceEquals(owner.Attachment, unit.Cast.Attachment) || unit.Cast.Attachment?.Cancelled == true)

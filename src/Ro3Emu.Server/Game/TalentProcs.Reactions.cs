@@ -8,7 +8,7 @@ namespace Ro3Emu.Server.Game;
 
 /// <summary>
 /// Talents that react to something other than the owner's cast resolving: the count of enemies a cast hits, damage taken,
-/// kills, a field's end, and the allies a heal reaches.
+/// kills, Gravitation Field's end, and the allies a heal reaches.
 /// </summary>
 public sealed partial class TalentProcs
 {
@@ -36,7 +36,7 @@ public sealed partial class TalentProcs
     // Players. Resets upon death, switching Locations, or going offline."
     private const long SoulReaper = 1247201;
     // Gravity Trap: "When [Gravitation Field] ends, inflicts [Immobilize] on enemies in the area for ${1} seconds."
-    private const long GravityTrap = 1248301;
+    private const long GravityTrapTalent = 1248301;
     // Sacred Divine Light: "[Heal] restores an Extra MATK*${2}%+${3} HP to targets below ${1}% HP." _kLogicData [80, 1421601]
     private const long SacredDivineLight = 1421501;
     // Holy Healing Light: "[Heal] has a ${1}% Chance to Splash to ${3} Other allies within ${2} meters of the target,
@@ -118,12 +118,21 @@ public sealed partial class TalentProcs
             yield return (AttrMatk, reaper.Matk);
     }
 
-    private async Task OnFieldEndedAsync(GameSession s, SkillObject field)
+    /// <summary>Gravitation Field resolves at once here (it leaves no field NPC), so it "ends" its _kLogicData[1] (3900 ms)
+    /// after the cast; the Immobilize then lands on the monsters within its _kRange of the target point (inferred).</summary>
+    private void GravityTrap(GameSession s, ActiveSkillCast action, SkillConfig cast)
     {
-        if (s.Role == null || new SkillConfig(field.Cast.Row).SkillId != GravitationField
-            || Talent(s, GravityTrap) is not { } description) return;
-        foreach (var monster in _combat.MonstersNear(s, field.Pos, field.Radius))
-            await _buffs.ShowOnUnitAsync(monster, (int)Immobilize, (int)(Value(description, 0) * 1000), s.Role.Id);
+        if (cast.SkillId != GravitationField || Talent(s, GravityTrapTalent) is not { } description
+            || cast.LogicData is not [_, var ms, ..] || s.Role is not { } role) return;
+        long scene = s.SceneGeneration;
+        var center = (action.Request.TargetPos ?? s.Position).Clone();
+        float radius = (cast.Range is [var range, ..] ? range : 0) / 100f;
+        _loop.ScheduleRuntime(TimeSpan.FromMilliseconds(ms), async () =>
+        {
+            if (!ReferenceEquals(s.Role, role) || s.SceneGeneration != scene) return;
+            foreach (var monster in _combat.MonstersNear(s, center, radius))
+                await _buffs.ShowOnUnitAsync(monster, (int)Immobilize, (int)(Value(description, 0) * 1000), role.Id);
+        });
     }
 
     /// <summary>After a heal or Sanctuary of the owner: <paramref name="hit"/> lists the allies it healed.</summary>
