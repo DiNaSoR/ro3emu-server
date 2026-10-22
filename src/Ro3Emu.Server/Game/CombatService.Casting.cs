@@ -19,6 +19,8 @@ public sealed class ActiveSkillCast
     public required Vec3 Origin { get; set; }
     /// <summary>Accepted while the caster still walked (WalkSlack): its stop right after is where it cast from.</summary>
     public bool StartedWalking { get; set; }
+    /// <summary>The caster's last walk message when the cast was accepted: the walk its stop can have covered starts there.</summary>
+    public DateTime WalkFromUtc { get; init; }
     public required long StartMs { get; init; }
     public required int ChantMs { get; init; }
     public required int ActionMs { get; init; }
@@ -222,9 +224,12 @@ public sealed partial class CombatService
 
     // The client casts on reaching range while it still walks; its stop arrives just after the cast (in-game 11.10:
     // 13 ms later, refused 3024 "invalid skill distance" on most approaches). The cast carries no caster position, so
-    // a walking caster's range allows the distance it can have covered since its last walk, at most 0.75 s of it.
-    private static float WalkSlack(GameSession s) => !s.Walking ? 0
-        : (float)(s.Speed / 100.0 * Math.Clamp((DateTime.UtcNow - s.LastWalkUtc).TotalSeconds, 0, 0.75));
+    // a walking caster's range allows the distance it can have covered since its last walk. The client sends a walk
+    // only when its direction changes (in-game 22.10: straight legs of 0.86 s and 0.9 s), so the time is not capped
+    // below the 5 s SceneService.AcceptWalkAsync allows.
+    internal const double MaxWalkSlackSeconds = 5;
+    private static double WalkedSeconds(DateTime since) => Math.Clamp((DateTime.UtcNow - since).TotalSeconds, 0, MaxWalkSlackSeconds);
+    private static float WalkSlack(GameSession s) => !s.Walking ? 0 : (float)(s.Speed / 100.0 * WalkedSeconds(s.LastWalkUtc));
 
     private int ValidateTarget(GameSession s, JsonElement row, CastSkillReq req, Vec3 origin, float slack = 0)
     {
@@ -412,7 +417,7 @@ public sealed partial class CombatService
         var action = new ActiveSkillCast
         {
             Id = id, OwnerId = s.Role!.Id, WorldScene = s.WorldScene, SceneGeneration = s.SceneGeneration,
-            Attachment = s.Attachment, Request = req, Row = row, Origin = origin, StartedWalking = actor == null && s.Walking,
+            Attachment = s.Attachment, Request = req, Row = row, Origin = origin, StartedWalking = actor == null && s.Walking, WalkFromUtc = s.LastWalkUtc,
             StartMs = Now, ChantMs = ChantMs(s, row), ActionMs = SkillMs(s, row), Operator = actor,
         };
         s.SkillCast = action;
@@ -502,7 +507,7 @@ public sealed partial class CombatService
         // The client casts on reaching range and stops 1 ms later (in-game 11.10): that first stop is the cast's real
         // origin, within the distance the walk can have covered, not a move that interrupts it.
         if (cast.StartedWalking && !s.Walking && Now - cast.StartMs <= 300
-            && Distance(cast.Origin, s.Position) <= s.Speed / 100f * 0.75f + 0.5f)
+            && Distance(cast.Origin, s.Position) <= s.Speed / 100.0 * WalkedSeconds(cast.WalkFromUtc) + 0.5)
         {
             cast.Origin = s.Position.Clone();
             cast.StartedWalking = false;
