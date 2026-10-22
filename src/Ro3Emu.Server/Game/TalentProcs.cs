@@ -14,8 +14,10 @@ namespace Ro3Emu.Server.Game;
 /// only in the description, so each rule below quotes it (inferred). The proc row's own _kDamageParam1/2, _kShowDmg and
 /// _kScriptLogic carry its damage, and the proc is an extra cast through the ordinary effect path.
 /// <see cref="WhileActive"/> lists the talents whose _kLogicData buff applies while another buff lives ("While [Aura
-/// Blade] is active ..."); SeasonTalentService applies those. Rules exist for the Knight, Lord Knight, Crusader and
-/// Paladin lines. Not covered yet: counters ("after every N casts"), taking-damage triggers, Cross Thrust (its target
+/// Blade] is active ..."); SeasonTalentService applies those. A description's skill links (&lt;link="skill/1411801"&gt;)
+/// name the same triggers the rules list. Rules exist for the Knight, Crusader, Priest, Mage and Archer lines and their
+/// later jobs. Not covered yet: the Thief and Merchant lines (no proc row: their damage is only in the description),
+/// counters ("after every N casts"), taking-damage and kill triggers, heals on allies, zones, Cross Thrust (its target
 /// count is a runtime value), Concussive Shield Bash (its _kLogicData names no SkillConfig row) and Shield Bash Echo (no
 /// _kLogicData).
 /// </summary>
@@ -23,10 +25,14 @@ public sealed class TalentProcs
 {
     // SkillConfig._iSkillID of the triggering casts, named by SkillConfig._iName.
     private const int Pierce = 11120, BowlingBash = 11104, HolyCross = 11411, GrandCross = 11412, ShieldBoomerang = 11418,
-        GloriaDomini = 11501, RapidSmiting = 11504;
+        GloriaDomini = 11501, RapidSmiting = 11504,
+        TurnUndead = 14118, MagnusExorcismus = 14109,
+        FireBolt = 12004, LightningBolt = 12005, ColdBolt = 12006, FireBall = 12012, EarthSpike = 12100, JupitelThunder = 12102,
+        FrostNova = 12103, MeteorStorm = 12106, StormGust = 12108, GravitationField = 12212,
+        ArrowAttack = 13000, DoubleStrafe = 13003, ArrowShower = 13004, BlitzBeat = 13102, FalconAssault = 13202;
     // BuffConfig._iBuffID of the skills' own buffs, named by BuffConfig._iName.
     private const long AuraBlade = 11201, Parry = 11210, AutoGuard = 11403, Sacrifice = 11501, BattleChant = 11505;
-    private const long TwoHandedSword = 3; // ItemConfig._iSubType
+    private const long TwoHandedSword = 3, Mace = 8; // ItemConfig._iSubType
     private const int BuffAttrType = 2; // EBuffAffectValueType.BuffAttr
 
     /// <summary>
@@ -34,12 +40,16 @@ public sealed class TalentProcs
     /// <paramref name="Radius"/>/<paramref name="Count"/>: the proc hits the target and up to Count - 1 more monsters
     /// within Radius meters of it; <paramref name="Others"/> instead counts the monsters besides the target, and
     /// <paramref name="OthersOnly"/> leaves the target out. <paramref name="RowArea"/> takes the area from the proc row
-    /// (_kRange, _iTargetMax); <paramref name="AroundCaster"/> centres the area on the caster. <paramref name="Buff"/>:
-    /// _kLogicData is [BuffConfig id, duration ms] on the caster. <paramref name="Active"/>: a buff group that must live.
+    /// (_kRange, _iTargetMax); <paramref name="AroundCaster"/> centres the area on the caster; <paramref name="HitTargets"/>
+    /// takes the monsters the cast hit (up to Count). <paramref name="Logic"/> indexes _kLogicData for the proc's SkillConfig
+    /// row (or skill group, or BuffConfig row); <paramref name="Recast"/> casts the triggering row again. <paramref name="Buff"/>:
+    /// the BuffConfig row goes on the caster (<paramref name="TargetBuff"/>: on the target) for the _kLogicData value after
+    /// it in ms, or <paramref name="BuffSeconds"/> of the description. <paramref name="Active"/>: a buff group that must live.
     /// </summary>
     private sealed record Rule(int[] Groups, bool NormalAttack = false, long Weapon = 0, int? Chance = null, int? Cooldown = null,
         int? Radius = null, int? Count = null, int? Others = null, bool OthersOnly = false, bool RowArea = false, bool Buff = false,
-        long Active = 0, bool AroundCaster = false);
+        long Active = 0, bool AroundCaster = false, int Logic = 0, bool Recast = false, bool TargetBuff = false, int? BuffSeconds = null,
+        bool HitTargets = false);
 
     /// <summary>Talent BuffConfig id -> the buff group that must live for its _kLogicData buff to apply.</summary>
     internal static readonly IReadOnlyDictionary<long, long> WhileActive = new Dictionary<long, long>
@@ -94,6 +104,74 @@ public sealed class TalentProcs
         [1151701] = new([GloriaDomini]),
         // Shield Pursuit: "[Rapid Smiting] has a ${1}% Chance to Deals DMG to the target an Extra @{1} times ..."
         [1155301] = new([RapidSmiting], Chance: 0),
+
+        // Priest line: _kLogicData is [chance in basis points, proc row]; the description's chance, when it has one, is
+        // the same value.
+        // Holy Light Resurrection: "When [Turn Undead] hits an enemy, it deals ${1} Extra hit(s) ... Internal Cooldown: ${4} sec."
+        [1421101] = new([TurnUndead], Logic: 1, Cooldown: 3),
+        // Radiant Resurrection: "[Turn Undead] ... dealing ... to the enemy and up to ${2} enemies within a ${1}-meter
+        // radius. Internal Cooldown: ${5} seconds."
+        [1421201] = new([TurnUndead], Logic: 1, Radius: 0, Others: 1, Cooldown: 4),
+        // Holy Light Strike: "When [Basic Attack] hits an enemy, it triggers Holy Light Strike ... Internal Cooldown: ${4} seconds."
+        [1421601] = new([], NormalAttack: true, Logic: 1, Cooldown: 3),
+        // Holy Cross Judgment: "When [Magnus Exorcismus] is cast, it also unleashes ... to up to ${1} enemies within the area."
+        [1422401] = new([MagnusExorcismus], Logic: 1, HitTargets: true, Count: 0),
+        // Fated Resurrection: "After casting [Turn Undead], there is a ${1}% Chance to trigger Turn Undead one Extra time.
+        // Internal Cooldown: ${2} seconds."
+        [1422201] = new([TurnUndead], Chance: 0, Cooldown: 1, Recast: true),
+        // Momentum-Breaking Hammer: "When using [Basic Attack] with a Mace, inflicts [Stun] on the target for ${1} seconds.
+        // Internal Cooldown: ${2} seconds." (_kLogicData [Stun 901601, 1000 ms])
+        [1422601] = new([], NormalAttack: true, Weapon: Mace, Cooldown: 1, Buff: true, TargetBuff: true),
+        // Holy Light Bludgeon: "When using [Basic Attack] with a Mace, ... to the enemy and up to ${2} enemies within a
+        // ${1}-meter radius. Internal Cooldown: ${5} seconds."
+        [1422701] = new([], NormalAttack: true, Weapon: Mace, Logic: 1, Radius: 0, Others: 1, Cooldown: 4),
+
+        // Mage line (the descriptions are the _kOtherDesc buffs').
+        // Elemental Pursuit: "After [Fire Bolt], [Cold Bolt], [Lightning Bolt], or [Earth Spike] hits, it triggers
+        // [Elemental Pursuit] @{1} times ... to the target. Cooldown: ${3} seconds."
+        [1240301] = new([FireBolt, ColdBolt, LightningBolt, EarthSpike], Cooldown: 2),
+        // Elemental Shock: "... to up to ${2} enemies within a ${1}-meter radius. Cooldown: ${5} seconds."
+        [1240401] = new([FireBolt, ColdBolt, LightningBolt, EarthSpike], Radius: 0, Count: 1, Cooldown: 4),
+        // Flame Chain: "After [Fire Ball] hits the primary target, it has a ${1}% Chance to trigger [Fire Bolt] Lv. ${2} @{1} times."
+        [1242201] = new([FireBall], Chance: 0),
+        // Fireball Burst: "After [Fire Ball] hits the primary target, it deals ... to up to ${2} enemies within a ${1}-meter radius."
+        [1242301] = new([FireBall], Radius: 0, Count: 1),
+        // Ice Spike: "[Frost Nova] ... triggers [Ice Spike] @{1} times on all targets hit ..."
+        [1243201] = new([FrostNova], HitTargets: true),
+        // Thunderbolt: "When [Jupitel Thunder] hits, it triggers [Thunderbolt] ... to the target."
+        [1243301] = new([JupitelThunder]),
+        // Flame Burst: "After using [Meteor Storm], immediately triggers [Fire Explosion] ... to up to ${2} enemies within
+        // a ${1}-meter radius."
+        [1244201] = new([MeteorStorm], Radius: 0, Count: 1),
+        // Frost Burst: "After using [Storm Gust], immediately triggers [Frost Explosion] ... to up to ${2} enemies within
+        // a ${1}-meter radius ..."
+        [1245201] = new([StormGust], Radius: 0, Count: 1),
+        // Spatial Distortion: "After using [Gravitation Field], trigger [Spatial Distortion] ... to up to ${2} enemies
+        // within a ${1}-meter radius ..."
+        [1248201] = new([GravitationField], Radius: 0, Count: 1),
+
+        // Archer line: _kLogicData is [chance in basis points, proc row] (Lightning Blitz: [chance, buff]).
+        // Rapid Combo: "When [Arrow Attack] hits an enemy, it deals ${1} Extra hits ... Internal Cooldown: ${4} seconds."
+        [1321101] = new([ArrowAttack], Logic: 1, Cooldown: 3),
+        // Chain Lightning: "When [Arrow Attack] hits an enemy, it deals ... to up to ${2} Other enemies within a ${1}-meter
+        // radius of the target. Internal Cooldown: ${5} seconds."
+        [1321201] = new([ArrowAttack], Logic: 1, Radius: 0, Others: 1, OthersOnly: true, Cooldown: 4),
+        // Triple Strafe: "When [Double Strafe] hits an enemy, it deals ${1} Extra hits ... Internal Cooldown: ${4} seconds."
+        [1321401] = new([DoubleStrafe], Logic: 1, Cooldown: 3),
+        // Explosive Arrow: "When [Double Strafe] hits an enemy, it has a ${1}% Chance to deal ... to up to ${3} enemies
+        // within a ${2}-meter radius of the target. Internal Cooldown: ${6} seconds."
+        [1321501] = new([DoubleStrafe], Logic: 1, Chance: 0, Radius: 1, Count: 2, Cooldown: 5),
+        // Falcon Strike: "When [Blitz Beat] hits an enemy, it has a ${1}% Chance to Summon the Falcon ... Internal Cooldown: ${4} seconds."
+        [1321701] = new([BlitzBeat], Logic: 1, Chance: 0, Cooldown: 3),
+        // Meteor Arrow Shower: "When [Arrow Shower] hits enemies, it deals ... to one of them. Internal Cooldown: ${3} seconds."
+        [1322001] = new([ArrowShower], Logic: 1, Cooldown: 2),
+        // Lightning Blitz: "After casting [Blitz Beat], ASPD increases by ${1}% for ${2} seconds. Internal Cooldown: ${3} seconds."
+        [1322401] = new([BlitzBeat], Logic: 1, Buff: true, BuffSeconds: 1, Cooldown: 2),
+        // Double Assault: "Casts [Falcon Assault] ${1} times. Internal Cooldown: ${2} seconds."
+        [1323501] = new([FalconAssault], Recast: true, Cooldown: 1),
+        // Falcon Rush: "When [Falcon Assault] hits an enemy, it deals ... to up to ${2} enemies within a ${1}-meter radius of
+        // the target. Internal Cooldown: ${5} seconds."
+        [1323601] = new([FalconAssault], Logic: 1, Radius: 0, Count: 1, Cooldown: 4),
     };
 
     private readonly GameData _data;
@@ -168,29 +246,45 @@ public sealed class TalentProcs
         return true;
     }
 
+    /// <summary>
+    /// After a player's cast: <paramref name="processed"/> are the monsters it hit. A field cast (Meteor Storm, Storm Gust)
+    /// resolves later, so it comes with none and its procs centre on the cast's target point.
+    /// </summary>
     private async Task OnCastResolvedAsync(GameSession s, ActiveSkillCast action, IReadOnlyList<MonsterUnit> processed)
     {
         if (s.TalentProcBuffs.Count == 0 || s.Role == null) return;
-        var target = processed.FirstOrDefault(m => m.Uid == action.Request.TargetId && m.Hp > 0) ?? processed.FirstOrDefault(m => m.Hp > 0);
-        if (target == null) return;
         var cast = new SkillConfig(action.Row);
         foreach (var (buff, description) in s.TalentProcBuffs)
         {
             if (!Rules.TryGetValue(buff, out var rule)) continue;
             if (rule.NormalAttack ? cast.IsNormalAtk != 1 : Array.IndexOf(rule.Groups, (int)cast.SkillId) < 0) continue;
+            var target = processed.FirstOrDefault(m => m.Uid == action.Request.TargetId && m.Hp > 0) ?? processed.FirstOrDefault(m => m.Hp > 0)
+                ?? (processed.Count == 0 && rule.Radius is int radius
+                    ? _combat.MonstersNear(s, action.Request.TargetPos ?? s.Position, (float)Value(description, radius)).FirstOrDefault()
+                    : null);
+            if (target == null) continue;
             if (rule.Weapon != 0 && !SkillParameterRules.Wields(s, _data, rule.Weapon)) continue;
             if (rule.Active != 0 && !SkillParameterRules.HasBuffGroup(s, _data, rule.Active)) continue;
             if (rule.Chance is int chance && Roll(10000) >= Value(description, chance) * 100) continue;
             if (!Ready(s, buff, rule.Cooldown is int cooldown ? (long)(Value(description, cooldown) * 1000) : 0)) continue;
-            if (BuffConfig.Get(_data, buff)?.LogicData is not [var first, ..] logic) continue;
-            if (rule.Buff)
+            if (rule.Recast)
             {
-                if (logic.Length >= 2 && BuffConfig.Get(_data, first) != null)
-                    await _buffs.AddAsync(s, (int)first, (int)logic[1], s.Role.Id);
+                await _combat.CastExtraAsync(s, action.Row, Targets(s, rule with { RowArea = true }, description, cast, target, processed));
                 continue;
             }
-            if (ProcRow(first) is not { } row || target.Hp <= 0) continue;
-            await _combat.CastExtraAsync(s, row.Row, Targets(s, rule, description, row, target));
+            if (BuffConfig.Get(_data, buff)?.LogicData is not { } logic || rule.Logic >= logic.Length) continue;
+            long id = logic[rule.Logic];
+            if (rule.Buff)
+            {
+                if (BuffConfig.Get(_data, id) == null) continue;
+                int ms = rule.BuffSeconds is int seconds ? (int)(Value(description, seconds) * 1000)
+                    : rule.Logic + 1 < logic.Length ? (int)logic[rule.Logic + 1] : 0;
+                if (rule.TargetBuff) await _buffs.ShowOnUnitAsync(target, (int)id, ms, s.Role.Id);
+                else await _buffs.AddAsync(s, (int)id, ms, s.Role.Id);
+                continue;
+            }
+            if (ProcRow(id) is not { } row || target.Hp <= 0) continue;
+            await _combat.CastExtraAsync(s, row.Row, Targets(s, rule, description, row, target, processed));
         }
     }
 
@@ -202,10 +296,16 @@ public sealed class TalentProcs
             : SkillConfig.All(_data).Where(r => r.SkillId == id && r.Mode == 0).OrderBy(r => r.Level).Cast<SkillConfig?>().FirstOrDefault();
     }
 
-    private List<MonsterUnit> Targets(GameSession s, Rule rule, string[] description, SkillConfig row, MonsterUnit target)
+    private List<MonsterUnit> Targets(GameSession s, Rule rule, string[] description, SkillConfig row, MonsterUnit target,
+        IReadOnlyList<MonsterUnit> processed)
     {
         float radius;
         int others;
+        if (rule.HitTargets)
+        {
+            var hit = processed.Where(m => m.Hp > 0);
+            return [.. rule.Count is int count ? hit.Take((int)Value(description, count)) : hit];
+        }
         if (rule.RowArea)
         {
             radius = (row.Range is [var range, ..] ? range : 0) / 100f;
