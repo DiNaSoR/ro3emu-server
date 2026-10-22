@@ -584,18 +584,18 @@ public sealed class SeasonTalentTests
         Assert.Equal(remnants, fixture.Character.CountOf(fixture.Session, Remnant));
         Assert.Equal(0, await Upgrade(alice, PierceA)); // choosing again changes nothing
         Assert.Equal(1, fixture.Session.SeasonTalent!.Plan[0].TalentNodes[PierceA].CurrentLevel);
-        await Eventually(() => fixture.Session.Buffs.Any(b => b.IsTalentOwned && b.SourceId == PierceA && b.ConfigId == 1112101)
-            && fixture.Session.ExtraSkillModifiers.Any(m => m.Group == 11120), "branch buff and modifiers");
+        await Eventually(() => fixture.Session.TalentProcBuffs.Any(b => b.Buff == 1112101)
+            && fixture.Session.TalentSkillModifiers.Select(t => t.Modifier).Any(m => m.Group == 11120), "branch buff and modifiers");
 
         // One small node per choice: Pierce B replaces Pierce A within the same large node.
         Assert.Equal(0, await Upgrade(alice, PierceB));
         plan = fixture.Session.SeasonTalent!.Plan[0].TalentNodes;
         Assert.Equal((1, 0, 1), (plan[Pierce].CurrentLevel, plan[PierceA].CurrentLevel, plan[PierceB].CurrentLevel));
-        await Eventually(() => fixture.Session.Buffs.Any(b => b.IsTalentOwned && b.SourceId == PierceB && b.ConfigId == 1112201)
-            && !fixture.Session.Buffs.Any(b => b.IsTalentOwned && b.SourceId == PierceA), "replaced small node buff");
+        await Eventually(() => fixture.Session.TalentProcBuffs.Any(b => b.Buff == 1112201)
+            && !fixture.Session.TalentProcBuffs.Any(b => b.Buff == 1112101), "replaced small node buff");
         // Pierce itself: [21,0,0,11120,29,1,100] and [21,0,0,11120,30,1,20].
-        Assert.Contains(fixture.Session.ExtraSkillModifiers, m => m is { Group: 11120, Type: 29, Operation: 1, Value: 100 });
-        Assert.Contains(fixture.Session.ExtraSkillModifiers, m => m is { Group: 11120, Type: 30, Operation: 1, Value: 20 });
+        Assert.Contains(fixture.Session.TalentSkillModifiers.Select(t => t.Modifier), m => m is { Group: 11120, Type: 29, Operation: 1, Value: 100 });
+        Assert.Contains(fixture.Session.TalentSkillModifiers.Select(t => t.Modifier), m => m is { Group: 11120, Type: 30, Operation: 1, Value: 20 });
 
         // Another large node of the same branch point replaces Pierce and its small nodes.
         Assert.Equal(0, await Upgrade(alice, BashA));
@@ -606,11 +606,11 @@ public sealed class SeasonTalentTests
         Assert.Equal(1, plan[Bash].CurrentLevel);
         Assert.Equal(1, plan[BashA].CurrentLevel);
         Assert.Equal(1, plan[Point].CurrentLevel);
-        // The refresh removes the buffs first and swaps the skill modifiers after, so wait for both.
-        await Eventually(() => !fixture.Session.Buffs.Any(b => b.IsTalentOwned)
-            && !fixture.Session.ExtraSkillModifiers.Any(m => m.Group == 11120), "replaced branch buffs and modifiers removed");
-        Assert.Contains(fixture.Session.ExtraSkillModifiers, m => m is { Group: 11104, Type: 0, Operation: 2, Value: 8000 });
-        Assert.Contains(fixture.Session.ExtraSkillModifiers, m => m is { Group: 11104, Type: 15, Operation: 2, Value: 1 });
+        // The refresh swaps the talent buffs and skill modifiers together.
+        await Eventually(() => fixture.Session.TalentProcBuffs.Count == 0
+            && !fixture.Session.TalentSkillModifiers.Select(t => t.Modifier).Any(m => m.Group == 11120), "replaced branch buffs and modifiers removed");
+        Assert.Contains(fixture.Session.TalentSkillModifiers.Select(t => t.Modifier), m => m is { Group: 11104, Type: 0, Operation: 2, Value: 8000 });
+        Assert.Contains(fixture.Session.TalentSkillModifiers.Select(t => t.Modifier), m => m is { Group: 11104, Type: 15, Operation: 2, Value: 1 });
         Assert.Equal(0, await Upgrade(alice, AfterPoint)); // the main line continues past the chosen branch point
 
         await alice.DisposeAsync();
@@ -618,11 +618,11 @@ public sealed class SeasonTalentTests
         var saved = await Next(again, SeasonTalentService.TalentSync, DBSeasonTalentIncrement.Parser);
         Assert.Equal(1, saved.Plan[0].All.TalentNodes[BashA].CurrentLevel);
         Assert.Equal(1, saved.Plan[0].All.TalentNodes[Point].CurrentLevel);
-        await Eventually(() => fixture.Session.ExtraSkillModifiers.Any(m => m.Group == 11104), "modifiers after relog");
+        await Eventually(() => fixture.Session.TalentSkillModifiers.Select(t => t.Modifier).Any(m => m.Group == 11104), "modifiers after relog");
 
         await again.SendGameAsync(SeasonTalentService.SetPlan, new SeasonTalentSetCurPlanReq { PlanId = 1 });
         Assert.Equal(0, (await Next(again, SeasonTalentService.SetPlan, SeasonTalentSetCurPlanResp.Parser)).Result);
-        Assert.Empty(fixture.Session.ExtraSkillModifiers);
+        Assert.Empty(fixture.Session.TalentSkillModifiers.Select(t => t.Modifier));
         Assert.False(fixture.Session.SeasonTalent!.UnlockedNode[AfterPoint]); // plan 1 has not chosen a branch
     }
 
@@ -636,8 +636,8 @@ public sealed class SeasonTalentTests
         await Max(alice, 10102002);
         Assert.Equal(ErrorCodes.TalentInvalid, await Upgrade(alice, 10102104)); // a Blacksmith (2x00) node only
         Assert.Equal(0, await Upgrade(alice, PierceA));
-        await Eventually(() => fixture.Session.Buffs.Any(b => b.IsTalentOwned && b.ConfigId == 1522201)
-            && fixture.Session.Buffs.Any(b => b.IsTalentOwned && b.ConfigId == 1522301), "assassin branch buffs");
+        await Eventually(() => fixture.Session.TalentProcBuffs.Any(b => b.Buff == 1522201)
+            && fixture.Session.TalentProcBuffs.Any(b => b.Buff == 1522301), "assassin branch buffs");
         await Max(alice, AfterPoint);
         await Max(alice, 10102005);
         long before = fixture.Character.Stats(fixture.Session)[103];

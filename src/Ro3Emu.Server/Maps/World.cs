@@ -52,7 +52,7 @@ public interface IAoiSink
 /// that loses one refills from its neighbourhood. <see cref="GameSession.Visible"/> is what a client shows,
 /// <see cref="GameSession.Observers"/> who shows it.
 /// </summary>
-public sealed class World(IAoiSink sink, GameLoop loop, ILogger<World> log)
+public sealed partial class World(IAoiSink sink, GameLoop loop, ILogger<World> log)
 {
     internal void TrackDetached(string name, Func<Task> work) => loop.TrackRuntimeDetached(name, work);
     /// <summary>Map units are the client's world coordinates (spawn 156,192 on a ~300-unit field).</summary>
@@ -303,8 +303,8 @@ public sealed class World(IAoiSink sink, GameLoop loop, ILogger<World> log)
             foreach (var other in ByDistance(session, NearLocked(session.WorldScene, session.Position.X, session.Position.Z)))
             {
                 if (!InRange(session, other, ViewRadius)) continue;
-                if (session.Visible.Count < session.ViewLimit && !other.AoiHidden) { See(session, other); enters.Add((session, other)); }
-                if (other.Visible.Count < other.ViewLimit && !session.AoiHidden) { See(other, session); enters.Add((other, session)); }
+                if (session.Visible.Count < session.ViewLimit && !other.AoiHidden && Observable(session, other)) { See(session, other); enters.Add((session, other)); }
+                if (other.Visible.Count < other.ViewLimit && !session.AoiHidden && Observable(other, session)) { See(other, session); enters.Add((other, session)); }
             }
             members.Add(session);
             Index(session);
@@ -455,21 +455,21 @@ public sealed class World(IAoiSink sink, GameLoop loop, ILogger<World> log)
             _moveEdges.AddRange(session.Observers);
             foreach (var other in _moveEdges)
             {
-                if (session.AoiHidden || Distance2(session, other) > leave2) { Unsee(other, session); work.Add((other, session, Change.Leave)); (refill ??= new()).Add(other); }
+                if (session.AoiHidden || Distance2(session, other) > leave2 || !Observable(other, session)) { Unsee(other, session); work.Add((other, session, Change.Leave)); (refill ??= new()).Add(other); }
                 else work.Add((other, session, Change.Move));
             }
             _moveEdges.Clear();
             _moveEdges.AddRange(session.Visible);
             foreach (var other in _moveEdges)
-                if (other.AoiHidden || Distance2(session, other) > leave2) { Unsee(session, other); work.Add((session, other, Change.Leave)); (refill ??= new()).Add(session); }
+                if (other.AoiHidden || Distance2(session, other) > leave2 || !Observable(session, other)) { Unsee(session, other); work.Add((session, other, Change.Leave)); (refill ??= new()).Add(session); }
             // 2. New edges, nearest first, only where a cap still has room: a saturated crowd sorts nothing.
             bool selfRoom = session.Visible.Count < session.ViewLimit;
             List<(GameSession Player, float D2)>? fresh = null;
             foreach (var other in NearLocked(session.WorldScene, session.Position.X, session.Position.Z))
             {
                 if (other == session) continue;
-                bool theyCan = !session.AoiHidden && other.Visible.Count < other.ViewLimit && !other.Visible.Contains(session);
-                bool iCan = !other.AoiHidden && selfRoom && !session.Visible.Contains(other);
+                bool theyCan = !session.AoiHidden && other.Visible.Count < other.ViewLimit && !other.Visible.Contains(session) && Observable(other, session);
+                bool iCan = !other.AoiHidden && selfRoom && !session.Visible.Contains(other) && Observable(session, other);
                 if (!theyCan && !iCan) continue;
                 float d2 = Distance2(session, other);
                 if (d2 <= view2) (fresh ??= new()).Add((other, d2));
@@ -477,9 +477,9 @@ public sealed class World(IAoiSink sink, GameLoop loop, ILogger<World> log)
             if (fresh != null)
                 foreach (var (other, _) in fresh.OrderBy(x => x.D2).ThenBy(x => Key(x.Player)))
                 {
-                    if (!session.AoiHidden && other.Visible.Count < other.ViewLimit && !other.Visible.Contains(session))
+                    if (!session.AoiHidden && other.Visible.Count < other.ViewLimit && !other.Visible.Contains(session) && Observable(other, session))
                     { See(other, session); work.Add((other, session, Change.Enter)); }
-                    if (!other.AoiHidden && session.Visible.Count < session.ViewLimit && !session.Visible.Contains(other))
+                    if (!other.AoiHidden && session.Visible.Count < session.ViewLimit && !session.Visible.Contains(other) && Observable(session, other))
                     { See(session, other); work.Add((session, other, Change.Enter)); }
                 }
             if (refill != null)
@@ -679,7 +679,7 @@ public sealed class World(IAoiSink sink, GameLoop loop, ILogger<World> log)
         if (bar <= 0) return;
         foreach (var other in NearLocked(scene, viewer.Position.X, viewer.Position.Z))
         {
-            if (other == viewer || other.AoiHidden || viewer.Visible.Contains(other)) continue;
+            if (other == viewer || other.AoiHidden || viewer.Visible.Contains(other) || !Observable(viewer, other)) continue;
             float d2 = Distance2(viewer, other);
             if (d2 > view2 || d2 >= bar * bar) continue;
             (closer ??= new()).Add((other, MathF.Sqrt(d2)));
@@ -760,7 +760,8 @@ public sealed class World(IAoiSink sink, GameLoop loop, ILogger<World> log)
         foreach (var other in ByDistance(viewer, NearLocked(cell.Scene, viewer.Position.X, viewer.Position.Z)))
         {
             if (viewer.Visible.Count >= viewer.ViewLimit) break;
-            if (other == viewer || other.AoiHidden || viewer.Visible.Contains(other) || !InRange(viewer, other, ViewRadius)) continue;
+            if (other == viewer || other.AoiHidden || viewer.Visible.Contains(other) || !InRange(viewer, other, ViewRadius)
+                || !Observable(viewer, other)) continue;
             See(viewer, other);
             added.Add(other);
         }

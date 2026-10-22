@@ -69,7 +69,7 @@ dotnet_diagnostic.CA1050.severity = suggestion
 dotnet_diagnostic.CA1051.severity = suggestion
 # 3: CancellationToken parameters must come last
 dotnet_diagnostic.CA1068.severity = suggestion
-# 431: specify IFormatProvider
+# 430: specify IFormatProvider
 dotnet_diagnostic.CA1305.severity = suggestion
 # 57: specify StringComparison for correctness
 dotnet_diagnostic.CA1310.severity = suggestion
@@ -109,11 +109,11 @@ dotnet_diagnostic.CA1832.severity = suggestion
 dotnet_diagnostic.CA1836.severity = suggestion
 # 4: prefer Dictionary.Contains methods
 dotnet_diagnostic.CA1841.severity = suggestion
-# 434: use LoggerMessage delegates
+# 433: use LoggerMessage delegates
 dotnet_diagnostic.CA1848.severity = suggestion
 # 5: prefer TryGetValue
 dotnet_diagnostic.CA1854.severity = suggestion
-# 76: use concrete types for performance
+# 73: use concrete types for performance
 dotnet_diagnostic.CA1859.severity = suggestion
 # 1: avoid Enumerable.Any()
 dotnet_diagnostic.CA1860.severity = suggestion
@@ -123,17 +123,17 @@ dotnet_diagnostic.CA1861.severity = suggestion
 dotnet_diagnostic.CA1862.severity = suggestion
 # 10: cache and reuse JsonSerializerOptions
 dotnet_diagnostic.CA1869.severity = suggestion
-# 170: avoid potentially expensive logging
+# 169: avoid potentially expensive logging
 dotnet_diagnostic.CA1873.severity = suggestion
 # 15: instantiate argument exceptions correctly
 dotnet_diagnostic.CA2208.severity = suggestion
-# 862: use a collection initializer or expression
+# 852: use a collection initializer or expression
 dotnet_diagnostic.IDE0028.severity = suggestion
-# 148: use a collection expression for an array
+# 147: use a collection expression for an array
 dotnet_diagnostic.IDE0300.severity = suggestion
 # 14: use a collection expression for an empty collection
 dotnet_diagnostic.IDE0301.severity = suggestion
-# 655: use a collection expression for a fluent call
+# 649: use a collection expression for a fluent call
 dotnet_diagnostic.IDE0305.severity = suggestion
 # 28: naming rule violations (fields persisted by name, see above)
 dotnet_diagnostic.IDE1006.severity = suggestion

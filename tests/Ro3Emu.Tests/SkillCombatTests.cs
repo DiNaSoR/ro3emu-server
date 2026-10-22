@@ -244,36 +244,6 @@ public sealed partial class SkillCombatTests : IAsyncLifetime
     }
 
     [ClientDataFact]
-    public async Task ThiefDaggerBasicAttackProcsDoubleAttack()
-    {
-        await using var alice = await InWorld("Alice");
-        var bag = await Next(alice, CharacterService.ItemsSync, DBItemsInfoIncrement.Parser);
-        long dagger = bag.PackInfo[2].All.Items.Values.Single(i => i.ItemEntry == 2010121).ItemGuid;
-        await Gm("alice", "!job 5100");
-        await Teach("alice", 15002); // Double Attack 1: 1% chance, 1 extra hit of PATK x 50%
-        await alice.SendGameAsync(CharacterService.EquipItemOpr, new EquipItemOprReq { Opr = 0, Pos = (EquipGridType)1, ItemGUID = dagger });
-        await Next(alice, SkillService.SkillDataSync, DBSkillDataIncrement.Parser, m => !m.SyncAllMark && m.CurrentAtkSkillId == 1005001);
-        var combat = _app.Services.GetRequiredService<CombatService>();
-
-        combat.Rolls = new FixedRolls(99); // no proc
-        var target = await Target("alice", stationary: true);
-        await Loop.InvokeAsync(() => { target.Hp = 1_000_000; return Task.CompletedTask; });
-        await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1005001, TargetId = target.Uid });
-        var reply = await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser);
-        Assert.Equal(0, reply.Result);
-        var first = await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser, h => h.SessionId == reply.SessionId);
-        long plain = Assert.Single(first.Dsts, d => d.DstID == target.Uid).Damage;
-        // The normal attack repeats on its own (AttackLoop); the next swing rolls a proc.
-        combat.Rolls = new FixedRolls(0);
-        var next = await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser,
-            h => h.SessionId != reply.SessionId && h.Dsts.Any(d => d.DstID == target.Uid));
-        long doubled = Assert.Single(next.Dsts, d => d.DstID == target.Uid).Damage;
-        Assert.True(doubled > plain, $"Double Attack added nothing: {plain} then {doubled}");
-        Assert.Equal(0, first.Split); // one number for a plain swing
-        Assert.Equal(2, next.Split); // the proc shows as a second number
-    }
-
-    [ClientDataFact]
     public async Task InterruptInvalidatesDelayedHitAndEchoesAutoCast()
     {
         await using var alice = await InWorld("Alice");
@@ -667,6 +637,34 @@ public sealed partial class SkillCombatTests : IAsyncLifetime
         Assert.Equal(0, accepted.Result);
         // The client's stop follows at once, where it really was: the cast continues and hits.
         var arrived = new Vec3 { X = start.X + (away.X - start.X) * 0.5f, Y = start.Y, Z = start.Z + (away.Z - start.Z) * 0.5f };
+        await alice.SendGameAsync(MsgId.Walk, new WalkReq { Pos = arrived, Face = 180, BStop = true, SpeedRate = 1 });
+        var hit = await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser, p => p.SessionId == accepted.SessionId);
+        Assert.Equal(target.Uid, Assert.Single(hit.Dsts).DstID);
+    }
+
+    [ClientDataFact]
+    public async Task ACasterOnALongStraightApproachKeepsItsCastWhenItStops()
+    {
+        // In-game 22.10: the client sends a walk only when its direction changes; Sonic Blow cast after a 0.86 s straight
+        // leg was accepted, then its stop 6 m from the leg's start interrupted it (the stop allowed 0.75 s of walking).
+        await using var alice = await InWorld("Alice");
+        var target = await Target("alice", stationary: true);
+        var start = Session("alice").Position.Clone();
+        var nav = _app.Services.GetRequiredService<WorldData>().Map(Session("alice").SceneEntry)!.Nav!;
+        var away = new[] { (9f, 0f), (-9f, 0f), (0f, 9f), (0f, -9f), (6.4f, 6.4f), (-6.4f, -6.4f) }
+            .Select(o => new Vec3 { X = start.X + o.Item1, Y = start.Y, Z = start.Z + o.Item2 })
+            .First(p => nav.IsWalkable(p.X, p.Y, p.Z) && nav.CanWalk(p.X, p.Y, p.Z, start.X, start.Z));
+        await alice.SendGameAsync(MsgId.Walk, new WalkReq { Pos = away, Face = 180, BStop = true, SpeedRate = 1 });
+        long speed = await Loop.InvokeAsync(() => Task.FromResult(Session("alice").Speed));
+        // Walk until 2 m from the target: 7 m, longer than 0.75 s at this speed.
+        int walkMs = (int)(7 / (speed / 100.0) * 1000);
+        Assert.True(walkMs > 900, $"speed {speed}");
+        await alice.SendGameAsync(MsgId.Walk, new WalkReq { Pos = away, Dir = 180, Face = 180, SpeedRate = 1 });
+        await Task.Delay(walkMs);
+        await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1000001, TargetId = target.Uid, ComboIndex = 1 });
+        var accepted = await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser);
+        Assert.Equal(0, accepted.Result);
+        var arrived = new Vec3 { X = start.X + (away.X - start.X) * 2 / 9f, Y = start.Y, Z = start.Z + (away.Z - start.Z) * 2 / 9f };
         await alice.SendGameAsync(MsgId.Walk, new WalkReq { Pos = arrived, Face = 180, BStop = true, SpeedRate = 1 });
         var hit = await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser, p => p.SessionId == accepted.SessionId);
         Assert.Equal(target.Uid, Assert.Single(hit.Dsts).DstID);

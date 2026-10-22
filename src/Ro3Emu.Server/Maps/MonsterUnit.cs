@@ -15,6 +15,8 @@ public sealed record MonsterTemplate(
 {
     /// <summary>The boss's special skills (BossSkillSets); null: only the normal attack.</summary>
     public BossSkillBook? Skills { get; init; }
+    /// <summary>AttriMonsterConfig cast speed (116), retained for live chant modifiers.</summary>
+    public long CastSpeed { get; init; }
 }
 
 /// <summary>A live monster on a map (entityType 1): HP, home point, current walk segment and AI state.</summary>
@@ -42,12 +44,16 @@ public sealed class MonsterUnit : WorldUnit
     /// <summary>Temporary strongest movement slow (basis points), with an absolute server-millisecond expiry.</summary>
     public int SlowMovementBp { get; set; }
     public long SlowMovementExpireMs { get; set; }
-    /// <summary>Movement speed change of live buffs (attribute 1131, basis points; negative slows), BuffService's.</summary>
+    /// <summary>Movement speed change of live non-guardian buffs (attribute 1131, basis points; negative slows),
+    /// BuffService's.</summary>
     public int BuffSpeedBp { get; set; }
+    /// <summary>The speed a guardian's buffs set (CombatService.MonsterAttributes); null for the template's.</summary>
+    public int? BuffSpeedCm { get; set; }
     public int SpeedCm(long nowMs)
     {
+        int baseCm = BuffSpeedCm ?? Template.SpeedCm;
         long bp = 10000L + BuffSpeedBp - (SlowMovementExpireMs > nowMs ? SlowMovementBp : 0);
-        return bp == 10000 ? Template.SpeedCm : (int)Math.Max(1, Template.SpeedCm * Math.Max(1000, bp) / 10000L);
+        return bp == 10000 ? baseCm : (int)Math.Max(1, baseCm * Math.Max(1000, bp) / 10000L);
     }
 
     /// <summary>Actions its live control buffs forbid: bit n = SpecialStatusConfig._kForbidden ordinal n (3 walk,

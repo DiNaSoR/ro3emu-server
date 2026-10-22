@@ -556,6 +556,32 @@ public sealed class CharacterTests : IAsyncLifetime
         Assert.Equal((3, 42L), (rank.Rankid, (long)rank.Itemuid));
     }
 
+    // A Novice's saved bar holds the Novice normal attack. After a job change its slot shows the career's own (an Archer's
+    // 1300001 with a bow; JobAttackConfig gives a bare-handed Archer the Novice's 1000001), or the client keeps casting
+    // the Novice's 1000001 instead of the career's.
+    [ClientDataFact]
+    public async Task ASavedNoviceAttackSlotBecomesTheCareersAttackAfterAJobChange()
+    {
+        await using var alice = await InWorld("Alice");
+        await _app.Services.GetRequiredService<GameLoop>().InvokeAsync(() =>
+        {
+            var s = _app.Services.GetRequiredService<SessionRegistry>().All().Single(s => s.Account == "alice");
+            s.Progress!.SkillBar[1] = 10000;
+            // ... and a plan's manual bar (SkillAssignPlan.ManualLoadSkill), which the wheel prefers.
+            var plan = s.SkillPlans!.SkillAssignPlans[s.SkillPlans.CurrentPlanIndex];
+            plan.ManualLoadSkill.Clear();
+            plan.ManualLoadSkill.Add(new SkillData { SkillId = 10000, SkillLevel = 1 });
+            s.Items.Add(new Ro3Emu.Server.Accounts.InvItem { Guid = 9_000_002, Entry = 2110120, Stack = 1, Pack = 1, Grid = 1 }); // a bow
+            return Task.CompletedTask;
+        });
+        await Gm("alice", "!job 3100");
+        await alice.SendGameAsync(1023, new PlayerAssetReq { AssetType = { 5 } });
+        var skills = await Next(alice, SkillService.SkillDataSync, DBSkillDataIncrement.Parser, m => m.SyncAllMark && m.CurrentAtkSkillId == 1300001);
+        Assert.Equal(1300001, skills.SkillWheel.All.AtkSkillId); // JobConfig 3100 _kSkillNormalID
+        Assert.DoesNotContain(skills.SkillWheel.All.WhellSkills.Values, slot => slot.SkillConfigId == 1000001);
+        Assert.Equal(1300001, skills.SkillWheel.All.WhellSkills[1].SkillConfigId);
+    }
+
     [ClientDataFact]
     public async Task ThiefNormalAttackFollowsTheWeaponAsJobAttackConfigPicksIt()
     {

@@ -56,7 +56,6 @@ public sealed partial class CombatService
             : ranged ? Pair(S(a, 229), S(b, 230)) * Pair(S(a, 1229), S(b, 1230))
                 : Pair(S(a, 227), S(b, 228)) * Pair(S(a, 1227), S(b, 1228));
         if (GameData.Int(skill, "_iIsNormalAtk") == 0) f *= Pair(S(a, 225), S(b, 226));
-        if (a.IsMonster && b.MonsterDamageCutBp > 0) f *= Math.Max(0, 1 - b.MonsterDamageCutBp / 10000.0);
         return f;
     }
 
@@ -112,7 +111,6 @@ public sealed partial class CombatService
         {
             Def = stats[105], Mdef = stats[106], Flee = stats[110], ResCri = stats[112],
             Stats = stats, Race = PlayerRace, Size = PlayerSize, Covered = DefenderCovered(p),
-            MonsterDamageCutBp = MonsterResistanceBp(p),
         };
 
     /// <summary>A defender's covered parts: the totems', plus the tower pets' support reductions (1216, 1230, 315), which

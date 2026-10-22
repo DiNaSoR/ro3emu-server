@@ -20,7 +20,7 @@ public sealed partial class CombatService
     internal async Task<int> MonsterSkillHitAsync(MonsterUnit caster, JsonElement row, IEnumerable<GameSession> targets, long sourceId,
         long session = 0, int damagePercent = 100, bool bossDebuffsOnly = false, long scaleBp = 10000)
     {
-        if (caster.Dead || caster.Hp <= 0) return 0;
+        if (caster.Dead || caster.Hp <= 0 || _buffs.UnitForbidden(caster, ForbiddenState.CastSkill)) return 0;
         int skillId = (int)GameData.Int(row, "_iID");
         if (session <= 0) session = ++_sessionIds;
         int show = HitEffect(GameData.Int(row, "_iScriptShow"));
@@ -40,6 +40,7 @@ public sealed partial class CombatService
             var defender = PlayerDefender(p, stats);
             var (damage, result) = Damage(attacker, defender, row);
             damage = ScaleMonsterDamage(damage, caster.DamageRatio);
+            damage = MonsterBuffDamage(caster, row, damage);
             if (damagePercent != 100) damage = damagePercent <= 0 ? 0 : ScaleMonsterDamage(damage, damagePercent * 100);
             if (scaleBp != 10000 && damage > 0) damage = Math.Max(1, damage * scaleBp / 10000);
             foreach (var adjust in MonsterDamageAdjusters) damage = adjust(caster, damage, true);

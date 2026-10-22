@@ -150,15 +150,6 @@ public sealed class SkillStatusTests : IAsyncLifetime
     }
 
     [ClientDataFact]
-    public void SteelCrowOwnsTheBlitzBeatBonusStoredUnderBeastbane()
-    {
-        // Steel Crow Lv5 reads Beastbane's level-5 row 1310405: +500 bp on Blitz Beat; Beastbane reads none.
-        Assert.Equal(1310405, CombatService.PassiveBuffRow(13105, Skill(1310505)));
-        Assert.Equal(0, CombatService.PassiveBuffRow(13104, Skill(1310405)));
-        Assert.Equal(1100301, CombatService.PassiveBuffRow(11003, Skill(1100301))); // every other passive keeps its own row
-    }
-
-    [ClientDataFact]
     public async Task StunHoldsAMonsterAndWearsOff()
     {
         await Server();

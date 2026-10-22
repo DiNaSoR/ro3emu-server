@@ -5,8 +5,7 @@ using Ro3Emu.Server.Maps;
 
 namespace Ro3Emu.Tests;
 
-/// <summary>Warg Hunt's forms, Swift Warg on the next step (CombatService.Wolves), Prayer of Gratitude's shield
-/// (CombatService.Prayer) and knock-ups.</summary>
+/// <summary>Warg Hunt's forms, Swift Warg on the next step (CombatService.Wolves) and knock-ups.</summary>
 public sealed partial class SkillCombatTests
 {
     private async Task<MonsterUnit> MountedRanger(BotClient alice, params (int Group, int Level)[] taught)
@@ -79,33 +78,6 @@ public sealed partial class SkillCombatTests
         Assert.Equal(0, await CastOn(alice, 1332301, target));
         await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser, h => h.SkillId == 1332901);
         Assert.Equal(0, await Loop.InvokeAsync(() => Task.FromResult(Session("alice").SwiftWargArmedMs)));
-    }
-
-    [ClientDataFact]
-    public async Task PrayerOfGratitudeShieldRefreshesAfterThirtyQuietSeconds()
-    {
-        await using var alice = await InWorld("Alice");
-        await Gm("alice", "!job 4400"); await Teach("alice", 14306); await Seasoned("alice");
-        await Until(s => s.Buffs.Any(b => b.ConfigId == 1430601 && b.ShieldRemaining > 0 && b.ExpireMs == long.MaxValue), "alice");
-        long full = await Loop.InvokeAsync(() => Task.FromResult(Session("alice").Buffs.First(b => b.ConfigId == 1430601).ShieldRemaining));
-        long maxHp = await Loop.InvokeAsync(() => Task.FromResult(Character.Stats(Session("alice"))[101]));
-        Assert.True(full >= maxHp * 6 / 100, $"shield {full} of max life {maxHp}"); // Lv1: Max Life x 6%
-
-        // Hit just now: the spent shield stays spent.
-        await Loop.InvokeAsync(() =>
-        {
-            var s = Session("alice");
-            int i = s.Buffs.FindIndex(b => b.ConfigId == 1430601);
-            s.Buffs[i] = s.Buffs[i] with { ShieldRemaining = 1 };
-            s.LastDamagedMs = MonsterService.NowMs;
-            return Task.CompletedTask;
-        });
-        await Task.Delay(1200);
-        Assert.Equal(1, await Loop.InvokeAsync(() => Task.FromResult(Session("alice").Buffs.First(b => b.ConfigId == 1430601).ShieldRemaining)));
-
-        // ${5} = 30 s without damage: back to full.
-        await Loop.InvokeAsync(() => { Session("alice").LastDamagedMs = MonsterService.NowMs - 31_000; return Task.CompletedTask; });
-        await Until(s => s.Buffs.Any(b => b.ConfigId == 1430601 && b.ShieldRemaining == full), "alice");
     }
 
     [ClientDataFact]

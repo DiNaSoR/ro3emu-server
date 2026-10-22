@@ -38,10 +38,6 @@ public sealed partial class SeasonTalentService
     private readonly RoleStore _roles;
     private readonly ILogger<SeasonTalentService> _log;
 
-    /// <summary>Run after the role's effective talents may have changed (purchase, plan switch, unlock change),
-    /// outside the role lock. SeasonTalentEffects reconciles job node buffs and skill modifiers here.</summary>
-    public List<Func<GameSession, Task>> Changed { get; } = new();
-
     public SeasonTalentService(GameData data, CharacterService character, FunctionService functions,
         SeasonService seasons, SkillService skills, RoleStore roles, ILogger<SeasonTalentService> log)
     {
@@ -55,11 +51,6 @@ public sealed partial class SeasonTalentService
         character.TalentAttributes = Attributes;
     }
 
-    private async Task ChangedAsync(GameSession session)
-    {
-        foreach (var handler in Changed) await handler(session);
-    }
-
     /// <summary>Called before the first login stat snapshot; (inferred) saved plans carry across seasons without reset.</summary>
     public void Load(GameSession session)
     {
@@ -67,6 +58,9 @@ public sealed partial class SeasonTalentService
             ? DBSeasonTalent.Parser.ParseFrom(bytes) : new DBSeasonTalent();
         session.TalentEffectsEnabled = false; // TaskService has not loaded this role's quest state yet.
         session.TalentPlanSwitchUtc = default;
+        session.TalentSkillModifiers = [];
+        session.TalentProcBuffs = [];
+        session.TalentBuffAttributes = [];
         Seed(session.SeasonTalent);
     }
 
@@ -85,11 +79,8 @@ public sealed partial class SeasonTalentService
         // Seeding false map keys at login cannot alter stats; avoid an extra pre-world 31008.
         if (before != session.TalentEffectsEnabled || (session.TalentEffectsEnabled
             && (!Same(oldTrees, session.SeasonTalent.UnlockedTrees)
-                || !Same(oldNodes, session.SeasonTalent.UnlockedNode))))
-        {
-            await _character.RefreshStatsAsync(session);
-            await ChangedAsync(session);
-        }
+                || !Same(oldNodes, session.SeasonTalent.UnlockedNode)))) await _character.RefreshStatsAsync(session);
+        await RefreshEffectsAsync(session);
     }
 
     private static bool Same(IReadOnlyDictionary<long, bool> old, IDictionary<long, bool> now) =>
@@ -116,7 +107,7 @@ public sealed partial class SeasonTalentService
     internal async Task SyncGenrePlanAsync(GameSession session)
     {
         await CharacterService.SyncAsync(session, TalentSync, session.SeasonTalent!, session.SeasonTalent!.Clone);
-        await ChangedAsync(session);
+        await RefreshEffectsAsync(session);
     }
 
     private bool HasTalentGraph() => Trees().Any(tree => tree.Id > 0) && Nodes().Count > 0;
@@ -342,7 +333,6 @@ public sealed partial class SeasonTalentService
             return;
         }
         int result;
-        bool changed = false;
         using (await CharacterService.Lock(s))
         {
             result = UpgradeLocked(s, req.TalentId, out var cost, out var node, out var isOath);
@@ -380,14 +370,13 @@ public sealed partial class SeasonTalentService
                         await _character.ItemsChangedAsync(s, stats: false); // 5009 before 5050 and the reply
                         await CharacterService.SyncAsync(s, TalentSync, next.Clone());
                         await _character.RefreshStatsAsync(s);
+                        await RefreshEffectsAsync(s);
                     }
                 }
-                changed = result == 0;
             }
         }
         _log.LogInformation("{Name} talent {Node}: {Result}", s.Role?.Name, req.TalentId, result);
         await s.SendGameAsync(Upgrade, new SeasonTalentUpgradeResp { Result = result, TalentId = req.TalentId });
-        if (changed) await ChangedAsync(s);
     }
 
     /// <summary>A job node costs nothing in the export: save the plan without an economy operation.</summary>
@@ -406,6 +395,7 @@ public sealed partial class SeasonTalentService
         }
         await CharacterService.SyncAsync(s, TalentSync, next.Clone());
         await _character.RefreshStatsAsync(s);
+        await RefreshEffectsAsync(s);
         return 0;
     }
 
@@ -461,6 +451,7 @@ public sealed partial class SeasonTalentService
                     });
                     await CharacterService.SyncAsync(s, TalentSync, next.Clone());
                     await _character.RefreshStatsAsync(s);
+                    await RefreshEffectsAsync(s);
                 }
                 catch (Exception e) when (e is SqliteException or InvalidOperationException)
                 {
@@ -470,7 +461,6 @@ public sealed partial class SeasonTalentService
             }
         }
         await s.SendGameAsync(SetPlan, new SeasonTalentSetCurPlanResp { Result = result, Req = req });
-        if (result == 0) await ChangedAsync(s);
     }
 
     /// <summary>83553: (inferred) trim, nonempty/no-control and eight-Unicode-scalar server validation from PublicParamConfig.SchemeNameNumMax=8.</summary>
@@ -530,53 +520,17 @@ public sealed partial class SeasonTalentService
         }
     }
 
-    /// <summary>The SpecialEffectConfig tuples of the effective job nodes, with the node that owns each.</summary>
-    internal IEnumerable<(long Node, long[] Op)> SpecialEffects(GameSession s) => SpecialEffects(Effective(s));
+    /// <summary>The effective rows alone (SeasonTalentService.Effects reads their special effects).</summary>
+    private IEnumerable<JsonElement> ActiveEffects(GameSession s) => Effective(s).Select(e => e.Row);
 
-    private IEnumerable<(long Node, long[] Op)> SpecialEffects(IEnumerable<(long Node, JsonElement Row)> effective)
-    {
-        foreach (var (node, row) in effective)
-        {
-            if (!row.TryGetProperty("_kSpecialEffectList", out var list) || list.ValueKind != JsonValueKind.Array) continue;
-            foreach (var id in list.EnumerateArray())
-                if (GameData.Number(id) is { } effectId && _data.Row("SpecialEffectConfig", (long)effectId) is { } effect)
-                    foreach (var op in EquipmentAffixes.Rows(effect, "_kSpecialEffect")) yield return (node, op);
-        }
-    }
-
-    /// <summary>Only bought target-level totals contribute once. Job nodes add their attribute tuples
-    /// (SpecialEffectConfig opcodes 1, 16, 19 and 22); their buffs and skill changes are SeasonTalentEffects'.</summary>
+    /// <summary>Only bought target-level totals contribute once; job and profession rows add their special effects'
+    /// attributes (SeasonTalentService.Effects).</summary>
     public IEnumerable<(long Id, double Value)> Attributes(GameSession s)
     {
-        var effective = Effective(s).ToList();
-        foreach (var (_, row) in effective)
-            foreach (var pair in GameData.Pairs(row, "_kAttrs")) yield return pair;
-        if (s.Progress == null) yield break;
-        (int SubType, bool Dual)? weapon = null;
-        foreach (var (_, op) in SpecialEffects(effective))
+        foreach (var (_, row) in Effective(s))
         {
-            switch (op)
-            {
-                case [1, var attr, var value]:
-                    yield return (attr, value);
-                    break;
-                // (inferred) [16, weapon subtype, attribute, value]: "When a dagger or katar is equipped, PATK +20"
-                // is one tuple per subtype; the main hand's ItemConfig._iSubType decides (SkillService.Weapon).
-                case [16, var sub, var attr, var value]:
-                    weapon ??= _skills.Weapon(s);
-                    if (weapon.Value.SubType == sub) yield return (attr, value);
-                    break;
-                // (inferred) [19, skill group, level, attribute, value]: "When Mace Mastery reaches Lv. 10, STR +5".
-                case [19, var group, var level, var attr, var value]:
-                    if (_skills.Level(s.Progress, (int)group) >= Math.Max(1, level)) yield return (attr, value);
-                    break;
-                // (inferred) [22, weapon subtype, attribute, per level, skill group]: "When a sword-type weapon is
-                // equipped, PATK +2 for each learned level of Sword Quicken".
-                case [22, var sub, var attr, var per, var group]:
-                    weapon ??= _skills.Weapon(s);
-                    if (weapon.Value.SubType == sub) yield return (attr, per * _skills.Level(s.Progress, (int)group));
-                    break;
-            }
+            foreach (var pair in GameData.Pairs(row, "_kAttrs")) yield return pair;
+            foreach (var pair in SpecialAttributes(s, row)) yield return pair;
         }
     }
 

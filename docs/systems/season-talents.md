@@ -1,7 +1,7 @@
 # Season talents
 
 `SeasonTalentService` owns the durable state (`DBSeasonTalent`, sync 5050) and the three client requests: 83550
-upgrade, 83552 switch plan, 83553 rename plan. `SeasonTalentEffects` owns the job node buffs and skill changes.
+upgrade, 83552 switch plan, 83553 rename plan. `SeasonTalentService.Effects` applies the chosen nodes' effects.
 The talent graph is `SeasonTalentConfig` (232 nodes), `SeasonTalentTreeConfig` (11 trees) and
 `SeasonTalentEffectConfig` (level rows by group and job). Node types follow the client's `enum_SeasonTalentType`
 in `Lua_GameDefine`: Small 1, Middle 2, Large 3, PVP 4, SkillPoint 5, Profession_L 6, Profession_M 7.
@@ -55,28 +55,23 @@ the panel shows.
 ## Job node effects
 
 A job row's `_kSpecialEffectList` names `SpecialEffectConfig` rows. Their `_kSpecialEffect` tuples apply while the
-node is chosen in the current plan:
+node is bought in the current plan (`SeasonTalentService.Effects`, described with the talent procs and charges in
+[skill-protocol.md](skill-protocol.md#talent-effects)):
 
 | Opcode | Tuples | Meaning | Applied by |
 | --- | --- | --- | --- |
 | 1 | 18 | `[1, attribute, value]` | stats |
-| 2 | 160 | `[2, buff]`: a zero-time `BuffConfig` row, registered as a passive owned by the node | buffs, skill rules |
+| 2 | 160 | `[2, buff]`: the buff's `_kSkillAttributeList`, and its `_kLogicData` proc (`TalentProcs`) | skill rules, procs |
 | 16 | 7 | `[16, weapon subtype, attribute, value]` **(inferred)** | stats |
 | 19 | 18 | `[19, skill group, level, attribute, value]` **(inferred)** | stats |
 | 21 | 36 | `[21, weapon subtype or 0, scope, selector, type, operation, value, index]` **(inferred)** | skill rules |
 | 22 | 4 | `[22, weapon subtype, attribute, per level, skill group]` **(inferred)** | stats |
-| 12, 20 | 7 | another buff's parameters; unknown | not applied |
+| 12, 20 | 7 | 12: another buff's parameters (BuffDictRef); 20: unknown | 12: buff values; 20: not applied |
 
 The opcode readings come from each row's English description. For example, 16120004 "Bowling Bash's Cooldown is
 changed to 8 seconds" is `[21,0,0,11104,0,2,8000]`, and 16520016 "When a dagger or katar is equipped, Physical
-ATK +20" is `[16,1,103,20]` plus `[16,12,103,20]`. The weapon is the main hand's `ItemConfig._iSubType`
-(`SkillService.Weapon`). Opcode 21 after its weapon slot is a `BuffConfig._kSkillAttributeList` tuple, so it
-joins `SkillParameterRules` through `GameSession.ExtraSkillModifiers`. Opcode 2 buffs reach the same rules through
-their own `_kSkillAttributeList`. Buff procs in `_kLogicData` (65 of the 160 buffs) are not executed: the server has
-no generic proc engine for them.
-
-Talent passives are registered again on scene load (their `_iSceneClear`), revive, weapon change, job change, plan
-switch and Build preset apply. `CardEffects` leaves them alone (`ActiveBuff.IsTalentOwned`).
+ATK +20" is `[16,1,103,20]` plus `[16,12,103,20]`. Opcode 21 after its weapon slot is a `BuffConfig._kSkillAttributeList`
+tuple, so it joins `SkillParameterRules` through `GameSession.TalentSkillModifiers`, with the buffs' own tuples.
 
 `SeasonTalentTests` covers the branch choice, switching branches, relog, plan switch, the job filter and an
 attribute effect. Behavior in the client has not been verified.

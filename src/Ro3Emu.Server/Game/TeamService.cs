@@ -99,6 +99,15 @@ public sealed partial class TeamService(SessionRegistry sessions, CharacterServi
         killer.Role is { } role && _byMember.TryGetValue(role.Id, out var team)
             ? team.Members.Count(m => Session(m) is { } s && s.WorldScene == killer.WorldScene) : 0;
 
+    /// <summary>After a party's roster or a member's card (career, online state) changed, with the roles it concerns: the
+    /// members and one who left (PassiveSkills: Union).</summary>
+    internal List<Func<IReadOnlyList<long>, Task>> RosterChanged { get; } = [];
+
+    private async Task NotifyRosterAsync(IReadOnlyList<long> roles)
+    {
+        foreach (var handler in RosterChanged) await handler(roles);
+    }
+
     /// <summary>The party a role is in: (team id, leader), or (0, the role itself) when solo.</summary>
     public (long TeamId, long Leader) TeamOf(long role) =>
         _byMember.TryGetValue(role, out var team) ? (team.Id, team.Leader) : (0, role);
@@ -285,6 +294,7 @@ public sealed partial class TeamService(SessionRegistry sessions, CharacterServi
         team.Offline.Remove(role);
         _byMember.Remove(role);
         _log.LogInformation("{Name} leaves party {Team} ({Left} left)", name, team.Id, team.Members.Count);
+        await NotifyRosterAsync([.. team.Members, role]);
         if (team.Members.Count == 0)
         {
             _teams.Remove(team.Id);
@@ -323,6 +333,7 @@ public sealed partial class TeamService(SessionRegistry sessions, CharacterServi
     private async Task RefreshAsync(Team team)
     {
         if (!_teams.TryGetValue(team.Id, out var current) || !ReferenceEquals(team, current)) return;
+        bool cardChanged = false;
         foreach (var m in team.Members.ToList())
         {
             var detail = Detail(team, m);
@@ -332,6 +343,7 @@ public sealed partial class TeamService(SessionRegistry sessions, CharacterServi
             if (!card.Equals(team.LastCard.GetValueOrDefault(m)))
             {
                 team.LastCard[m] = card;
+                cardChanged = true;
                 var update = new TeamMemberChangeResp { TeamId = team.Id };
                 update.MemberList[m] = detail;
                 // The owner also consumes its card for the dungeon Light of Bonds panel (verified LC_DAL_Team).
@@ -343,6 +355,8 @@ public sealed partial class TeamService(SessionRegistry sessions, CharacterServi
             }
             team.LastBattle[m] = battle;
         }
+        // A card carries a member's career and online state, which party-counting passives (Union) read.
+        if (cardChanged) await NotifyRosterAsync([.. team.Members]);
     }
 
     // ---- shapes ----

@@ -14,9 +14,8 @@ public sealed partial class BuffService
     /// <summary>CombatService supplies its ordinary death transition for decline/timeout.</summary>
     public Func<GameSession, Task>? ImmuneDeathDeclined { get; set; }
 
-    /// <summary>Passive lethal-hit savers (CombatService: Wood Spirit's Blessing), tried after the buff charges; each
-    /// returns true when it kept the player alive (it sets the HP itself).</summary>
-    public List<Func<GameSession, Task<bool>>> LethalSavers { get; } = new();
+    /// <summary>A learned passive's lethal-hit survival (PassiveSkills: Wood Spirit's Blessing), after the buffs'.</summary>
+    internal Func<GameSession, Task<bool>>? PassiveLethalSave { get; set; }
 
     /// <summary>
     /// Apply an active buff's lethal-hit protection before HP reaches zero. BuffConfig 1430501 and 16340401
@@ -43,13 +42,10 @@ public sealed partial class BuffService
             await _character.SetHpSpAsync(p, Math.Max(1, stats[101] * percent / 100), null);
             return true;
         }
-        foreach (var saver in LethalSavers)
-            if (await saver(p)) return true;
-
         var choice = live.FirstOrDefault(b => _data.Row("BuffConfig", b.ConfigId) is { } row
             && GameData.Int(row, "_iBuffID") is 20520 or 20521
             && p.BuffEffectCds.GetValueOrDefault(b.Guid) <= now);
-        if (choice == null) return false;
+        if (choice == null) return PassiveLethalSave != null && await PassiveLethalSave(p);
         long window = _data.Table("PublicParamConfig").TryGetValue("ImmuneDeadConfirmTimeMs", out var value)
             ? (long)(GameData.Number(value) ?? 5000) : 5000;
         window = Math.Clamp(window, 1000, 30000);

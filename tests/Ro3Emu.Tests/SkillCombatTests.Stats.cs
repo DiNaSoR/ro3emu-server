@@ -9,15 +9,6 @@ namespace Ro3Emu.Tests;
 /// <summary>Stats the server now reads (Cast Speed 116, 1205/1206/1207, 243) and the new knockbacks and pulls.</summary>
 public sealed partial class SkillCombatTests
 {
-    [Fact]
-    public void CastSpeedShortensOnlyTheVariableChant()
-    {
-        Assert.Equal(1, CombatService.ChantFactor(0));
-        Assert.Equal(0, CombatService.ChantFactor(530));
-        Assert.Equal(0, CombatService.ChantFactor(2000));
-        Assert.Equal(1 - Math.Sqrt(130 / 530.0), CombatService.ChantFactor(130), 6);
-        Assert.True(CombatService.ChantFactor(-50) > 1);
-    }
 
     [ClientDataFact]
     public async Task SuffragiumShortensTheHealChant()
@@ -25,9 +16,9 @@ public sealed partial class SkillCombatTests
         await using var alice = await InWorld("Alice");
         await Gm("alice", "!job 1100");
         var heal = Data.Row("SkillConfig", 1140501)!.Value; // Heal: _iChantVar 1000
-        int before = await Loop.InvokeAsync(() => Task.FromResult(Combat.ChantTime(Session("alice"), heal)));
+        int before = await Loop.InvokeAsync(() => Task.FromResult(Combat.ChantMs(Session("alice"), heal)));
         await Loop.InvokeAsync(() => Buffs.AddAsync(Session("alice"), 1412305, 30000, 0)); // Suffragium: Cast Speed +10
-        int after = await Loop.InvokeAsync(() => Task.FromResult(Combat.ChantTime(Session("alice"), heal)));
+        int after = await Loop.InvokeAsync(() => Task.FromResult(Combat.ChantMs(Session("alice"), heal)));
         Assert.InRange(before, 1, 1000);
         Assert.True(after < before, $"{after} !< {before}");
     }
