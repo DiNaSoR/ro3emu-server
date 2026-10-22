@@ -55,7 +55,8 @@ public sealed class PassiveSkills
         combat.Killed.Add(OnKilledAsync);
         combat.DamageAdjusters.Add(PreyOnTheWeakDamage);
         buffs.PassiveLethalSave = WoodSpiritsBlessingAsync;
-        scenes.AfterLoaded.Add(PrayerShieldAsync);
+        // It touches only the loaded session's own buffs, inside the scene load's scope: no hook scope of its own.
+        scenes.AddOwnedAfterLoaded(PrayerShieldAsync);
         skills.Learned.Add(PrayerShieldAsync);
         character.JobChanged.Add(PrayerShieldAsync);
     }
