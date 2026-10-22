@@ -282,6 +282,7 @@ public sealed class GuildVoiceService(GameData data, GuildStore store, GuildServ
                 code = req.TargetPlayerId == self ? ErrorCodes.GuildVoiceCannotKickSelf
                     : IsLeader(guild!, req.TargetPlayerId) ? ErrorCodes.GuildVoiceCannotKickLeader
                     : !channel!.Members.ContainsKey(req.TargetPlayerId) ? ErrorCodes.GuildVoiceNotInChannel
+                    : Outranks(guild!, req.TargetPlayerId, self) ? ErrorCodes.GuildVoiceNoPermission
                     : 0;
                 if (code == 0)
                 {
@@ -442,6 +443,15 @@ public sealed class GuildVoiceService(GameData data, GuildStore store, GuildServ
     private bool ValidIndex(int index) => index >= 0 && index < ChannelCount();
 
     private static bool IsLeader(GuildStore.State guild, long role) => guild.Members.TryGetValue(role, out var m) && m.Official == 1;
+
+    /// <summary>
+    /// The guild kick and appoint rule (GuildService.KickCoreAsync, ChangeOfficialCoreAsync): below the leader, an
+    /// officer may act only on a member whose Official is larger than its own. Applying it to voice kicks is the
+    /// maintainer's call on #258 (inferred).
+    /// </summary>
+    private static bool Outranks(GuildStore.State guild, long target, long actor) =>
+        guild.Members.TryGetValue(actor, out var a) && a.Official != 1
+        && guild.Members.TryGetValue(target, out var t) && t.Official <= a.Official;
 
     private bool IsManager(GuildStore.State guild, long role) => guilds.HasRight(guild, role, VoiceRight);
 
