@@ -35,7 +35,38 @@ public sealed class TalentProcs
     // The client's element enum (Lua_GameDefine): None 1, Wind 2, Earth 3, Fire 4, Water 5, Poison 6 ...
     private const long Neutral = 1, Fire = 4, Poison = 6;
     // BuffConfig._iBuffID of the skills' own buffs, named by BuffConfig._iName.
-    private const long AuraBlade = 11201, Parry = 11210, AutoGuard = 11403, Sacrifice = 11501, BattleChant = 11505;
+    private const long AuraBlade = 11201, Parry = 11210, AutoGuard = 11403, Sacrifice = 11501, BattleChant = 11505,
+        MysticalAmplification = 12201;
+    // AttributeConfig id: Cast Speed 116; MATK as Mystical Amplification's own _kChangeAttri has it.
+    private const long CastSpeed = 116, AmplifiedMatk = 1043;
+
+    /// <summary>
+    /// Talents whose buff carries no data but whose description names what a buff of the owner adds: "[Mystical
+    /// Amplification] grants ${1} Extra MATK." Keyed by the talent's BuffConfig id: the buff group and its added attributes
+    /// with the description value index. They join every buff of that group the owner applies (inferred).
+    /// </summary>
+    internal static readonly IReadOnlyDictionary<long, (long Group, (long Attr, int Value)[] Pairs)> BuffBonuses =
+        new Dictionary<long, (long, (long, int)[])>
+        {
+            [1249201] = (MysticalAmplification, [(CastSpeed, 0)]), // Magic Strike Calibration: "${1} Extra Cast Speed."
+            [1249301] = (MysticalAmplification, [(AmplifiedMatk, 0)]), // Magic Infusion: "${1} Extra MATK."
+        };
+
+    /// <summary>
+    /// Skill buffs named after a talent ("Crazy Uproar - Mind and Body Renewal"): the skill's _kBuff1 lists them
+    /// unconditionally, so the caster's talent gates them (inferred from the names). Keyed by the BuffConfig id: the
+    /// talent's BuffConfig id, and whether the buff goes to the caster only ("Weapon Polishing: [Maximize Power] increases
+    /// your PATK") or to the others only ("Weapon Enhance: ... increases nearby allies' PATK").
+    /// </summary>
+    private static readonly Dictionary<long, (long Talent, bool? Caster)> TalentBuffs = new()
+    {
+        [1601001] = (1643201, null), // Crazy Uproar - Mind and Body Renewal
+        [1601101] = (1643301, null), // Crazy Uproar - Self-Motivation
+        [1611001] = (1647201, true), // Maximize Power - Weapon Polishing
+        [1611101] = (1647301, false), // Maximize Power - Weapon Enhance
+        [1621001] = (1649201, null), // Maximum Over Thrust - Enhanced Power Thrust
+        [1621101] = (1649301, null), // Maximum Over Thrust - Critical Strike
+    };
     private const long TwoHandedSword = 3, Mace = 8; // ItemConfig._iSubType
     private const int BuffAttrType = 2; // EBuffAffectValueType.BuffAttr
 
@@ -247,6 +278,7 @@ public sealed class TalentProcs
         _character = character;
         _sessions = sessions;
         buffs.SourceAttributes = BuffAttributes;
+        combat.SkillBuffAllowed = SkillBuffAllowed;
         combat.CastResolved.Add(OnCastResolvedAsync);
         buffs.Changed.Add(OnBuffsChangedAsync);
     }
@@ -261,9 +293,15 @@ public sealed class TalentProcs
         GameSession? source = null;
         foreach (var s in _sessions.All())
             if (s.Role?.Id == sourceId) { source = s; break; }
-        if (source == null || source.TalentBuffAttributes.Count == 0) return pairs;
+        if (source == null || source.TalentBuffAttributes.Count == 0 && source.TalentProcBuffs.Count == 0) return pairs;
         long group = new BuffConfig(row).BuffId;
         List<(long Id, double Value)>? changed = null;
+        foreach (var (buff, description) in source.TalentProcBuffs)
+            if (BuffBonuses.TryGetValue(buff, out var bonus) && bonus.Group == group)
+            {
+                changed ??= [.. pairs];
+                foreach (var (attr, index) in bonus.Pairs) changed.Add((attr, Value(description, index)));
+            }
         foreach (var attribute in source.TalentBuffAttributes)
         {
             if (attribute.Group != group || attribute.Type != BuffAttrType || attribute.Index < 0 || attribute.Index >= pairs.Count) continue;
@@ -279,6 +317,10 @@ public sealed class TalentProcs
         }
         return changed ?? pairs;
     }
+
+    private static bool SkillBuffAllowed(GameSession caster, GameSession recipient, int buff) =>
+        !TalentBuffs.TryGetValue(buff, out var gate)
+        || caster.TalentProcBuffs.Any(t => t.Buff == gate.Talent) && (gate.Caster is not { } self || ReferenceEquals(caster, recipient) == self);
 
     /// <summary>A "while a buff is active" talent's attributes follow that buff (SeasonTalentService.Attributes).</summary>
     private async Task OnBuffsChangedAsync(GameSession s)

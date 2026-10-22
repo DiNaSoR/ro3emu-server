@@ -16,7 +16,10 @@ public sealed class ProfessionTalentEffectTests : IAsyncDisposable
     private const int AutoGuardEnhance = 1153701, Granted = 77002, AutoGuard = 77003, AutoGuardGroup = 11403;
     private static readonly int[] PlayBook = [101], Career = [1000], BranchEffects = [1001], OptionEffects = [1002],
         Ratio = [1000], Flat = [10], GrantedBuff = [Granted];
-    private static readonly int[][] GrantedAttrs = [[103, 9]], GuardAttrs = [[105, 32], [106, 32]];
+    private static readonly int[][] GrantedAttrs = [[103, 9]], GuardAttrs = [[105, 32], [106, 32]], AmplifyAttrs = [[1043, 1]];
+    private static readonly string[] OptionValues = ["5"];
+    // TalentProcs.BuffBonuses keys Magic Infusion's talent buff to Mystical Amplification's group 12201; values invented.
+    private const int MagicInfusion = 1249301, Amplify = 77021, AmplifyGroup = 12201;
     private const int Guard = 77011, GuardGroup = 77010;
     private readonly string _configRoot = Path.Combine(Path.GetTempPath(), "ro3emu-talent-effects-" + Guid.NewGuid().ToString("N"));
     private SyntheticHost _host = null!;
@@ -62,9 +65,10 @@ public sealed class ProfessionTalentEffectTests : IAsyncDisposable
             // The option: flat attr, sword-only attr (two sword kinds, once), skill-level attr, per-level attr, a buff's tuples.
             new
             {
-                _iID = 1002, _kSpecialEffect = new[]
+                _iID = 1002, _kDescData = OptionValues, _kSpecialEffect = new[]
                 {
                     new long[] { 1, 103, 7 }, [16, 2, 1, 3], [16, 3, 1, 3], [19, Mastery, 2, 4, 6], [22, 2, 103, 5, Mastery], [2, Buff], [2, AutoGuardEnhance],
+                    [2, MagicInfusion],
                 },
             },
         });
@@ -79,6 +83,8 @@ public sealed class ProfessionTalentEffectTests : IAsyncDisposable
             },
             new { _iID = AutoGuard, _iBuffID = AutoGuardGroup },
             new { _iID = Guard, _iBuffID = GuardGroup, _kChangeAttri = GuardAttrs },
+            new { _iID = MagicInfusion },
+            new { _iID = Amplify, _iBuffID = AmplifyGroup, _kChangeAttri = AmplifyAttrs },
         });
         Write("SkillConfig", new[]
         {
@@ -177,6 +183,11 @@ public sealed class ProfessionTalentEffectTests : IAsyncDisposable
         await OnLoop(async () => { await buffs.AddAsync(Session, Guard, 60_000, Session.Role!.Id); return 0; });
         var guard = await OnLoop(() => Task.FromResult(Session.Buffs.Single(b => b.ConfigId == Guard).Changes.ToArray()));
         Assert.Equal([(105L, 32d), (106L, 82d)], guard);
+
+        // "[Mystical Amplification] grants ${1} Extra MATK.": the talent buff has no data, the description's value joins.
+        await OnLoop(async () => { await buffs.AddAsync(Session, Amplify, 60_000, Session.Role!.Id); return 0; });
+        var amplify = await OnLoop(() => Task.FromResult(Session.Buffs.Single(b => b.ConfigId == Amplify).Changes.ToArray()));
+        Assert.Equal([(1043L, 1d), (1043L, 5d)], amplify);
 
         Assert.Equal(0, await Request(bot, SeasonTalentService.SetPlan, new SeasonTalentSetCurPlanReq { PlanId = 1 },
             body => SeasonTalentSetCurPlanResp.Parser.ParseFrom(body).Result));

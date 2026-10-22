@@ -219,7 +219,9 @@ public sealed partial class CombatService
                 if (!CanApplyMoreEffects()) break;
                 if (field == null)
                     foreach (var tuple in Tuples(row, "_kBuff1"))
-                        if (CanApplyMoreEffects() && RollBuff(tuple, out int id, out int duration)) await _buffs.AddAsync(recipient, id, duration, castingRole.Id);
+                        if (CanApplyMoreEffects() && RollBuff(tuple, out int id, out int duration)
+                            && SkillBuffAllowed?.Invoke(s, recipient, id) != false)
+                            await _buffs.AddAsync(recipient, id, duration, castingRole.Id);
                 if (friendly && damage)
                 {
                     double multiplier = Numbers(row, "_kDamageParam1").FirstOrDefault(), flat = Numbers(row, "_kDamageParam2").FirstOrDefault();

@@ -150,6 +150,24 @@ public sealed partial class SkillCombatTests
         Assert.True(proc.Dsts.Single(d => d.DstID == bystander.Uid).Damage > 0);
     }
 
+    // Crazy Uproar's _kBuff1 lists "Crazy Uproar - Mind and Body Renewal" and "Crazy Uproar - Self-Motivation"
+    // unconditionally; each comes only with its talent (10102118 Mind and Body Renewal for a Whitesmith-line job).
+    [ClientDataFact]
+    public async Task CrazyUproarGivesOnlyTheChosenTalentsBuff()
+    {
+        await using var alice = await InWorld("Alice");
+        await Gm("alice", "!lvl 99"); await Gm("alice", "!job 6200"); await Teach("alice", 16008);
+        await ChooseProfessionTalent(alice, "alice", 10102118);
+
+        await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1600801, TargetPos = Session("alice").Position.Clone() });
+        Assert.Equal(0, (await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
+        await Next(alice, BuffService.BuffUpdate, BuffUpdateNotify.Parser, x => x.Buffs.Any(b => b.ConfigId == 1600801));
+        await Task.Delay(300);
+        var buffs = await Loop.InvokeAsync(() => Task.FromResult(Session("alice").Buffs.Select(b => b.ConfigId).ToArray()));
+        Assert.Contains(1601001, buffs); // Mind and Body Renewal
+        Assert.DoesNotContain(1601101, buffs); // Self-Motivation, not chosen
+    }
+
     // Meteor Storm leaves a field, so Flame Burst centres on its target point: "After using [Meteor Storm], immediately
     // triggers [Fire Explosion] ... to up to ${2} enemies within a ${1}-meter radius."
     [ClientDataFact]
