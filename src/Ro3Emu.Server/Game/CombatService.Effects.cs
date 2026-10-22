@@ -317,7 +317,7 @@ public sealed partial class CombatService
         var action = new ActiveSkillCast
         {
             Id = ++_sessionIds, OwnerId = s.Role.Id, WorldScene = s.WorldScene, SceneGeneration = s.SceneGeneration,
-            Attachment = s.Attachment, Row = SkillParameterRules.Effective(s, _data, row),
+            Attachment = s.Attachment, Row = ExtraRow(s, row),
             Request = new CastSkillReq
             {
                 SkillId = (int)new SkillConfig(row).Id, TargetId = target.Uid, TargetPos = target.Pos.Clone(), Face = s.Face,
@@ -327,6 +327,13 @@ public sealed partial class CombatService
         };
         return ApplyEffectsAsync(s, action, target.Pos.Clone(), chosenTargets: targets);
     }
+
+    /// <summary>
+    /// An extra cast's row with the session's live modifiers. Not the per-id cached SkillParameterRules.Effective: a
+    /// described hit (SkillConfig.AsDescribedHit) keeps its trigger's id, and that cache would return the trigger's row.
+    /// </summary>
+    internal JsonElement ExtraRow(GameSession s, JsonElement row) => SkillParameterRules.Effective(row,
+        SkillParameterRules.Active(s, _data), [.. new SkillConfig(row).SkillCategory.Select(tag => (int)tag)]);
 
     /// <summary>Living monsters this caster may hit within a radius of a point, nearest first.</summary>
     internal List<MonsterUnit> MonstersNear(GameSession s, Vec3 center, float radius) =>

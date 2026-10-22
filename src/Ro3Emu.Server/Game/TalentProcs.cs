@@ -315,7 +315,10 @@ public sealed class TalentProcs
             var target = processed.FirstOrDefault(m => m.Uid == action.Request.TargetId && m.Hp > 0) ?? processed.FirstOrDefault(m => m.Hp > 0)
                 ?? (processed.Count == 0 && rule.Radius is int radius
                     ? _combat.MonstersNear(s, action.Request.TargetPos ?? s.Position, (float)Value(description, radius)).FirstOrDefault()
-                    : null);
+                    : null)
+                // "... within a ${2}-meter radius of you" needs no living target: the cast may have killed it.
+                ?? (rule.AroundCaster && rule.Radius is int around
+                    ? _combat.MonstersNear(s, s.Position, (float)Value(description, around)).FirstOrDefault() : null);
             if (rule.RandomHit && processed.Count > 0) target = processed[Roll(processed.Count)];
             if (target == null || target.Hp <= 0) continue;
             if (rule.HpBelow is int below && target.Hp * 100 >= target.Template.MaxHp * Value(description, below)) continue;
