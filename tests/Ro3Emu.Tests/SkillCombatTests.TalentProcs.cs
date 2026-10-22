@@ -8,9 +8,10 @@ namespace Ro3Emu.Tests;
 
 public sealed partial class SkillCombatTests
 {
-    // Knight talent tree 10102: gate 10102003, Pierce Enhance 10102101 > Rapid Pierce 10102102,
-    // Swift Sword 10102105 > Double Counter 10102107. The tree opens at a total talent level of 40.
-    private async Task ChooseKnightTalent(BotClient bot, string name, int option)
+    // Talent tree 10102 (a node's effect depends on the job). Knight: gate 10102003, Pierce Enhance 10102101 > Rapid Pierce
+    // 10102102, Swift Sword 10102105 > Double Counter 10102107. Wizard: 10102103 Elemental Pursuit, 10102126 Flame Burst.
+    // The tree opens at a total talent level of 40.
+    private async Task ChooseProfessionTalent(BotClient bot, string name, int option)
     {
         await Gm(name, "!quest done 10101170");
         await Gm(name, "!quest done 10103160");
@@ -37,7 +38,7 @@ public sealed partial class SkillCombatTests
     {
         await using var alice = await InWorld("Alice");
         await Gm("alice", "!lvl 99"); await Gm("alice", "!job 1200"); await Teach("alice", 11120);
-        await ChooseKnightTalent(alice, "alice", 10102102);
+        await ChooseProfessionTalent(alice, "alice", 10102102);
         _app.Services.GetRequiredService<TalentProcs>().Roll = _ => 0;
         var monster = await Target("alice", stationary: true);
         await Loop.InvokeAsync(() => { monster.Hp = 1_000_000; return Task.CompletedTask; });
@@ -67,7 +68,7 @@ public sealed partial class SkillCombatTests
     {
         await using var alice = await InWorld("Alice");
         await Gm("alice", "!lvl 99"); await Gm("alice", "!job 1200"); await Teach("alice", 11104);
-        await ChooseKnightTalent(alice, "alice", 10102107);
+        await ChooseProfessionTalent(alice, "alice", 10102107);
         _app.Services.GetRequiredService<TalentProcs>().Roll = _ => 0;
         var monster = await Target("alice", stationary: true);
         await Loop.InvokeAsync(() => { monster.Hp = 1_000_000; return Task.CompletedTask; });
@@ -78,5 +79,41 @@ public sealed partial class SkillCombatTests
         await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser, x => x.SessionId == accepted.SessionId);
         var extra = await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser, x => x.SkillId == 1112701);
         Assert.Contains(extra.Dsts, d => d.DstID == monster.Uid && d.Damage > 0);
+    }
+
+    // Elemental Pursuit takes its values from its _kOtherDesc buff: "After [Fire Bolt] ... hits, it triggers
+    // [Elemental Pursuit] ... to the target."
+    [ClientDataFact]
+    public async Task ElementalPursuitFollowsFireBolt()
+    {
+        await using var alice = await InWorld("Alice");
+        await Gm("alice", "!lvl 99"); await Gm("alice", "!job 2200"); await Teach("alice", 12004);
+        await ChooseProfessionTalent(alice, "alice", 10102103);
+        var monster = await Target("alice", stationary: true);
+        await Loop.InvokeAsync(() => { monster.Hp = 1_000_000; return Task.CompletedTask; });
+
+        await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1200401, TargetId = monster.Uid });
+        var accepted = await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser);
+        Assert.Equal(0, accepted.Result);
+        var proc = await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser, x => x.SkillId == 1240301);
+        Assert.Contains(proc.Dsts, d => d.DstID == monster.Uid && d.Damage > 0);
+    }
+
+    // Meteor Storm leaves a field, so Flame Burst centres on its target point: "After using [Meteor Storm], immediately
+    // triggers [Fire Explosion] ... to up to ${2} enemies within a ${1}-meter radius."
+    [ClientDataFact]
+    public async Task FlameBurstFollowsAMeteorStormField()
+    {
+        await using var alice = await InWorld("Alice");
+        await Gm("alice", "!lvl 99"); await Gm("alice", "!job 2200"); await Teach("alice", 12106);
+        await ChooseProfessionTalent(alice, "alice", 10102126);
+        var monster = await Target("alice", stationary: true);
+        await Loop.InvokeAsync(() => { monster.Hp = 1_000_000; return Task.CompletedTask; });
+
+        await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1210601, TargetPos = monster.Pos.Clone() });
+        var accepted = await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser);
+        Assert.Equal(0, accepted.Result);
+        var proc = await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser, x => x.SkillId == 1244201);
+        Assert.Contains(proc.Dsts, d => d.DstID == monster.Uid && d.Damage > 0);
     }
 }

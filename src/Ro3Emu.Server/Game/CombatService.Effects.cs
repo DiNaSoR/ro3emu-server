@@ -62,7 +62,17 @@ public sealed partial class CombatService
             else if (ReviveOffer != null) await ReviveOffer(s, target, row);
             return;
         }
-        if (await CreateSkillObjectAsync(s, action)) return;
+        if (await CreateSkillObjectAsync(s, action))
+        {
+            // A field resolves its effects later; "After using [Meteor Storm] ..." talent procs centre on its target point.
+            if (!action.Request.IsExtraSkill)
+                foreach (var handler in CastResolved)
+                {
+                    if (!CurrentCastMap(s, action)) break;
+                    await handler(s, action, []);
+                }
+            return;
+        }
         if (!CurrentCastMap(s, action)) return;
         // SkillConfig._bMovement is enum_SkillLockMoveType (may the caster walk while casting), not a displacement.
         await MoveCasterAsync(s, action);
