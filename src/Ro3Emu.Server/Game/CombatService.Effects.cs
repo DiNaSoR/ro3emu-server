@@ -319,9 +319,11 @@ public sealed partial class CombatService
 
     /// <summary>Living monsters this caster may hit within a radius of a point, nearest first.</summary>
     internal List<MonsterUnit> MonstersNear(GameSession s, Vec3 center, float radius) =>
-        _world.Map(s.WorldScene).Units.OfType<MonsterUnit>()
+    [
+        .. _world.Map(s.WorldScene).Units.OfType<MonsterUnit>()
             .Where(m => m.Hp > 0 && CanHitMonster(s, m) && Distance(center, m.Pos) <= radius + 0.1f)
-            .OrderBy(m => Distance(center, m.Pos)).ThenBy(m => m.Uid).ToList();
+            .OrderBy(m => Distance(center, m.Pos)).ThenBy(m => m.Uid),
+    ];
 
     private bool RollBuff(JsonElement tuple, out int id, out int duration)
     {

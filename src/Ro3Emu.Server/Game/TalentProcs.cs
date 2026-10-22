@@ -98,7 +98,7 @@ public sealed class TalentProcs
     private readonly CombatService _combat;
     private readonly BuffService _buffs;
     private readonly CharacterService _character;
-    private readonly ConditionalWeakTable<GameSession, Dictionary<long, long>> _readyAt = new();
+    private readonly ConditionalWeakTable<GameSession, Dictionary<long, long>> _readyAt = [];
     private readonly Dictionary<long, SkillConfig?> _procRows = [];
 
     // A test can fix each ten-thousandth roll without changing the production probability.
@@ -185,6 +185,6 @@ public sealed class TalentProcs
         else return [target];
         var near = _combat.MonstersNear(s, rule.AroundCaster ? s.Position : target.Pos, radius).Where(m => m != target)
             .Take(Math.Max(0, others));
-        return rule.OthersOnly ? near.ToList() : [target, .. near];
+        return rule.OthersOnly ? [.. near] : [target, .. near];
     }
 }
