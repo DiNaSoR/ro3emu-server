@@ -91,7 +91,7 @@ public sealed partial class DungeonService
         long awardId = MultiverseAward(GameData.Int(boss, "_iPartAward"));
         AwardPlan? plan = null;
         try { if (awardId > 0) plan = _awards.ResolveDirect(s, awardId); }
-        catch (AwardResolutionException e) { _log.LogWarning(e, "First pass award {Award} rejected", awardId); }
+        catch (AwardResolutionException e) { LogFirstPassAwardRejected(_log, e, awardId); }
         if (plan == null || plan.Grants.Count == 0) return ErrorCodes.RewardMissing;
         var next = CurrentState(s.Dungeons!);
         next.FirstPassPaid.Add(key);
@@ -106,6 +106,9 @@ public sealed partial class DungeonService
         }, committed: () => s.Dungeons = next);
         return paid ? 0 : ErrorCodes.Unknown;
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "First pass award {Award} rejected")]
+    private static partial void LogFirstPassAwardRejected(ILogger logger, Exception exception, long award);
 
     /// <summary>MultiverseGroupConfig: the AwardConfig id of the current play book, else the default one; 0 when absent.</summary>
     private long MultiverseAward(long group)

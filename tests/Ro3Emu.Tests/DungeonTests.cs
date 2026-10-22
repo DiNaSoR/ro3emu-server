@@ -611,10 +611,10 @@ public sealed partial class DungeonTests : IAsyncLifetime
     {
         static bool ClearPublished(DBMultiDungeonInfoIncrement update, int used)
             => update.DungeonInfo.TryGetValue(Multi, out var dungeon) &&
-                (dungeon.All?.AwardInfo.FirstOrDefault() is { IsFirst: 2 } full && full.UseNumber == used ||
-                 dungeon.Inc?.AwardInfo?.All?.Value.FirstOrDefault() is { IsFirst: 2 } all && all.UseNumber == used ||
+                (dungeon.All?.AwardInfo.FirstOrDefault() is { IsFirst: DungeonService.FirstAwardComplete } full && full.UseNumber == used ||
+                 dungeon.Inc?.AwardInfo?.All?.Value.FirstOrDefault() is { IsFirst: DungeonService.FirstAwardComplete } all && all.UseNumber == used ||
                  dungeon.Inc?.AwardInfo?.Inc?.Value.FirstOrDefault() is { } counter &&
-                    (used == 1 ? counter.HasIsFirst && counter.IsFirst == 2 : counter.HasUseNumber && counter.UseNumber == used));
+                    (used == 1 ? counter.HasIsFirst && counter.IsFirst == DungeonService.FirstAwardComplete : counter.HasUseNumber && counter.UseNumber == used));
         SyntheticSolo(daily: true); // test-only admission and reset fixture; original team minimum is three
         await using var alice = await InWorld("Alice");
         await Gm(alice, "!lvl 99");
@@ -631,7 +631,7 @@ public sealed partial class DungeonTests : IAsyncLifetime
         var firstCounter = ((DBMultiDungeonInfo)Session(alice).Synced[DungeonService.Sync]).DungeonInfo[Multi].AwardInfo[0];
         Assert.Equal(2, firstCounter.TotalNumber);
         Assert.Equal(1, firstCounter.UseNumber);
-        Assert.Equal(2, firstCounter.IsFirst);
+        Assert.Equal(DungeonService.FirstAwardComplete, firstCounter.IsFirst); // cleared, its first-clear reward unclaimed
 
         // The exported panel adds a free first clear. The next clear spends the one recurring charge.
         await alice.SendGameAsync(DungeonService.ClientEvent, new ClientDungeonEvent { StrCmd = "DungeonReset" });
