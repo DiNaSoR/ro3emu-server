@@ -72,12 +72,13 @@ public readonly partial record struct SkillConfig(JsonElement Row)
     /// element (0 keeps the row's). It keeps the row's id, release and show, but drops its group, tags, script, buffs and
     /// shown hit count, so no skill modifier, script effect or buff of the original applies to it.
     /// </summary>
-    public JsonElement AsDescribedHit(long ratio, long flat, long element)
+    public JsonElement AsDescribedHit(long ratio, long flat, long element, long targetMax = 0)
     {
         var node = System.Text.Json.Nodes.JsonNode.Parse(Row.GetRawText())!.AsObject();
         node["_kDamageParam1"] = new System.Text.Json.Nodes.JsonArray(ratio);
         node["_kDamageParam2"] = new System.Text.Json.Nodes.JsonArray(flat);
         if (element > 0) node["_iEleType"] = element;
+        if (targetMax > 0) node["_iTargetMax"] = targetMax;
         node["_iSkillID"] = 0;
         node["_kSkillCategory"] = new System.Text.Json.Nodes.JsonArray();
         node["_kScriptLogic"] = "";

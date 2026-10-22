@@ -73,6 +73,26 @@ public sealed partial class CombatService
     /// <summary>Direct _kAttri on the learned mode-0 passive row; no duplicate stacking of its lower levels.</summary>
     public IEnumerable<(long Id, double Value)> PassiveAttributes(GameSession session)
     {
+        foreach (var row in PassiveRows(session))
+            foreach (var pair in GameData.Pairs(row, "_kAttri")) yield return pair;
+    }
+
+    /// <summary>
+    /// The skill tuples of the learned passives' own BuffConfig rows, which share the passive row's id (Advanced Katar
+    /// Mastery 1522001: "Your [Assassin Normal Attack] CRIT Chance increases by ${5}%, but its damage is reduced by
+    /// ${6}%" is its row's [15000, 10, +4000] and [15000, 29, -2000]) (inferred from the descriptions).
+    /// </summary>
+    internal IReadOnlyList<SkillParameterRules.Modifier> PassiveModifiers(GameSession session)
+    {
+        var result = new List<SkillParameterRules.Modifier>();
+        foreach (var row in PassiveRows(session))
+            result.AddRange(SkillParameterRules.BuffModifiers(_data, (int)GameData.Int(row, "_iID")));
+        return result;
+    }
+
+    /// <summary>The SkillConfig row of each learned mode-0 passive at its level.</summary>
+    private IEnumerable<JsonElement> PassiveRows(GameSession session)
+    {
         if (session.Progress == null) yield break;
         _passiveGroups ??= _data.Table("SkillConfig").Values
             .Where(r => GameData.Int(r, "_iBasicType") == 0 && GameData.Int(r, "_iMode") == 0
@@ -83,7 +103,7 @@ public sealed partial class CombatService
             int level = _skills.Level(session.Progress, group);
             if (level <= 0 || _data.Row("SkillConfig", _skills.RealId(group, level)) is not { } row
                 || GameData.Int(row, "_iBasicType") != 0) continue;
-            foreach (var pair in GameData.Pairs(row, "_kAttri")) yield return pair;
+            yield return row;
         }
     }
 
@@ -91,6 +111,8 @@ public sealed partial class CombatService
     public async Task RefreshSkillParametersAsync(GameSession session)
     {
         if (session.Role == null || session.Progress == null) return;
+        var passives = PassiveModifiers(session);
+        if (!passives.SequenceEqual(session.PassiveSkillModifiers)) session.PassiveSkillModifiers = passives;
         var mods = SkillParameterRules.Active(session, _data);
         var update = new SkillBeAffectedParamExNotify { IsAll = true, Uuid = session.Role.Id };
         // Scope 0 names its group; a scope-1 tag selector reaches every learned skill whose row carries its tags.

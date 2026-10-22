@@ -105,7 +105,8 @@ internal static class SkillParameterRules
         foreach (var buff in session.Buffs)
             signature = unchecked(((signature * 31 + buff.Guid) * 31 + buff.ConfigId) * 31 + buff.PileCount * 2 + (buff.ExpireMs > now ? 1 : 0));
         var talents = session.TalentSkillModifiers;
-        signature = unchecked(signature * 31 + RuntimeHelpers.GetHashCode(talents));
+        signature = unchecked(((signature * 31 + RuntimeHelpers.GetHashCode(talents)) * 31
+            + RuntimeHelpers.GetHashCode(session.PassiveSkillModifiers)) * 31 + RuntimeHelpers.GetHashCode(session.TalentChargeModifiers));
         for (int i = 0; i < talents.Count; i++)
         {
             if (talents[i].Weapon == 0) continue;
@@ -114,9 +115,10 @@ internal static class SkillParameterRules
             break;
         }
         if (cache.Signature == signature && ReferenceEquals(cache.Data, data)) return cache;
-        var result = new List<Modifier>();
+        var result = new List<Modifier>(session.PassiveSkillModifiers);
         foreach (var (weapon, buffGroup, mod) in talents)
             if ((weapon == 0 || Wields(session, data, weapon)) && (buffGroup == 0 || HasBuffGroup(session, data, buffGroup))) result.Add(mod);
+        result.AddRange(session.TalentChargeModifiers);
         foreach (var buff in session.Buffs)
         {
             if (buff.ExpireMs <= now) continue;
@@ -173,6 +175,25 @@ internal static class SkillParameterRules
             if (mod.Type == 15 && Matches(mod, group, tags)) mode = Apply(mode, mod);
         return (int)Math.Clamp(mode, 0, 99);
     }
+
+    /// <summary>
+    /// Type 10 tuples add a CRIT chance in basis points to their skills' hits: Advanced Katar Mastery's "[Assassin Normal
+    /// Attack] CRIT Chance increases by ${5}%" is +4000, and Spiral Pierce Mastery's "your next [Spiral Pierce] is
+    /// guaranteed to CRIT" +10000 (inferred from those descriptions; the client has no type 10).
+    /// </summary>
+    internal static double CritChance(GameSession session, GameData data, JsonElement row)
+    {
+        var mods = Active(session, data);
+        if (mods.Count == 0) return 0;
+        int group = (int)GameData.Int(row, "_iSkillID");
+        int[]? tags = null;
+        long sum = 0;
+        foreach (var mod in mods)
+            if (mod.Type == CritType && mod.Operation == 1 && Matches(mod, group, tags ??= CategoriesOf(data, row))) sum += mod.Value;
+        return sum / 10000.0;
+    }
+
+    private const int CritType = 10;
 
     // The supported scalar/list fields are shared by server validation and client 31132.
     internal static string? Field(int type) => type switch
