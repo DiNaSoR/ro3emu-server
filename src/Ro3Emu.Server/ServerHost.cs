@@ -139,6 +139,7 @@ public static class ServerHost
         builder.Services.AddSingleton<MonsterHuntService>();
         builder.Services.AddSingleton<GrowthClassService>();
         builder.Services.AddSingleton<ParagonService>();
+        builder.Services.AddSingleton<FlyingDragonService>();
         builder.Services.AddSingleton<FirstHeartService>();
         builder.Services.AddSingleton<AppraisalService>();
         builder.Services.AddSingleton<EnchantService>();

@@ -39,6 +39,9 @@ public static class ErrorCodes
     public const int ActivityClosed = 3902;      // "Event Not Available"
     public const int ActivityPeriod = 5801;      // "Not in the event period"
     public const int ActivityReward = 1511;      // "Invalid Activity Reward ID"
+    // Starshatter ritual (FlyingDragonService): ErrorCodeConfig 1517-1526.
+    public const int DragonBusy = 1517, DragonPlace = 1518, DragonAssisted = 1519, DragonItems = 1520, DragonSelf = 1521;
+    public const int DragonNoLike = 1522, DragonLiked = 1523, DragonDone = 1524, DragonConfig = 1525, DragonCooldown = 1526;
     public const int BattlePassClosed = 8260, BattlePassLevel = 8261, BattlePassClaimed = 8262;
     public const int BattlePassLevelRequired = 8263, BattlePassRewardType = 8264, BattlePassPremium = 8265;
     public const int BattlePassNoRewards = 8266, BattlePassMaxLevel = 8267, BattlePassExpFull = 8268, BattlePassCurrency = 8269;
