@@ -385,6 +385,8 @@ public sealed class RoleStore(AccountStore accounts)
     public void SaveCareerSpecial(long id, byte[] value) => SaveBlob(id, "career_special", value);
     public byte[]? LoadHeroicSpirit(long id) => LoadBlob(id, "heroic_spirit");
     public byte[]? LoadParagon(long id) => LoadBlob(id, "paragon");
+    public byte[]? LoadTitle(long id) => LoadBlob(id, "title");
+    public void SaveTitle(long id, byte[] value, RoleItemPlanBuilder? transaction = null) => SaveBlob(id, "title", value, transaction);
     public void SaveParagon(long id, byte[] value, RoleItemPlanBuilder? transaction = null) => SaveBlob(id, "paragon", value, transaction);
     public byte[]? LoadAreaConcur(long id) => LoadBlob(id, "area_concur");
     public void SaveAreaConcur(long id, byte[] value, RoleItemPlanBuilder? transaction = null) => SaveBlob(id, "area_concur", value, transaction);

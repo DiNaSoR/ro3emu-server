@@ -146,6 +146,8 @@ internal sealed class RoleSchemaPlan : DbPlan
         SchemaSql.AddColumn(db, tx, "role", "heroic_spirit", "BLOB");
         // Serialized romsg.DBParagonLevel (Astral Level stars and installed Star Cores; AUTO_SYNC 5015, ParagonService).
         SchemaSql.AddColumn(db, tx, "role", "paragon", "BLOB");
+        // Serialized romsg.DBTitleInfo (the title rank; AUTO_SYNC 5031, TitleService).
+        SchemaSql.AddColumn(db, tx, "role", "title", "BLOB");
         // Serialized romsg.DBAreaConcurInfo (Monster Hunt kill counters and claimed stages; AUTO_SYNC 5053).
         SchemaSql.AddColumn(db, tx, "role", "area_concur", "BLOB");
         // Serialized romsg.DBGrowthClassInfo (Growth Classroom claimed rank rewards; AUTO_SYNC 5045, GrowthClassService).

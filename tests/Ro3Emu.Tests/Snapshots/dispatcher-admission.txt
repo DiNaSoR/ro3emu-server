@@ -663,7 +663,7 @@
 43012	economic dispatcher/economic request	refused
 43013	session Realm:legacy: dispatcher/unrouted	refused
 43014	session Realm:legacy: dispatcher/unrouted	refused
-43102	session Realm:legacy: dispatcher/unrouted	refused
+43102	session role:WholeRole dispatcher/43102	refused
 43103	session Realm:legacy: dispatcher/unrouted	refused
 43302	session Realm:legacy: dispatcher/unrouted	refused
 43303	session Realm:legacy: dispatcher/unrouted	refused
