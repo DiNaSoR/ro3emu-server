@@ -86,6 +86,10 @@ public sealed class SocialMessages(ChatService chat, TeamService teams, EmblemSe
         {
             await guildChallenge.OpenAsync(session, GuildDungeonChallengeOpenReq.Parser.ParseFrom(body.Span));
         });
+        routes.Map(GuildChallengeService.CallMembers, "guildChallenge", async (session, msgId, body) =>
+        {
+            await guildChallenge.CallMembersAsync(session, DungeonCallMemberReq.Parser.ParseFrom(body.Span));
+        });
         routes.Map(83243, "campfire", async (session, msgId, body) =>
         {
             await campfire.AccelerantAsync(session, GuildCampFireAddAccelerantReq.Parser.ParseFrom(body.Span));

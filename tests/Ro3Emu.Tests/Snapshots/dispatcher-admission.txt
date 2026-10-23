@@ -405,7 +405,7 @@
 32255	economic dispatcher/economic request	refused
 32256	session Realm:legacy: dispatcher/32256	refused
 32257	economic dispatcher/economic request	refused
-32266	session Realm:legacy: dispatcher/unrouted	refused
+32266	economic dispatcher/economic request	refused
 32267	session Realm:legacy: dispatcher/unrouted	refused
 32268	session Realm:legacy: dispatcher/unrouted	refused
 32269	economic dispatcher/economic request	refused
