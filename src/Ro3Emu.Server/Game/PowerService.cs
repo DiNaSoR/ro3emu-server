@@ -85,6 +85,10 @@ public sealed class PowerService : IGameTicker
     /// <summary>The role's current TitleConfig id; no title rank owner exists on this server yet.</summary>
     public Func<GameSession, long>? TitleId { get; set; }
 
+    /// <summary>The Astral Level's lvPower (ParagonService). No package unit names it, so like the pet lineup it lands
+    /// in the client's "other" line, as season power (35003 "Season Power" on the panel; inferred).</summary>
+    public Func<GameSession, long>? ParagonPower { get; set; }
+
     public PowerService(GameData data, CharacterService character, SkillService skills, TotemService totems,
         EmblemService emblems, SeasonRefineService seasonRefine, RoleStore roles, SessionRegistry sessions, GameLoop loop,
         GmCommands gm, ILogger<PowerService> log)
@@ -135,7 +139,7 @@ public sealed class PowerService : IGameTicker
             TotemScore = Normal(TotemScore(s)),
             EmblemScore = _emblems.GenrePower(s, s.Emblems),
         };
-        var total = new PowerUnit { NormalPower = BasePower(s.Progress.Level) + PetPower(s) };
+        var total = new PowerUnit { NormalPower = BasePower(s.Progress.Level) + PetPower(s), SeasonPower = ParagonPower?.Invoke(s) ?? 0 };
         foreach (var unit in Units(package)) { total.NormalPower += unit.NormalPower; total.SeasonPower += unit.SeasonPower; }
         return (total, package);
     }

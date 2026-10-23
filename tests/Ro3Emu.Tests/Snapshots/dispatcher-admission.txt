@@ -970,11 +970,11 @@
 83098	session Realm:legacy: dispatcher/unrouted	refused
 83099	economic dispatcher/economic request	refused
 83100	economic dispatcher/economic request	refused
-83101	session Realm:legacy: dispatcher/unrouted	refused
-83102	session Realm:legacy: dispatcher/unrouted	refused
-83103	session Realm:legacy: dispatcher/unrouted	refused
-83104	session Realm:legacy: dispatcher/unrouted	refused
-83105	session Realm:legacy: dispatcher/unrouted	refused
+83101	session role:WholeRole dispatcher/83101	refused
+83102	session role:WholeRole dispatcher/83102	refused
+83103	session role:WholeRole dispatcher/83103	refused
+83104	session role:WholeRole dispatcher/83104	refused
+83105	session role:WholeRole dispatcher/83105	refused
 83200	economic dispatcher/economic request	refused
 83201	economic dispatcher/economic request	refused
 83220	session role:WholeRole dispatcher/83220	refused

@@ -155,6 +155,12 @@ public sealed class ServerOptions
     public int ScriptedScenePacePercent { get; set; } = 100;
 
     /// <summary>
+    /// (inferred) Star Cores drop for roles with the Astral Level open (ParagonService.StarCoreDrops). The client data gives
+    /// them no source; false turns the reconstructed drop off.
+    /// </summary>
+    public bool StarCoreDrops { get; set; } = true;
+
+    /// <summary>
     /// (inferred) Seconds from a raid boss fight's start to its enrage, against which the Final Trial "more than N minutes
     /// remaining until enrage" honors (TenGameplayFinalTrialConfig, condition 7004) are judged. The enrage timer lives in
     /// the boss's server script, which the client does not carry.
