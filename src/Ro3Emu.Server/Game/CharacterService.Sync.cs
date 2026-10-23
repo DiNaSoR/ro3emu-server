@@ -52,7 +52,9 @@ public sealed partial class CharacterService
     private async Task SyncItemsAsync(GameSession session, Func<bool>? stillOwner = null)
     {
         var now = BuildItems(session);
-        if (now.StoragePack != null && session.Synced.GetValueOrDefault(ItemsSync) is DBItemsInfo { StoragePack: null }) session.Synced.Remove(ItemsSync);
+        // Rebuild after dropping the old snapshot: retained empty packs have no sortedIndex in a full
+        // protobuf decode, but LC_DAL_Knapsack.InitPackData iterates that map for every supplied pack.
+        if (ResendItemsWholeIfNeeded(session, now)) now = BuildItems(session);
         await SyncAsync(session, ItemsSync, now);
         if (stillOwner?.Invoke() == false) return;
         if (PruneEquipmentPlans(session))
@@ -60,6 +62,23 @@ public sealed partial class CharacterService
             roles.SaveEquipPlans(session.Role!.Id, session.EquipmentPlans.ToByteArray());
             await SyncEquipmentAsync(session);
         }
+    }
+
+    /// <summary>
+    /// 5009 goes out whole again when it carries a part the client only builds from a full sync: storagePack (see
+    /// <see cref="SyncItemsAsync"/>) or a bag pack the client was never sent. LC_DAL_Knapsack.InitPackData -> InitGridInfo
+    /// builds each pack's grid from the full sync only, so gear sent into a pack missing at login (a new character's
+    /// first unequipped gear: the starter weapon and shirt are worn, so pack 2 is absent) is stored but never shown.
+    /// </summary>
+    private static bool ResendItemsWholeIfNeeded(GameSession session, DBItemsInfo now)
+    {
+        if (session.Synced.GetValueOrDefault(ItemsSync) is DBItemsInfo sent
+            && (now.StoragePack != null && sent.StoragePack == null || now.PackInfo.Keys.Any(k => !sent.PackInfo.ContainsKey(k))))
+        {
+            session.Synced.Remove(ItemsSync);
+            return true;
+        }
+        return false;
     }
 
     /// <summary>5066: PlayerBasicInfo (id and career are mandatory); exp is the progress inside the level.</summary>
@@ -98,7 +117,7 @@ public sealed partial class CharacterService
         var info = new DBItemsInfo { AutoDecomposeSetting = session.AutoDecompose.Clone() };
         var preferences = session.BagState.Info;
         info.QuickUseInfos.Add(preferences.QuickUseInfos);
-        info.ShortcutBarInfos.Add(preferences.ShortcutBarInfos);
+        info.ShortcutBarInfos.Add(FullShortcutBar(preferences.ShortcutBarInfos));
         info.MedicinesAutoUse = preferences.MedicinesAutoUse?.Clone();
         info.CurrentArrowID = preferences.CurrentArrowID;
         info.ItemCds = preferences.ItemCds?.Clone();

@@ -35,7 +35,7 @@ public sealed partial class CharacterService
         [(1600301, 50), (1600501, 55), (1600502, 60), (1600503, 70), (1600504, 80), (1600505, 90)];
     private const int StatPlanCount = 5; // PublicParamConfig.SchemeNum=5 (inferred for attribute plans).
     private const int StatPlanNameLimit = 8; // PublicParamConfig.SchemeNameNumMax=8.
-    private const int ShortcutSlotLimit = 12; // (inferred) bounded by the visible bar; no server field declares its size.
+    private const int ShortcutSlotLimit = 6; // UI_Sys_Main_PropsWidget has PropsItem01..06, bound to keys ShortCut_1..6.
 
     private void LoadStatPlans(GameSession session)
     {
@@ -281,6 +281,20 @@ public sealed partial class CharacterService
         if (result == 0) await SyncItemsAsync(session);
     }
 
+    /// <summary>
+    /// 5009 shortcutBarInfos as the client needs it: one entry per slot, in slot order, GUID 0 when empty.
+    /// LC_DAL_Item.OnShortcutBarInfosUpdate only updates a slot already in ShortcutBarData and drops a whole-list
+    /// replacement, so a slot missing from the login list never shows what is saved into it, and a list whose
+    /// length changes is never applied. A fixed list makes every save an element-wise increment.
+    /// </summary>
+    internal static IEnumerable<ShortcutBarInfo> FullShortcutBar(IEnumerable<ShortcutBarInfo> saved)
+    {
+        var bySlot = saved.Where(i => i.SlotIndex is >= 0 and < ShortcutSlotLimit)
+            .GroupBy(i => i.SlotIndex).ToDictionary(g => g.Key, g => g.Last().ItemGuid);
+        for (int slot = 0; slot < ShortcutSlotLimit; slot++)
+            yield return new ShortcutBarInfo { SlotIndex = slot, ItemGuid = bySlot.GetValueOrDefault(slot) };
+    }
+
     /// <summary>31336 stores an owned GUID at a zero-based slot. GUID 0 clears it.</summary>
     public async Task ShortcutBarSaveAsync(GameSession session, ShortcutBarSaveReq req)
     {
@@ -294,7 +308,10 @@ public sealed partial class CharacterService
         {
             var next = session.BagState.Info.Clone();
             var list = next.ShortcutBarInfos;
-            foreach (var old in list.Where(i => i.SlotIndex == req.SlotIndex).ToList()) list.Remove(old);
+            // UI_Sys_Main_PropsItemWidgetCtrl._onDragIn marks the source with MarkSwap; its drag-end
+            // consumes that marker without sending a clear. Move the binding in this commit (inferred).
+            foreach (var old in list.Where(i => i.SlotIndex == req.SlotIndex || req.ItemGuid != 0 && i.ItemGuid == req.ItemGuid).ToList())
+                list.Remove(old);
             if (req.ItemGuid != 0) list.Add(new ShortcutBarInfo { SlotIndex = req.SlotIndex, ItemGuid = req.ItemGuid });
             await CommitBagAsync(session, "bag-setting", next);
         }
