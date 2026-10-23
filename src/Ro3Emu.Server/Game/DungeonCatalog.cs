@@ -110,7 +110,8 @@ public sealed class DungeonCatalog(GameData data, WorldData worldData, MonsterSe
         // plain lc_dungeon_base like an ordinary dungeon (GamePlayConfig.lua:136-140).
         else if (kind is not (1 or 2) || mode is not (6 or 24) && !(mode == 26 && reconstructed?.Scripted(req.SceneEntry) != null)
             || data.Table("TenGameplayBossConfig").Values.Any(r => GameData.Int(r, "_iDungeon") == req.SceneEntry)) return null;
-        var waves = mode == 24 && selected == null ? JourneySpawns(config) : Spawns(config, boss, worldData.Map(req.SceneEntry)!);
+        var waves = mode == 24 && selected == null && reconstructed?.Scripted(req.SceneEntry) == null
+            ? JourneySpawns(config) : Spawns(config, boss, worldData.Map(req.SceneEntry)!);
         return max >= min && waves.Count > 0 ? new Plan(config, multi, boss, mark, min, max, waves) : null;
     }
 
@@ -359,6 +360,9 @@ public sealed class DungeonCatalog(GameData data, WorldData worldData, MonsterSe
                 };
                 if (!known) return [];
             }
+            foreach (var (interaction, skill, shots) in step.Strikes)
+                if (!step.Fight || shots < 0 || data.Row("SkillConfig", skill) == null
+                    || !step.Actors.Any(a => Interactions(a.NpcId).Contains(interaction))) return [];
             // A fight step: its monsters, at server spawn points of the scene, with a template the server knows.
             var spawns = new List<Spawn>();
             foreach (var spawn in step.Spawns)

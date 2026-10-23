@@ -116,6 +116,8 @@ public sealed partial class DungeonService
         /// <summary>30441 roster slots by role (index = 0-based position), fixed on the first roster.</summary>
         public List<long> Slots { get; } = new();
         public HashSet<long> Killed { get; } = new();
+        public HashSet<(ReconstructedDungeons.TriggerKind Kind, long Id)> StepSeen { get; } = [];
+        public Dictionary<long, int> Struck { get; } = [];
         public HashSet<long> Precounted { get; } = new();
         public bool ObligationsFrozen { get; set; }
         public bool ObligationsActivated { get; set; }
@@ -475,7 +477,7 @@ public sealed partial class DungeonService
         var v = new DungeonVar { VarId = 10003 };
         if (Step(a) is { Fight: false } step)
         {
-            v.Vi64.Add([step.Goal.Done, step.Goal.Total]); // a scripted step: its configured counter (inferred)
+            v.Vi64.Add(step.All ? [a.StepSeen.Count, step.Complete.Count] : [step.Goal.Done, step.Goal.Total]);
             return v;
         }
         v.Vi64.Add([Math.Clamp(a.Killed.Count - a.WaveBase, 0, size), size]);

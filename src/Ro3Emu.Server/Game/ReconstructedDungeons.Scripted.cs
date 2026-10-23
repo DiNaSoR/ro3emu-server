@@ -46,7 +46,7 @@ public sealed partial class ReconstructedDungeons
     /// (0: none); <paramref name="TeleportAfter"/> a scene-editor point the participants are moved to when it
     /// completes (0: none). <paramref name="Goal"/> is the tracker's "(done/total)" while the step runs.
     /// <paramref name="Spawns"/> makes it a fight step: those monsters spawn at its start and it completes when all are
-    /// killed (the tracker counts the kills); it has no completing client event.
+    /// killed (the tracker counts the kills), as well as any configured completing events.
     /// </summary>
     public sealed record ScriptedStep(string Stage, int Quest, (int Done, int Total) Goal, IReadOnlyList<SceneActor> Actors,
         long Story, IReadOnlyList<StepTrigger> Complete, IReadOnlyList<StepTrigger> Ignore, long TeleportAfter,
@@ -63,6 +63,10 @@ public sealed partial class ReconstructedDungeons
         /// </summary>
         public IReadOnlyList<long> Guide { get; init; } = [];
         public bool Fight => Spawns.Count > 0;
+        /// <summary>Every listed event must arrive, rather than any single one.</summary>
+        public bool All { get; init; }
+        /// <summary>Actor interaction, skill, and inferred number of strikes needed to sink a target.</summary>
+        public IReadOnlyList<(long Interaction, long Skill, int Shots)> Strikes { get; init; } = [];
     }
 
     /// <summary>
@@ -112,13 +116,15 @@ public sealed partial class ReconstructedDungeons
             : [];
         string stage = s.GetProperty("stage").GetString() ?? "";
         if (complete.Count == 0 && spawns.Length == 0) throw new InvalidOperationException($"Scripted step '{stage}' cannot complete.");
-        if (complete.Count > 0 && spawns.Length > 0)
-            throw new InvalidOperationException($"Scripted fight step '{stage}' completes on its kills, not on client events.");
         return new ScriptedStep(stage, s.GetProperty("quest").GetInt32(), goal, actors,
             s.TryGetProperty("story", out var story) ? story.GetInt64() : 0, complete, Triggers(s, "ignore"),
             s.TryGetProperty("after", out var after) && after.TryGetProperty("teleport", out var to) ? to.GetInt64() : 0,
             spawns, Lines(s, "lines"), Lines(s, "doneLines"))
         {
+            All = s.TryGetProperty("all", out var all) && all.GetBoolean(),
+            Strikes = s.TryGetProperty("strike", out var strike)
+                ? strike.EnumerateArray().Select(x => (x.GetProperty("interaction").GetInt64(), x.GetProperty("skill").GetInt64(),
+                    x.TryGetProperty("shots", out var shots) ? shots.GetInt32() : 0)).ToArray() : [],
             Slide = s.TryGetProperty("slide", out var slide)
                 ? new StepSlide(slide.GetProperty("side").GetSingle(), slide.GetProperty("down").GetSingle()) : null,
             Fallback = s.TryGetProperty("fallback", out var f)
