@@ -6,6 +6,7 @@ using Romsg;
 using Ro3Emu.Bot;
 using Ro3Emu.Server;
 using Ro3Emu.Server.Accounts;
+using Ro3Emu.Server.Data;
 using Ro3Emu.Server.Game;
 
 namespace Ro3Emu.Tests;
@@ -90,7 +91,7 @@ public sealed class BattlePassActivityTests : IAsyncLifetime
     public async Task PassRequiresEarnedLevelAndPremiumEntitlementAndPersistsClaims()
     {
         var alice = await InWorld("Alice");
-        await Gm(alice, "!lvl 10");
+        await Gm(alice, $"!lvl {PassOpenLevel.Novice(Service<GameData>())}");
         await Reconcile(alice);
         var premature = await Common(alice, new CommonActivityReq
         {
