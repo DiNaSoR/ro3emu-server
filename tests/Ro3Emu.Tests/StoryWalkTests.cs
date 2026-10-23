@@ -45,7 +45,9 @@ public sealed class StoryWalkFactAttribute : FactAttribute
 /// <item>Travel: <c>!warp</c> / <c>!jump</c> to the target map and point. Instead the walk checks that the map is
 /// reachable from where the story left the player through portals and Kafras.</item>
 /// <item>Fights: next to the monster, its HP is set to 1 before a real normal attack lands (the same shortcut as
-/// DungeonTests.Kill); the kill, its exp, drops and quest credit go through the server's real settlement.</item>
+/// DungeonTests.Kill), with guaranteed hit rolls. Dungeon entry restores the bot's HP so damage carried from earlier
+/// shortcuts does not decide a no-revive story fight; each restore is reported. The kill, its exp, drops and quest
+/// credit go through the server's real settlement. Combat balance and survival belong to the dedicated combat tests.</item>
 /// <item>Grind: where a target waits on a level (101002) or a job change needs Base/Job levels the story has not
 /// given, <c>!lvl</c> supplies exactly the missing levels; where a growth-manual craft or talent costs materials the
 /// bag lacks, <c>!item</c> supplies exactly the missing cost (totals per item in the report). A real player farms
@@ -97,6 +99,7 @@ public sealed class StoryWalkTests(ITestOutputHelper output) : IAsyncLifetime
             o.MicroGatePort = microPort;
             o.GameGatePort = gamePort;
         });
+        SureHitRolls.Install(_app); // the walk prepares lethal hits; random misses are not progression blockers
         await _app.StartAsync();
         _http = $"http://127.0.0.1:{httpPort}";
         using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(_gameData, "config", "TaskConfig.json")));
@@ -594,6 +597,7 @@ public sealed class StoryWalkTests(ITestOutputHelper output) : IAsyncLifetime
     /// </summary>
     private async Task ClearDungeonAsync(long task, long scene, List<string> detail)
     {
+        await RestoreDungeonHealthAsync(detail);
         using var sw = _bot.Inbox.Expect(e => e.IsGame(MsgId.SwitchSceneLine) && SwitchSceneLineResp.Parser.ParseFrom(e.Body).SceneEntry == scene);
         using var refused = _bot.Inbox.Expect(e => e.IsGame(DungeonService.Enter) && EnterDungeonRsp.Parser.ParseFrom(e.Body).Result != 0);
         var region = _regions.Values.FirstOrDefault(r => r.Actions.StartsWith($"613|{scene}|", StringComparison.Ordinal));
@@ -653,10 +657,25 @@ public sealed class StoryWalkTests(ITestOutputHelper output) : IAsyncLifetime
         if (!result.IsCompleted) throw new WalkBlocked($"dungeon {scene}: no result after {kills} kills, {steps} scripted steps");
         var res = DungeonResNotify.Parser.ParseFrom((await result.WaitAsync(Wait)).Body);
         detail.Add(steps > 0 ? $"dungeon {scene}: {steps} scripted steps, result {res.Res}" : $"dungeon {scene}: {kills} kills (fast), result {res.Res}");
+        if (res.Res != DungeonRes.Success)
+            detail.Add(await OnLoop(s => $"result state: hp {s.CurrentHp}, dead {s.Dead}, wave {s.DungeonAttempt?.Wave}"));
         await EnsureAliveAsync();
         using var back = _bot.Inbox.Expect(x => x.IsGame(MsgId.SwitchSceneLine));
         await _bot.SendGameAsync(DungeonService.Leave, new LeaveDungeonReq());
         await LoadSceneAsync(SwitchSceneLineResp.Parser.ParseFrom((await back.WaitAsync(Wait)).Body).SceneEntry);
+    }
+
+    private async Task RestoreDungeonHealthAsync(List<string> detail)
+    {
+        await EnsureAliveAsync();
+        await Service<GameLoop>().InvokeAsync(async () =>
+        {
+            var session = Session();
+            var character = Service<CharacterService>();
+            long maximum = character.Stats(session)[AttributeId.MaxHp];
+            detail.Add($"GM rest before dungeon: HP {session.CurrentHp ?? maximum}→{maximum}");
+            await character.SetHpSpAsync(session, maximum, null);
+        });
     }
 
     /// <summary>

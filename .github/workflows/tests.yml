@@ -39,16 +39,27 @@ jobs:
       # global.json only sets the lowest SDK; pin the one installed above so a newer band on the runner
       # cannot change the formatter or analyzers.
       - name: Pin the SDK
+        id: pin_sdk
         run: dotnet new globaljson --sdk-version ${{ steps.dotnet.outputs.dotnet-version }} --force
       # Tests that need the client's exported game data are skipped here; the synthetic fixture
       # (tests/Ro3Emu.Tests/Fixtures/GameData, docs/guide/testing.md) lets the rest run.
       - name: Server tests
         run: dotnet test tests/Ro3Emu.Tests -c Release --filter "Category!=Slow" --logger "trx;LogFileName=server.trx" --results-directory TestResults
       - name: Patcher tests
+        if: ${{ !cancelled() && steps.pin_sdk.outcome == 'success' }}
         run: dotnet test tests/Ro3Emu.Patcher.Tests -c Release --logger "trx;LogFileName=patcher.trx" --results-directory TestResults
       - name: Setup tests (RO3Emu.exe, data export, installer)
+        if: ${{ !cancelled() && steps.pin_sdk.outcome == 'success' }}
         run: dotnet test tests/Ro3Emu.Setup.Tests -c Release --filter "Category!=Slow" --logger "trx;LogFileName=setup.trx" --results-directory TestResults
       - name: Executed and skipped tests
         if: always()
         shell: pwsh
         run: ./tools/test-summary.ps1 -Results TestResults
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: test-results-${{ matrix.os }}
+          path: TestResults/*.trx
+          if-no-files-found: warn
+          retention-days: 14

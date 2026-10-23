@@ -66,6 +66,19 @@ pwsh tools/test-summary.ps1 -Results TestResults   # server: N executed (0 faile
 
 CI prints the same line per test project in its job summary.
 
+The patcher and setup suites still run after a server-test failure, provided SDK setup succeeded and the job was not
+cancelled. A failed suite still fails the job. Each operating system uploads its TRX files as a `test-results-*`
+artifact, including on failure, retained for 14 days.
+
+`ApproachAttackTests`, `MedicinePreferenceTests`, `BagPackSyncTests`, and `ShortcutBarSyncTests` cover arrival-stop
+handling, medicine settings, equipment returning to the bag, and shortcut moves on the synthetic fixture. They run
+in CI without a client export. The client-data combat tests additionally exercise the real skill and navigation
+tables; retain both kinds of coverage when changing these systems.
+
+The optional `RO3EMU_STORYWALK=1` walkthrough tests quest progression. Its fast-kill shortcut uses guaranteed hit
+rolls, and it reports a full-health restore before entering each dungeon. Those aids avoid random misses and damage
+carried from earlier shortcuts deciding a no-revive encounter; they do not validate combat balance or survival.
+
 ## Running tests while you work
 
 Every server test starts its own server, so a whole run starts about 2,000 of them. The test project shares what
