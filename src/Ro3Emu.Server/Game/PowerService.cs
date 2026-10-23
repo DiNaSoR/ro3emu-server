@@ -350,6 +350,11 @@ public sealed class PowerService : IGameTicker
         var history = History(s);
         if (Total(total) > Total(history)) history = total.Clone();
         var snapshot = new Snapshot(total, history, package);
+        var role = s.Role;
+        var attachment = s.Attachment;
+        // The client may disconnect as soon as it sees 31502. Persist before publishing or changing the cached score.
+        await SaveAsync(s, snapshot);
+        if (s.Role != role || !ReferenceEquals(s.Attachment, attachment)) return;
         s.Power = snapshot;
         s.PowerPublishedMs = MonsterService.NowMs;
         await s.SendGameAsync(ChangeNtf, new PlayerChangePowerNtf
@@ -360,7 +365,6 @@ public sealed class PowerService : IGameTicker
         });
         await s.SendGameAsync(PackageNtf, new PlayerPowerPackageNtf { PowerPackage = package.Clone() });
         await _character.SyncBaseInfoAsync(s);
-        await SaveAsync(s, snapshot);
     }
 
     /// <summary>
