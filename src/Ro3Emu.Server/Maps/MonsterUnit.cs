@@ -98,6 +98,8 @@ public sealed class MonsterUnit : WorldUnit
     public long NextSpecialMs { get; set; }
     /// <summary>MvpService paces this boss's specials from its own tick (its plans first, then the generic ones).</summary>
     public bool SpecialsOwnedByMvp { get; set; }
+    /// <summary>A story step schedules this skill itself, including its warning and protected targets; 0 means none.</summary>
+    public long ScriptedSkill { get; set; }
     /// <summary>Live boss skill cooldowns for 31125/31127, keyed by actual cast row.</summary>
     public Dictionary<int, long> BossSkillCds { get; } = new();
 

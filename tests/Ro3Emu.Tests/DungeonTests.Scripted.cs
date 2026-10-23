@@ -301,6 +301,7 @@ public sealed partial class DungeonTests
     public async Task MoonlightFlowersGameEndsWhenThePlayerHidesAwayFromTheOpenCentre()
     {
         const long scene = 3120802;
+        Service<IOptions<ServerOptions>>().Value.ScriptedScenePacePercent = 10;
         await using var alice = await InWorld("Alice");
         await Gm(alice, "!quest accept 205110"); // Falling into a Trap: [101018, 3120802, 1]
         Assert.Equal(0, await Enter(alice, new EnterDungeonReq { SceneEntry = scene }));
@@ -321,6 +322,8 @@ public sealed partial class DungeonTests
         Assert.False(Session(alice).DungeonAttempt!.Settled);
 
         await WalkTo(alice, hide.X, hide.Y, hide.Z + 1);
+        await Next(alice, 1022, SystemBoardCastMsgNtf.Parser, m => m.ChatId == 5310006);
+        await Gm(alice, FormattableString.Invariant($"!actors walk {map.Points[78].X} {map.Points[78].Z}"));
         var result = await Next(alice, DungeonService.Result, DungeonResNotify.Parser);
         Assert.Equal((DungeonRes)1, result.Res);
         await StoryMovesOn(alice, 205110, 205120);

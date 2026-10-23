@@ -122,6 +122,13 @@ public sealed partial class DungeonService
         public HashSet<long> Killed { get; } = new();
         public HashSet<(ReconstructedDungeons.TriggerKind Kind, long Id)> StepSeen { get; } = [];
         public Dictionary<long, int> Struck { get; } = [];
+        /// <summary>A step's own timers' generation: each step (and each new hide-and-seek game) starts a new one, so a
+        /// stale timer does nothing.</summary>
+        public int StepGeneration { get; set; }
+        /// <summary>A hide-and-seek step: the round being played (1-based) and the hiding places already searched in
+        /// this game.</summary>
+        public int SeekRound { get; set; }
+        public HashSet<long> Searched { get; } = [];
         public HashSet<long> Precounted { get; } = new();
         public bool ObligationsFrozen { get; set; }
         public bool ObligationsActivated { get; set; }
@@ -626,6 +633,8 @@ public sealed partial class DungeonService
                 return;
             }
             if (monster == null) { a.Spawning = false; await SettleAsync(a, false); return; }
+            if (Step(a)?.Shelter is { } shelter && monster.Template.NpcId == shelter.Boss)
+                monster.ScriptedSkill = shelter.Skill;
             a.Spawned++;
             // Multi-bosses retain their AI instead of being ordered to attack on scene load. In Culvert the
             // born point 15 is 15m from monster point 19; NPC 4300000/1 uses non-roaming AI 25000001 and

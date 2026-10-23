@@ -534,66 +534,254 @@
         "Editor sc_pm_branchstory_paydun_001 (map 31208, the Moonlight Flower MVP room of 3120801): born point 22 in the open centre (74.7, 76.7); group 24 holds server spawn points 25 (direction 180, facing the born point) and 26 (direction 0), 0.8 m apart at (74.8, 92) north of it; group 27 holds 42 server spawn points (67-108) in clusters along the four sides and corners of the room, 15.6 to 32 m from the born point. No region, guide, mark or NPC list; no spawn point names its NPC (npcId 0, generic label).",
         "NPCConfig 400097 Moonlight Flower: a story NPC (type 1, unit 33018, model ratio 1.8, no AI, no interaction), the only NPC named Moonlight Flower without AI (the MVP, raid and party ones, 5020014, 4380000-4380001, 24010198, 24010528 and 81000006, carry boss AI).",
         "ChatConfig 5310005-5310014, which no client code or other config references (so the original scene script sent them): CombatCountdownTip 5310010 (type 16, 5000 ms) 'Hide in the darkness and don't let them Discover you!'; bubbles 5310011 'Meow, meow! Let the hide-and-seek begin!', 5310012 'Hehe, I'm the Moonlit Challenger of hide-and-seek!', 5310013 'Can your eyes see me?'; Moonlight Flower's lines 5310005 'I'm about to catch you! Watch out!', 5310006 'You're pretty good at hide-and-seek! Play with me a little longer!', 5310007 'I didn't know you were so good! I had a great time~'; bubble 5310014 'You're no good at hide-and-seek! Hahaha! Play with me again~'.",
-        "The letter after the game (LetterConfig 3, opened by task 205130): 'I can't believe you managed to slip away from Moonlight Flower ... you've barely passed the first round of our carefully designed qualification test', signed 'Z, awaiting your arrival in shadows beyond the moonlight's reach'."
+        "The letter after the game (LetterConfig 3, opened by task 205130): 'I can't believe you managed to slip away from Moonlight Flower ... you've barely passed the first round of our carefully designed qualification test', signed 'Z, awaiting your arrival in shadows beyond the moonlight's reach'.",
+        "ChatConfig types (enum_SystemMessageType): 5310005-5310007 are 7 Secretary (an NPC portrait message, 4000 ms), 5310010 is 16 CombatCountdownTip (DungeonCombatTipData, 5000 ms), 5310011-5310014 are 2 Bubbling. A 1022 SystemBoardCastMsgNtf reaches LC_SystemMessageHelper.MessagePush(chatId, paramList, source, nil, playerId) (LC_DAL_SystemMessage.CheckMessage), and PushBubbling raises the head bubble over the unit whose uuid is that playerId."
       ],
       "guessed": [
-        "Nothing in the client data defines who discovers the player, where the darkness is or how long a round lasts: no region, buff, story or interaction belongs to this scene. The seek is not reproduced and the player cannot be discovered. In the original, being discovered restarted the game ('Play with me again~', 5310014), not the dungeon; here the step keeps waiting until the player hides, which is where such a restart returns.",
-        "The darkness is read as group 27: its 42 server spawn points ring the open centre where the player is born, away from Moonlight Flower; the step completes within 3 m of any of them. What the original spawned there (seekers, moonlight or hiding places) is not named by the client data.",
+        "The game is inferred as a whole from its lines: Moonlight Flower opens with her three bubbles (5310011-5310013); each round warns 'I'm about to catch you! Watch out!' (5310005), shows the 5 s countdown tip 'Hide in the darkness and don't let them Discover you!' (5310010) three seconds later and looks when it runs out. A player standing within 3 m of a group 27 point passes the round; anyone else is found ('Play with me again~', 5310014) and the game starts over.",
+        "Two rounds, from 'Play with me a little longer!' (5310006) after the first and 'I had a great time~' (5310007) after the last. A passed round searches every darkness point within 8 m of where the player hid, so the next round needs another side of the room.",
+        "The darkness is read as group 27: its 42 server spawn points ring the open centre where the player is born, away from Moonlight Flower. What the original spawned there (seekers, moonlight or hiding places) is not named by the client data, and the player gets no hidden status there.",
         "Moonlight Flower (400097) stands at point 26, turned away from the room (direction 0) like a seeker counting; point 25, the same place facing the born point, is presumably where she talked to the player.",
-        "The rounds that 'Play with me a little longer!' implies are one round, and the ChatConfig lines are not shown: the engine sends no chat."
+        "The 1.5 s between the opening bubbles, the 3 s warning and the 3 s pause after a look are chosen, not data."
       ],
       "steps": [
         {
           "quest": 1,
           "stage": "Moonlight Flower's game: hide in the darkness",
           "actors": [
-            { "npc": 400097, "point": 26, "why": "Moonlight Flower (story NPC, no AI) at group 24's point turned away from the room, counting" }
+            {
+              "npc": 400097,
+              "point": 26,
+              "why": "Moonlight Flower (story NPC, no AI) at group 24's point turned away from the room, counting"
+            }
           ],
           "complete": [
-            { "point": 67, "radius": 3, "why": "group 27, south-west (49.9, 59.1)" },
-            { "point": 68, "radius": 3, "why": "group 27, south-west (55.4, 59.8)" },
-            { "point": 69, "radius": 3, "why": "group 27, south-west (57.4, 57.1)" },
-            { "point": 70, "radius": 3, "why": "group 27, south-west (60.5, 61.1)" },
-            { "point": 71, "radius": 3, "why": "group 27, south-west (64.5, 59.3)" },
-            { "point": 72, "radius": 3, "why": "group 27, south-west (61.5, 54.7)" },
-            { "point": 73, "radius": 3, "why": "group 27, south-west (52.8, 54.2)" },
-            { "point": 74, "radius": 3, "why": "group 27, south-west (58.1, 51.4)" },
-            { "point": 75, "radius": 3, "why": "group 27, south-west (65.2, 51.3)" },
-            { "point": 76, "radius": 3, "why": "group 27, south-east (85.5, 60.4)" },
-            { "point": 77, "radius": 3, "why": "group 27, south-east (89.3, 62.7)" },
-            { "point": 78, "radius": 3, "why": "group 27, south-east (93.2, 64.6)" },
-            { "point": 79, "radius": 3, "why": "group 27, south-east (94.8, 58.6)" },
-            { "point": 80, "radius": 3, "why": "group 27, south-east (92.1, 59.7)" },
-            { "point": 81, "radius": 3, "why": "group 27, south-east (98.0, 62.0)" },
-            { "point": 82, "radius": 3, "why": "group 27, south-east (87.7, 56.1)" },
-            { "point": 83, "radius": 3, "why": "group 27, south-east (91.2, 53.1)" },
-            { "point": 84, "radius": 3, "why": "group 27, south-east (98.2, 54.8)" },
-            { "point": 85, "radius": 3, "why": "group 27, south-east (91.4, 56.7)" },
-            { "point": 86, "radius": 3, "why": "group 27, south-east (86.2, 51.4)" },
-            { "point": 87, "radius": 3, "why": "group 27, east (94.4, 77.1)" },
-            { "point": 88, "radius": 3, "why": "group 27, north-east (93.6, 82.8)" },
-            { "point": 89, "radius": 3, "why": "group 27, north-east (91.4, 87.3)" },
-            { "point": 90, "radius": 3, "why": "group 27, north-east (85.3, 92.3)" },
-            { "point": 91, "radius": 3, "why": "group 27, west (53.4, 76.2)" },
-            { "point": 92, "radius": 3, "why": "group 27, west (55.1, 79.2)" },
-            { "point": 93, "radius": 3, "why": "group 27, north-west (55.4, 84.3)" },
-            { "point": 94, "radius": 3, "why": "group 27, north-west (60.3, 88.3)" },
-            { "point": 95, "radius": 3, "why": "group 27, north-west (63.7, 91.8)" },
-            { "point": 96, "radius": 3, "why": "group 27, north-west (60.0, 93.6)" },
-            { "point": 97, "radius": 3, "why": "group 27, north-west (57.5, 92.4)" },
-            { "point": 98, "radius": 3, "why": "group 27, north-west (53.3, 93.7)" },
-            { "point": 99, "radius": 3, "why": "group 27, north-west (57.5, 98.2)" },
-            { "point": 100, "radius": 3, "why": "group 27, north-west (63.0, 98.9)" },
-            { "point": 101, "radius": 3, "why": "group 27, north-east (88.4, 97.1)" },
-            { "point": 102, "radius": 3, "why": "group 27, north-east (93.6, 94.1)" },
-            { "point": 103, "radius": 3, "why": "group 27, north-east (99.0, 93.3)" },
-            { "point": 104, "radius": 3, "why": "group 27, north-east (97.8, 89.6)" },
-            { "point": 105, "radius": 3, "why": "group 27, north-east (101.1, 83.8)" },
-            { "point": 106, "radius": 3, "why": "group 27, east (99.4, 79.3)" },
-            { "point": 107, "radius": 3, "why": "group 27, west (59.5, 72.7)" },
-            { "point": 108, "radius": 3, "why": "group 27, west (48.8, 72.7)" }
-
-          ]
+            {
+              "point": 67,
+              "radius": 3,
+              "why": "group 27, south-west (49.9, 59.1)"
+            },
+            {
+              "point": 68,
+              "radius": 3,
+              "why": "group 27, south-west (55.4, 59.8)"
+            },
+            {
+              "point": 69,
+              "radius": 3,
+              "why": "group 27, south-west (57.4, 57.1)"
+            },
+            {
+              "point": 70,
+              "radius": 3,
+              "why": "group 27, south-west (60.5, 61.1)"
+            },
+            {
+              "point": 71,
+              "radius": 3,
+              "why": "group 27, south-west (64.5, 59.3)"
+            },
+            {
+              "point": 72,
+              "radius": 3,
+              "why": "group 27, south-west (61.5, 54.7)"
+            },
+            {
+              "point": 73,
+              "radius": 3,
+              "why": "group 27, south-west (52.8, 54.2)"
+            },
+            {
+              "point": 74,
+              "radius": 3,
+              "why": "group 27, south-west (58.1, 51.4)"
+            },
+            {
+              "point": 75,
+              "radius": 3,
+              "why": "group 27, south-west (65.2, 51.3)"
+            },
+            {
+              "point": 76,
+              "radius": 3,
+              "why": "group 27, south-east (85.5, 60.4)"
+            },
+            {
+              "point": 77,
+              "radius": 3,
+              "why": "group 27, south-east (89.3, 62.7)"
+            },
+            {
+              "point": 78,
+              "radius": 3,
+              "why": "group 27, south-east (93.2, 64.6)"
+            },
+            {
+              "point": 79,
+              "radius": 3,
+              "why": "group 27, south-east (94.8, 58.6)"
+            },
+            {
+              "point": 80,
+              "radius": 3,
+              "why": "group 27, south-east (92.1, 59.7)"
+            },
+            {
+              "point": 81,
+              "radius": 3,
+              "why": "group 27, south-east (98.0, 62.0)"
+            },
+            {
+              "point": 82,
+              "radius": 3,
+              "why": "group 27, south-east (87.7, 56.1)"
+            },
+            {
+              "point": 83,
+              "radius": 3,
+              "why": "group 27, south-east (91.2, 53.1)"
+            },
+            {
+              "point": 84,
+              "radius": 3,
+              "why": "group 27, south-east (98.2, 54.8)"
+            },
+            {
+              "point": 85,
+              "radius": 3,
+              "why": "group 27, south-east (91.4, 56.7)"
+            },
+            {
+              "point": 86,
+              "radius": 3,
+              "why": "group 27, south-east (86.2, 51.4)"
+            },
+            {
+              "point": 87,
+              "radius": 3,
+              "why": "group 27, east (94.4, 77.1)"
+            },
+            {
+              "point": 88,
+              "radius": 3,
+              "why": "group 27, north-east (93.6, 82.8)"
+            },
+            {
+              "point": 89,
+              "radius": 3,
+              "why": "group 27, north-east (91.4, 87.3)"
+            },
+            {
+              "point": 90,
+              "radius": 3,
+              "why": "group 27, north-east (85.3, 92.3)"
+            },
+            {
+              "point": 91,
+              "radius": 3,
+              "why": "group 27, west (53.4, 76.2)"
+            },
+            {
+              "point": 92,
+              "radius": 3,
+              "why": "group 27, west (55.1, 79.2)"
+            },
+            {
+              "point": 93,
+              "radius": 3,
+              "why": "group 27, north-west (55.4, 84.3)"
+            },
+            {
+              "point": 94,
+              "radius": 3,
+              "why": "group 27, north-west (60.3, 88.3)"
+            },
+            {
+              "point": 95,
+              "radius": 3,
+              "why": "group 27, north-west (63.7, 91.8)"
+            },
+            {
+              "point": 96,
+              "radius": 3,
+              "why": "group 27, north-west (60.0, 93.6)"
+            },
+            {
+              "point": 97,
+              "radius": 3,
+              "why": "group 27, north-west (57.5, 92.4)"
+            },
+            {
+              "point": 98,
+              "radius": 3,
+              "why": "group 27, north-west (53.3, 93.7)"
+            },
+            {
+              "point": 99,
+              "radius": 3,
+              "why": "group 27, north-west (57.5, 98.2)"
+            },
+            {
+              "point": 100,
+              "radius": 3,
+              "why": "group 27, north-west (63.0, 98.9)"
+            },
+            {
+              "point": 101,
+              "radius": 3,
+              "why": "group 27, north-east (88.4, 97.1)"
+            },
+            {
+              "point": 102,
+              "radius": 3,
+              "why": "group 27, north-east (93.6, 94.1)"
+            },
+            {
+              "point": 103,
+              "radius": 3,
+              "why": "group 27, north-east (99.0, 93.3)"
+            },
+            {
+              "point": 104,
+              "radius": 3,
+              "why": "group 27, north-east (97.8, 89.6)"
+            },
+            {
+              "point": 105,
+              "radius": 3,
+              "why": "group 27, north-east (101.1, 83.8)"
+            },
+            {
+              "point": 106,
+              "radius": 3,
+              "why": "group 27, east (99.4, 79.3)"
+            },
+            {
+              "point": 107,
+              "radius": 3,
+              "why": "group 27, west (59.5, 72.7)"
+            },
+            {
+              "point": 108,
+              "radius": 3,
+              "why": "group 27, west (48.8, 72.7)"
+            }
+          ],
+          "seek": {
+            "rounds": 2,
+            "searchedRadius": 8,
+            "opening": [
+              5310011,
+              5310012,
+              5310013
+            ],
+            "round": 5310005,
+            "countdown": 5310010,
+            "longer": 5310006,
+            "won": 5310007,
+            "found": 5310014,
+            "why": "the round structure built from the game's ChatConfig lines (inferred)"
+          }
         }
       ]
     },
@@ -913,11 +1101,14 @@
       "evidence": [
         "DungeonQuestConfig 5300028: 1 'Mysterious Space' 'Pulled into a mysterious space by a giant hand that suddenly appeared' [5,0,1] 'Defeat Pharaoh'. Task 108110 'Monsters Appear': 'A Pharaoh suddenly leaps out of the Relic.'",
         "Editor sc_pm_mainstory_sphinx_dg01: two server points, 20 and 24, 6 m apart on one axis.",
-        "NPCConfig 5300013 Pharaoh's Coffin (camp 0, a prop with state buff 901301) next to 5300010 Pharaoh and 5300011 Pyramid."
+        "NPCConfig 5300013 Pharaoh's Coffin (camp 0, a prop with state buff 901301) next to 5300010 Pharaoh and 5300011 Pyramid.",
+        "NPCConfig 5300011 Pyramid: unit 33124 'mvp法老王金字塔' (the MVP Pharaoh's pyramid), camp 3, unselectable, speed 0, born buff 901301 like the coffin; the raid Pharaoh's pyramids 4370003/4370004 share the unit. The raid's CombatTip 4370002 (type 5): 'Pharaoh is unleashing Cleansing Light! Quickly, hide behind the Pyramid!'.",
+        "The story Pharaoh's skills (MainStory_FaLaoWangSkill1-5, 5340101-5340501) have no names; 5340301 is the strongest (_kDamageParam1 100000, 10x ATK)."
       ],
       "guessed": [
         "The Relic Pharaoh leaps out of is his coffin 5300013, standing at point 24 behind him.",
-        "The Pyramid 5300011 (camp 3, AI 25000001) is not spawned: what it did in the fight is unknown."
+        "The Pyramid stands 6 m east and 7 m north of Pharaoh's point 20, between him and the player's approach: the scene has no point for it.",
+        "Cleansing Light: every 20 s of the fight (the first after 10 s) the raid tip 4370002 goes out and Pharaoh holds still for 4 s, then 5340301 hits everyone not in the Pyramid's shadow (behind it as seen from Pharaoh, within 1.5 m of that line and 6 m past it). The raid's own mechanic is not described by the client data."
       ],
       "steps": [
         {
@@ -931,8 +1122,31 @@
                 901301
               ],
               "why": "the Relic: Pharaoh's Coffin, the scene's second point"
+            },
+            {
+              "npc": 5300011,
+              "point": 20,
+              "offset": [
+                6,
+                7
+              ],
+              "buffs": [
+                901301
+              ],
+              "why": "the Pyramid, cover from Cleansing Light (placement inferred)"
             }
           ],
+          "shelter": {
+            "boss": 5300010,
+            "cover": 5300011,
+            "tip": 4370002,
+            "skill": 5340301,
+            "everyMs": 20000,
+            "warnMs": 4000,
+            "width": 1.5,
+            "depth": 6,
+            "why": "hide behind the Pyramid (inferred from the raid's tip)"
+          },
           "spawns": [
             {
               "point": 20,

@@ -363,6 +363,13 @@ public sealed class DungeonCatalog(GameData data, WorldData worldData, MonsterSe
             foreach (var (interaction, skill, shots) in step.Strikes)
                 if (!step.Fight || shots < 0 || data.Row("SkillConfig", skill) == null
                     || !step.Actors.Any(a => Interactions(a.NpcId).Contains(interaction))) return [];
+            if (step.Seek is { } seek && (step.Actors.Count == 0 || seek.Rounds <= 0 || seek.SearchedRadius < 0
+                    || step.Complete.Count == 0 || step.Complete.Any(t => t.Kind != ReconstructedDungeons.TriggerKind.Point)
+                    || seek.Opening.Append(seek.Round).Append(seek.Countdown).Append(seek.Longer).Append(seek.Won).Append(seek.Found)
+                        .Any(chat => data.Row("ChatConfig", chat) == null))) return [];
+            if (step.Shelter is { } shelter && (!step.Spawns.Any(f => f.NpcId == shelter.Boss) || !step.Actors.Any(a => a.NpcId == shelter.Cover)
+                    || data.Row("ChatConfig", shelter.Tip) == null || data.Row("SkillConfig", shelter.Skill) == null
+                    || shelter.EveryMs <= shelter.WarnMs || shelter.WarnMs < 0 || shelter.Width <= 0 || shelter.Depth <= 0)) return [];
             // A fight step: its monsters, at server spawn points of the scene, with a template the server knows.
             var spawns = new List<Spawn>();
             foreach (var spawn in step.Spawns)

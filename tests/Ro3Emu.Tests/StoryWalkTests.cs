@@ -635,9 +635,10 @@ public sealed class StoryWalkTests(ITestOutputHelper output) : IAsyncLifetime
         while (!result.IsCompleted && DateTime.UtcNow < until)
         {
             // Send a step's pending client events, including mixed fight/event steps. Its kills still go through combat.
-            // StepDone prevents replaying already completed events while the fight continues.
+            // StepDone prevents replaying completed events; a fight's cannon interactions remain usable until its kills.
             var (wave, step) = await OnLoop(s => s.DungeonAttempt is { Settled: false } a && a.Wave < a.Plan.Waves.Count
-                && !a.StepDone && a.Plan.Waves[a.Wave].Step is { Complete.Count: > 0 } scripted ? (a.Wave, scripted) : (-1, null));
+                && a.Plan.Waves[a.Wave].Step is { } scripted
+                && (!a.StepDone && scripted.Complete.Count > 0 || scripted.Strikes.Count > 0) ? (a.Wave, scripted) : (-1, null));
             if (step != null)
             {
                 await PlayStepAsync(scene, wave, step, detail);
@@ -670,7 +671,17 @@ public sealed class StoryWalkTests(ITestOutputHelper output) : IAsyncLifetime
     private async Task PlayStepAsync(long scene, int wave, ReconstructedDungeons.ScriptedStep step, List<string> detail)
     {
         var catalog = Service<DungeonCatalog>();
-        foreach (var t in step.All ? step.Complete : step.Complete.Take(1))
+        // Use the cannon from its own deck instead of the fast-kill helper teleporting onto a hostile airship.
+        IEnumerable<ReconstructedDungeons.StepTrigger> events = step.Strikes.Count > 0
+            ? [new(ReconstructedDungeons.TriggerKind.Interaction, step.Strikes[0].Interaction)]
+            : step.All ? step.Complete : step.Complete.Take(1);
+        if (step.Seek != null)
+        {
+            var hidingPlace = await OnLoop(s => s.DungeonAttempt is { } a
+                ? step.Complete.FirstOrDefault(t => !a.Searched.Contains(t.Id)) : null);
+            events = hidingPlace == null ? [] : [hidingPlace]; // move again after a passed round searches this place
+        }
+        foreach (var t in events)
             switch (t.Kind)
             {
                 case ReconstructedDungeons.TriggerKind.Plot:

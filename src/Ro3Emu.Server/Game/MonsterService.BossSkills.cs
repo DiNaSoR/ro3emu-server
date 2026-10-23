@@ -94,6 +94,7 @@ public sealed partial class MonsterService
         for (int i = 0; i < skills.Length; i++)
         {
             var skill = skills[i];
+            if (skill.Id == m.ScriptedSkill) continue; // the scene owns its warning, timing and target selection
             if (rt.Phase < skill.FromPhase || rt.Phase > skill.ToPhase || rt.ReadyMs[i] > now) continue;
             bool opener = rt.Opener[i];
             if (!opener && !gapOpen || dist > skill.Reach + 0.5f) continue;

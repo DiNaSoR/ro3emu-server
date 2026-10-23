@@ -19,7 +19,7 @@ public sealed partial class ReconstructedDungeons
     public sealed record StepTrigger(TriggerKind Kind, long Id, float Radius = 0);
 
     /// <summary>A scene actor: an NPCConfig id at a scene-editor point, with the buffs (BuffConfig ids) it carries.</summary>
-    public sealed record SceneActor(int NpcId, long Point, IReadOnlyList<int> Buffs);
+    public sealed record SceneActor(int NpcId, long Point, IReadOnlyList<int> Buffs, float Dx = 0, float Dz = 0);
 
     /// <summary>
     /// A ChatConfig story line, said <paramref name="Ms"/> after the step starts (or as it completes, for a "done" line).
@@ -57,6 +57,8 @@ public sealed partial class ReconstructedDungeons
         public IReadOnlyList<StepLine> DoneLines { get; init; } = DoneLines ?? [];
         public StepSlide? Slide { get; init; }
         public StepFallback? Fallback { get; init; }
+        public Seek? Seek { get; init; }
+        public Shelter? Shelter { get; init; }
         /// <summary>
         /// Scene-editor guide points (m_kGuidePoints) the client draws as a guide arrow line while the step runs
         /// (dungeon var 10021 PGuideWayList); empty: none.
@@ -77,6 +79,20 @@ public sealed partial class ReconstructedDungeons
     /// </summary>
     public sealed record ScriptedScene(long Scene, string Name, string Confidence, IReadOnlyList<ScriptedStep> Steps,
         IReadOnlyList<int> Unplayed, long Next = 0);
+
+    /// <summary>
+    /// Hide-and-seek rounds (inferred): warn, count down, then check every participant against unsearched Point
+    /// triggers. A passed round searches nearby points; a found participant restarts the game. ChatConfig ids name
+    /// the opening, warning, countdown, next-round, win and failure messages.
+    /// </summary>
+    public sealed record Seek(int Rounds, float SearchedRadius, IReadOnlyList<int> Opening, int Round, int Countdown, int Longer,
+        int Won, int Found);
+
+    /// <summary>
+    /// Cover from a boss attack (inferred): warn, hold the boss for WarnMs, then hit participants outside the Cover
+    /// actor's shadow with Skill. Width is the shadow's half-width; Depth is its length beyond the cover, in metres.
+    /// </summary>
+    public sealed record Shelter(int Boss, int Cover, int Tip, long Skill, int EveryMs, int WarnMs, float Width, float Depth);
 
     private readonly Dictionary<long, ScriptedScene> _scripted = new();
 
@@ -108,7 +124,8 @@ public sealed partial class ReconstructedDungeons
         var goal = s.TryGetProperty("goal", out var g) ? (g[0].GetInt32(), g[1].GetInt32()) : (0, 1);
         var actors = s.TryGetProperty("actors", out var a)
             ? a.EnumerateArray().Select(x => new SceneActor(x.GetProperty("npc").GetInt32(), x.GetProperty("point").GetInt64(),
-                x.TryGetProperty("buffs", out var b) ? b.EnumerateArray().Select(v => v.GetInt32()).ToArray() : [])).ToArray()
+                x.TryGetProperty("buffs", out var b) ? b.EnumerateArray().Select(v => v.GetInt32()).ToArray() : [],
+                x.TryGetProperty("offset", out var o) ? o[0].GetSingle() : 0, x.TryGetProperty("offset", out o) ? o[1].GetSingle() : 0)).ToArray()
             : [];
         var complete = Triggers(s, "complete");
         var spawns = s.TryGetProperty("spawns", out var sp)
@@ -122,6 +139,17 @@ public sealed partial class ReconstructedDungeons
             spawns, Lines(s, "lines"), Lines(s, "doneLines"))
         {
             All = s.TryGetProperty("all", out var all) && all.GetBoolean(),
+            Seek = s.TryGetProperty("seek", out var seek)
+                ? new Seek(seek.GetProperty("rounds").GetInt32(), seek.GetProperty("searchedRadius").GetSingle(),
+                    [.. seek.GetProperty("opening").EnumerateArray().Select(v => v.GetInt32())], seek.GetProperty("round").GetInt32(),
+                    seek.GetProperty("countdown").GetInt32(), seek.GetProperty("longer").GetInt32(), seek.GetProperty("won").GetInt32(),
+                    seek.GetProperty("found").GetInt32())
+                : null,
+            Shelter = s.TryGetProperty("shelter", out var shelter)
+                ? new Shelter(shelter.GetProperty("boss").GetInt32(), shelter.GetProperty("cover").GetInt32(), shelter.GetProperty("tip").GetInt32(),
+                    shelter.GetProperty("skill").GetInt64(), shelter.GetProperty("everyMs").GetInt32(), shelter.GetProperty("warnMs").GetInt32(),
+                    shelter.GetProperty("width").GetSingle(), shelter.GetProperty("depth").GetSingle())
+                : null,
             Strikes = s.TryGetProperty("strike", out var strike)
                 ? strike.EnumerateArray().Select(x => (x.GetProperty("interaction").GetInt64(), x.GetProperty("skill").GetInt64(),
                     x.TryGetProperty("shots", out var shots) ? shots.GetInt32() : 0)).ToArray() : [],

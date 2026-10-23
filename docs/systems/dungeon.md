@@ -316,3 +316,24 @@ Tests (`DungeonTests`, `TowerTests`, `TowerShopTests`, `FirstPassAwardTests`):
   service, enters the real point-respawn scene, kills its NPC through the wire and receives a result. The 4400001
   test spawns its source-backed 50-actor region plan. Separate two-wave execution uses a synthetic host-local
   editor fixture. The exported data is never modified; these tests do not claim complete solo script parity.
+
+### Timed hide-and-seek and Pharaoh cover
+
+Moonlight Flower's scene (3120802) now runs warning and countdown rounds instead of completing on arrival at a
+hiding point. Every participant must hide at an unsearched darkness point; being found restarts the game, while
+passing searches nearby points. Two successful rounds complete the scene. The opening and result bubbles use
+ChatConfig 5310005-5310014 through message 1022 with the seeker's unit id. The round rules, timing and search radius
+are **inferred**: the client supplies the dialogue and scene points, but not the original server script.
+
+The story Pharaoh (3120702) has Pyramid 5300011 beside point 20, offset by 6 m east and 7 m north. After the first
+10 seconds, and every 20 seconds thereafter, tip 4370002 warns of Cleansing Light; Pharaoh holds position for four
+seconds, then skill 5340301 hits living participants outside the Pyramid's shadow. Cover is measured from the boss
+through the Pyramid, 1.5 m either side and up to 6 m behind it. The placement, cadence, geometry and use of the raid
+tip in the story encounter are **inferred**. Existing story rides, guide paths, cutscene protection, rescue stages
+and Eddga encounters retain their behavior.
+
+Each step owns a timer generation; completed or closed attempts and timers from an earlier step do no work.
+The shelter skill is reserved on that boss instance so its generic AI cannot cast it without the warning or bypass
+the Pyramid's protection. Other special skills keep their ordinary scheduler.
+`ScriptedScenePacePercent` defaults to 100; tests can shorten these timers. Protocol tests exercise the new mechanics
+against exported client content; this does not establish visual fidelity to the original server.
