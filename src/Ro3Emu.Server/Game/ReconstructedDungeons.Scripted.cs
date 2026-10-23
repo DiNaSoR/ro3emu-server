@@ -28,11 +28,25 @@ public sealed partial class ReconstructedDungeons
     /// defeated (a story dungeon that mixes fights with scripted parts). <paramref name="All"/>: every completing event
     /// is needed, not any one ("Have a Chitchat with them"). <paramref name="Strikes"/>: an interaction of an actor that
     /// casts a skill at the nearest monster of the step's fight (the airship's cannons); with Shots above 0, that many
-    /// strikes defeat a monster whatever the skill's damage.
+    /// strikes defeat a monster whatever the skill's damage. <paramref name="Seek"/>: the step is a hide-and-seek game
+    /// whose hiding places are its Point triggers; walking there does not complete it, winning the game does.
     /// </summary>
     public sealed record ScriptedStep(string Stage, int Quest, (int Done, int Total) Goal, IReadOnlyList<SceneActor> Actors,
         long Story, IReadOnlyList<StepTrigger> Complete, IReadOnlyList<StepTrigger> Ignore, long TeleportAfter,
-        IReadOnlyList<Spawn> Fight, bool All, IReadOnlyList<(long Interaction, long Skill, int Shots)>? Strikes = null);
+        IReadOnlyList<Spawn> Fight, bool All, IReadOnlyList<(long Interaction, long Skill, int Shots)>? Strikes = null,
+        Seek? Seek = null);
+
+    /// <summary>
+    /// A hide-and-seek game (inferred, Moonlight Flower's 3120802): the step's first actor opens with its
+    /// <paramref name="Opening"/> bubbles; each round warns (<paramref name="Round"/>), counts down
+    /// (<paramref name="Countdown"/>, a CombatCountdownTip row whose time is the count) and looks. Every participant must
+    /// then stand at one of the step's points that this game has not searched yet. A found participant restarts the game
+    /// (<paramref name="Found"/>, a bubble); a passed round searches the points within <paramref name="SearchedRadius"/>
+    /// of each hiding place (<paramref name="Longer"/>), and the last of <paramref name="Rounds"/> wins
+    /// (<paramref name="Won"/>), completing the step. Every message is a ChatConfig row sent as 1022.
+    /// </summary>
+    public sealed record Seek(int Rounds, float SearchedRadius, IReadOnlyList<int> Opening, int Round, int Countdown, int Longer,
+        int Won, int Found);
 
     /// <summary>
     /// A scene. <paramref name="Unplayed"/> are DungeonQuestConfig quests of the scene that no step shows: the branch
@@ -85,6 +99,12 @@ public sealed partial class ReconstructedDungeons
             s.TryGetProperty("strike", out var strike)
                 ? strike.EnumerateArray().Select(x => (x.GetProperty("interaction").GetInt64(), x.GetProperty("skill").GetInt64(),
                     x.TryGetProperty("shots", out var shots) ? shots.GetInt32() : 0)).ToArray()
+                : null,
+            s.TryGetProperty("seek", out var seek)
+                ? new Seek(seek.GetProperty("rounds").GetInt32(), seek.GetProperty("searchedRadius").GetSingle(),
+                    [.. seek.GetProperty("opening").EnumerateArray().Select(v => v.GetInt32())], seek.GetProperty("round").GetInt32(),
+                    seek.GetProperty("countdown").GetInt32(), seek.GetProperty("longer").GetInt32(), seek.GetProperty("won").GetInt32(),
+                    seek.GetProperty("found").GetInt32())
                 : null);
     }
 

@@ -351,6 +351,10 @@ public sealed class DungeonCatalog(GameData data, WorldData worldData, MonsterSe
                 };
                 if (!known) return [];
             }
+            if (step.Seek is { } seek && (step.Actors.Count == 0 || seek.Rounds <= 0 || seek.SearchedRadius < 0
+                    || step.Complete.Count == 0 || step.Complete.Any(t => t.Kind != ReconstructedDungeons.TriggerKind.Point)
+                    || seek.Opening.Append(seek.Round).Append(seek.Countdown).Append(seek.Longer).Append(seek.Won).Append(seek.Found)
+                        .Any(chat => data.Row("ChatConfig", chat) == null))) return [];
             foreach (var (interaction, skill, shots) in step.Strikes ?? [])
                 if (step.Fight.Count == 0 || shots < 0 || data.Row("SkillConfig", skill) == null
                     || !step.Actors.Any(a => Interactions(a.NpcId).Contains(interaction))) return [];

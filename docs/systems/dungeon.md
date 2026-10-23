@@ -153,6 +153,13 @@ Reconstructed scripted scenes (`Reconstructed/scripted-scenes.json`, same switch
   type 24) with a scripted reconstruction plays it instead of its bare point respawns. A step's `strike` makes an
   actor's interaction cast a skill from the player at the nearest monster of the fight; with `shots`, that many strikes
   defeat it whatever the damage (inferred, for the airship's cannons).
+- Moonlight Flower's hide-and-seek (3120802) is played as a game, inferred as a whole from its ChatConfig lines (a step
+  `seek`, DungeonService.HideAndSeek): her three opening bubbles over her head, then rounds of a warning
+  (5310005), the 5 s countdown tip (5310010) and a look. A player within 3 m of a group 27 point (the darkness that
+  rings the room) passes the round; anyone else is found (5310014) and the game starts over. A passed round searches
+  the darkness within 8 m of the hiding place, so the second round needs another side of the room; it wins (5310007)
+  and completes the step. The lines go out as 1022 with her uid, which the client's Bubbling rows need for the head
+  bubble. `ScriptedScenePacePercent` shortens these timers for tests.
 - Five story dungeons that were monster waves (or bare point respawns) now play their scripted stages around the
   fights, each with its evidence and guessed parts in the file:
   - Maya's nest (1000401): Maya, then 'Find the Professor' (within 10 m of the egg point), 'Free the Ant Egg' (5300056,
