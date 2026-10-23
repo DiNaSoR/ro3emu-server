@@ -120,7 +120,7 @@ public sealed class CardEffects
     private async Task GrantSkillsAsync(GameSession s)
     {
         if (s.Progress is not { } progress) return;
-        var granted = new Dictionary<int, int>();
+        Dictionary<int, int> granted = [];
         foreach (var (_, id) in EquipmentStunts.CardEffects(s, _data))
             if (SpecialEffectConfig.Get(_data, id) is { } effect)
                 foreach (var op in effect.SpecialEffect)
