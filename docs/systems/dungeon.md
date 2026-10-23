@@ -175,7 +175,11 @@ Reconstructed scripted scenes (`Reconstructed/scripted-scenes.json`, same switch
   - Payon Forest (1022001): 'Cover Boya and Wule' (reach the standoff point 22 between them and Eddga), then Eddga.
     Boya and Wule (5300086/5300087) are shown, not fighting.
   - The Peco Peco nest (1051001): the Elusive Pecopeco with the Ancient Nest and Bragis shown.
-  - Pharaoh (main story, 3120702): Pharaoh with the Relic he leaps out of, his coffin 5300013 at point 24.
+  - Pharaoh (main story, 3120702): Pharaoh with the Relic he leaps out of, his coffin 5300013 at point 24, and the
+    Pyramid 5300011 beside him (6 m east, 7 m north of point 20: the scene has no point for it). Its use is **inferred**
+    from the raid Pharaoh's tip 4370002 'Pharaoh is unleashing Cleansing Light! Quickly, hide behind the Pyramid!': every
+    20 s of the fight the tip goes out, Pharaoh holds still for 4 s, then his strongest skill 5340301 (whose effect the
+    client draws as a cross of light) hits everyone outside the Pyramid's shadow (a step `shelter`, DungeonService.Shelter).
 
 
 - The last three main-story blockers of the story walk: the ant nest vortex and egg passage (1000201, task 10104290),

@@ -498,18 +498,20 @@
     "3120702": {
       "name": "Pharaoh (main story): the Relic and Pharaoh",
       "confidence": "high",
-      "evidence": ["DungeonQuestConfig 5300028: 1 'Mysterious Space' 'Pulled into a mysterious space by a giant hand that suddenly appeared' [5,0,1] 'Defeat Pharaoh'. Task 108110 'Monsters Appear': 'A Pharaoh suddenly leaps out of the Relic.'", "Editor sc_pm_mainstory_sphinx_dg01: two server points, 20 and 24, 6 m apart on one axis.", "NPCConfig 5300013 Pharaoh's Coffin (camp 0, a prop with state buff 901301) next to 5300010 Pharaoh and 5300011 Pyramid."],
-      "guessed": ["The Relic Pharaoh leaps out of is his coffin 5300013, standing at point 24 behind him.", "The Pyramid 5300011 (camp 3, AI 25000001) is not spawned: what it did in the fight is unknown."],
+      "evidence": ["DungeonQuestConfig 5300028: 1 'Mysterious Space' 'Pulled into a mysterious space by a giant hand that suddenly appeared' [5,0,1] 'Defeat Pharaoh'. Task 108110 'Monsters Appear': 'A Pharaoh suddenly leaps out of the Relic.'", "Editor sc_pm_mainstory_sphinx_dg01: two server points, 20 and 24, 6 m apart on one axis.", "NPCConfig 5300013 Pharaoh's Coffin (camp 0, a prop with state buff 901301) next to 5300010 Pharaoh and 5300011 Pyramid.", "NPCConfig 5300011 Pyramid: unit 33124 'mvp法老王金字塔' (the MVP Pharaoh's pyramid), camp 3, unselectable, speed 0, born buff 901301 like the coffin; the raid Pharaoh's pyramids 4370003/4370004 share the unit. The raid's CombatTip 4370002 (type 5): 'Pharaoh is unleashing Cleansing Light! Quickly, hide behind the Pyramid!'.", "The story Pharaoh's skills (MainStory_FaLaoWangSkill1-5, 5340101-5340501) have no names; 5340301 is the strongest (_kDamageParam1 100000, 10x ATK)."],
+      "guessed": ["The Relic Pharaoh leaps out of is his coffin 5300013, standing at point 24 behind him.", "The Pyramid stands 6 m east and 7 m north of Pharaoh's point 20, between him and the player's approach: the scene has no point for it.", "Cleansing Light: every 20 s of the fight (the first after 10 s) the raid tip 4370002 goes out and Pharaoh holds still for 4 s, then 5340301 hits everyone not in the Pyramid's shadow (behind it as seen from Pharaoh, within 1.5 m of that line and 6 m past it). The raid's own mechanic is not described by the client data."],
       "steps": [
         {
           "quest": 1,
           "stage": "Mysterious Space: defeat Pharaoh",
           "actors": [
-            { "npc": 5300013, "point": 24, "buffs": [901301], "why": "the Relic: Pharaoh's Coffin, the scene's second point" }
+            { "npc": 5300013, "point": 24, "buffs": [901301], "why": "the Relic: Pharaoh's Coffin, the scene's second point" },
+            { "npc": 5300011, "point": 20, "offset": [6, 7], "buffs": [901301], "why": "the Pyramid, cover from Cleansing Light (placement inferred)" }
           ],
           "fight": [
             { "point": 20, "npc": 5300010, "why": "stage 'Mysterious Space / Defeat Pharaoh'; 5300010 is the client's story Pharaoh (L45)" }
-          ]
+          ],
+          "shelter": { "boss": 5300010, "cover": 5300011, "tip": 4370002, "skill": 5340301, "everyMs": 20000, "warnMs": 4000, "width": 1.5, "depth": 6, "why": "hide behind the Pyramid (inferred from the raid's tip)" }
         }
       ]
     },

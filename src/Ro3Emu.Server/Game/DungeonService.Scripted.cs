@@ -80,7 +80,9 @@ public sealed partial class DungeonService
         // A fight-only step has no client event to wait for: its kills complete it.
         a.StepDone = step.Complete.Count == 0;
         await SyncSceneActorsAsync(a, step.Actors);
+        a.StepGeneration++;
         if (step.Seek is { } seek) StartSeek(a, seek);
+        if (step.Shelter is { } shelter) StartShelter(a, shelter);
         if (step.Story != 0 && !a.Settled && !a.Room.Closed)
             // Once, in a var-change event: the client calls PlayCutSceneStory on every push of this var.
             await BroadcastAsync(a, Event, new DungeonEventNotify
@@ -121,7 +123,7 @@ public sealed partial class DungeonService
             var unit = new SceneActorUnit
             {
                 Uid = SceneActorUidBase | Interlocked.Increment(ref _sceneActorSerial), SceneEntry = a.Plan.SceneEntry,
-                InstanceId = a.Room.Id, X = at.X, Y = at.Y, Z = at.Z, Face = at.Face, NpcId = spec.NpcId, Point = spec.Point,
+                InstanceId = a.Room.Id, X = at.X + spec.Dx, Y = at.Y, Z = at.Z + spec.Dz, Face = at.Face, NpcId = spec.NpcId, Point = spec.Point,
                 EntityType = type, Camp = GameData.Int(row, "_iCamp"), Name = type == 2 ? _data.TextOf(row, "_kName") : "",
                 Template = type == 1 ? _monsters.Template(spec.NpcId) : null, BornMs = MonsterService.NowMs,
             };

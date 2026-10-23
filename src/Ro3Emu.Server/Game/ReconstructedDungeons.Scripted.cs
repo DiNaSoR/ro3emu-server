@@ -17,8 +17,10 @@ public sealed partial class ReconstructedDungeons
     /// <summary>A client event that completes (or, under "ignore", deliberately does not complete) a step.</summary>
     public sealed record StepTrigger(TriggerKind Kind, long Id, float Radius = 0);
 
-    /// <summary>A scene actor: an NPCConfig id at a scene-editor point, with the buffs (BuffConfig ids) it carries.</summary>
-    public sealed record SceneActor(int NpcId, long Point, IReadOnlyList<int> Buffs);
+    /// <summary>A scene actor: an NPCConfig id at a scene-editor point, with the buffs (BuffConfig ids) it carries.
+    /// <paramref name="Dx"/>/<paramref name="Dz"/> (metres) place it beside the point when the scene has no point of its own
+    /// for it (inferred placement).</summary>
+    public sealed record SceneActor(int NpcId, long Point, IReadOnlyList<int> Buffs, float Dx = 0, float Dz = 0);
 
     /// <summary>
     /// One scripted step. <paramref name="Story"/> is a PlotInterpretation id the client plays at the step's start
@@ -34,7 +36,17 @@ public sealed partial class ReconstructedDungeons
     public sealed record ScriptedStep(string Stage, int Quest, (int Done, int Total) Goal, IReadOnlyList<SceneActor> Actors,
         long Story, IReadOnlyList<StepTrigger> Complete, IReadOnlyList<StepTrigger> Ignore, long TeleportAfter,
         IReadOnlyList<Spawn> Fight, bool All, IReadOnlyList<(long Interaction, long Skill, int Shots)>? Strikes = null,
-        Seek? Seek = null);
+        Seek? Seek = null, Shelter? Shelter = null);
+
+    /// <summary>
+    /// Cover from a boss's sweeping attack (inferred, the story Pharaoh's 3120702 after the raid Pharaoh's "Pharaoh is
+    /// unleashing Cleansing Light! Quickly, hide behind the Pyramid!"): every <paramref name="EveryMs"/> while the fight's
+    /// <paramref name="Boss"/> lives, the <paramref name="Tip"/> ChatConfig row goes out and the boss holds its ground for
+    /// <paramref name="WarnMs"/>; then <paramref name="Skill"/> hits every participant not in the shadow of the
+    /// <paramref name="Cover"/> actor: behind it as seen from the boss, within <paramref name="Width"/> metres of that line
+    /// and <paramref name="Depth"/> metres past the cover.
+    /// </summary>
+    public sealed record Shelter(int Boss, int Cover, int Tip, long Skill, int EveryMs, int WarnMs, float Width, float Depth);
 
     /// <summary>
     /// A hide-and-seek game (inferred, Moonlight Flower's 3120802): the step's first actor opens with its
@@ -84,7 +96,8 @@ public sealed partial class ReconstructedDungeons
         var goal = s.TryGetProperty("goal", out var g) ? (g[0].GetInt32(), g[1].GetInt32()) : (0, 1);
         var actors = s.TryGetProperty("actors", out var a)
             ? a.EnumerateArray().Select(x => new SceneActor(x.GetProperty("npc").GetInt32(), x.GetProperty("point").GetInt64(),
-                x.TryGetProperty("buffs", out var b) ? b.EnumerateArray().Select(v => v.GetInt32()).ToArray() : [])).ToArray()
+                x.TryGetProperty("buffs", out var b) ? b.EnumerateArray().Select(v => v.GetInt32()).ToArray() : [],
+                x.TryGetProperty("offset", out var o) ? o[0].GetSingle() : 0, x.TryGetProperty("offset", out o) ? o[1].GetSingle() : 0)).ToArray()
             : [];
         var complete = Triggers(s, "complete");
         var fight = s.TryGetProperty("fight", out var f)
@@ -105,6 +118,11 @@ public sealed partial class ReconstructedDungeons
                     [.. seek.GetProperty("opening").EnumerateArray().Select(v => v.GetInt32())], seek.GetProperty("round").GetInt32(),
                     seek.GetProperty("countdown").GetInt32(), seek.GetProperty("longer").GetInt32(), seek.GetProperty("won").GetInt32(),
                     seek.GetProperty("found").GetInt32())
+                : null,
+            s.TryGetProperty("shelter", out var shelter)
+                ? new Shelter(shelter.GetProperty("boss").GetInt32(), shelter.GetProperty("cover").GetInt32(), shelter.GetProperty("tip").GetInt32(),
+                    shelter.GetProperty("skill").GetInt64(), shelter.GetProperty("everyMs").GetInt32(), shelter.GetProperty("warnMs").GetInt32(),
+                    shelter.GetProperty("width").GetSingle(), shelter.GetProperty("depth").GetSingle())
                 : null);
     }
 

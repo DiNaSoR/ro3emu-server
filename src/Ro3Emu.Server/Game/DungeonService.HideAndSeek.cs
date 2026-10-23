@@ -23,19 +23,20 @@ public sealed partial class DungeonService
     {
         a.SeekRound = 1;
         a.Searched.Clear();
-        int generation = ++a.SeekGeneration;
+        int generation = ++a.StepGeneration;
         for (int i = 0; i < seek.Opening.Count; i++)
         {
             int chat = seek.Opening[i];
-            SeekLater(a, generation, i * SeekOpeningGapMs, () => SeekChatAsync(a, chat));
+            StepLater(a, generation, i * SeekOpeningGapMs, () => SeekChatAsync(a, chat));
         }
-        SeekLater(a, generation, seek.Opening.Count * SeekOpeningGapMs, () => SeekRoundAsync(a, generation, seek));
+        StepLater(a, generation, seek.Opening.Count * SeekOpeningGapMs, () => SeekRoundAsync(a, generation, seek));
     }
 
-    /// <summary>A timer of the game: it does nothing once the step is over or a newer game started.</summary>
-    private void SeekLater(Attempt a, int generation, int ms, Func<Task> work) =>
+    /// <summary>A timer of the step: it does nothing once a newer game or step started, or (unless
+    /// <paramref name="whileFighting"/>: a fight-only step is done from its start) once the step is done.</summary>
+    private void StepLater(Attempt a, int generation, int ms, Func<Task> work, bool whileFighting = false) =>
         _loop.ScheduleLegacy(TimeSpan.FromMilliseconds((long)ms * Math.Max(1, _options.ScriptedScenePacePercent) / 100),
-            () => !a.Settled && !a.Room.Closed && !a.StepDone && a.SeekGeneration == generation && Step(a)?.Seek != null
+            () => !a.Settled && !a.Room.Closed && (whileFighting || !a.StepDone) && a.StepGeneration == generation
                 ? work() : Task.CompletedTask);
 
     private Task SeekChatAsync(Attempt a, int chat) => BroadcastAsync(a, SystemBroadcast, new SystemBoardCastMsgNtf
@@ -46,8 +47,8 @@ public sealed partial class DungeonService
     {
         await SeekChatAsync(a, seek.Round);
         int countdown = _data.Row("ChatConfig", seek.Countdown) is { } row ? (int)new ChatConfig(row).Time : 5000;
-        SeekLater(a, generation, SeekWarnMs, () => SeekChatAsync(a, seek.Countdown));
-        SeekLater(a, generation, SeekWarnMs + countdown, () => SeekLookAsync(a, generation, seek));
+        StepLater(a, generation, SeekWarnMs, () => SeekChatAsync(a, seek.Countdown));
+        StepLater(a, generation, SeekWarnMs + countdown, () => SeekLookAsync(a, generation, seek));
     }
 
     private async Task SeekLookAsync(Attempt a, int generation, ReconstructedDungeons.Seek seek)
@@ -61,7 +62,7 @@ public sealed partial class DungeonService
             await SeekChatAsync(a, seek.Found);
             a.SeekRound = 1;
             a.Searched.Clear();
-            SeekLater(a, generation, SeekPauseMs, () => SeekRoundAsync(a, generation, seek));
+            StepLater(a, generation, SeekPauseMs, () => SeekRoundAsync(a, generation, seek));
             return;
         }
         foreach (var place in places)
@@ -77,7 +78,7 @@ public sealed partial class DungeonService
         }
         await SeekChatAsync(a, seek.Longer);
         a.SeekRound++;
-        SeekLater(a, generation, SeekPauseMs, () => SeekRoundAsync(a, generation, seek));
+        StepLater(a, generation, SeekPauseMs, () => SeekRoundAsync(a, generation, seek));
     }
 
     /// <summary>The step's point a participant hides at: within its radius and not searched in this game.</summary>

@@ -100,6 +100,40 @@ public sealed partial class DungeonTests
         Assert.Equal((DungeonRes)1, (await Next(alice, DungeonService.Result, DungeonResNotify.Parser)).Res);
     }
 
+    // The story Pharaoh's Cleansing Light (inferred): the raid's tip, then his strongest skill on whoever stands outside the
+    // Pyramid's shadow.
+    [ClientDataFact]
+    public async Task ThePharaohsCleansingLightHitsWhoeverIsNotBehindThePyramid()
+    {
+        const long scene = 3120702;
+        Service<IOptions<ServerOptions>>().Value.ScriptedScenePacePercent = 10;
+        await using var alice = await InWorld("Alice");
+        await Gm(alice, "!lvl 99");
+        Assert.Equal(0, await Enter(alice, new EnterDungeonReq { SceneEntry = scene }));
+        long instance = await Load(alice, scene);
+        await Stage(alice, 1, quest: 1);
+        var pyramid = Assert.Single(await ActorsIn(alice, 1, a => a.NpcId == 5300011));
+        var point = Service<WorldData>().Map(scene)!.Points[20];
+        Assert.Equal((point.X + 6, point.Z + 7), (pyramid.X, pyramid.Z)); // beside Pharaoh's point, no point of its own
+        var pharaoh = await BossIn(instance, 5300010);
+        long me = Session(alice).Role!.Id;
+        await Next(alice, 1022, SystemBoardCastMsgNtf.Parser, m => m.ChatId == 4370002); // "hide behind the Pyramid!"
+        var hit = await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser, h => h.SkillId == 5340301 && h.Dsts.Any(d => d.DstID == me));
+        Assert.Equal(pharaoh.Uid, hit.SrcID);
+    }
+
+    [Theory]
+    [InlineData(0f, 7f, true)] // straight behind the cover
+    [InlineData(1.4f, 8f, true)] // within the shadow's width
+    [InlineData(2f, 8f, false)] // beside it
+    [InlineData(0f, 3f, false)] // in front of it
+    [InlineData(0f, 12f, false)] // past the shadow's depth
+    public void ThePyramidsShadowLiesBehindItAsSeenFromTheBoss(float x, float z, bool sheltered)
+    {
+        var shelter = new ReconstructedDungeons.Shelter(0, 0, 0, 0, 20000, 4000, 1.5f, 6);
+        Assert.Equal(sheltered, DungeonService.Sheltered(0, 0, 0, 5, x, z, shelter));
+    }
+
     [ClientDataFact]
     public async Task TheVortexScenePlaysFromTheCorridorThroughTheJumpToTheEndOfThePassage()
     {
