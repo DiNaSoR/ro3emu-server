@@ -28,9 +28,9 @@ public sealed class VoiceRelayTests : IAsyncLifetime
             o.MicroGatePort = microPort;
             o.GameGatePort = gamePort;
             o.Voice.Port = _voicePort;
-            // Short enough that the "no Auth in time" / idle tests do not need to wait the production defaults.
+            // Short enough that the "no Auth in time" test does not need to wait the production default. The idle
+            // timeout keeps its default: these tests leave a listener silent for seconds, and 2 s closed it (#198).
             o.Voice.FirstFrameTimeoutSeconds = 2;
-            o.Voice.IdleTimeoutSeconds = 2;
         }, _clock);
         await _app.StartAsync();
         _http = $"http://127.0.0.1:{httpPort}";
@@ -538,6 +538,7 @@ public sealed class VoiceRelayTests : IAsyncLifetime
         Assert.Equal(VoiceKickCode.Flood, kicked.Payload[0]);
         await Wait200UntilAsync(() => aliceVoice.Closed, Wait);
         Assert.True(aliceVoice.Closed);
+        Assert.False(bobVoice.Closed, "Bob's connection closed before Alice's leave");
         await bobVoice.WaitAsync((t, p) => t == VoiceDown.MemberChange && BitConverter.ToInt64(p) == aliceRole && p[8] == 0, Wait);
 
         Assert.False(bobVoice.Closed);
