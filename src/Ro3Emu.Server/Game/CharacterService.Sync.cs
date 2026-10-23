@@ -52,7 +52,9 @@ public sealed partial class CharacterService
     private async Task SyncItemsAsync(GameSession session, Func<bool>? stillOwner = null)
     {
         var now = BuildItems(session);
-        ResendItemsWholeIfNeeded(session, now);
+        // Rebuild after dropping the old snapshot: retained empty packs have no sortedIndex in a full
+        // protobuf decode, but LC_DAL_Knapsack.InitPackData iterates that map for every supplied pack.
+        if (ResendItemsWholeIfNeeded(session, now)) now = BuildItems(session);
         await SyncAsync(session, ItemsSync, now);
         if (stillOwner?.Invoke() == false) return;
         if (PruneEquipmentPlans(session))
@@ -68,11 +70,15 @@ public sealed partial class CharacterService
     /// builds each pack's grid from the full sync only, so gear sent into a pack missing at login (a new character's
     /// first unequipped gear: the starter weapon and shirt are worn, so pack 2 is absent) is stored but never shown.
     /// </summary>
-    private static void ResendItemsWholeIfNeeded(GameSession session, DBItemsInfo now)
+    private static bool ResendItemsWholeIfNeeded(GameSession session, DBItemsInfo now)
     {
         if (session.Synced.GetValueOrDefault(ItemsSync) is DBItemsInfo sent
             && (now.StoragePack != null && sent.StoragePack == null || now.PackInfo.Keys.Any(k => !sent.PackInfo.ContainsKey(k))))
+        {
             session.Synced.Remove(ItemsSync);
+            return true;
+        }
+        return false;
     }
 
     /// <summary>5066: PlayerBasicInfo (id and career are mandatory); exp is the progress inside the level.</summary>
