@@ -14,7 +14,7 @@ using Ro3Emu.Server.Maps;
 namespace Ro3Emu.Tests;
 
 /// <summary>E04 fixed rewards, real role ownership/writer and wire presentation. No load runs.</summary>
-public sealed class KillEconomyTests : IAsyncLifetime
+public sealed partial class KillEconomyTests : IAsyncLifetime
 {
     private readonly string _directory = Path.Combine(RepoRoot(), ".loadtest-temp", "e04-kill-" + Guid.NewGuid().ToString("N"));
     private WebApplication _app = null!;

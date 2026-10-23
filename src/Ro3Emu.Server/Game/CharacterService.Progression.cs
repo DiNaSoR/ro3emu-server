@@ -135,6 +135,14 @@ public sealed partial class CharacterService
         if (stillOwner?.Invoke() == false) return;
         await SendStatsAsync(session, showChange: levelUp);
         if (stillOwner?.Invoke() == false) return;
+        if (levelUp && !session.Dead)
+        {
+            // The refill again on its own, after the client holds the new maximum: one message carrying both may land
+            // HP against the old maximum (Steven saw no refill in game, 2026-10-18), and a later Hp-only update cannot.
+            var full = Stats(session);
+            await SetHpSpAsync(session, full[MaxHp], full[MaxSp]);
+            if (stillOwner?.Invoke() == false) return;
+        }
         foreach (var handler in ProgressHandlers)
         {
             await handler(session);
