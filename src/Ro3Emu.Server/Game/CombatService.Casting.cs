@@ -141,7 +141,8 @@ public sealed partial class CombatService
             {
                 Target = target, SkillId = loopSkill,
                 NextSwingMs = Now + SkillMs(s, row.Value) + ChantMs(s, row.Value) + 1,
-                StartX = s.Position.X, StartZ = s.Position.Z
+                StartX = s.Position.X, StartZ = s.Position.Z, StartedWalking = s.Walking, StartMs = Now,
+                ArrivalSpeed = s.Speed / 100f, WalkFromUtc = s.LastWalkUtc
             };
         }
         else s.Attack = null;
@@ -527,7 +528,18 @@ public sealed partial class CombatService
     {
         if (_eventAttacks.TryGetValue(s, out var eventAttack)
             && MonsterService.Distance(eventAttack.StartX, eventAttack.StartZ, s.Position.X, s.Position.Z) > 1.5f) _eventAttacks.Remove(s);
-        if (s.Attack is { } a && MonsterService.Distance(a.StartX, a.StartZ, s.Position.X, s.Position.Z) > 0.1f) s.Attack = null;
+        if (s.Attack is { } a && MonsterService.Distance(a.StartX, a.StartZ, s.Position.X, s.Position.Z) > 0.1f)
+        {
+            // Clicking an enemy from afar: the client attacks on reaching range and stops a few ms later (in-game
+            // 11.10), so that first stop is where the auto-attack starts, not a step away that ends it. The 300 ms grace is inferred.
+            if (a.StartedWalking && !s.Walking && Now - a.StartMs <= 300
+                && MonsterService.Distance(a.StartX, a.StartZ, s.Position.X, s.Position.Z) <= a.ArrivalSpeed * WalkedSeconds(a.WalkFromUtc) + 0.5)
+            {
+                a.StartX = s.Position.X; a.StartZ = s.Position.Z;
+                a.StartedWalking = false;
+            }
+            else s.Attack = null;
+        }
         if (s.SkillCast is not { } cast || Distance(cast.Origin, s.Position) <= 0.1f || GameData.Int(cast.Row, "_bMovement") != 0) return;
         // The client casts on reaching range and stops 1 ms later (in-game 11.10): that first stop is the cast's real
         // origin, within the distance the walk can have covered, not a move that interrupts it.
