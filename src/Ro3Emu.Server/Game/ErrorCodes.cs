@@ -128,6 +128,7 @@ public static class ErrorCodes
     // Skills
     public const int SkillPointsShort = 307;    // "Not enough skill points"
     public const int SkillMaxLevel = 319;       // "Skill Level exceeds the maximum level"
+    public const int LevelTooLow = 31016;       // UIWords 31016: the title rank's level requirement (inferred code)
     public const int SkillPrerequisite = 333;   // "The level of prerequisite skill is too low"
     public const int SkillNotInTree = 341;      // "This skill is not in the skill tree ..."
 
