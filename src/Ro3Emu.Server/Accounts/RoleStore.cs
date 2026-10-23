@@ -35,6 +35,10 @@ public sealed class RoleProgress
 
     /// <summary>Skill bar: slot (1..6) -> skill group id.</summary>
     public Dictionary<int, int> SkillBar { get; } = new();
+
+    /// <summary>Skill groups granted while their source holds, by level: the socketed cards' Skill(3) rows (CardEffects).
+    /// Derived on every scene load and socket change, so never saved.</summary>
+    internal Dictionary<int, int> GrantedSkills { get; } = [];
 }
 
 /// <summary>Characters in the same SQLite file as the accounts.</summary>
