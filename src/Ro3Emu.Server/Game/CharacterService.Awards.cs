@@ -362,7 +362,13 @@ public sealed partial class CharacterService
             p.Exp -= need;
             p.Level++;
         }
-        if (p.Level >= MaxLevel) p.Exp = 0;
+        if (p.Level >= MaxLevel)
+        {
+            // Past the cap Base EXP feeds the Astral Level (CharacterService.Paragon) instead of being dropped.
+            long overflow = p.Exp;
+            p.Exp = 0;
+            if (overflow > 0) AddParagonExp(p, overflow);
+        }
         p.JobExp = checked(p.JobExp + jobExp);
         SkipFreeJobLevels(p);
         int maxJob = MaxJobLevel(p.Career);
@@ -391,7 +397,8 @@ public sealed partial class CharacterService
         var result = new RoleProgress
         {
             SourceRevision = source.SourceRevision, Career = source.Career, Level = source.Level, JobLevel = source.JobLevel,
-            Exp = source.Exp, JobExp = source.JobExp, BonusPoints = source.BonusPoints, StarterKit = source.StarterKit
+            Exp = source.Exp, JobExp = source.JobExp, BonusPoints = source.BonusPoints, StarterKit = source.StarterKit,
+            ParagonLevel = source.ParagonLevel, ParagonExp = source.ParagonExp
         };
         Array.Copy(source.Stats, result.Stats, source.Stats.Length);
         foreach (var (key, value) in source.Currency) result.Currency[key] = value;
@@ -406,6 +413,7 @@ public sealed partial class CharacterService
         target.Career = source.Career; target.Level = source.Level; target.JobLevel = source.JobLevel;
         target.Exp = source.Exp; target.JobExp = source.JobExp; target.BonusPoints = source.BonusPoints;
         target.StarterKit = source.StarterKit;
+        target.ParagonLevel = source.ParagonLevel; target.ParagonExp = source.ParagonExp;
         Array.Copy(source.Stats, target.Stats, source.Stats.Length);
         target.Currency.Clear(); foreach (var (key, value) in source.Currency) target.Currency[key] = value;
         target.Skills.Clear(); foreach (var (key, value) in source.Skills) target.Skills[key] = value;
