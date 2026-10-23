@@ -229,6 +229,7 @@ public static class ErrorCodes
     public const int GuildNameInvalid = 10000, GuildNameNumbers = 10001, GuildLevelCreate = 10002;
     public const int GuildIconLocked = 10003, GuildFrameLocked = 10004, GuildJoinLevel = 10008;
     public const int GuildTextLength = 10027;
+    public const int GuildMailDaily = 10025, GuildMailContent = 10026; // group mail: today's letters used, empty text
     public const int GuildFundsShort = 484, GuildContributeShort = 10040, GuildBuildBusy = 485, GuildHallLow = 486, GuildBuildMax = 487;
     // Guild voice channels (ErrorCodeConfig 97001-97032, Localization_en): not in a guild, invalid channel, on the
     // channel's block list, already / not in the channel, not leader nor GuildVoice right, the leader cannot be kicked,

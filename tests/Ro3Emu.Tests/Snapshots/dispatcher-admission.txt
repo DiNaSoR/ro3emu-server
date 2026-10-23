@@ -394,7 +394,7 @@
 32237	economic dispatcher/economic request	refused
 32238	session Realm:legacy: dispatcher/unrouted	refused
 32239	economic dispatcher/economic request	refused
-32241	session Realm:legacy: dispatcher/unrouted	refused
+32241	economic dispatcher/economic request	refused
 32242	economic dispatcher/economic request	refused
 32243	session Realm:legacy: dispatcher/unrouted	refused
 32247	economic dispatcher/economic request	refused
