@@ -71,6 +71,17 @@ public sealed class WorldRoleOperationsTests : IAsyncLifetime
         {
             var login = await Next(alice, CharacterService.ItemsSync, DBItemsInfoIncrement.Parser);
             potion = login.PackInfo[1].All.Items.Values.Single(i => i.ItemEntry == 1000000).ItemGuid;
+            // Every bar slot is present from login: the client only updates slots it already has.
+            Assert.Equal([0, 1, 2, 3, 4, 5], login.ShortcutBarInfos.All.Value.Select(s => s.SlotIndex));
+            Assert.All(login.ShortcutBarInfos.All.Value, s => Assert.Equal(0, s.ItemGuid));
+
+            // The tutorial drags a potion onto slot 5. The client applies element-wise increments, never a new list.
+            await alice.SendGameAsync(CharacterService.ShortcutBarSave, new ShortcutBarSaveReq { SlotIndex = 4, ItemGuid = potion });
+            Assert.Equal(0, (await Next(alice, CharacterService.ShortcutBarSave, ShortcutBarSaveRes.Parser)).Result);
+            var slotFive = await Next(alice, CharacterService.ItemsSync, DBItemsInfoIncrement.Parser, m => m.ShortcutBarInfos != null);
+            Assert.Null(slotFive.ShortcutBarInfos.All);
+            Assert.Equal(6, slotFive.ShortcutBarInfos.Inc.Value.Count);
+            Assert.Equal(potion, slotFive.ShortcutBarInfos.Inc.Value[4].ItemGuid);
 
             await alice.SendGameAsync(CharacterService.ShortcutBarSave, new ShortcutBarSaveReq { SlotIndex = 0, ItemGuid = potion });
             Assert.Equal(0, (await Next(alice, CharacterService.ShortcutBarSave, ShortcutBarSaveRes.Parser)).Result);
@@ -94,6 +105,8 @@ public sealed class WorldRoleOperationsTests : IAsyncLifetime
         var persisted = await Next(again, CharacterService.ItemsSync, DBItemsInfoIncrement.Parser);
         Assert.Equal(19, persisted.PackInfo[1].All.Items[potion].Stack);
         Assert.Contains(persisted.ShortcutBarInfos.All.Value, s => s.SlotIndex == 0 && s.ItemGuid == potion);
+        Assert.Contains(persisted.ShortcutBarInfos.All.Value, s => s.SlotIndex == 4 && s.ItemGuid == 0);
+        Assert.Equal(6, persisted.ShortcutBarInfos.All.Value.Count);
         Assert.Equal(1000000, Assert.Single(persisted.QuickUseInfos.All.Value).ItemEntry);
     }
 
