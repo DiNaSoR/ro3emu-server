@@ -357,7 +357,7 @@ public sealed partial class CombatService
     }
 
     /// <summary>Ends a skill group's running cooldowns now, each under the mode it was shown (a talent's reset).</summary>
-    internal async Task ResetCooldownAsync(GameSession s, int group)
+    internal static async Task ResetCooldownAsync(GameSession s, int group)
     {
         long now = Now;
         var notice = new SkillCdNotify { Uuid = s.Role!.Id };
