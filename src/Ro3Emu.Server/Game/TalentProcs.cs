@@ -410,7 +410,7 @@ public sealed partial class TalentProcs
             if (!Ready(s, buff, rule.Cooldown is int cooldown ? (long)(Value(description, cooldown) * 1000) : 0)) continue;
             if (rule.ResetCooldown != 0)
             {
-                await _combat.ResetCooldownAsync(s, rule.ResetCooldown);
+                await CombatService.ResetCooldownAsync(s, rule.ResetCooldown);
                 continue;
             }
             if (target == null || rule.Buff)
