@@ -110,7 +110,9 @@ public sealed class DungeonCatalog(GameData data, WorldData worldData, MonsterSe
         // plain lc_dungeon_base like an ordinary dungeon (GamePlayConfig.lua:136-140).
         else if (kind is not (1 or 2) || mode is not (6 or 24) && !(mode == 26 && reconstructed?.Scripted(req.SceneEntry) != null)
             || data.Table("TenGameplayBossConfig").Values.Any(r => GameData.Int(r, "_iDungeon") == req.SceneEntry)) return null;
-        var waves = mode == 24 && selected == null ? JourneySpawns(config) : Spawns(config, boss, worldData.Map(req.SceneEntry)!);
+        // A Journey scene (24) rebuilt as a scripted scene plays its steps instead of the bare point respawns.
+        var waves = mode == 24 && selected == null && reconstructed?.Scripted(req.SceneEntry) == null
+            ? JourneySpawns(config) : Spawns(config, boss, worldData.Map(req.SceneEntry)!);
         return max >= min && waves.Count > 0 ? new Plan(config, multi, boss, mark, min, max, waves) : null;
     }
 
@@ -349,7 +351,16 @@ public sealed class DungeonCatalog(GameData data, WorldData worldData, MonsterSe
                 };
                 if (!known) return [];
             }
-            waves.Add(new Wave(waves.Count + 1, [], step.Quest, step));
+            foreach (var (interaction, skill, shots) in step.Strikes ?? [])
+                if (step.Fight.Count == 0 || shots < 0 || data.Row("SkillConfig", skill) == null
+                    || !step.Actors.Any(a => Interactions(a.NpcId).Contains(interaction))) return [];
+            var fight = new List<Spawn>();
+            foreach (var spawn in step.Fight)
+            {
+                if (!map.Points.TryGetValue(spawn.Point, out var at) || monsters.Template(spawn.NpcId) == null) return [];
+                fight.Add(new Spawn(spawn.NpcId, at));
+            }
+            waves.Add(new Wave(waves.Count + 1, fight, step.Quest, step));
         }
         // An unplayed quest is one of the scene's own quests that no step shows.
         if (scene.Unplayed.Any(q => scene.Steps.Any(s => s.Quest == q) || !data.Table("DungeonQuestConfig").Values.Any(r =>
@@ -393,7 +404,7 @@ public sealed class DungeonCatalog(GameData data, WorldData worldData, MonsterSe
         Spawn? At(long point) => bound.TryGetValue(point, out int npc) && map.Points.TryGetValue(point, out var p)
             && monsters.Template(npc) != null ? new Spawn(npc, p) : null;
         ReconstructedDungeons.ScriptedStep Chase(long region) => new($"chase to region {region}", 0, (0, 1), [], 0,
-            [new(ReconstructedDungeons.TriggerKind.Region, region)], [], 0);
+            [new(ReconstructedDungeons.TriggerKind.Region, region)], [], 0, [], false);
         var waves = new List<Wave>();
         foreach (var (elite, region, groups) in DraculaFights)
         {
@@ -429,7 +440,7 @@ public sealed class DungeonCatalog(GameData data, WorldData worldData, MonsterSe
         waves.Add(new Wave(waves.Count + 1, [], 0, new ReconstructedDungeons.ScriptedStep("find the key", 0, (0, 1), actors, 0,
             [new(ReconstructedDungeons.TriggerKind.Interaction, DraculaUnlock)],
             DraculaBushes.SelectMany(Interactions).Select(i => new ReconstructedDungeons.StepTrigger(
-                ReconstructedDungeons.TriggerKind.Interaction, i)).ToArray(), 0)));
+                ReconstructedDungeons.TriggerKind.Interaction, i)).ToArray(), 0, [], false)));
         return new Plan(config, null, null, 0, 1, (int)GameData.Int(config, "_iRoleCntLimit"), waves);
     }
 

@@ -9,7 +9,7 @@ using Ro3Emu.Bot;
 namespace Ro3Emu.Tests;
 
 /// <summary>
-/// Scripted story scenes without a fight (Reconstructed/scripted-scenes.json, DungeonService.Scripted): each scene is
+/// Scripted story scenes (Reconstructed/scripted-scenes.json, DungeonService.Scripted): each scene is
 /// entered, played through the events its client sends (32700 on the scene actors, walks into server regions, 84011
 /// at a story's end), settles as a clear, and the clear counts for its story step so the next one is offered.
 /// </summary>
@@ -26,7 +26,8 @@ public sealed partial class DungeonTests
         var plan = Service<DungeonCatalog>().Resolve(new EnterDungeonReq { SceneEntry = scene });
         Assert.NotNull(plan); // every actor, point, region, buff, plot, interaction and message resolved
         Assert.Equal(scripted.Steps.Count, plan.Waves.Count);
-        Assert.All(plan.Waves, w => Assert.Empty(w.Spawns));
+        // A step's fight spawns client-known monsters at its points; a step without one spawns nothing.
+        Assert.Equal(scripted.Steps.Select(s => s.Fight.Select(f => f.NpcId)), plan.Waves.Select(w => w.Spawns.Select(s => s.NpcId)));
         Assert.Equal(scripted.Steps, plan.Waves.Select(w => w.Step!));
         // The tracker walks the scene's configured DungeonQuestConfig quests in order, each of them but the unplayed.
         var quests = Service<GameData>().Table("DungeonQuestConfig").Values
@@ -34,6 +35,36 @@ public sealed partial class DungeonTests
             .Where(q => !scripted.Unplayed.Contains(q)).Order();
         Assert.Equal(quests, plan.Waves.Select(w => w.Quest).Distinct());
         Assert.Equal(plan.Waves.Select(w => w.Quest).Order(), plan.Waves.Select(w => w.Quest));
+    }
+
+    // The airship's cannons (inferred): 'Board the Cannon' (5300006) on a Cannon fires 5365001 at the nearest enemy
+    // airship, three boardings a ship; sinking both (5300015 at point 24, 5300053 at 61) ends stage 2 and the boarders come.
+    [ClientDataFact]
+    public async Task TheAirshipCannonsSinkTheEnemyShips()
+    {
+        const long scene = 1000501;
+        await using var alice = await InWorld("Alice");
+        await Gm(alice, "!lvl 99");
+        Assert.Equal(0, await Enter(alice, new EnterDungeonReq { SceneEntry = scene }));
+        long instance = await Load(alice, scene);
+        await Stage(alice, 1, quest: 1);
+        await Gm(alice, "!actors use"); // the chitchat (all four)
+        await Stage(alice, 2, quest: 2);
+        var cannons = await ActorsIn(alice, 3, a => a.NpcId == 5300022);
+        var ships = await WaveIn(instance, 2);
+        Assert.Equal([5300015, 5300053], ships.Select(m => m.Template.NpcId).Order());
+        var cannon = cannons[0];
+        await Gm(alice, "!actors 5300022");
+        int boardings = 0;
+        for (; boardings < 20 && ships.Any(m => !m.Dead); boardings++)
+        {
+            Assert.Equal(0, await Interact(alice, cannon, 5300006));
+            await Next(alice, CombatService.SkillHit, SkillHitInfo.Parser, h => h.SkillId == 5365001);
+            foreach (var ship in ships.Where(m => !m.Dead)) ship.Hp = ship.Template.MaxHp; // a far ship's leash reset
+        }
+        Assert.All(ships, m => Assert.True(m.Dead));
+        Assert.InRange(boardings, 6, 8); // three a ship (a miss costs one more)
+        await Stage(alice, 3, quest: 3); // the boarding
     }
 
     [ClientDataFact]

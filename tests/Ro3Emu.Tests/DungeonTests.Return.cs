@@ -307,7 +307,7 @@ public sealed partial class DungeonTests
     }
 
     [ClientDataTheory]
-    [InlineData(false, 1022001L, 5300001, 10101L)]
+    [InlineData(false, 1021851L, 5000025, 10101L)] // Eastern Payon: its elite Mandragora at entry
     [InlineData(true, Scene, Boss, RoleStore.SpawnSceneEntry)]
     public async Task LethalDungeonHitReturnsAliveThrough30402AfterDeathPublication(
         bool multi, long dungeonScene, int npc, long outside)

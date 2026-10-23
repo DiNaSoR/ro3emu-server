@@ -114,6 +114,10 @@ public sealed partial class DungeonService
         /// <summary>30441 roster slots by role (index = 0-based position), fixed on the first roster.</summary>
         public List<long> Slots { get; } = new();
         public HashSet<long> Killed { get; } = new();
+        /// <summary>The completing events a step with "all" has seen so far.</summary>
+        public HashSet<(ReconstructedDungeons.TriggerKind Kind, long Id)> StepSeen { get; } = [];
+        /// <summary>A scripted step's strikes taken so far, by monster uid.</summary>
+        public Dictionary<long, int> Struck { get; } = [];
         public HashSet<long> Precounted { get; } = new();
         public bool ObligationsFrozen { get; set; }
         public bool ObligationsActivated { get; set; }
@@ -464,9 +468,10 @@ public sealed partial class DungeonService
         if (a.Wave >= a.Plan.Waves.Count || a.Plan.Waves[a.Wave].Quest <= 0) return null;
         int size = a.Plan.Waves[a.Wave].Spawns.Count;
         var v = new DungeonVar { VarId = 10003 };
-        if (Step(a) is { } step)
+        if (Step(a) is { } step && size == 0)
         {
-            v.Vi64.Add([step.Goal.Done, step.Goal.Total]); // a scripted step: its configured counter (inferred)
+            // A scripted step: its configured counter, or the events an "all" step has seen (inferred).
+            v.Vi64.Add(step.All ? [a.StepSeen.Count, step.Complete.Count] : [step.Goal.Done, step.Goal.Total]);
             return v;
         }
         v.Vi64.Add([Math.Clamp(a.Killed.Count - a.WaveBase, 0, size), size]);
@@ -561,9 +566,13 @@ public sealed partial class DungeonService
         if (Step(a) is { } step)
         {
             await BeginStepAsync(a, step);
-            a.Spawning = false;
-            await AdvanceAsync(a); // waits for the step's client event
-            return;
+            if (a.Plan.Waves[a.Wave].Spawns.Count == 0)
+            {
+                a.Spawning = false;
+                await AdvanceAsync(a); // waits for the step's client event
+                return;
+            }
+            // A step with a fight spawns it below; it advances once its event and its kills are both in.
         }
         foreach (var spawn in a.Plan.Waves[a.Wave].Spawns)
         {
