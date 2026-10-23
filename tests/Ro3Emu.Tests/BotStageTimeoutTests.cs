@@ -22,7 +22,9 @@ public sealed class BotStageTimeoutTests
             bot.Timeout = TimeSpan.FromSeconds(1);
             var timeout = await Assert.ThrowsAsync<TimeoutException>(() => bot.EnterWorldAsync(role));
             Assert.StartsWith("bot stage role-select timed out after ", timeout.Message, StringComparison.Ordinal);
-            Assert.EndsWith($"game {MsgId.LoginRoleCreate}", timeout.Message, StringComparison.Ordinal);
+            // Other notices may arrive while selection is held; creation must be in the history,
+            // but need not be its final entry.
+            Assert.Contains($"game {MsgId.LoginRoleCreate}", timeout.Message, StringComparison.Ordinal);
             Assert.IsType<TimeoutException>(timeout.InnerException);
         }
         finally
