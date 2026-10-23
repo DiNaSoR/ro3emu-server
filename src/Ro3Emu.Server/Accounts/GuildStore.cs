@@ -58,6 +58,11 @@ public sealed class GuildStore(AccountStore accounts)
         /// commodity to count; DBGuildData shopCommodityData.</summary>
         public Dictionary<int, int> ShopCommodityBuys { get; set; } = new();
         public long ShopCommodityWeek { get; set; }
+        /// <summary>Guild group mail (32241, GuildService.BroadEmail): when the next letter may go (unix ms), and how many
+        /// went on the day BroadEmailDay (05:00, unix s).</summary>
+        public long NextBroadEmailMs { get; set; }
+        public int BroadEmailCount { get; set; }
+        public long BroadEmailDay { get; set; }
         /// <summary>32228 journal rows (GuildEventData bytes) to append with this state's next save; not part of the state.</summary>
         internal List<byte[]> PendingEvents { get; } = new();
     }

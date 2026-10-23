@@ -274,6 +274,10 @@ public sealed class SocialMessages(ChatService chat, TeamService teams, EmblemSe
         {
             await guilds.EliteSaveAsync(session, QuickJoinEliteGroupReq.Parser.ParseFrom(body.Span));
         });
+        routes.Map(GuildService.BroadEmail, "guilds", async (session, msgId, body) =>
+        {
+            await guilds.BroadEmailAsync(session, GuildBroadEmailReq.Parser.ParseFrom(body.Span));
+        });
         // Reads the committed roster, then the team family reserves the leader and the invited elites itself.
         routes.Map(GuildService.EliteTeam, "teams", async (session, msgId, body) =>
         {
