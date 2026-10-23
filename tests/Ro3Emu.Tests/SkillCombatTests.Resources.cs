@@ -165,21 +165,24 @@ public sealed partial class SkillCombatTests
         await Gm("alice", "!job 5400"); await Teach("alice", 15304); await Seasoned("alice"); await Wield("alice", 2120120);
         await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1530401 });
         Assert.Equal(0, (await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
-        await Until(s => s.Stealthed, "alice");
-        var aoi = await Next(alice, CombatService.AoiAttrChange, AOIAttrChange.Parser, a => a.Property.Any(p => p.Idx == 3010 && p.Data == 1));
+        await Until(Combat.Stealthed, "alice");
+        var aoi = await Next(alice, CombatService.AoiAttrChange, AOIAttrChange.Parser, a => a.Property.Any(p => p.Idx == 3010 && p.Data == 2));
         Assert.NotNull(aoi);
         var monster = await Target("alice", stationary: true);
         await Loop.InvokeAsync(() =>
         {
-            Assert.False(MonsterService.DetectsStealth(monster));
             Monsters.Engage(monster, Session("alice"));
             Assert.Null(monster.Target); // it cannot see her
             return Task.CompletedTask;
         });
-        for (int i = 0; i < 4; i++) await Loop.InvokeAsync(() => Buffs.StealthHitAsync(Session("alice")));
-        Assert.True(await Loop.InvokeAsync(() => Task.FromResult(Session("alice").Stealthed)));
-        await Loop.InvokeAsync(() => Buffs.StealthHitAsync(Session("alice"))); // the fifth hit reveals her
-        await Until(s => !s.Stealthed && !s.Buffs.Any(b => b.ConfigId == 1530401), "alice");
+        Task Taken() => Loop.InvokeAsync(async () =>
+        {
+            foreach (var handler in Combat.TakenAsync) await handler(monster, Session("alice"), 1);
+        });
+        for (int i = 0; i < 4; i++) await Taken();
+        Assert.True(await Loop.InvokeAsync(() => Task.FromResult(Combat.Stealthed(Session("alice")))));
+        await Taken(); // the fifth hit reveals her
+        await Until(s => !Combat.Stealthed(s) && !s.Buffs.Any(b => b.ConfigId == 1530401), "alice");
         await Loop.InvokeAsync(() =>
         {
             Monsters.Engage(monster, Session("alice"));
@@ -195,12 +198,12 @@ public sealed partial class SkillCombatTests
         await Gm("alice", "!job 5400"); await Teach("alice", 15304); await Teach("alice", 15303); await Seasoned("alice"); await Wield("alice", 2120120);
         await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1530401 });
         Assert.Equal(0, (await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
-        await Until(s => s.Stealthed, "alice");
+        await Until(Combat.Stealthed, "alice");
         var target = await Target("alice", stationary: true);
         await Loop.InvokeAsync(() => { target.Hp = 1_000_000; return Task.CompletedTask; });
         await Task.Delay(ActionMs(1530401) + 100);
         await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1530301, Face = 0 });
         Assert.Equal(0, (await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
-        await Until(s => !s.Stealthed, "alice");
+        await Until(s => !Combat.Stealthed(s), "alice");
     }
 }

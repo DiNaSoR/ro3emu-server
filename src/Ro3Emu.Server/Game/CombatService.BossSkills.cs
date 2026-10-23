@@ -82,6 +82,13 @@ public sealed partial class CombatService
             foreach (var (buff, chance, ms) in skill.SelfBuffs)
                 if (ms > 0 && Rolls.Proc(10000) < chance) await _buffs.AddSupportAsync(boss, buff, ms, boss.Uid);
         }
+        if (first && skill.GroundNpc > 0)
+        {
+            // On the target it struck, else where the area lies (the boss for an area around it).
+            bool onTarget = skill.Area is BossSkillArea.Target or BossSkillArea.AroundTarget && player != null && ReferenceEquals(player.Role, role)
+                && !player.Dead && player.WorldScene == boss.WorldScene;
+            await PlaceGroundAsync(boss, rt, skill, onTarget ? player!.Position : center);
+        }
         if (skill.SummonNpc > 0)
         {
             // A summon only spawns: its row's damage belongs to the minions' own attacks (inferred).
@@ -118,6 +125,12 @@ public sealed partial class CombatService
         }
         if (victims.Count > 0)
             await MonsterSkillHitAsync(boss, skill.Row, victims, boss.Uid, session, skill.Damages ? options.DamagePercent : 0, bossDebuffsOnly: true);
+        if (skill.PushEffect > 0)
+            foreach (var victim in victims)
+            {
+                if (!BossCastCurrent(boss, serial)) break;
+                await PushPlayerAsync(boss, skill, victim);
+            }
         foreach (var tp in pets)
         {
             if (!BossCastCurrent(boss, serial)) break;
@@ -158,6 +171,26 @@ public sealed partial class CombatService
     {
         double radians = face * Math.PI / 180;
         return (dx * Math.Sin(radians) + dz * Math.Cos(radians), dx * Math.Cos(radians) - dz * Math.Sin(radians));
+    }
+
+    /// <summary>A knockback or a pull of a player the skill hit, along the line from the boss, on the show's displacement
+    /// effect (31112, MoveType 2, as a player skill moves its target).</summary>
+    private async Task PushPlayerAsync(MonsterUnit boss, BossSkill skill, GameSession p)
+    {
+        if (p.Dead || p.SceneLoading || p.Role is not { } role || p.WorldScene != boss.WorldScene) return;
+        float dx = p.Position.X - boss.X, dz = p.Position.Z - boss.Z, length = MathF.Sqrt(dx * dx + dz * dz);
+        if (length < 0.001f || skill.PushDistance < 0 && length <= -skill.PushDistance) return;
+        float go = skill.PushDistance >= 0 ? skill.PushDistance : -(length + skill.PushDistance);
+        var start = p.Position.Clone();
+        var end = WalkableEnd(p.SceneEntry, start, dx / length * go, dz / length * go);
+        await ToPlayerAndViewersAsync(p, SkillMove, new SkillStartMoveNotify
+        {
+            EntityID = (ulong)role.Id, StartPos = start, EndPos = end, SkillConfigId = skill.Id, EffectId = skill.PushEffect,
+            MoveType = 2, StartTimestampMs = Now, Face = p.Face, MoveTimeMs = Math.Max(1, skill.PushMs),
+        });
+        p.PreviousPosition = start;
+        p.Position = end;
+        await _world.MoveAsync(p, new WalkReq { Pos = end, Dir = p.Face, Face = p.Face, BStop = true }, forceTeleport: true);
     }
 
     /// <summary>A charge or leap: the boss moves to just short of its target (within the skill's reach) on the show's
@@ -252,5 +285,48 @@ public sealed partial class CombatService
             await _world.RemoveUnitAsync(minion);
         }
         rt.Summons.Clear();
+        foreach (var ground in rt.Grounds.ToArray()) await RemoveGroundAsync(rt, ground);
+    }
+
+    private const long GroundUidBase = (1L << 55) | (1L << 54);
+    private long _groundSerial;
+
+    /// <summary>A skill's ground object (BossSkill.GroundNpc): the field MVPs' coffin-less props such as Osiris's Horong,
+    /// Moonlight Flower's bell or Dracula's tombstone, shown where the skill lands for its life (inferred).</summary>
+    private async Task PlaceGroundAsync(MonsterUnit boss, BossSkillRuntime rt, BossSkill skill, Vec3 at)
+    {
+        long now = Now;
+        var ground = new MvpFieldUnit
+        {
+            Uid = GroundUidBase | ++_groundSerial, SceneEntry = boss.SceneEntry, InstanceId = boss.InstanceId, RuntimeMap = boss.RuntimeMap,
+            NpcId = skill.GroundNpc, EntityType = 4, Boss = boss, BornMs = now, EndMs = now + skill.GroundLifeMs,
+            X = at.X, Y = at.Y, Z = at.Z, Face = boss.Face,
+        };
+        rt.Grounds.Add(ground);
+        await _world.AddUnitAsync(ground);
+        ScheduleRuntime(boss.WorldScene, TimeSpan.FromMilliseconds(skill.GroundLifeMs), () => GroundEndsAsync(boss, rt, ground, skill));
+    }
+
+    /// <summary>The object goes; one with a _kRespawnSkill (the tombstone's Gravestone Blast) first blasts the players around it.</summary>
+    private async Task GroundEndsAsync(MonsterUnit boss, BossSkillRuntime rt, MvpFieldUnit ground, BossSkill skill)
+    {
+        if (ground.Gone) return;
+        if (skill.GroundBlast > 0 && !boss.Dead && ReferenceEquals(boss.BossSkills, rt) && _data.Row("SkillConfig", skill.GroundBlast) is { } row)
+        {
+            float radius = BossSkillRadius(row);
+            var near = new List<GameSession>();
+            _world.CollectPlayers(ground.WorldScene, ground.X, ground.Z, radius + 0.5f, near);
+            near.RemoveAll(p => p.Role == null || p.Dead || p.SceneLoading);
+            if (near.Count > 0) await MonsterSkillHitAsync(boss, row, near, ground.Uid, damagePercent: _monsters.BossOptions.DamagePercent);
+        }
+        await RemoveGroundAsync(rt, ground);
+    }
+
+    private async Task RemoveGroundAsync(BossSkillRuntime rt, MvpFieldUnit ground)
+    {
+        if (ground.Gone) return;
+        ground.Gone = true;
+        rt.Grounds.Remove(ground);
+        await _world.RemoveUnitAsync(ground);
     }
 }

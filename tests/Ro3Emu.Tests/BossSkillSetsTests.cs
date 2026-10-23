@@ -37,6 +37,38 @@ public sealed class BossSkillSetsTests(ITestOutputHelper output)
         Assert.Equal((BossSkillArea.Rect, 23f, 7f), (slash.Area, slash.Radius, slash.Width));
     }
 
+    // The field MVPs' summon and prop skills name no NPC (no _kLogicData); BossSkillSets.ReconstructedSummons binds them to
+    // the 50010xx NPCs made for those MVPs. A summoned unit's own skill (its _kRespawnSkill) leaves the boss's rotation.
+    [ClientDataFact]
+    public void FieldMvpSummonsAndGroundObjectsComeFromTheirReconstructedNpcs()
+    {
+        var pharaoh = Book(5020016)!;
+        Assert.Equal(5001035, pharaoh.Skills.Single(k => k.Id == 5209701).SummonNpc); // Summon Coffin: Pharaoh's Coffin
+        Assert.Equal(5210101, pharaoh.Skills.Single(k => k.Id == 5209701).SummonBlast); // it erupts (Coffin Eruption)
+        Assert.Equal(5001036, pharaoh.Skills.Single(k => k.Id == 5209901).SummonNpc); // Summon Pyramid
+        Assert.DoesNotContain(5210101, Ids(5020016)); // the coffin's skill, not Pharaoh's
+        Assert.DoesNotContain(5210001, Ids(5020016)); // the pyramid's Spinning Pyramid
+        Assert.Equal(5001037, Book(5020008)!.Skills.Single(k => k.Id == 5213101).SummonNpc); // Drake's Water Tornado
+        var tombstone = Book(5020015)!.Skills.Single(k => k.Id == 5210601); // Dracula's Gift of the Underworld
+        Assert.Equal((5001042, 5214901), (tombstone.GroundNpc, tombstone.GroundBlast));
+        Assert.Equal(5001031, Book(5020011)!.Skills.Single(k => k.Id == 5207101).GroundNpc); // Osiris's Horong
+    }
+
+    // A show whose displacement EffectData has a knockback curve (击退/震退) pushes the players hit 3 m away; a pull (勾/吸/拉,
+    // "Pulls enemies inward toward yourself") brings them to 1 m in front of the boss (both distances inferred).
+    [ClientDataFact]
+    public void BossKnockbacksAndPullsMoveThePlayersHit()
+    {
+        var moves = Data.Table("NPCConfig").Values
+            .Where(n => GameData.Int(n, "_iNPCType") == 1 && GameData.Int(n, "_iNPCSubType") is 3 or 4 or 6)
+            .Select(n => Book((int)GameData.Int(n, "_iID"))).Where(b => b != null)
+            .SelectMany(b => b!.Skills).Where(k => k.PushEffect > 0)
+            .GroupBy(k => k.Id).ToDictionary(g => g.Key, g => g.First().PushDistance);
+        foreach (var (id, distance) in moves) output.WriteLine($"{id} {Data.TextOf(Data.Row("SkillConfig", id)!.Value, "_iName")} {distance}");
+        Assert.Equal(-1f, moves[5205501]); // Powerful Drain: a pull
+        Assert.Contains(moves.Values, d => d == 3f);
+    }
+
     [ClientDataFact]
     public void MvpServiceKeepsItsOwnPlansAndOtherAngelingsGetThemGenerically()
     {

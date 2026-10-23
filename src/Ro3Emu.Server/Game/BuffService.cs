@@ -63,9 +63,7 @@ public sealed partial class BuffService : IGameTicker
         character.GiveBuff = (p, buff, ms) => AddAsync(p, buff, ms, p.Role!.Id);
         character.IsItemUseForbidden = p => HasForbidden(p, ForbiddenState.UseItem);
         character.DynamicProperties.Add(SupportShieldProperties);
-        character.DynamicProperties.Add(StealthProperties);
         character.DynamicProperties.Add(BlindProperties);
-        Changed.Add(SyncStealthAsync);
         world.UnitRemoved.Add(unit => { _unitBuffs.Remove(unit.Uid); return Task.CompletedTask; });
     }
 

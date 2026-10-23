@@ -199,7 +199,7 @@ public sealed partial class CombatService
     }
 
     /// <summary>Ends every cooldown of a skill group (all its modes) and tells the client.</summary>
-    private async Task ResetCooldownAsync(GameSession s, int group)
+    internal static async Task ResetCooldownAsync(GameSession s, int group)
     {
         if (s.Role == null) return;
         long now = Now;

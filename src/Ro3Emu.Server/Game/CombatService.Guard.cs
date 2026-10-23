@@ -6,7 +6,7 @@ using Ro3Emu.Server.Maps;
 namespace Ro3Emu.Server.Game;
 
 /// <summary>
-/// Protection and detection skills:
+/// Protection skills (hiding and detection are handled by CombatService.Stealth and StealthEffects):
 /// <list type="bullet">
 /// <item>Damage sharing: an ally under 【Devotion】 (group 11504, "The Crusader takes @{1}% of the damage you receive",
 /// _kLogicData [12..20]) or 【King's Grace】 (11615, [50]) passes that share of each hit to the buff's source; Devotion
@@ -16,9 +16,6 @@ namespace Ro3Emu.Server.Game;
 /// cast removes the caster's control effects (category 25), and "taking DMG restores HP equal to ${4}% of the DMG
 /// taken" while it lasts. Enemies under its orbit (group 11626, _kLogicData [slow row]) gain a 【Slow】 pile every ${9} s;
 /// at ${10} piles the slow becomes Stun 901601 for ${6} s.</item>
-/// <item>Sight 12002 (buff group 12012) and Sight Sprout 12110 uncover hidden enemy players within 3.5 m; Ruwach's buff
-/// (14005, _kLogicData [1400601]) finds one within ${1} (20) m, uncovers it, strikes it with Ruwach2 and ends. Only
-/// players hide (BuffService.Stealth).</item>
 /// <item>Melt Down 16203: while its buff lasts, a monster hit has its ${4}% chance to put _kLogicData[2] (1620510,
 /// "Reduces Physical ATK and DEF by 5%") on the monster for ${6} s: the monster hits for 5% less and, monsters having no
 /// DEF in the formula, takes 5% more (inferred). A hit on an enemy player has its ${2}% chance to put 【Weapon Damage】
@@ -30,8 +27,7 @@ public sealed partial class CombatService
 {
     private const int DevotionGroup = 11504, DevotionSkillGroup = 11413, KingsGraceSkillGroup = 11612,
         KingsGraceCarrierGroup = 11614, KingsGraceLinkGroup = 11615, KingsGraceOrbitGroup = 11626,
-        SightBuffGroup = 12012, SightSkillGroup = 12002, SightSproutGroup = 12110, RuwachBuffGroup = 14005,
-        RuwachSkillGroup = 14005, MeltDownGroup = 16203, MeltDownDebuffGroup = 16205, StunBuff = 901601, ControlCategory = 25;
+        MeltDownGroup = 16203, MeltDownDebuffGroup = 16205, StunBuff = 901601, ControlCategory = 25;
 
     private void WireGuardSkills()
     {
@@ -112,7 +108,6 @@ public sealed partial class CombatService
     {
         if (s.Role == null || s.Progress == null || s.Dead || s.SceneLoading) return;
         await KingsGraceSlowAsync(s);
-        await UncoverAroundAsync(s);
     }
 
     private async Task KingsGraceSlowAsync(GameSession s)
@@ -136,28 +131,6 @@ public sealed partial class CombatService
             await _buffs.RemoveUnitConfigAsync(unit, (int)slowId);
             await _buffs.ShowOnUnitAsync(unit, StunBuff, stun, s.Role.Id);
         }
-    }
-
-    /// <summary>Sight, Sight Sprout and Ruwach uncover hidden enemy players near the caster.</summary>
-    private async Task UncoverAroundAsync(GameSession s)
-    {
-        float radius = 0;
-        if (LiveGroup(s, SightBuffGroup) != null && SkillDescAt(SightSkillGroup, 1) is { Length: > 1 } sight) radius = (float)sight[1];
-        if (_skills.Level(s.Progress!, SightSproutGroup) > 0 && SkillDescAt(SightSproutGroup, 1) is { Length: > 0 } sprout)
-            radius = Math.Max(radius, (float)sprout[0]);
-        var ruwach = LiveGroup(s, RuwachBuffGroup);
-        if (radius <= 0 && ruwach == null) return;
-        var hidden = _world.PlayersIn(s.WorldScene).Where(p => p != s && p.Stealthed && !p.Dead && PlayerHostile?.Invoke(s, p) == true)
-            .OrderBy(p => Distance(p.Position, s.Position)).ToArray();
-        foreach (var p in hidden.Where(p => Distance(p.Position, s.Position) <= radius)) await _buffs.UncoverAsync(p);
-        if (ruwach == null || _data.Row("BuffConfig", ruwach.ConfigId) is not { } ruwachRow
-            || Numbers(ruwachRow, "_kLogicData") is not [var strikeId, ..] || _data.Row("SkillConfig", (long)strikeId) is not { } strike) return;
-        float reach = SkillDescAt(RuwachSkillGroup, 1) is { Length: > 0 } rd && rd[0] > 0 ? (float)rd[0] : 20;
-        if (hidden.FirstOrDefault(p => Distance(p.Position, s.Position) <= reach) is not { } found) return;
-        await _buffs.UncoverAsync(found);
-        await _buffs.RemoveAsync(s, ruwach); // "disappears after Discovering a target"
-        await HitEventPlayersAsync(s, [found], strike, (int)strikeId, HitEffect(GameData.Int(strike, "_iScriptShow")), ++_sessionIds,
-            () => s.Role != null && !s.Dead);
     }
 
     // ------------------------------------------------------------------ Melt Down

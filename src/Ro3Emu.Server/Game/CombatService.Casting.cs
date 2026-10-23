@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Romsg;
 using Ro3Emu.Server.Data;
+using Ro3Emu.Server.Data.Config;
 using Ro3Emu.Server.Maps;
 using Ro3Emu.Server.Game.Ownership;
 
@@ -59,7 +60,7 @@ public sealed class ActiveSkillCast
 }
 
 /// <summary>One cooldown a cast set: its end, and what the group/mode held before (0 = none).</summary>
-internal readonly record struct CooldownStamp(int Group, int Mode, bool Shared, long End, long PreviousMode, long PreviousShared);
+internal readonly record struct CooldownStamp(int Group, int Mode, bool Shared, long End, long PreviousMode, long PreviousShared, int ShownMode);
 
 public sealed partial class CombatService
 {
@@ -132,14 +133,16 @@ public sealed partial class CombatService
         var origin = owned?.Pos ?? s.Position;
         if (error == 0)
         {
-            int group = (int)GameData.Int(row!.Value, "_iSkillID"), mode = (int)GameData.Int(row.Value, "_iMode");
+            var skill = new SkillConfig(row!.Value);
+            int group = (int)skill.SkillId, mode = (int)skill.Mode;
             if (Math.Max(s.SkillCds.GetValueOrDefault(group), s.SkillModeCds.GetValueOrDefault((group, mode))) > Now) error = ErrorCodes.SkillCooldown;
             // A live cast refuses a new one until it yields (_iInterruptedType). _bCancelCast is only the client's
             // cancel-button flag (LC_SkillInput_Handler_Default.CheckShowCancelBtn), not a licence to recast.
             else if (s.SkillCast is { Cancelled: false } active && Now < active.StartMs + active.ChantMs + active.ActionMs
                 && !CastYieldsTo(active, row.Value)) error = ErrorCodes.SkillBusy;
             else if (owned == null && NormalAttackTooSoon(s, row.Value)) error = ErrorCodes.SkillBusy;
-            else error = ValidateTarget(s, row.Value, req, origin, owned == null ? WalkSlack(s) : 0);
+            else error = ValidateTarget(s, row.Value, req, origin, owned == null ? WalkSlack(s) : 0,
+                _data.Row("SkillConfig", request.SkillId) is { } askedRow ? Range(askedRow) : 0);
         }
         var costs = row is { } value ? ResolveCosts(s, value) : new CastCosts();
         long errorParam = 0;
@@ -196,7 +199,8 @@ public sealed partial class CombatService
             _eventAttacks[s] = new EventAttack(playerTarget, loopSkill,
                 Now + SkillMs(s, row.Value) + ChantMs(s, row.Value) + 1,
                 s.Position.X, s.Position.Z);
-        var cooldowns = await StartCooldownAsync(s, row.Value);
+        var cooldowns = await StartCooldownAsync(s, row.Value,
+            askedMode: SkillConfig.Get(_data, request.SkillId) is { } asked ? (int)asked.Mode : null);
         await StartCastAsync(s, row.Value, req, id, owned, chanted ? costs : null, arrival, cooldowns);
     }
 
@@ -363,7 +367,9 @@ public sealed partial class CombatService
     internal const double MaxWalkSlackSeconds = 5;
     private static float WalkSlack(GameSession s) => s.WalkReportLag(MaxWalkSlackSeconds);
 
-    private int ValidateTarget(GameSession s, JsonElement row, CastSkillReq req, Vec3 origin, float slack = 0)
+    /// <param name="askedRange">The range of the row the client asked for: it walks into that range, not into the
+    /// range of a mode row a talent or a mount selects (Arrow Smash 18 m, its wolf row 5 m; issue #62).</param>
+    private int ValidateTarget(GameSession s, JsonElement row, CastSkillReq req, Vec3 origin, float slack = 0, float askedRange = 0)
     {
         int release = (int)GameData.Int(row, "_iRelease");
         var monster = FindMonster(s.WorldScene, req.TargetId);
@@ -407,7 +413,8 @@ public sealed partial class CombatService
         }
         if (!_buffs.CanSeePosition(s, targetPosition)) return ErrorCodes.SkillTargetInvalid;
         float d = Distance(origin, targetPosition);
-        if (d < GameData.Int(row, "_iDistanceMin") / 100f - slack || d > Range(row) + 0.5f + slack) return ErrorCodes.SkillDistance;
+        if (d < GameData.Int(row, "_iDistanceMin") / 100f - slack || d > Math.Max(Range(row), askedRange) + 0.5f + slack)
+            return ErrorCodes.SkillDistance;
         float height = GameData.Int(row, "_iHeightRange") / 100f;
         if (height > 0 && MathF.Abs(origin.Y - targetPosition.Y) > height) return ErrorCodes.SkillHeight;
         // Same test as the client's own pre-cast check (LC_Skill_Function.CheckPosIsCanInputSkill), so a cast the client
@@ -512,26 +519,32 @@ public sealed partial class CombatService
         return false;
     }
 
-    private async Task<IReadOnlyList<CooldownStamp>?> StartCooldownAsync(GameSession s, JsonElement row, bool landing = false)
+    private async Task<IReadOnlyList<CooldownStamp>?> StartCooldownAsync(GameSession s, JsonElement row, bool landing = false, int? askedMode = null)
     {
         if (s.GmNoCooldown) return null; // GM panel GmNoCD
         // High-Energy Impact's take-off shares its cooldown with the attack it arms; the cooldown starts on landing.
         if (!landing && FlightScript(Script(row))) return null;
-        int group = (int)GameData.Int(row, "_iSkillID"), mode = (int)GameData.Int(row, "_iMode");
-        long now = Now, cd = GameData.Int(row, "_iCD");
+        var skill = new SkillConfig(row);
+        int group = (int)skill.SkillId, mode = (int)skill.Mode;
+        long now = Now, cd = skill.Cd;
         var notice = new SkillCdNotify { Uuid = s.Role!.Id };
         var stamps = new List<CooldownStamp>();
-        void Set(int g, int m, long duration, bool shared)
+        void Set(int g, int m, long duration, bool shared, int shownMode)
         {
             if (duration <= 0) return;
             long end = now + duration;
             long previousMode = s.SkillModeCds.GetValueOrDefault((g, m)), previousShared = s.SkillCds.GetValueOrDefault(g);
             s.SkillModeCds[(g, m)] = Math.Max(end, previousMode);
             if (shared) s.SkillCds[g] = Math.Max(end, previousShared);
-            stamps.Add(new CooldownStamp(g, m, shared, end, previousMode, previousShared));
-            notice.Infos.Add(new SkillCdInfo { SkillId = g, SkillMode = m, CdStartTimestampMs = now, CdEndTimestampMs = end });
+            stamps.Add(new CooldownStamp(g, m, shared, end, previousMode, previousShared, shownMode));
+            notice.Infos.Add(new SkillCdInfo { SkillId = g, SkillMode = shownMode, CdStartTimestampMs = now, CdEndTimestampMs = end });
         }
-        Set(group, mode, cd, GameData.Int(row, "_iCdModeGroup") < 0);
+        // The client files a 31113 under group * 10000 + its mode (LC_Skill_Function.GetSkillCDInfoKey) and its bar reads
+        // the key of the row it keeps, the row it asks to cast. A mode a talent or a mount selects (type 15: Joint Beat,
+        // Spear Throw, Arrow Smash on the wolf) casts another row, and a cooldown sent under that row's mode never showed
+        // (issue #62): it goes under the asked row's mode. Without one, a mode row's _iCdModeGroup (0: mode 0's) decides.
+        int cdModeGroup = (int)new SkillConfig(row).CdModeGroup;
+        Set(group, mode, cd, cdModeGroup < 0, askedMode ?? (cdModeGroup >= 0 ? cdModeGroup : mode));
         var shared = Numbers(row, "_iPubCD");
         var groups = Numbers(row, "_iPubCDGroup");
         // Parallel arrays, e.g. BackSlide [15104,15330,15329] / [1000,15000,0] (inferred server application).
@@ -539,7 +552,7 @@ public sealed partial class CombatService
         {
             int sibling = (int)groups[i];
             if (_data.Row("SkillConfig", sibling) is { } siblingRow) sibling = (int)GameData.Int(siblingRow, "_iSkillID");
-            if (sibling > 0) Set(sibling, 0, (long)shared[i], true);
+            if (sibling > 0) Set(sibling, 0, (long)shared[i], true, 0);
         }
         if (notice.Infos.Count > 0) await s.SendGameAsync(SkillCdUpdate, notice);
         return stamps;
@@ -574,7 +587,7 @@ public sealed partial class CombatService
             if (!changed) continue;
             long end = Math.Max(now, Math.Max(s.SkillModeCds.GetValueOrDefault((stamp.Group, stamp.Mode)),
                 stamp.Shared ? s.SkillCds.GetValueOrDefault(stamp.Group) : 0));
-            notice.Infos.Add(new SkillCdInfo { SkillId = stamp.Group, SkillMode = stamp.Mode, CdStartTimestampMs = now, CdEndTimestampMs = end });
+            notice.Infos.Add(new SkillCdInfo { SkillId = stamp.Group, SkillMode = stamp.ShownMode, CdStartTimestampMs = now, CdEndTimestampMs = end });
         }
         if (notice.Infos.Count > 0) await s.SendGameAsync(SkillCdUpdate, notice);
     }
