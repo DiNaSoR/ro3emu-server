@@ -161,6 +161,12 @@ public sealed class ServerOptions
     public bool StarCoreDrops { get; set; } = true;
 
     /// <summary>
+    /// (inferred) Chance in percent that an MVP kill drops a Lord's Mane, the Starshatter Dragon's unseal material, to one
+    /// participant (MvpService). The client data gives it no source; 0 turns it off.
+    /// </summary>
+    public int LordsManePercent { get; set; } = 10;
+
+    /// <summary>
     /// (inferred) Seconds from a raid boss fight's start to its enrage, against which the Final Trial "more than N minutes
     /// remaining until enrage" honors (TenGameplayFinalTrialConfig, condition 7004) are judged. The enrage timer lives in
     /// the boss's server script, which the client does not carry.
