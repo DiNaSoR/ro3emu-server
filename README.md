@@ -1,5 +1,10 @@
 # RO3Emu: Ragnarok Online 3 server emulator
 
+This fork combines [akreao's server](https://github.com/akreao/ro3emu-server) at `1df7e8d` with
+[aethai's v1.0.13](https://github.com/aethai/ro3emu-server/tree/v1.0.13), preserving both histories. It also carries
+fixes for moving item shortcuts and refreshing newly appearing inventory sections. Contributions back to either
+upstream should use focused branches based on that upstream's current code.
+
 An open-source server for the **Ragnarok Online 3 PC client**, written in C# (.NET 10, SQLite). Play on your own PC,
 host a server for friends, or help rebuild the original game server one system at a time. The goal is a faithful 1:1
 server first; changes to the original rules come after.
