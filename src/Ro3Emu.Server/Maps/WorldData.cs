@@ -161,14 +161,14 @@ public sealed class MapWorld
             MapPoint? best = null;
             float bestDistance = float.MaxValue;
             for (int dx = -r; dx <= r; dx++)
-            for (int dz = -r; dz <= r; dz++)
-            {
-                if (Math.Max(Math.Abs(dx), Math.Abs(dz)) != r) continue;
-                float x = cx + dx + 0.5f, z = cz + dz + 0.5f;
-                if (nav.WalkHeight(x, z, p.Y) is not { } y) continue;
-                float distance = (x - p.X) * (x - p.X) + (z - p.Z) * (z - p.Z) + (y - p.Y) * (y - p.Y);
-                if (distance < bestDistance) { bestDistance = distance; best = p with { X = x, Y = y, Z = z }; }
-            }
+                for (int dz = -r; dz <= r; dz++)
+                {
+                    if (Math.Max(Math.Abs(dx), Math.Abs(dz)) != r) continue;
+                    float x = cx + dx + 0.5f, z = cz + dz + 0.5f;
+                    if (nav.WalkHeight(x, z, p.Y) is not { } y) continue;
+                    float distance = (x - p.X) * (x - p.X) + (z - p.Z) * (z - p.Z) + (y - p.Y) * (y - p.Y);
+                    if (distance < bestDistance) { bestDistance = distance; best = p with { X = x, Y = y, Z = z }; }
+                }
             if (best is { } found) return found;
         }
         return p;

@@ -127,8 +127,10 @@ public sealed partial class MapTests
                 Assert.Equal(0, MergedKillReceiptCount("monster-kill"));
                 Assert.DoesNotContain(alice.Inbox.Snapshot(), e => e.IsGame(CombatService.SkillHit)
                     && SkillHitInfo.Parser.ParseFrom(e.Body).Dsts.Any(d => d.DstID == uid && d.IsDead));
+                // Keep the rejection in place until the automatic swing has ended; otherwise it can kill the boss
+                // before the explicit retry below, making that retry legitimately return an invalid-target error.
+                await StopAttackingAsync("alice");
                 accounts.BeforeOwnedCommitForTest = null;
-                await StopAttackingAsync("alice"); // a Normal Attack never breaks its own live swing
                 await alice.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = 1000001, TargetId = uid });
                 Assert.Equal(0, (await Next(alice, CombatService.UseSkill, CastSkillRsp.Parser)).Result);
                 await Next(alice, MvpService.DeadNotify, MVPDeadNotify.Parser);

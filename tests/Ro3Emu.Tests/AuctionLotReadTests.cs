@@ -16,7 +16,7 @@ public sealed class AuctionLotReadTests : IDisposable
 
     public AuctionLotReadTests()
     {
-        _accounts = new AccountStore(Options.Create(new ServerOptions { DataDir = _directory }));
+        _accounts = new AccountStore(Options.Create(new ServerOptions { DataDir = _directory, GameDataDir = SyntheticData.Dir }));
         _auctions = new AuctionStore(_accounts);
     }
 
@@ -38,7 +38,7 @@ public sealed class AuctionLotReadTests : IDisposable
         return (open, settled, run);
     }
 
-    private static long[] Ids(IEnumerable<AuctionStore.Item> items) => items.Select(item => item.Id).Order().ToArray();
+    private static long[] Ids(IEnumerable<AuctionStore.Item> items) => [.. items.Select(item => item.Id).Order()];
 
     private void AssertReads(AuctionStore.Item open, AuctionStore.Item settled, AuctionStore.Item run)
     {

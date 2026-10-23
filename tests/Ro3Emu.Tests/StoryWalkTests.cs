@@ -634,14 +634,14 @@ public sealed class StoryWalkTests(ITestOutputHelper output) : IAsyncLifetime
         var until = DateTime.UtcNow + TimeSpan.FromSeconds(90);
         while (!result.IsCompleted && DateTime.UtcNow < until)
         {
-            // A scripted scene without a fight: play its current step the way the client does (see PlayStepAsync).
-            // A fight step (its Step has spawns) is cleared by the kills below, like any wave.
+            // Send a step's pending client events, including mixed fight/event steps. Its kills still go through combat.
+            // StepDone prevents replaying already completed events while the fight continues.
             var (wave, step) = await OnLoop(s => s.DungeonAttempt is { Settled: false } a && a.Wave < a.Plan.Waves.Count
-                && a.Plan.Waves[a.Wave].Step is { Fight: false } scripted ? (a.Wave, scripted) : (-1, null));
+                && !a.StepDone && a.Plan.Waves[a.Wave].Step is { Complete.Count: > 0 } scripted ? (a.Wave, scripted) : (-1, null));
             if (step != null)
             {
                 await PlayStepAsync(scene, wave, step, detail);
-                for (int i = 0; i < 100 && !result.IsCompleted && await OnLoop(s => s.DungeonAttempt?.Wave) == wave; i++)
+                for (int i = 0; i < 100 && !result.IsCompleted && await OnLoop(s => s.DungeonAttempt is { StepDone: false } pending && pending.Wave == wave); i++)
                     await Task.Delay(50);
                 steps++;
                 continue;
@@ -660,7 +660,8 @@ public sealed class StoryWalkTests(ITestOutputHelper output) : IAsyncLifetime
 
     /// <summary>
     /// One step of a scripted scene (Reconstructed/scripted-scenes.json): the bot sends what the player's client sends
-    /// for the step's first completing event. For an interaction (or the dungeon message an interaction sends) it stands
+    /// for each required event, or its first completing event when any one suffices. For an interaction (or the dungeon
+    /// message an interaction sends) it stands
     /// beside the step's scene actor offering it and sends 32700 as the client does when the player presses the
     /// interaction (or walks into its range, or picks the dialogue option that triggers it); for a region or a point it
     /// reports a walk into it (31082); for a story it sends what the client sends when the story ends (32709, 84011).
@@ -669,35 +670,35 @@ public sealed class StoryWalkTests(ITestOutputHelper output) : IAsyncLifetime
     private async Task PlayStepAsync(long scene, int wave, ReconstructedDungeons.ScriptedStep step, List<string> detail)
     {
         var catalog = Service<DungeonCatalog>();
-        var t = step.Complete[0];
-        switch (t.Kind)
-        {
-            case ReconstructedDungeons.TriggerKind.Plot:
-                await _bot.SendGameAsync(TaskService.ExitCutSceneState, new ExitCutSceneStateReq());
-                await _bot.SendGameAsync(TaskService.PlotActingEnd, new PlotActingEndReq { PlotId = t.Id });
-                detail.Add($"step {wave + 1}: story {t.Id} ended (84011)");
-                break;
-            case ReconstructedDungeons.TriggerKind.Interaction or ReconstructedDungeons.TriggerKind.Message:
-                var (actor, interaction) = await OnLoop(s => (s.DungeonAttempt?.SceneActors ?? []).SelectMany(a => catalog.Interactions(a.NpcId)
-                    .Where(i => t.Kind == ReconstructedDungeons.TriggerKind.Interaction ? i == t.Id : catalog.DungeonMessage(i) == t.Id)
-                    .Select(i => (a, i))).FirstOrDefault());
-                if (actor == null) throw new WalkBlocked($"dungeon {scene} step {wave + 1}: no scene actor offers {t.Kind} {t.Id}");
-                await Service<GameLoop>().InvokeAsync(() => Service<SceneService>().TeleportInMapAsync(Session(),
-                    new MapPoint(actor.X + 1, actor.Y, actor.Z, actor.Face)));
-                var reply = await RequestAsync(SceneService.NpcInteraction, new NpcInteractionReq
-                { NpcUid = actor.Uid, InteractionId = (int)interaction, SceneConfigId = scene }, NpcInteractionRsp.Parser);
-                detail.Add($"step {wave + 1}: 32700 interaction {interaction} on {actor.NpcId}" + (reply.Result != 0 ? $" refused {reply.Result}" : ""));
-                break;
-            default:
-                MapPoint at = t.Kind == ReconstructedDungeons.TriggerKind.Region && catalog.SceneRegion(scene, t.Id) is { } region
-                    ? new MapPoint(region.X, region.Y, region.Z, 0)
-                    : catalog.ScenePoint(scene, t.Id) ?? throw new WalkBlocked($"dungeon {scene}: no {t.Kind} {t.Id}");
-                await Service<GameLoop>().InvokeAsync(() => Service<SceneService>().TeleportInMapAsync(Session(),
-                    new MapPoint(at.X - 0.5f, at.Y, at.Z, 0)));
-                await _bot.SendGameAsync(MsgId.Walk, new WalkReq { Pos = new Vec3 { X = at.X, Y = at.Y, Z = at.Z }, BStop = true, SpeedRate = 1 });
-                detail.Add($"step {wave + 1}: walked into {t.Kind.ToString().ToLowerInvariant()} {t.Id}");
-                break;
-        }
+        foreach (var t in step.All ? step.Complete : step.Complete.Take(1))
+            switch (t.Kind)
+            {
+                case ReconstructedDungeons.TriggerKind.Plot:
+                    await _bot.SendGameAsync(TaskService.ExitCutSceneState, new ExitCutSceneStateReq());
+                    await _bot.SendGameAsync(TaskService.PlotActingEnd, new PlotActingEndReq { PlotId = t.Id });
+                    detail.Add($"step {wave + 1}: story {t.Id} ended (84011)");
+                    break;
+                case ReconstructedDungeons.TriggerKind.Interaction or ReconstructedDungeons.TriggerKind.Message:
+                    var (actor, interaction) = await OnLoop(s => (s.DungeonAttempt?.SceneActors ?? []).SelectMany(a => catalog.Interactions(a.NpcId)
+                        .Where(i => t.Kind == ReconstructedDungeons.TriggerKind.Interaction ? i == t.Id : catalog.DungeonMessage(i) == t.Id)
+                        .Select(i => (a, i))).FirstOrDefault());
+                    if (actor == null) throw new WalkBlocked($"dungeon {scene} step {wave + 1}: no scene actor offers {t.Kind} {t.Id}");
+                    await Service<GameLoop>().InvokeAsync(() => Service<SceneService>().TeleportInMapAsync(Session(),
+                        new MapPoint(actor.X + 1, actor.Y, actor.Z, actor.Face)));
+                    var reply = await RequestAsync(SceneService.NpcInteraction, new NpcInteractionReq
+                    { NpcUid = actor.Uid, InteractionId = (int)interaction, SceneConfigId = scene }, NpcInteractionRsp.Parser);
+                    detail.Add($"step {wave + 1}: 32700 interaction {interaction} on {actor.NpcId}" + (reply.Result != 0 ? $" refused {reply.Result}" : ""));
+                    break;
+                default:
+                    MapPoint at = t.Kind == ReconstructedDungeons.TriggerKind.Region && catalog.SceneRegion(scene, t.Id) is { } region
+                        ? new MapPoint(region.X, region.Y, region.Z, 0)
+                        : catalog.ScenePoint(scene, t.Id) ?? throw new WalkBlocked($"dungeon {scene}: no {t.Kind} {t.Id}");
+                    await Service<GameLoop>().InvokeAsync(() => Service<SceneService>().TeleportInMapAsync(Session(),
+                        new MapPoint(at.X - 0.5f, at.Y, at.Z, 0)));
+                    await _bot.SendGameAsync(MsgId.Walk, new WalkReq { Pos = new Vec3 { X = at.X, Y = at.Y, Z = at.Z }, BStop = true, SpeedRate = 1 });
+                    detail.Add($"step {wave + 1}: walked into {t.Kind.ToString().ToLowerInvariant()} {t.Id}");
+                    break;
+            }
     }
 
     /// <summary>Grind stand-in: the levels a real player would gain by fighting, supplied by !lvl and reported.</summary>

@@ -134,6 +134,12 @@ public sealed class PassPlayTests : IAsyncLifetime
         Assert.Equal(60, play.WeeklyProgress["w.activity"]);
         Assert.Equal(expected, await Currency(alice, NewActivityService.PassExpCurrency));
         Assert.Equal(expected, play.Earned);
+        // The currency/runtime commit precedes ReconcilePassAsync's separate level projection and publication.
+        await Until(async () =>
+        {
+            var current = await Pass(alice);
+            return current.Level * 2000L + current.Exp == expected;
+        }, "pass level projection after the reward commit");
         pass = await Pass(alice);
         Assert.Equal(expected, pass.Level * 2000L + pass.Exp);
     }

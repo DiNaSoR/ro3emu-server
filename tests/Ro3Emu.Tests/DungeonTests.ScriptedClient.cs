@@ -198,11 +198,23 @@ public sealed partial class DungeonTests
         {
             var o = data.Row("NPCInteractConfig", other)!.Value;
             foreach (var dialogue in Actions(o, "_iEXECAction").Where(a => a is ["53", _, ..]).Select(a => long.Parse(a[1])))
-                if (data.Row("DialogueConfig", dialogue) is { } lines && lines.EnumerateArray().Any(line => Actions(line, "_iEXECAction")
-                        .Any(a => a is ["211", var n, var i, ..] && n == npcId.ToString() && i == interaction.ToString())))
-                    return (int)other;
+                if (DialogueTriggers(dialogue, [])) return (int)other;
         }
         throw new Xunit.Sdk.XunitException($"ActionTrigger {interaction} of {npcId}: no dialogue of the unit runs it");
+
+        // Dialogue choices can continue into another dialogue (action 7) before running the interaction (211).
+        // The injured airship captain uses 530003802 -> 530003803 -> interaction 5300039.
+        bool DialogueTriggers(long dialogue, HashSet<long> visited)
+        {
+            if (!visited.Add(dialogue) || data.Row("DialogueConfig", dialogue) is not { } lines) return false;
+            foreach (var action in lines.EnumerateArray().SelectMany(line => Actions(line, "_iEXECAction")))
+            {
+                if (action is ["211", var n, var i, ..] && n == npcId.ToString() && i == interaction.ToString()) return true;
+                if (action is ["7", var next, ..] && long.TryParse(next, System.Globalization.NumberStyles.Integer,
+                    System.Globalization.CultureInfo.InvariantCulture, out long id) && DialogueTriggers(id, visited)) return true;
+            }
+            return false;
+        }
     }
 
     /// <summary>The interaction's _iNPCCondition as the client evaluates it here: its 1004 CheckHaveBuff parts.</summary>

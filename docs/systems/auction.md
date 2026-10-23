@@ -2,6 +2,11 @@
 
 Scope: `MG_Auction` (19). Client evidence is the extracted Lua, configuration, localization, C# and protobuf. Behavior has not been validated against the original client at runtime. Protocol tests use the emulator's TCP/protobuf interfaces and temporary databases on free ports.
 
+Auction reads use indexed copies of settlement state, auction type, run ID and end time. The original state blob
+remains authoritative; every lot write updates the columns in the same transaction. Startup backfills existing lots
+when adding the columns. Recurring sweeps read open lots, and each result includes its owner revision for the next
+checked write, avoiding repeated decoding of the entire auction history.
+
 ## Ownership boundary with the trading house
 
 `MG_TradeCenter` (27) is the 326xx trading-house family: 32602-32610, 32612-32621, 32623, 32625-32626, 32628-32630 and 5033, together with player/system stalls and their settlement, are documented in [trade-stalls.md](trade-stalls.md) ("Implemented interfaces" and "Canonical mailbox integration"). The auction service does not duplicate those routes. The distinct protocol families are visible in `MG_TradeCenter.proto`, `MG_Auction.proto`, `LC_TradeServer.lua` and `LC_AuctionServer.lua`.

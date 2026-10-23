@@ -276,6 +276,14 @@ Reconstructed scripted scenes (`Reconstructed/scripted-scenes.json`, same switch
   (31037, 31104/31105) against these rules for every step. GM test aid: !actors lists the step and its actors, !actors
   <npcId> puts the player on one.
 
+- Airship 1000501, Peco nest 1051001 and Pharaoh 3120702 use scripted stages rather than only their fight waves.
+  A stage can require both combat and client events. With `all: true`, each distinct event in `complete` must arrive;
+  replaying one event does not replace another. The airship uses this for its paired cannon objectives. Its `strike`
+  entries map an actor interaction to a configured skill against the nearest living fight target. A `shots` count
+  applies an inferred volley progression before the ordinary damage and kill paths; this is a reconstruction, not
+  an original server script. The injured captain's interaction is reached through chained dialogue choices
+  (530003802 to 530003803, then action 211 for interaction 5300039).
+
 Not implemented or unqualified:
 
 - Of 65 eligible ordinary dungeon config rows (64 have an editor file, representing 60 distinct exports), 1022001 joins editor point 20

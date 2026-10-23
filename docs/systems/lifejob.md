@@ -25,6 +25,11 @@ Starting a forge presentation (33510) only reserves a recipe/scene/time ticket. 
 
 The first 5010 represents unchosen professions. Wire-only deletion entries materialize empty top-level maps through `LC_PbHelper.ParseMapTypeIncrement`; these entries do not enter persisted state. A newly learned profession sends a fresh full 5010 because `LC_DAL_LifeJob.lua:800` dereferences its prior career asset on the incremental path. Nested title/tool/gather/build messages are explicit; no placeholder recipe or drop is granted to populate a map.
 
+Gathering tiers unlock when the active profession meets `LifeCollectionConfig._iCondition`, at login, profession
+selection and EXP gain. The pending profession level is used when a gather itself earns the level, and the unlock
+is saved with that progression. The client's Unlock action for collections with map destinations only navigates to
+the gathering area; it does not send a separate study request.
+
 Empty nested maps were checked against the actual decoder setup: `Network/NW_GameServerHandler.lua:332-354` selects `no_decode_default_array`, but not `no_default_values`; the client and server DB protos are matching proto3 schemas. In the [upstream lua-protobuf decoder](https://github.com/starwing/lua-protobuf/blob/master/pb.c), proto3 default-table construction includes map tables independently of the repeated-array option. **Inferred compatibility:** the bundled bridge follows this proto3 map behavior. The tests parse the actual wire with generated protobuf types; behavior in the native client bridge has not been verified.
 
 ## Explicit inferred policies

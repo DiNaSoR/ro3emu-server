@@ -158,7 +158,8 @@ public sealed partial class DungeonTests
     public async Task PaidReviveDetachedDuringPublicationDoesNotFault()
     {
         await using var alice = await InWorld("Alice");
-        ChangeRow("MapConfig", RoleStore.SpawnSceneEntry.ToString(), row => row["_kItemRevive"] = new JsonArray(1112001, 1));
+        ChangeRow("MapConfig", RoleStore.SpawnSceneEntry.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            row => row["_kItemRevive"] = new JsonArray(1112001, 1));
         await Gm(alice, "!item 1112001 2");
         var session = Session(alice);
         var role = session.Role;

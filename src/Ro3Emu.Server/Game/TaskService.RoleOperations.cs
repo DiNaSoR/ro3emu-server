@@ -167,7 +167,7 @@ public sealed partial class TaskService
         if (rows.Count != 1) return [];
         var preview = rows[0].Preview;
         if (preview.Length != 8 || preview.Any(t => t.Length < 2 || t[0] is <= 0 or > int.MaxValue || t[1] is <= 0 or > int.MaxValue)) return [];
-        return preview.Select(t => ((int)t[0], (int)t[1])).ToList();
+        return [.. preview.Select(t => ((int)t[0], (int)t[1]))];
     }
 
     /// <summary>30016 resolves the destination from a running quest's own 142/143 track action.</summary>

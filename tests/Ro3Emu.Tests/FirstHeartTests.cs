@@ -6,19 +6,35 @@ using Ro3Emu.Bot;
 using Ro3Emu.Server;
 using Ro3Emu.Server.Accounts;
 using Ro3Emu.Server.Game;
+using Ro3Emu.Server.Data;
+using Ro3Emu.Server.Data.Config;
 
 namespace Ro3Emu.Tests;
 
 /// <summary>
-/// Seven-Day Goal (FirstHeartService): 5049 starts at base level 30 (NewActivityConfig 114, condition 21000012; level 10
-/// before the 20 Oct 2026 client) with day 1 open; 83500 pays a completed task once and scores its point, 83501 a score reward once the score reaches it; the state
+/// Seven-Day Goal (FirstHeartService): 5049 starts at the exported open level (NewActivityConfig 114, condition
+/// 21000012) with day 1 open; 83500 pays a completed task once and scores its point, 83501 a score reward once the score reaches it; the state
 /// survives a relogin. Day 1 tasks: 100100200 (level 10), 101101100 (1 login day), 102101110 (a quality-3 card).
 /// </summary>
 public sealed class FirstHeartTests : IAsyncLifetime
 {
     private const long LevelTen = 100100200, LevelTwenty = 100100201, LevelFifty = 100100206, LoginOne = 101101100,
         LoginSeven = 101101106, CardTask = 102101110;
-    private const int OpenLevel = 30; // condition 21000012
+    private int OpenLevel
+    {
+        get
+        {
+            var data = Service<GameData>();
+            var activity = NewActivityConfig.Get(data, FirstHeartService.Activity)
+                ?? throw new InvalidOperationException("The export must include the Seven-Day Goal activity.");
+            var condition = LCConditionList.Get(data, activity.OpenCondition)
+                ?? throw new InvalidOperationException("The activity must have an opening condition.");
+            var conditions = condition.SubConditionList
+                ?? throw new InvalidOperationException("The opening condition must specify its level.");
+            var level = conditions.EnumerateArray().Select(c => new LCConditionList(c).Data).Single(d => d is [1002, _]);
+            return checked((int)level[1]);
+        }
+    }
     private const int Zeny = 1;
     private static readonly TimeSpan Wait = TimeSpan.FromSeconds(15);
     private readonly string _dataDir = Path.Combine(Path.GetTempPath(), "ro3emu-firstheart-" + Guid.NewGuid().ToString("N"));
@@ -185,6 +201,7 @@ public sealed class FirstHeartTests : IAsyncLifetime
         Assert.Equal(0, await ClaimTask(alice, LoginOne));
         Assert.Equal(ErrorCodes.TaskRequirements, await ClaimScore(alice, 1)); // 2 of 3 points
 
+        await Gm(alice, "!lvl 20"); // Opening the activity need not already satisfy day 2's level requirement.
         await Gm(alice, "!firstheart day 2");
         await Until(s, cfg => Status(cfg, LevelTwenty) == FirstHeartTaskState.Accept, "day 2 level task completed");
         Assert.Equal(1, (await Cfg(s))!.CfgData[1002]);

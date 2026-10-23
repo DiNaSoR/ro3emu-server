@@ -7,7 +7,7 @@ namespace Ro3Emu.Server.Accounts.Persistence;
 /// <summary>
 /// Indexed copies of the auction_item state fields the reads filter on (#254): the sweep and the market read only
 /// unsettled lots, history only settled ones of a type, a dungeon run only its own lots. The state blob stays the
-/// source of truth; every write of it rewrites these columns in the same statement.
+/// source of truth; every write of it rewrites these columns in the same transaction.
 /// </summary>
 internal static class AuctionItemColumns
 {

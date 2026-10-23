@@ -13,7 +13,7 @@ public sealed partial class KillEconomyTests
     {
         await using var bot = await Enter();
         using (var client = new HttpClient())
-            (await client.PostAsync(http + "/ro3emu/gm?account=killtest", new StringContent("!job 1100"))).EnsureSuccessStatusCode();
+            (await client.PostAsync(_http + "/ro3emu/gm?account=killtest", new StringContent("!job 1100"))).EnsureSuccessStatusCode();
         var player = Session;
         var character = Service<CharacterService>();
         var monster = await Service<GameLoop>().InvokeAsync(async () =>
