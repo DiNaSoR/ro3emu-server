@@ -98,6 +98,38 @@ public sealed class FirstPassAwardTests
         Assert.Equal(DungeonService.FirstAwardNone, (await AwardInfo(host, bot, Hard, 1)).IsFirst);
     }
 
+    /// <summary>
+    /// The reward pays again every season (Steven's answer on #228 and #275). A new season rebuilds the state
+    /// (CurrentState) without Records or FirstPassPaid, and the once-only economy key carries the season start. The
+    /// restart with a later ServerOptions.SeasonStart stands in for the rollover.
+    /// </summary>
+    [Fact]
+    public async Task ANewSeasonOffersTheFirstClearRewardAgain()
+    {
+        string seasonStart = "2026-10-05";
+        await using var host = await SyntheticHost.StartAsync(o => o.SeasonStart = seasonStart);
+        long before;
+        await using (var bot = await host.InWorldAsync("Seasons"))
+        {
+            await Cleared(host, bot, Normal, 1);
+            before = await Count(host, bot);
+            Assert.Equal(0, await Claim(bot, Normal, 1));
+            Assert.Equal(ErrorCodes.RewardClaimed, await Claim(bot, Normal, 1));
+        }
+
+        seasonStart = "2027-01-04";
+        await host.RestartAsync();
+        await using var again = await host.InWorldAsync("Seasons", create: false);
+        Assert.Equal(DungeonService.FirstAwardNone, (await AwardInfo(host, again, Normal, 1)).IsFirst); // the clear resets too
+        Assert.Equal(ErrorCodes.Parameter, await Claim(again, Normal, 1));
+
+        await Cleared(host, again, Normal, 1);
+        Assert.Equal(DungeonService.FirstAwardComplete, (await AwardInfo(host, again, Normal, 1)).IsFirst);
+        Assert.Equal(0, await Claim(again, Normal, 1));
+        Assert.Equal(before + 60, await Count(host, again));
+        Assert.Equal(ErrorCodes.RewardClaimed, await Claim(again, Normal, 1));
+    }
+
     [Fact]
     public async Task HardDoesNotPayALockedNormal()
     {

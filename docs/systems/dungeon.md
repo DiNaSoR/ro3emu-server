@@ -103,7 +103,9 @@ original-server encounter parity:
    boss also pays the Normal boss in the same `_kBoss` slot when that one is still unpaid ("you will directly Claim that
    Boss's Normal First Clear Rewards", Phantom Realm rules). A boss with `_iPartAward` 0 shows Finish once cleared.
    Paying by claim instead of at settlement (82584 `firstPassAward`), and offering it to roles cleared earlier, is the
-   maintainer's choice *(inferred: the client supports both)*. The paid flags reset with the season, as the records do.
+   maintainer's choice *(inferred: the client supports both)*. The paid flags reset with the season, as the records do,
+   so each season pays the reward again (the maintainer's decision on #228; the Realm of the Gods rules say "First Clear
+   records ... from the previous Season's dungeon will not be Kept", and the Phantom Realm rules don't say).
 10. Normal spends its own extra balance first, then an unlocked same-type Hard balance, paying the selected Normal
     boss's reward. When Lua's same-type lookup has multiple Hard candidates, the lowest config id wins.
 11. Team-boss world loot is suppressed because the personal award is paid with its allowance. Story results report
