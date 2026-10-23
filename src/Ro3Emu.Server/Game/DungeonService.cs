@@ -118,6 +118,13 @@ public sealed partial class DungeonService
         public HashSet<(ReconstructedDungeons.TriggerKind Kind, long Id)> StepSeen { get; } = [];
         /// <summary>A scripted step's strikes taken so far, by monster uid.</summary>
         public Dictionary<long, int> Struck { get; } = [];
+        /// <summary>A step's own timers' generation: each step (and each new hide-and-seek game) starts a new one, so a
+        /// stale timer does nothing.</summary>
+        public int StepGeneration { get; set; }
+        /// <summary>A hide-and-seek step: the round being played (1-based) and the hiding places already searched in
+        /// this game.</summary>
+        public int SeekRound { get; set; }
+        public HashSet<long> Searched { get; } = [];
         public HashSet<long> Precounted { get; } = new();
         public bool ObligationsFrozen { get; set; }
         public bool ObligationsActivated { get; set; }

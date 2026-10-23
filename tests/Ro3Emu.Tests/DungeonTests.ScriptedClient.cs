@@ -41,6 +41,12 @@ public sealed partial class DungeonTests
             // A step's fight first: its monsters, killed.
             if (plan.Waves[wave].Spawns.Count > 0)
                 foreach (var monster in await WaveIn(instance, plan.Waves[wave].Spawns.Count)) await Kill(alice, monster);
+            // A hide-and-seek step is won by hiding round after round (its own test); the aid settles it here.
+            if (step.Seek != null)
+            {
+                await Gm(alice, "!actors use");
+                continue;
+            }
             // An "all" step takes each of its events; another one, its first.
             foreach (var t in step.All ? step.Complete : step.Complete.Take(1))
                 switch (t.Kind)

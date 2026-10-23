@@ -153,6 +153,13 @@ Reconstructed scripted scenes (`Reconstructed/scripted-scenes.json`, same switch
   type 24) with a scripted reconstruction plays it instead of its bare point respawns. A step's `strike` makes an
   actor's interaction cast a skill from the player at the nearest monster of the fight; with `shots`, that many strikes
   defeat it whatever the damage (inferred, for the airship's cannons).
+- Moonlight Flower's hide-and-seek (3120802) is played as a game, inferred as a whole from its ChatConfig lines (a step
+  `seek`, DungeonService.HideAndSeek): her three opening bubbles over her head, then rounds of a warning
+  (5310005), the 5 s countdown tip (5310010) and a look. A player within 3 m of a group 27 point (the darkness that
+  rings the room) passes the round; anyone else is found (5310014) and the game starts over. A passed round searches
+  the darkness within 8 m of the hiding place, so the second round needs another side of the room; it wins (5310007)
+  and completes the step. The lines go out as 1022 with her uid, which the client's Bubbling rows need for the head
+  bubble. `ScriptedScenePacePercent` shortens these timers for tests.
 - Five story dungeons that were monster waves (or bare point respawns) now play their scripted stages around the
   fights, each with its evidence and guessed parts in the file:
   - Maya's nest (1000401): Maya, then 'Find the Professor' (within 10 m of the egg point), 'Free the Ant Egg' (5300056,
@@ -168,7 +175,11 @@ Reconstructed scripted scenes (`Reconstructed/scripted-scenes.json`, same switch
   - Payon Forest (1022001): 'Cover Boya and Wule' (reach the standoff point 22 between them and Eddga), then Eddga.
     Boya and Wule (5300086/5300087) are shown, not fighting.
   - The Peco Peco nest (1051001): the Elusive Pecopeco with the Ancient Nest and Bragis shown.
-  - Pharaoh (main story, 3120702): Pharaoh with the Relic he leaps out of, his coffin 5300013 at point 24.
+  - Pharaoh (main story, 3120702): Pharaoh with the Relic he leaps out of, his coffin 5300013 at point 24, and the
+    Pyramid 5300011 beside him (6 m east, 7 m north of point 20: the scene has no point for it). Its use is **inferred**
+    from the raid Pharaoh's tip 4370002 'Pharaoh is unleashing Cleansing Light! Quickly, hide behind the Pyramid!': every
+    20 s of the fight the tip goes out, Pharaoh holds still for 4 s, then his strongest skill 5340301 (whose effect the
+    client draws as a cross of light) hits everyone outside the Pyramid's shadow (a step `shelter`, DungeonService.Shelter).
 
 
 - The last three main-story blockers of the story walk: the ant nest vortex and egg passage (1000201, task 10104290),
