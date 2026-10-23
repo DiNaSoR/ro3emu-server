@@ -105,7 +105,7 @@ public sealed class WorldRoleOperationsTests : IAsyncLifetime
         var persisted = await Next(again, CharacterService.ItemsSync, DBItemsInfoIncrement.Parser);
         Assert.Equal(19, persisted.PackInfo[1].All.Items[potion].Stack);
         Assert.Contains(persisted.ShortcutBarInfos.All.Value, s => s.SlotIndex == 0 && s.ItemGuid == potion);
-        Assert.Contains(persisted.ShortcutBarInfos.All.Value, s => s.SlotIndex == 4 && s.ItemGuid == potion);
+        Assert.Contains(persisted.ShortcutBarInfos.All.Value, s => s.SlotIndex == 4 && s.ItemGuid == 0);
         Assert.Equal(6, persisted.ShortcutBarInfos.All.Value.Count);
         Assert.Equal(1000000, Assert.Single(persisted.QuickUseInfos.All.Value).ItemEntry);
     }

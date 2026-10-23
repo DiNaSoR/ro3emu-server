@@ -339,7 +339,10 @@ public sealed partial class CharacterService
         {
             var next = session.BagState.Info.Clone();
             var list = next.ShortcutBarInfos;
-            foreach (var old in list.Where(i => i.SlotIndex == req.SlotIndex).ToList()) list.Remove(old);
+            // UI_Sys_Main_PropsItemWidgetCtrl._onDragIn marks the source with MarkSwap; its drag-end
+            // consumes that marker without sending a clear. Move the binding in this commit (inferred).
+            foreach (var old in list.Where(i => i.SlotIndex == req.SlotIndex || req.ItemGuid != 0 && i.ItemGuid == req.ItemGuid).ToList())
+                list.Remove(old);
             if (req.ItemGuid != 0) list.Add(new ShortcutBarInfo { SlotIndex = req.SlotIndex, ItemGuid = req.ItemGuid });
             await CommitBagAsync(session, "bag-setting", next);
         }
