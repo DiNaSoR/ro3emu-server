@@ -351,6 +351,9 @@ public sealed class DungeonCatalog(GameData data, WorldData worldData, MonsterSe
                 };
                 if (!known) return [];
             }
+            foreach (var (interaction, skill, shots) in step.Strikes ?? [])
+                if (step.Fight.Count == 0 || shots < 0 || data.Row("SkillConfig", skill) == null
+                    || !step.Actors.Any(a => Interactions(a.NpcId).Contains(interaction))) return [];
             var fight = new List<Spawn>();
             foreach (var spawn in step.Fight)
             {

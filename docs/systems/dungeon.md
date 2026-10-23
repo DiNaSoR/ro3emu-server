@@ -150,7 +150,9 @@ Reconstructed scripted scenes (`Reconstructed/scripted-scenes.json`, same switch
 - A step may carry a fight: client-known monsters at scene-editor points (`fight`), spawned with the step; it then
   waits for every kill and, when it also lists events, for its event too. A fight-only step ends on its kills. A step
   with `all` needs every listed event, not any one, and its tracker counter follows them. A Journey scene (gameplay
-  type 24) with a scripted reconstruction plays it instead of its bare point respawns.
+  type 24) with a scripted reconstruction plays it instead of its bare point respawns. A step's `strike` makes an
+  actor's interaction cast a skill from the player at the nearest monster of the fight; with `shots`, that many strikes
+  defeat it whatever the damage (inferred, for the airship's cannons).
 - Five story dungeons that were monster waves (or bare point respawns) now play their scripted stages around the
   fights, each with its evidence and guessed parts in the file:
   - Maya's nest (1000401): Maya, then 'Find the Professor' (within 10 m of the egg point), 'Free the Ant Egg' (5300056,
@@ -159,7 +161,10 @@ Reconstructed scripted scenes (`Reconstructed/scripted-scenes.json`, same switch
   - The airship (1000501): the chitchat with Bobo, the captain, Wule and Boya (their gated auto-range bubbles
     5300031-5300034, all four), the boarding and the Evil Boss as before, the look around after the battle (five
     bubbles 5300048-5300052) and the talk with the injured captain (dialogue 530003802, whose option triggers
-    interaction 5300039 and message 5300039). Stage 2, the cannons (GameplayStatusConfig 12, UpperCannon), is not played.
+    interaction 5300039 and message 5300039). Stage 2, the cannons, is **inferred**: each 'Board the Cannon' (5300006) on
+    one of the three Cannons 5300022 fires 5365001 from the player at the nearest enemy airship (5300015 at point 24,
+    5300053 at 61), and three boardings sink a ship at any level; sinking both ends the stage. The original's
+    UpperCannon gameplay status (GameplayStatusConfig 12) has no abilities in the client data.
   - Payon Forest (1022001): 'Cover Boya and Wule' (reach the standoff point 22 between them and Eddga), then Eddga.
     Boya and Wule (5300086/5300087) are shown, not fighting.
   - The Peco Peco nest (1051001): the Elusive Pecopeco with the Ancient Nest and Bragis shown.

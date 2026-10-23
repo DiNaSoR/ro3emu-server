@@ -116,6 +116,8 @@ public sealed partial class DungeonService
         public HashSet<long> Killed { get; } = new();
         /// <summary>The completing events a step with "all" has seen so far.</summary>
         public HashSet<(ReconstructedDungeons.TriggerKind Kind, long Id)> StepSeen { get; } = [];
+        /// <summary>A scripted step's strikes taken so far, by monster uid.</summary>
+        public Dictionary<long, int> Struck { get; } = [];
         public HashSet<long> Precounted { get; } = new();
         public bool ObligationsFrozen { get; set; }
         public bool ObligationsActivated { get; set; }

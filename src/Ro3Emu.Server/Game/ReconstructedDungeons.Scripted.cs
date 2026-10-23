@@ -26,11 +26,13 @@ public sealed partial class ReconstructedDungeons
     /// completes (0: none). <paramref name="Goal"/> is the tracker's "(done/total)" while the step runs.
     /// <paramref name="Fight"/> are monsters spawned at the step's start: the step also waits until every one is
     /// defeated (a story dungeon that mixes fights with scripted parts). <paramref name="All"/>: every completing event
-    /// is needed, not any one ("Have a Chitchat with them").
+    /// is needed, not any one ("Have a Chitchat with them"). <paramref name="Strikes"/>: an interaction of an actor that
+    /// casts a skill at the nearest monster of the step's fight (the airship's cannons); with Shots above 0, that many
+    /// strikes defeat a monster whatever the skill's damage.
     /// </summary>
     public sealed record ScriptedStep(string Stage, int Quest, (int Done, int Total) Goal, IReadOnlyList<SceneActor> Actors,
         long Story, IReadOnlyList<StepTrigger> Complete, IReadOnlyList<StepTrigger> Ignore, long TeleportAfter,
-        IReadOnlyList<Spawn> Fight, bool All);
+        IReadOnlyList<Spawn> Fight, bool All, IReadOnlyList<(long Interaction, long Skill, int Shots)>? Strikes = null);
 
     /// <summary>
     /// A scene. <paramref name="Unplayed"/> are DungeonQuestConfig quests of the scene that no step shows: the branch
@@ -79,7 +81,11 @@ public sealed partial class ReconstructedDungeons
         return new ScriptedStep(s.GetProperty("stage").GetString() ?? "", s.GetProperty("quest").GetInt32(), goal, actors,
             s.TryGetProperty("story", out var story) ? story.GetInt64() : 0, complete, Triggers(s, "ignore"),
             s.TryGetProperty("after", out var after) && after.TryGetProperty("teleport", out var to) ? to.GetInt64() : 0,
-            fight, s.TryGetProperty("all", out var all) && all.GetBoolean());
+            fight, s.TryGetProperty("all", out var all) && all.GetBoolean(),
+            s.TryGetProperty("strike", out var strike)
+                ? strike.EnumerateArray().Select(x => (x.GetProperty("interaction").GetInt64(), x.GetProperty("skill").GetInt64(),
+                    x.TryGetProperty("shots", out var shots) ? shots.GetInt32() : 0)).ToArray()
+                : null);
     }
 
     private static IReadOnlyList<StepTrigger> Triggers(JsonElement step, string field)
