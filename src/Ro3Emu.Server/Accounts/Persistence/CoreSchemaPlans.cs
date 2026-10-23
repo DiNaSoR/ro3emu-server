@@ -369,6 +369,7 @@ internal sealed class AuctionSchemaPlan : DbPlan
         cmd.ExecuteNonQuery();
         SchemaSql.AddColumn(db, tx, "auction_prebuy", "requested_id", "INTEGER NOT NULL DEFAULT 0");
         SchemaSql.AddColumn(db, tx, "auction_prebuy", "paused", "INTEGER NOT NULL DEFAULT 0");
+        AuctionItemColumns.Migrate(db, tx);
         SchemaSql.Execute(db, tx, """
             INSERT OR IGNORE INTO owner_revision(kind,id,part,revision)
                 SELECT 'auction_item',source_key,'state',0 FROM auction_item;

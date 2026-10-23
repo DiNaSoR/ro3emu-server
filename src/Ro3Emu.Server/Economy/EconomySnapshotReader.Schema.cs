@@ -25,7 +25,7 @@ public static partial class EconomySnapshotReader
         ["recent_team_peer"] = "owner other last_seen",
         ["adventure_group"] = "id name state", ["adventure_group_member"] = "role_id group_id",
         ["market_record"] = "kind id data",
-        ["auction_item"] = "id source_key state", ["auction_run"] = "id state",
+        ["auction_item"] = "id source_key state settled auction_type run_id end_time", ["auction_run"] = "id state",
         ["auction_bonus"] = "role_id group_key amount claimed guild_id", ["auction_source"] = "source_key",
         ["auction_prebuy"] = "id role_id auction_type src_type item_id quantity unit_price currency revision processed requested_id paused",
         ["guild"] = "id name state", ["guild_member"] = "role_id guild_id", ["guild_market"] = "id state",
