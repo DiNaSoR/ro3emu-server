@@ -21,3 +21,16 @@ than deriving an exchange from a message name. The source-level tests are `tests
 The absence claims above rest on exact-name searches for `LuckyTrun|LuckyTurn|RingTaskLuckyTurn|FinishPYD|OnTaskFinishPYD|TaskRewardNotify` and `TASK_NPC_CHAT|TaskNpcChat|TASK_FINISH_PYD|FinishPYD|TASK_LUCKY_TURN|LuckyTurn|LuckyTrun|TaskRewardNotify|CartRemouldBagNum|SchemeNum`. Scopes and results: `data/config/*.json` (517 files: no named reward-notify owner; the lottery is defined by LuckyTrunConfig, PublicParamConfig, MultiverseGroupConfig and AwardConfig), `data/sceneeditor/*` including `*_monsteridmap.json` (381 files: no names), `data/nav` (172 files: no names), `data/loc` (2 files: no names), the **entire** `re/lua-src` and `re/clientB/lua-src` trees including Config/Logic (13,488 files each), `re/decomp` (2,251 text/source files: no names), and `src/Ro3Emu.Server/Protos/romsg` (144 files: MG_Task only). The 31213 exchange is implemented from the login download widget's concrete sender; the remaining Chicken notification boundary does not claim that the original server lacked the feature.
 
 Validation: `WorldRoleOperationsTests` covers the PYD success/refusal/replay/relog/delivery path and reset acknowledgment ordering, item and shortcut use/refusal, relogged bindings, stat switch/rename/relog, cart split/return and overdraw, HP auto-medicine and arrow relog, season-lapse decomposition refusal, task reset/branch anti-replay, NPC-chat/track refusals, and lottery ticket spend/grant/exhausted replay/relog. A positive task NPC chat or task-track teleport awaits a reachable quest fixture; 31211 needs a Chicken completion event owner. See also [world-core-evidence.md](world-core-evidence.md).
+
+## Potion quick-use configuration
+
+Dataset 5009 always supplies both HP and SP `medicinesAutoUse` configurations with three entries (0 = empty).
+`LC_DAL_Item._processMedicinesAutoUseSet` creates the configurations used by
+`UI_Sys_AutoDrink_OptionItemWidgetCtrl` Add/Replace/Remove and
+`UI_Sys_AutoDrink_SetBoxWidgetCtrl._recommendItem` (Add All). Without those configurations, the buttons index nil.
+The widgets send every slot in 31320, including zero entries for empty or removed medicines; validation accepts those
+zeros and still rejects negative or unusable item entries. Missing slots are padded on a clone so published defaults do
+not mutate saved preferences.
+
+The initial threshold of 60 is **inferred** from the prefab text. Missing configurations leave automatic use disabled;
+saved thresholds, enabled states, and selected items are preserved.
