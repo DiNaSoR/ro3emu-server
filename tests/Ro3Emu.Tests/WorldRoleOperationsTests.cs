@@ -5,6 +5,8 @@ using Ro3Emu.Bot;
 using Ro3Emu.Server;
 using Ro3Emu.Server.Accounts;
 using Ro3Emu.Server.Game;
+using Ro3Emu.Server.Data;
+using Ro3Emu.Server.Data.Config;
 
 namespace Ro3Emu.Tests;
 
@@ -348,36 +350,43 @@ public sealed class WorldRoleOperationsTests : IAsyncLifetime
     }
 
     [ClientDataFact]
-    public async Task LuckyTurnSpendsTicketsAndGrantsConfiguredWeightedAwardsExactlyOncePerPaidRequest()
+    public async Task LuckyTurnSpendsGemsAndStopsTheWheelOnTheSlotItGranted()
     {
+        // #bug-reports "Dodo Pink Gem hard lock": the wheel (UI_Sys_Main_EntrustLotteryPanelCtrl) stays locked until a
+        // GetRewardNotify of ManifestTypeRunRing (18) names the slots it stops on. The slots are award 84011's preview.
+        const int Gem = 1250001, RunRing = 18;
+        var data = _app.Services.GetRequiredService<GameData>();
+        long award = MultiverseGroupConfig.Get(data, 84011)!.Value.ValueDefault;
+        var slots = Assert.Single(AwardConfig.Get(data, award)).Preview.Select(t => ((int)t[0], (int)t[1])).ToArray();
         await using (var alice = await InWorld("Alice"))
         {
             var session = _app.Services.GetRequiredService<SessionRegistry>().All().Single(s => s.Role?.Name == "Alice");
             await Next(alice, CharacterService.ItemsSync, DBItemsInfoIncrement.Parser);
-            await Gm("alice", "!item 1250001 11");
-            long before = session.Progress!.Currency.GetValueOrDefault(1);
+            await Gm("alice", $"!item {Gem} 11");
 
             await alice.SendGameAsync(TaskService.TaskLuckyTurn, new LuckyTurnReq { Type = 0, Version = 1 });
+            var one = await Next(alice, CharacterService.GetRewardNotify, GetRewardNotify.Parser, m => m.RewardType.Contains(RunRing));
             Assert.Equal(0, (await Next(alice, TaskService.TaskLuckyTurn, LuckyTurnResp.Parser)).Result);
-            Assert.InRange(session.Progress.Currency[1] - before, 2_000, 12_000);
-            Assert.Equal(10, session.Items.Where(i => i.Grid == 0 && i.Entry == 1250001).Sum(i => i.Stack));
+            int slot = Assert.Single(one.RewardIndexes);
+            Assert.InRange(slot, 0, slots.Length - 1);
+            var granted = Assert.Single(one.Rewards);
+            Assert.Equal(slots[slot], (granted.ItemEntry, (int)granted.Stack));
+            Assert.Equal(10, session.Items.Where(i => i.Grid == 0 && i.Entry == Gem).Sum(i => i.Stack));
 
-            long afterOne = session.Progress.Currency[1];
             await alice.SendGameAsync(TaskService.TaskLuckyTurn, new LuckyTurnReq { Type = 1, Version = 1 });
+            var ten = await Next(alice, CharacterService.GetRewardNotify, GetRewardNotify.Parser, m => m.RewardType.Contains(RunRing));
             Assert.Equal(0, (await Next(alice, TaskService.TaskLuckyTurn, LuckyTurnResp.Parser)).Result);
-            Assert.InRange(session.Progress.Currency[1] - afterOne, 20_000, 120_000);
-            Assert.DoesNotContain(session.Items, i => i.Grid == 0 && i.Entry == 1250001);
+            Assert.Equal(10, ten.RewardIndexes.Count);
+            Assert.All(ten.RewardIndexes, i => Assert.InRange(i, 0, slots.Length - 1));
+            Assert.DoesNotContain(session.Items, i => i.Grid == 0 && i.Entry == Gem);
 
-            long paid = session.Progress.Currency[1];
             await alice.SendGameAsync(TaskService.TaskLuckyTurn, new LuckyTurnReq { Type = 0, Version = 1 });
             Assert.Equal(ErrorCodes.ItemsShort, (await Next(alice, TaskService.ApiError, APIErrorMsg.Parser,
                 m => m.OriginMsgId == TaskService.TaskLuckyTurn)).ErrorCode);
-            Assert.Equal(paid, session.Progress.Currency[1]);
         }
         await using var again = await InWorld("Alice", create: false);
         var saved = _app.Services.GetRequiredService<SessionRegistry>().All().Single(s => s.Role?.Name == "Alice");
-        Assert.DoesNotContain(saved.Items, i => i.Grid == 0 && i.Entry == 1250001);
-        Assert.True(saved.Progress!.Currency.GetValueOrDefault(1) > 0);
+        Assert.DoesNotContain(saved.Items, i => i.Grid == 0 && i.Entry == Gem);
     }
 
     private static string RepoRoot()

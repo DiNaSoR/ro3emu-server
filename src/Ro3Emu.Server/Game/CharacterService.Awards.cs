@@ -96,13 +96,13 @@ public sealed partial class CharacterService
         byte[]? taskRuntimeState = null, int manifestType = 1, byte[]? expectedDaily = null,
         byte[]? nextDaily = null, byte[]? expectedTasks = null, Action<RoleItemPlanBuilder>? persist = null,
         bool stateLockHeld = false, Action? committed = null, EconomyMutation? familyEconomy = null,
-        OwnedAwardSource? ownedAward = null, bool suppressRewardNotice = false)
+        OwnedAwardSource? ownedAward = null, bool suppressRewardNotice = false, IReadOnlyList<int>? rewardIndexes = null)
     {
         using var _ = stateLockHeld ? null : await LockAsync(session);
         var context = RequireOwnedRole(session);
         return await ApplyAwardCoreAsync(session, context, plan, taskBaseExp, costs, deliveredTaskState,
             taskRuntimeState, manifestType, expectedDaily, nextDaily, expectedTasks, persist, committed,
-            familyEconomy, ownedAward, suppressRewardNotice);
+            familyEconomy, ownedAward, suppressRewardNotice, rewardIndexes);
     }
 
     /// <summary>Checked owned Core: stage copied award values, commit, apply before notices.</summary>
@@ -110,13 +110,16 @@ public sealed partial class CharacterService
         long taskBaseExp, IReadOnlyList<(int Entry, int Count)>? costs, byte[]? deliveredTaskState,
         byte[]? taskRuntimeState, int manifestType, byte[]? expectedDaily, byte[]? nextDaily,
         byte[]? expectedTasks, Action<RoleItemPlanBuilder>? persist, Action? committed,
-        EconomyMutation? familyEconomy, OwnedAwardSource? ownedAward, bool suppressRewardNotice)
+        EconomyMutation? familyEconomy, OwnedAwardSource? ownedAward, bool suppressRewardNotice,
+        IReadOnlyList<int>? rewardIndexes = null)
     {
         context.AssertRole(session.Role!.Id);
         context.BindPresentation(session);
         var attachment = session.Attachment;
         if (taskBaseExp < 0) throw new ArgumentOutOfRangeException(nameof(taskBaseExp));
-        if (manifestType is < 1 or > 19 or 15 or 18) throw new ArgumentOutOfRangeException(nameof(manifestType));
+        // PBManifestType.ManifestTypeRunRing (18) needs the slots LC_DAL_Reward uses to stop the wheel.
+        if (manifestType is < 1 or > 19 or 15 || manifestType == TaskService.ManifestTypeRunRing && rewardIndexes is not { Count: > 0 })
+            throw new ArgumentOutOfRangeException(nameof(manifestType));
         if ((expectedDaily == null) != (nextDaily == null)) throw new ArgumentException("Daily award requires before and after state");
         if (expectedTasks != null && deliveredTaskState == null) throw new ArgumentException("Task comparison requires next task state");
         if (expectedDaily != null && (session.Daily == null
@@ -342,9 +345,11 @@ public sealed partial class CharacterService
                 foreach (var handler in ProgressHandlers) await handler(session);
             }
         }
-        if (!suppressRewardNotice && notification.Rewards.Count > 0)
+        // A wheel (rewardIndexes) waits for its notice to stop and unlock, even when nothing showable was granted.
+        if (!suppressRewardNotice && (notification.Rewards.Count > 0 || rewardIndexes is { Count: > 0 }))
         {
             notification.RewardType.Add(manifestType);
+            if (rewardIndexes != null) notification.RewardIndexes.Add(rewardIndexes);
             await session.SendGameAsync(GetRewardNotify, notification);
         }
         if (decomposed.DecomposeItemInfo.Count > 0)
