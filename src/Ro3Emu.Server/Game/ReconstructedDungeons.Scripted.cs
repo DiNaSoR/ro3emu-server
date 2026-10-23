@@ -4,7 +4,7 @@ using System.Text.Json;
 namespace Ro3Emu.Server.Game;
 
 /// <summary>
-/// Scripted story scenes without a fight (Reconstructed/scripted-scenes.json; its "contract" section cites the client
+/// Scripted story scenes, with or without fights (Reconstructed/scripted-scenes.json; its "contract" section cites the client
 /// code for every event used here). The original server's scene script is not in the client: each scene is rebuilt as
 /// steps, each naming the DungeonQuestConfig quest the tracker shows, the scene actors shown during it, an optional
 /// run-time story the client plays, and the client events that complete it. Nothing is keyed by a task id: a step
@@ -24,9 +24,13 @@ public sealed partial class ReconstructedDungeons
     /// One scripted step. <paramref name="Story"/> is a PlotInterpretation id the client plays at the step's start
     /// (0: none); <paramref name="TeleportAfter"/> a scene-editor point the participants are moved to when it
     /// completes (0: none). <paramref name="Goal"/> is the tracker's "(done/total)" while the step runs.
+    /// <paramref name="Fight"/> are monsters spawned at the step's start: the step also waits until every one is
+    /// defeated (a story dungeon that mixes fights with scripted parts). <paramref name="All"/>: every completing event
+    /// is needed, not any one ("Have a Chitchat with them").
     /// </summary>
     public sealed record ScriptedStep(string Stage, int Quest, (int Done, int Total) Goal, IReadOnlyList<SceneActor> Actors,
-        long Story, IReadOnlyList<StepTrigger> Complete, IReadOnlyList<StepTrigger> Ignore, long TeleportAfter);
+        long Story, IReadOnlyList<StepTrigger> Complete, IReadOnlyList<StepTrigger> Ignore, long TeleportAfter,
+        IReadOnlyList<Spawn> Fight, bool All);
 
     /// <summary>
     /// A scene. <paramref name="Unplayed"/> are DungeonQuestConfig quests of the scene that no step shows: the branch
@@ -67,10 +71,15 @@ public sealed partial class ReconstructedDungeons
                 x.TryGetProperty("buffs", out var b) ? b.EnumerateArray().Select(v => v.GetInt32()).ToArray() : [])).ToArray()
             : [];
         var complete = Triggers(s, "complete");
-        if (complete.Count == 0) throw new InvalidOperationException($"Scripted step '{s.GetProperty("stage").GetString()}' cannot complete.");
+        var fight = s.TryGetProperty("fight", out var f)
+            ? f.EnumerateArray().Select(x => new Spawn(x.GetProperty("point").GetInt64(), x.GetProperty("npc").GetInt32())).ToArray()
+            : [];
+        if (complete.Count == 0 && fight.Length == 0)
+            throw new InvalidOperationException($"Scripted step '{s.GetProperty("stage").GetString()}' cannot complete.");
         return new ScriptedStep(s.GetProperty("stage").GetString() ?? "", s.GetProperty("quest").GetInt32(), goal, actors,
             s.TryGetProperty("story", out var story) ? story.GetInt64() : 0, complete, Triggers(s, "ignore"),
-            s.TryGetProperty("after", out var after) && after.TryGetProperty("teleport", out var to) ? to.GetInt64() : 0);
+            s.TryGetProperty("after", out var after) && after.TryGetProperty("teleport", out var to) ? to.GetInt64() : 0,
+            fight, s.TryGetProperty("all", out var all) && all.GetBoolean());
     }
 
     private static IReadOnlyList<StepTrigger> Triggers(JsonElement step, string field)

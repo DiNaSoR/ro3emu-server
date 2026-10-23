@@ -9,7 +9,7 @@ using Ro3Emu.Bot;
 namespace Ro3Emu.Tests;
 
 /// <summary>
-/// Scripted story scenes without a fight (Reconstructed/scripted-scenes.json, DungeonService.Scripted): each scene is
+/// Scripted story scenes (Reconstructed/scripted-scenes.json, DungeonService.Scripted): each scene is
 /// entered, played through the events its client sends (32700 on the scene actors, walks into server regions, 84011
 /// at a story's end), settles as a clear, and the clear counts for its story step so the next one is offered.
 /// </summary>
@@ -26,7 +26,8 @@ public sealed partial class DungeonTests
         var plan = Service<DungeonCatalog>().Resolve(new EnterDungeonReq { SceneEntry = scene });
         Assert.NotNull(plan); // every actor, point, region, buff, plot, interaction and message resolved
         Assert.Equal(scripted.Steps.Count, plan.Waves.Count);
-        Assert.All(plan.Waves, w => Assert.Empty(w.Spawns));
+        // A step's fight spawns client-known monsters at its points; a step without one spawns nothing.
+        Assert.Equal(scripted.Steps.Select(s => s.Fight.Select(f => f.NpcId)), plan.Waves.Select(w => w.Spawns.Select(s => s.NpcId)));
         Assert.Equal(scripted.Steps, plan.Waves.Select(w => w.Step!));
         // The tracker walks the scene's configured DungeonQuestConfig quests in order, each of them but the unplayed.
         var quests = Service<GameData>().Table("DungeonQuestConfig").Values

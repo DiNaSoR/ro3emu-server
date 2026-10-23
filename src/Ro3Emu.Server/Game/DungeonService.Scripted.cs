@@ -6,7 +6,7 @@ using Kind = Ro3Emu.Server.Game.ReconstructedDungeons.TriggerKind;
 namespace Ro3Emu.Server.Game;
 
 /// <summary>
-/// Scripted story scenes without a fight (ReconstructedDungeons.Scripted, Reconstructed/scripted-scenes.json). A step
+/// Scripted story scenes (ReconstructedDungeons.Scripted, Reconstructed/scripted-scenes.json). A step
 /// shows its scene actors, may start a story, and completes on one of its client events: a 32700 interaction on one
 /// of its actors (or the dungeon message that interaction's server-hosted action 210 names), the participant's walked
 /// position in a server region or near a point, or 84011 at the end of a story. Then the room moves on to the next
@@ -76,7 +76,9 @@ public sealed partial class DungeonService
     /// <summary>Called by SpawnWaveAsync for a scripted step instead of spawning monsters.</summary>
     private async Task BeginStepAsync(Attempt a, ReconstructedDungeons.ScriptedStep step)
     {
-        a.StepDone = false;
+        a.StepSeen.Clear();
+        // A fight-only step has no client event to wait for: its kills complete it.
+        a.StepDone = step.Complete.Count == 0;
         await SyncSceneActorsAsync(a, step.Actors);
         if (step.Story != 0 && !a.Settled && !a.Room.Closed)
             // Once, in a var-change event: the client calls PlayCutSceneStory on every push of this var.
@@ -205,11 +207,12 @@ public sealed partial class DungeonService
             // sent it (for an interaction, as a 32700 on its actor), so a scene can be finished while a client-side
             // problem is investigated. The usual step completion runs (teleport, next step, settlement).
             if (Active(s) is not { } used || Step(used) is not { } current || used.StepDone)
-                throw new ArgumentException("not in a scripted scene step that is waiting");
+                throw new ArgumentException("not in a scripted scene step that is waiting (a fight-only step ends on its kills)");
             var t = current.Complete[0];
             _log.LogWarning("GM test aid: {Role} completes scripted scene {Scene} step {Step} with {Kind} {Id}",
                 s.Role?.Id, used.Plan.SceneEntry, used.Wave + 1, t.Kind, t.Id);
-            await StepEventAsync(used, s, [(t.Kind, t.Id)]);
+            // An "all" step takes every one of its events.
+            await StepEventAsync(used, s, current.All ? [.. current.Complete.Select(c => (c.Kind, c.Id))] : [(t.Kind, t.Id)]);
             await GmCommands.ReplyAsync(s, $"TEST AID: step {used.Wave + 1} '{current.Stage}' completed with {t.Kind} {t.Id}.");
             return;
         }
@@ -276,6 +279,16 @@ public sealed partial class DungeonService
                 _log.LogInformation("Scripted scene {Scene} step {Step}: {Role} sent {Events}, which does not advance it",
                     a.Plan.SceneEntry, a.Wave + 1, s.Role?.Id, string.Join(", ", events));
             return;
+        }
+        if (step.All)
+        {
+            foreach (var t in step.Complete.Where(Matches)) a.StepSeen.Add((t.Kind, t.Id));
+            if (a.StepSeen.Count < step.Complete.Count)
+            {
+                // The tracker's counter follows each event of an "all" step.
+                if (GoalParams(a) != null) await BroadcastAsync(a, BaseInfo, Snapshot(a));
+                return;
+            }
         }
         a.StepDone = true;
         _log.LogInformation("Scripted scene {Scene} step {Step} '{Stage}' completed by {Role} ({Events})",

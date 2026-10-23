@@ -113,16 +113,22 @@ public sealed partial class DungeonTests
     public async Task TheUseTestAidFinishesAScriptedSceneServerSide(long scene)
     {
         await using var alice = await InWorld("Alice");
+        await Gm(alice, "!lvl 99"); // a scene with a fight
         await Gm(alice, "!actors use"); // outside a scene: refused, nothing happens
+        // Payon Forest's DungeonConfig condition 1000000 is [1101, 10102200]: its story task is running.
+        if (scene == 1022001) await Gm(alice, "!quest accept 10102200");
         Assert.Equal(0, await Enter(alice, new EnterDungeonReq { SceneEntry = scene }));
-        await Load(alice, scene);
+        long instance = await Load(alice, scene);
         var plan = Session(alice).DungeonAttempt!.Plan;
         for (int wave = 0; wave < plan.Waves.Count; wave++)
         {
             var step = plan.Waves[wave].Step!;
             await Stage(alice, wave + 1, quest: step.Quest);
             await ActorsIn(alice, step.Actors.Count);
-            await Gm(alice, "!actors use");
+            // A step's fight: its monsters, then its event if it has one.
+            if (plan.Waves[wave].Spawns.Count > 0)
+                foreach (var monster in await WaveIn(instance, plan.Waves[wave].Spawns.Count)) await Kill(alice, monster);
+            if (step.Complete.Count > 0) await Gm(alice, "!actors use");
         }
         Assert.Equal((DungeonRes)1, (await Next(alice, DungeonService.Result, DungeonResNotify.Parser)).Res);
     }
