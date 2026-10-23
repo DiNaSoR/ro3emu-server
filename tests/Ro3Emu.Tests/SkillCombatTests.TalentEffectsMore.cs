@@ -47,6 +47,7 @@ public sealed partial class SkillCombatTests
         await using var alice = await InWorld("Alice");
         await Gm("alice", "!lvl 99"); await Gm("alice", "!job 1410"); await Teach("alice", 11418); await Teach("alice", 11504);
         await ChooseProfessionTalent(alice, "alice", 10104107);
+        await Wield("alice", 2500120, 2); // Both shield skills require subtype 50 (_iSkillCondition).
         _app.Services.GetRequiredService<TalentProcs>().Roll = _ => 0;
         var a = Session("alice");
         var monster = await Target("alice", stationary: true);

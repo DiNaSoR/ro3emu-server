@@ -141,7 +141,8 @@ public sealed partial class SkillCombatTests
     }
 
     // Category 109 rows carry their radius in _kLogicData[0]: Steady Focus 350, Detecting 500, Keen Senses 1200. Sight
-    // Sprout: "You Discover hidden enemy targets within a ${1}-meter radius" (3.5), a Wizard's from the start (_iInitialLevel 1).
+    // Sprout: "You Discover hidden enemy targets within a ${1}-meter radius" (3.5), a Wizard's free skill once Sight
+    // is learned (_iInitialLevel 1, _kPreSkillRequired 12002).
     [ClientDataFact]
     public async Task DetectionRadiiComeFromTheirRowsAndSightSprout()
     {
@@ -152,6 +153,8 @@ public sealed partial class SkillCombatTests
         var a = Session("alice");
         Assert.Equal(0, await Loop.InvokeAsync(() => Task.FromResult(combat.DetectionRadiusCm(a))));
         await Gm("alice", "!job 2200");
+        Assert.Equal(0, await Loop.InvokeAsync(() => Task.FromResult(combat.DetectionRadiusCm(a))));
+        await Teach("alice", 12002);
         Assert.Equal(350, await Loop.InvokeAsync(() => Task.FromResult(combat.DetectionRadiusCm(a))));
         foreach (var (buff, radius) in new[] { (1310501, 500), (1330301, 1200) })
         {

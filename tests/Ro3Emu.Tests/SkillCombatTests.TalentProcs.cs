@@ -44,6 +44,7 @@ public sealed partial class SkillCombatTests
         await using var alice = await InWorld("Alice");
         await Gm("alice", "!lvl 99"); await Gm("alice", "!job 1200"); await Teach("alice", 11110);
         await ChooseProfessionTalent(alice, "alice", 10102114);
+        await Wield("alice", 2050120); // Spear Throw requires an equipped spear (_iSkillCondition).
         var monster = await Target("alice", stationary: true);
         await Loop.InvokeAsync(() => { monster.Hp = 1_000_000; return Task.CompletedTask; });
 
