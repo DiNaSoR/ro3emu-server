@@ -19,7 +19,7 @@ public sealed partial class GuildChallengeService : IGameTicker
     public const uint Notify = 83300, Info = 83301, Open = 83302, CallMembers = 32266, CallMembersNotify = 32267;
     /// <summary>PublicParamConfig GVESummonButtonCd: the Muster button's client cooldown, kept per guild here too (inferred).</summary>
     private const long CallCooldownSeconds = 10;
-    private readonly Dictionary<long, long> _nextCall = new();
+    private readonly Dictionary<long, long> _nextCall = [];
     public const int Activity = 125;
     private readonly GameData _data;
     private readonly GuildStore _guilds;
