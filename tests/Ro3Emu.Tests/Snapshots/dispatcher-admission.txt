@@ -135,7 +135,7 @@
 30403	session Realm:legacy: dispatcher/30403	refused
 30404	session Realm:legacy: dispatcher/30404	refused
 30406	session Realm:legacy: dispatcher/30406	refused
-30407	session Realm:legacy: dispatcher/unrouted	refused
+30407	session Realm:legacy: dispatcher/30407	session Realm:legacy: dispatcher/30407
 30408	session Realm:legacy: dispatcher/unrouted	refused
 30409	session Realm:legacy: dispatcher/unrouted	refused
 30410	economic dispatcher/economic request	refused
@@ -143,7 +143,7 @@
 30412	economic dispatcher/economic request	refused
 30414	session Realm:legacy: dispatcher/unrouted	refused
 30415	session Realm:legacy: dispatcher/unrouted	refused
-30431	session Realm:legacy: dispatcher/unrouted	refused
+30431	session Realm:legacy: dispatcher/30431	session Realm:legacy: dispatcher/30431
 30432	session Realm:legacy: dispatcher/unrouted	refused
 30433	session Realm:legacy: dispatcher/unrouted	refused
 30434	session Realm:legacy: dispatcher/unrouted	refused

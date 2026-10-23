@@ -138,6 +138,7 @@ public static class ServerHost
         builder.Services.AddSingleton<TerritoryWarsClock>();
         builder.Services.AddSingleton<TerritoryWarsService>();
         builder.Services.AddSingleton<TerritoryEscortService>();
+        builder.Services.AddSingleton<MapMarkService>();
         builder.Services.AddSingleton<GuildLeagueCalendar>();
         builder.Services.AddSingleton<GuildLeagueService>();
         builder.Services.AddSingleton<TowerService>();

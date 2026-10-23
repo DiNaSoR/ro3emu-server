@@ -112,6 +112,10 @@ public sealed partial class TeamService(SessionRegistry sessions, CharacterServi
     public (long TeamId, long Leader) TeamOf(long role) =>
         _byMember.TryGetValue(role, out var team) ? (team.Id, team.Leader) : (0, role);
 
+    /// <summary>LC_TeamHelper.IsGroupLeader: the leader of a 40-member team (TeamTypeForty, title Leader).</summary>
+    public bool IsFortyLeader(long role) =>
+        _byMember.TryGetValue(role, out var team) && team.Type == TeamType.Forty && team.Leader == role;
+
     /// <summary>Authoritative roster, including offline members; dungeon admission must not silently omit them.</summary>
     public IReadOnlyList<long> MembersOf(long role) =>
         _byMember.TryGetValue(role, out var team) ? team.Members.ToArray() : [role];

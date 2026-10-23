@@ -5,7 +5,7 @@ using Romsg;
 namespace Ro3Emu.Server.Game;
 
 /// <summary>The world around the role: scenes, combat targets, MVPs, world interaction, revival and the territory war.</summary>
-public sealed class WorldMessages(Maps.World world, CombatService combat, SceneService scene, MvpService mvps, TowerService tower, DungeonService dungeons, WorldCoreService worldCore, WorldCommonService common, WorldInteractionService interaction, TimedBattleService timedBattles, FestivalService festival, GuildHomeService guildHome, DraculaWeddingService dracula, TrainingService training, TerritoryWarsService territory, TerritoryEscortService escort, GuildLeagueService league) : Messaging.IMessageModule
+public sealed class WorldMessages(Maps.World world, CombatService combat, SceneService scene, MvpService mvps, TowerService tower, DungeonService dungeons, WorldCoreService worldCore, WorldCommonService common, WorldInteractionService interaction, TimedBattleService timedBattles, FestivalService festival, GuildHomeService guildHome, DraculaWeddingService dracula, TrainingService training, TerritoryWarsService territory, TerritoryEscortService escort, GuildLeagueService league, MapMarkService marks) : Messaging.IMessageModule
 {
     private const uint ChangeViewCfg = 30007, SyncMiniMapStatus = 31043, SceneGetLineInfo = 70009;
 
@@ -33,6 +33,14 @@ public sealed class WorldMessages(Maps.World world, CombatService combat, SceneS
         routes.Intercept("escort/actors", id => id is 32287 || NpcInteraction(id), escort.HandleSharedAsync); // guild goods, cargo NPCs
         routes.Intercept("territory/world", NpcInteraction, territory.WorldSharedAsync);
 
+        routes.Map(MapMarkService.SetMark, "marks", async (session, msgId, body) =>
+        {
+            await marks.SetMarkAsync(session, DungeonSetMarkPosReq.Parser.ParseFrom(body.Span));
+        });
+        routes.Map(MapMarkService.Gather, "marks", async (session, msgId, body) =>
+        {
+            await marks.GatherAsync(session, DungeonGatherMarkPosReq.Parser.ParseFrom(body.Span));
+        });
         routes.Map(1031, "common", async (session, msgId, body) =>
         {
             await common.TransmitAsync(session, GMCommandTransmitReq.Parser.ParseFrom(body.Span));

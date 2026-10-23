@@ -86,6 +86,25 @@ dotnet test tests/Ro3Emu.Tests --filter "FullyQualifiedName~Territory" -- xUnit.
 
 Behavior in the game client UI is not covered by these tests.
 
+## Big-map flags (30407/30431)
+
+`MapMarkService` handles the flags the siege and push-up big maps place (`UI_Sys_SiegeBigMapWidgetBaseCtrl`).
+
+- 30407 `DUNGEON_SET_MARKPOS` adds (`bDel` false, no id) or deletes (`bDel` true, an id) one flag. The server picks
+  the first free slot 1..`GVEMapMarkMaxNum` (10), because `LC_DAL_Dungeon._processDungeonMarkPosNtf` keeps flags in those
+  slots. Each change sends 30408 with the type's whole list.
+- Delete and gather name a flag by `m_iFlagIndex`, its index in the client's list of both types:
+  (type - 1) * `GVEMapMarkMaxNum` + slot (`UI_Sys_BigMap_MarkTipPanelCtrl`; only its escort branch subtracts the
+  offset). The server turns an id above the maximum back into the slot, so TeamLeader slot 1 arrives as 11.
+- `LC_DunGeon_Helper.CheckManageMarkPermission` decides who may manage a type: TeamLeader flags need the leader of a
+  40-member team (`LC_TeamHelper.IsGroupLeader`), Commander flags the guild right `BattleFieldCommand` (12).
+- 30431 `DUNGEON_GATHER_MARKPOS` gathers at an existing flag (`DungeonGatherMark`) or a building (`DungeonGatherBuilding`
+  with its guid), and 30438 relays it.
+- *(inferred)* Commander flags go to the guild and TeamLeader flags to the team, only in the same battle instance; a
+  gather goes to the same people, a building gather by a commander to the guild. Any battle instance accepts them, not
+  only siege. Flags are kept in memory and dropped once nobody is in the instance; someone who enters later sees them
+  only after the next change. A full board and an unknown slot are refused with `Parameter`.
+
 ## Stronghold gameplay points (30129)
 
 Implemented (`TerritoryWarsService.ScenePoints.cs`):
