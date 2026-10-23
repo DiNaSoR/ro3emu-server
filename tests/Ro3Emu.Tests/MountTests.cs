@@ -570,6 +570,26 @@ public sealed class MountTests : IAsyncLifetime
         await UnlockMount(a, "alice", 1501004);
         var s = Session("alice");
         long self = s.Role!.Id;
+        // Both visual templates contain an enemy selector although their scripts only change flight state.
+        // A passive stationary monster makes accidental combat entry deterministic.
+        var nearby = await loop.InvokeAsync(async () =>
+        {
+            var monsters = _app.Services.GetRequiredService<MonsterService>();
+            var source = monsters.Template(5000001);
+            Assert.NotNull(source);
+            var template = source with { Aggressive = false, RoamDistance = 0 };
+            return await monsters.SpawnSingleAsync(s.SceneEntry, template.NpcId,
+                new MapPoint(s.Position.X, s.Position.Y, s.Position.Z, 0), s.InstanceId, customTemplate: template);
+        });
+        Assert.NotNull(nearby);
+        var takeOffResolved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var landingResolved = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _app.Services.GetRequiredService<CombatService>().CastResolved.Add((player, cast, targets, hit) =>
+        {
+            if (player == s && cast.Request.SkillId == TakeFlight) takeOffResolved.TrySetResult();
+            if (player == s && cast.Request.SkillId == Land) landingResolved.TrySetResult();
+            return Task.CompletedTask;
+        });
         Task Cast(int skill) => a.SendGameAsync(CombatService.UseSkill, new CastSkillReq { SkillId = skill, TargetId = self });
 
         await Cast(TakeFlight); // not riding yet: not a skill Alice has
@@ -592,14 +612,17 @@ public sealed class MountTests : IAsyncLifetime
         Assert.Contains(s.Buffs, b => b.ConfigId == Land);
         Assert.DoesNotContain(s.Buffs, b => b.ConfigId == TakeFlight);
         Assert.Equal(Land, s.MountSkillShown);
+        await takeOffResolved.Task.WaitAsync(Wait);
+        Assert.Equal(0, s.LastCombatMs);
 
         // In the air 31084 moves her, climbing as the take-off skill lifts her (20 m), with no echo to herself.
         var ahead = s.Position.Clone(); ahead.X += 1; ahead.Y += 15;
         int seen = a.Inbox.Snapshot().Count;
         await a.SendGameAsync(WorldCoreService.FlyMove, new FlyMoveReq { Pos = ahead, Dir = new Vec3 { X = 1 }, Face = 90 });
-        await Task.Delay(300);
+        await WaitForFlightPosition(s, ahead);
         Assert.Equal(ahead.X, s.Position.X);
-        Assert.Equal(ahead.Y, s.Position.Y);
+        Assert.Equal(0, s.LastCombatMs);
+        Assert.True(ahead.Y == s.Position.Y, $"Flight position expected {ahead.Y}, actual {s.Position.Y}; riding {MountService.Rider(s)}, flying {s.WorldState.Flying}, dead {s.Dead}, bits {s.StatusBits}, combat {s.LastCombatMs}");
         Assert.DoesNotContain(a.Inbox.Snapshot().Skip(seen), e => e.IsGame(GameAoiSink.MovementChange)
             && MovementChangeNtf.Parser.ParseFrom(e.Body).Uid == self);
         Assert.DoesNotContain(a.Inbox.Snapshot().Skip(seen), e => e.IsGame(99999) && APIErrorMsg.Parser.ParseFrom(e.Body).OriginMsgId == WorldCoreService.FlyMove);
@@ -617,6 +640,9 @@ public sealed class MountTests : IAsyncLifetime
         Assert.Contains(s.Buffs, b => b.ConfigId == TakeFlight);
         Assert.DoesNotContain(s.Buffs, b => b.ConfigId == Land);
         Assert.Equal(TakeFlight, s.MountSkillShown);
+        await landingResolved.Task.WaitAsync(Wait);
+        Assert.Equal(0, s.LastCombatMs);
+        Assert.Equal(Dragon, MountService.Rider(s));
 
         // Getting off in the air lands at once.
         await loop.InvokeAsync(() =>
@@ -672,20 +698,20 @@ public sealed class MountTests : IAsyncLifetime
 
         var ahead = new Vec3 { X = x, Y = floor + 12, Z = z };
         await a.SendGameAsync(WorldCoreService.FlyMove, new FlyMoveReq { Pos = ahead, Dir = new Vec3 { Y = 1 }, Face = 90 });
-        await Task.Delay(300);
-        Assert.Equal(ahead.Y, s.Position.Y); // taken over unwalkable ground
+        await WaitForFlightPosition(s, ahead);
+        Assert.True(ahead.Y == s.Position.Y, $"Flight position expected {ahead.Y}, actual {s.Position.Y}; riding {MountService.Rider(s)}, flying {s.WorldState.Flying}, dead {s.Dead}, bits {s.StatusBits}, combat {s.LastCombatMs}"); // taken over unwalkable ground
 
         var high = new Vec3 { X = x, Y = floor + 70, Z = z };
         await a.SendGameAsync(WorldCoreService.FlyMove, new FlyMoveReq { Pos = high, Dir = new Vec3 { Y = 1 }, Face = 90 });
         await Next(a, GameAoiSink.MovementChange, MovementChangeNtf.Parser, m => m.Uid == self && m.TransType == MovementTransitionType.MoveTransForceTeleport);
-        Assert.Equal(ahead.Y, s.Position.Y); // above the band, put back
+        Assert.True(ahead.Y == s.Position.Y, $"Flight position expected {ahead.Y}, actual {s.Position.Y}; riding {MountService.Rider(s)}, flying {s.WorldState.Flying}, dead {s.Dead}, bits {s.StatusBits}, combat {s.LastCombatMs}"); // above the band, put back
 
         // Off a cliff into a lower band: holding or losing height is taken, climbing further is not.
         await loop.InvokeAsync(() => { s.Position = new Vec3 { X = x, Y = floor + 60, Z = z }; return Task.CompletedTask; });
         var down = new Vec3 { X = x, Y = floor + 59, Z = z };
         await a.SendGameAsync(WorldCoreService.FlyMove, new FlyMoveReq { Pos = down, Dir = new Vec3 { Y = -1 }, Face = 90 });
-        await Task.Delay(300);
-        Assert.Equal(down.Y, s.Position.Y);
+        await WaitForFlightPosition(s, down);
+        Assert.True(down.Y == s.Position.Y, $"Flight position expected {down.Y}, actual {s.Position.Y}; riding {MountService.Rider(s)}, flying {s.WorldState.Flying}, dead {s.Dead}, bits {s.StatusBits}, combat {s.LastCombatMs}");
 
         await Ready();
         await Cast(Land);
@@ -699,6 +725,14 @@ public sealed class MountTests : IAsyncLifetime
         Assert.Equal(takeOff.X, s.Position.X);
         Assert.Equal(takeOff.Z, s.Position.Z);
         Assert.True(nav.IsWalkable(s.Position.X, s.Position.Y, s.Position.Z));
+    }
+
+    // 31084 does not echo to its sender. Wait for its observable state instead of assuming the worker runs in 300 ms.
+    private static async Task WaitForFlightPosition(GameSession session, Vec3 expected)
+    {
+        var deadline = DateTime.UtcNow + Wait;
+        while (session.WorldState.Flying && !session.Position.Equals(expected) && DateTime.UtcNow < deadline)
+            await Task.Delay(25);
     }
 
     private sealed class ManualClock(DateTimeOffset initial) : TimeProvider

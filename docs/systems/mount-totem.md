@@ -41,6 +41,9 @@ separate ownership, selected slot and visible riding. In particular:
   take-off (landing in the air), which `JoyStickSkillNormalMixin` shows as the mount button; the ground buff is
   `_kBindBuff` (3112101) and the air buff is the row sharing the landing skill's id (3112201, `FlyBuffTag`). An
   accepted take-off sets the bit; the skill climbs by itself (EffectData 3112121: 20 m) while the client already sends
+  movement. Take-off and landing scripts (`normal_leisuremount_upper` / `normal_leisuremount_below`) do not process
+  hostile targets: their visual templates contain an enemy selector, but using that selector as an attack would
+  wrongly enter combat and force a dismount when a monster is nearby. The client sends
   31084, so 31084 may climb or dive anywhere in the 50 m band over the nearest nav layer of any kind (water and
   cliffs included; a cell off the grid is refused), its speed check is horizontal, and a refused move is put
   back without an error tip (each one showed a "parameter error" and the echo of its own moves fought the client, which

@@ -220,11 +220,14 @@ public sealed partial class CombatService
             && ReferenceEquals(s.Attachment, action.Attachment)
             && _sessions.Contains(s);
         string script = Script(row);
-        var targets = only != null
+        // Mount flight switches use enemy-selector visual templates (31121/31122), but their scripts only
+        // move the rider (WorldCoreService.MountFlight). They must not enter combat or hit nearby units.
+        bool flightSwitch = script is "normal_leisuremount_upper" or "normal_leisuremount_below";
+        var targets = flightSwitch ? [] : only != null
             ? only.Hp > 0 && !only.Dead && CanHitMonster(s, only) && Hostile(action, only) ? [only] : new List<MonsterUnit>()
             : chosenTargets?.Where(m => m.Hp > 0 && CanHitMonster(s, m)).ToList()
                 ?? SelectEnemies(s, action, center, field?.Trap == true ? field.Radius : null);
-        var playerTargets = only != null || stage is { First: false } ? [] : EffectPlayerTargets(s, action, center);
+        var playerTargets = flightSwitch || only != null || stage is { First: false } ? [] : EffectPlayerTargets(s, action, center);
         var alreadySlowed = GuardianPreviouslySlowed(row, targets, playerTargets);
         if (playerTargets.Length > 0)
         {
