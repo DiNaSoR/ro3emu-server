@@ -720,8 +720,7 @@ public sealed partial class CombatService : IGameTicker
     private (long Damage, DamageHitResult Result) Damage(Fighter a, Fighter b, JsonElement skill, int branch = 0,
         double bonusCrit = 0, bool forceCrit = false, int element = 0)
     {
-        // A skill that never misses (_iSkillHit 10000) draws no hit roll, as before.
-        if (GameData.Int(skill, "_iSkillHit") < 10000 && Rolls.Hit() >= HitRate(a, b, skill)) return (0, DamageHitResult.Miss);
+        if (!NeverMisses(skill) && Rolls.Hit() >= HitRate(a, b, skill)) return (0, DamageHitResult.Miss);
         double dmg = BaseDamage(a, b, skill, branch, out bool magic, element);
         dmg *= 0.97 + DamageFloatRoll() * 0.06; // DamageFloat [9700, 10300]
         var result = DamageHitResult.Normal;
@@ -735,8 +734,17 @@ public sealed partial class CombatService : IGameTicker
     }
 
     // Hit: dodge = FLEE/(FLEE + ParHit 600), attacker HIT adds back; HitRateRange [0.3, 1]; _iSkillHit 10000 never misses.
-    private static double HitRate(Fighter a, Fighter b, JsonElement skill) => GameData.Int(skill, "_iSkillHit") >= 10000 ? 1
+    private static double HitRate(Fighter a, Fighter b, JsonElement skill) => NeverMisses(skill) ? 1
         : Math.Clamp(1 - b.Flee / (double)(b.Flee + 600) + a.Hit / (double)(a.Hit + 600) * 0.5, 0.3, 1.0);
+
+    /// <summary>
+    /// _iSkillHit 10000 never misses, except on a normal attack (_iIsNormalAtk 1). Nearly every monster's normal attack
+    /// carries 10000 (280 of 282), which made FLEE useless against monsters while the character sheet shows it as dodge
+    /// (#bug-reports "163 FLEE, every attack hits"). (inferred) A normal attack always draws the FLEE roll, like the
+    /// players' own normal attacks (all _iSkillHit 0).
+    /// </summary>
+    internal static bool NeverMisses(JsonElement skill) =>
+        new Data.Config.SkillConfig(skill) is { SkillHit: >= 10000, IsNormalAtk: not 1 };
 
     private static double CritRate(Fighter a, Fighter b, JsonElement skill) =>
         Math.Max(0, a.Cri - b.ResCri) / 10000.0 * GameData.Int(skill, "_iSkillCri") / 10000.0;
